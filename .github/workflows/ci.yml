@@ -1,0 +1,65 @@
+name: PDF Engine CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install engine and tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Run unit tests
+        run: pytest
+
+      - name: Build public fixture at review DPI
+        run: |
+          rm -rf .ci-output
+          pdf-production build \
+            --root . \
+            --manifest examples/hello/build.yaml \
+            --out .ci-output \
+            --dpi 144
+
+      - name: Enforce machine evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('.ci-output/hello-engine/build-manifest.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['status'] == 'MACHINE_PASS'
+          assert data['visual_status'] == 'HUMAN_PIXEL_CONFIRMATION_REQUIRED'
+          assert data['qa']['page_count'] >= 1
+          assert data['qa']['page_count'] == data['qa']['rendered_page_count']
+          assert len(data['pdf']['sha256']) == 64
+          print('PASS: PDF open/preflight/render/hash evidence complete')
+          PY
+
+      - name: Upload public fixture evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-engine-public-fixture
+          path: .ci-output/hello-engine/
+          if-no-files-found: error
+          retention-days: 7
