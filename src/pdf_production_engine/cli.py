@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import fitz
+import pypdfium2 as pdfium
 import yaml
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -84,7 +85,6 @@ def _styles(use_cjk: bool) -> dict[str, ParagraphStyle]:
     font = "Helvetica"
     font_bold = "Helvetica-Bold"
     if use_cjk:
-        # Standard CJK CID font keeps the generic fixture independent of local font files.
         if "STSong-Light" not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
         font = "STSong-Light"
@@ -109,8 +109,7 @@ def build_markdown_reportlab(root: Path, manifest: dict, output_pdf: Path) -> No
     text = source_path.read_text(encoding="utf-8")
     metadata = manifest.get("metadata") or {}
     title = str(metadata.get("title") or manifest["document_id"])
-    use_cjk = bool(CJK.search(text + title))
-    st = _styles(use_cjk)
+    st = _styles(bool(CJK.search(text + title)))
 
     story = [Paragraph(_escape(title), st["title"])]
     paragraph: list[str] = []
@@ -183,38 +182,61 @@ def build_command(root: Path, manifest: dict, output_pdf: Path, output_dir: Path
 
 def preflight_and_render(pdf_path: Path, render_dir: Path, dpi: int) -> dict:
     render_dir.mkdir(parents=True, exist_ok=True)
+
+    # Preflight/open with PyMuPDF.
     doc = fitz.open(pdf_path)
     if doc.page_count <= 0:
         raise ManifestError("PDF has zero pages")
-    pages = []
-    matrix = fitz.Matrix(dpi / 72.0, dpi / 72.0)
+    page_meta = []
     for index in range(doc.page_count):
         page = doc.load_page(index)
         rect = page.rect
         if rect.width <= 0 or rect.height <= 0:
             raise ManifestError(f"invalid page geometry at page {index + 1}")
-        pix = page.get_pixmap(matrix=matrix, alpha=False)
-        render_path = render_dir / f"page-{index + 1:04d}.png"
-        pix.save(render_path)
-        pages.append({
+        page_meta.append({
             "page": index + 1,
             "width_pt": round(rect.width, 2),
             "height_pt": round(rect.height, 2),
-            "render": render_path.name,
-            "render_sha256": _sha256(render_path),
             "text_chars": len(page.get_text("text")),
         })
     doc.close()
-    if len(list(render_dir.glob("page-*.png"))) != len(pages):
+
+    # Render with independent PDFium backend.
+    render_doc = pdfium.PdfDocument(str(pdf_path))
+    if len(render_doc) != len(page_meta):
+        render_doc.close()
+        raise ManifestError("PDFium page count disagrees with preflight page count")
+    scale = dpi / 72.0
+    for index, meta in enumerate(page_meta):
+        page = render_doc[index]
+        bitmap = page.render(scale=scale)
+        image = bitmap.to_pil()
+        render_path = render_dir / f"page-{index + 1:04d}.png"
+        image.save(render_path, format="PNG")
+        meta["render"] = render_path.name
+        meta["render_sha256"] = _sha256(render_path)
+        bitmap.close()
+        page.close()
+    render_doc.close()
+
+    render_count = len(list(render_dir.glob("page-*.png")))
+    if render_count != len(page_meta):
         raise ManifestError("render count does not equal PDF page count")
-    return {"page_count": len(pages), "rendered_page_count": len(pages), "dpi": dpi, "pages": pages}
+    return {
+        "page_count": len(page_meta),
+        "rendered_page_count": render_count,
+        "dpi": dpi,
+        "preflight_backend": "PyMuPDF",
+        "render_backend": "PDFium",
+        "pages": page_meta,
+    }
 
 
 def build(root: Path, manifest_relative: str, out_root: Path, dpi: int = 144) -> Path:
     root = root.resolve()
     manifest, manifest_path = load_manifest(root, manifest_relative)
     document_id = manifest["document_id"]
-    out_dir = (out_root.resolve() / document_id)
+    out_dir = out_root.resolve() / document_id
     out_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = out_dir / manifest["output"]["filename"]
 
