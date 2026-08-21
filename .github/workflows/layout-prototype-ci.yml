@@ -70,7 +70,12 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, urllib.request
-          payload = {'state':'success','context':'pdf-engine/layout-prototype','description':'ReportLab and Typst previews rendered into one review pack'}
+          payload = {
+              'state':'success',
+              'context':'pdf-engine/layout-prototype',
+              'description':'ReportLab and Typst previews rendered into one review pack',
+              'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
           req = urllib.request.Request(
               f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
               data=json.dumps(payload).encode(),
@@ -85,7 +90,12 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, urllib.request
-          payload = {'state':'failure','context':'pdf-engine/layout-prototype','description':'Layout prototype failed; inspect workflow logs'}
+          payload = {
+              'state':'failure',
+              'context':'pdf-engine/layout-prototype',
+              'description':'Layout prototype failed; inspect workflow logs',
+              'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
           req = urllib.request.Request(
               f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
               data=json.dumps(payload).encode(),
