@@ -8,7 +8,8 @@ import pytest
 import yaml
 
 from pdf_production_engine.cli import ManifestError, build, load_manifest
-from pdf_production_engine.job_protocol import JobProtocolError, load_job, validate_job
+from pdf_production_engine.job_protocol import load_job, validate_job
+from pdf_production_engine.sealed_handoff import generate_keypair, seal_file, unseal_file
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -163,3 +164,16 @@ def test_review_pass_without_hash_is_rejected() -> None:
         ],
     }
     assert "BLOCK_REVIEW_HASH_INVALID:figure-1" in validate_job(job)
+
+
+def test_sealed_handoff_roundtrip_keeps_plaintext_out_of_transport(tmp_path: Path) -> None:
+    public_key, private_key = generate_keypair()
+    source = tmp_path / "private-input.zip"
+    source.write_bytes(b"private consumer bytes\x00\x01")
+    sealed = tmp_path / "input.sealed"
+    restored = tmp_path / "restored.zip"
+    seal_file(public_key, source, sealed)
+    assert sealed.read_bytes() != source.read_bytes()
+    assert b"private consumer bytes" not in sealed.read_bytes()
+    unseal_file(private_key, sealed, restored)
+    assert restored.read_bytes() == source.read_bytes()
