@@ -33,6 +33,9 @@ jobs:
       - name: Run unit tests
         run: pytest
 
+      - name: Validate block-gated resource job protocol
+        run: pdf-resource-job examples/block-gate/resource-job.yaml
+
       - name: Build public fixture at review DPI
         run: |
           rm -rf .ci-output
@@ -51,10 +54,12 @@ jobs:
           data = json.loads(p.read_text(encoding='utf-8'))
           assert data['status'] == 'MACHINE_PASS'
           assert data['visual_status'] == 'HUMAN_PIXEL_CONFIRMATION_REQUIRED'
+          assert data['qa']['preflight_backend'] == 'PyMuPDF'
+          assert data['qa']['render_backend'] == 'PDFium'
           assert data['qa']['page_count'] >= 1
           assert data['qa']['page_count'] == data['qa']['rendered_page_count']
           assert len(data['pdf']['sha256']) == 64
-          print('PASS: PDF open/preflight/render/hash evidence complete')
+          print('PASS: resource gate + PDF preflight/render/hash evidence complete')
           PY
 
       - name: Upload public fixture evidence
@@ -80,7 +85,7 @@ jobs:
               data=json.dumps({
                   'state': 'success',
                   'context': 'pdf-engine/ci',
-                  'description': 'PDF fixture build, preflight and full render passed',
+                  'description': 'Block gate, PDF build, preflight and full render passed',
               }).encode(),
               headers={
                   'Authorization': f'Bearer {token}',
@@ -109,7 +114,7 @@ jobs:
               data=json.dumps({
                   'state': 'failure',
                   'context': 'pdf-engine/ci',
-                  'description': 'PDF fixture CI failed; inspect workflow logs',
+                  'description': 'PDF engine CI failed; inspect workflow logs',
               }).encode(),
               headers={
                   'Authorization': f'Bearer {token}',
