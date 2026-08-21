@@ -55,6 +55,22 @@ The engine may report only `MACHINE_PASS + REVIEW_REQUIRED`; ChatGPT records `RE
 - PDFium full-page pixel rendering;
 - page/PDF SHA-256 evidence.
 
+### Batched final review pack
+
+`pdf-review-pack` turns one or more already-composed PDFs into one mechanical review bundle in a single invocation. It provides:
+
+- independent PyMuPDF preflight and page geometry/text metadata;
+- independent PDFium render of **every page** at the requested DPI;
+- PDF SHA-256 and per-page render SHA-256;
+- font usage/embedded-font evidence when extractable;
+- chunked contact sheets for fast navigation;
+- a page-by-page Markdown review index;
+- generic page-occupancy / near-empty-page warnings to surface suspicious whitespace before human review.
+
+The occupancy logic is deliberately a **warning heuristic, not a rejection oracle**. A sparse page may be intentional, and a dense page may still be visually wrong. The review pack therefore always reports `MACHINE_PASS / HUMAN_REVIEW_REQUIRED`; it exists to batch mechanical work and help ChatGPT spend review time on actual page judgement, not to remove the final human gate.
+
+This capability uses the engine's existing `PyMuPDF + PDFium + Pillow` stack; no additional image-analysis dependency is required.
+
 ### Locked source-page extraction
 
 `pdf-locked-pages` is the generic source-page primitive for stage packages that already know the immutable source identity and physical pages. It provides:
@@ -103,6 +119,9 @@ pdf-resource-run --root . --job resource-job.yaml --block figures --out dist --d
 # Build/preflight/render one PDF manifest
 pdf-production build --root . --manifest examples/hello/build.yaml --out dist --dpi 144
 
+# Build one batched final-review bundle for one or more PDFs
+pdf-review-pack --out dist/review --dpi 200 first.pdf second.pdf
+
 # Fetch/verify an immutable PDF and extract declared physical pages
 pdf-locked-pages --spec locked-source.yaml --out dist/source-pages
 
@@ -117,7 +136,7 @@ pdf-sealed keygen
 
 The engine has two distinct public validation routes:
 
-- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture, including locked-source identity/extraction tests;
+- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture, plus an installed-CLI `pdf-review-pack` smoke that verifies the review index/contact sheet/full-page evidence;
 - `Resource Runtime CI`: real TeX/CJK/scientific-figure/Poppler/render runtime.
 
 A generic runtime change is not accepted unless its real resource smoke passes.
