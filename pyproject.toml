@@ -15,6 +15,7 @@ dependencies = [
   "reportlab>=4.2,<5",
   "PyMuPDF>=1.24,<2",
   "pypdfium2>=4.30,<5",
+  "Pillow>=10,<12",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +24,7 @@ dev = ["pytest>=8,<9"]
 [project.scripts]
 pdf-production = "pdf_production_engine.cli:main"
 pdf-resource-job = "pdf_production_engine.job_protocol:main"
+pdf-resource-run = "pdf_production_engine.resource_runner:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
