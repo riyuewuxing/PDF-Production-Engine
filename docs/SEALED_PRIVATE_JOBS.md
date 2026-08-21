@@ -20,13 +20,25 @@ Generate a sealed-box keypair in a trusted environment:
 pdf-sealed keygen
 ```
 
-Store only `PUBLIC_KEY` in a readable engine configuration/reference. Store `PRIVATE_KEY` as the GitHub Actions secret:
+Store **only** `PRIVATE_KEY` as the GitHub Actions repository secret:
 
 `ENGINE_SEALED_PRIVATE_KEY`
 
-Never commit the private key.
+Never commit the private key, put it in a workflow file, issue, PR, artifact, log, commit status, repository variable or consumer package.
 
-The public key is safe to provide to ChatGPT because it can encrypt but cannot decrypt.
+The matching public key is safe to share because it can encrypt but cannot decrypt. The engine provides an owner-only bootstrap workflow:
+
+`.github/workflows/sealed-key-bootstrap.yml`
+
+It reads the secret, derives only the public key, and publishes these commit-status signals:
+
+- `pdf-engine/sealed-key/bootstrap-started=success` — workflow reached key derivation;
+- `pdf-engine/sealed-key/missing-secret=error` — secret is absent;
+- `pdf-engine/sealed-key/derive-failed=error` — configured secret cannot be parsed;
+- `pdf-engine/sealed-key=success` — a public key was derived;
+- `pdf-engine/sealed-key/<PUBLIC_KEY>=success` — machine-readable public key for ChatGPT/orchestrators.
+
+A real private consumer job must not be submitted until the machine-readable public-key status exists. `pdf-engine/ci=success` by itself does not prove private sealed transport is configured.
 
 ## Per-job return key
 
@@ -48,6 +60,8 @@ dpi: 144
 ```
 
 `resource-job.yaml` follows `schemas/resource-job-v1.yaml` and must use `privacy: sealed`.
+
+For immutable public PDF source pages, a sealed stage package may use `pdf-locked-pages` with a package-local `locked-source.yaml`. That generic primitive validates declared source identity and extracts declared physical pages; it never decides whether those pages are the correct business/domain pages and still returns `REVIEW_REQUIRED`.
 
 The bundle is encrypted with the engine public key:
 
