@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pdf-production-engine"
 version = "0.1.0"
-description = "Deterministic PDF build, preflight, full-page render, and evidence engine"
+description = "Deterministic stateless resource build, PDF preflight, full-page render, and evidence engine"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -22,6 +22,7 @@ dev = ["pytest>=8,<9"]
 
 [project.scripts]
 pdf-production = "pdf_production_engine.cli:main"
+pdf-resource-job = "pdf_production_engine.job_protocol:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
