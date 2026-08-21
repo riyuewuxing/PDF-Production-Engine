@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from pdf_production_engine.cli import ManifestError, build, load_manifest
+from pdf_production_engine.job_protocol import JobProtocolError, load_job, validate_job
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -90,3 +91,75 @@ def test_command_backend_requires_argv_list(tmp_path: Path) -> None:
     )
     with pytest.raises(ManifestError):
         load_manifest(tmp_path, "build.yaml")
+
+
+def _reviewed_block(block_id: str, kind: str) -> dict:
+    return {
+        "block_id": block_id,
+        "kind": kind,
+        "required": True,
+        "state": "REVIEW_PASS",
+        "accepted_sha256": "a" * 64,
+    }
+
+
+def test_resource_stage_allows_unreviewed_independent_blocks() -> None:
+    job = {
+        "version": 1,
+        "job_id": "figures-r1",
+        "stage": "resource",
+        "privacy": "public",
+        "blocks": [
+            {"block_id": "content", "kind": "content", "required": True, "state": "REVIEW_PASS", "accepted_sha256": "b" * 64},
+            {"block_id": "figure-1", "kind": "figure", "required": True, "state": "PENDING_BUILD"},
+        ],
+    }
+    assert validate_job(job) == []
+
+
+def test_composition_is_blocked_until_every_required_block_is_reviewed() -> None:
+    job = {
+        "version": 1,
+        "job_id": "compose-r1",
+        "stage": "composition",
+        "privacy": "sealed",
+        "blocks": [
+            _reviewed_block("content", "content"),
+            {"block_id": "figure-1", "kind": "figure", "required": True, "state": "MACHINE_PASS"},
+        ],
+        "composition_requires": ["content", "figure-1"],
+    }
+    errors = validate_job(job)
+    assert any(x.startswith("GATE_REVIEW_PASS_REQUIRED:composition_requires:figure-1") for x in errors)
+
+
+def test_composition_passes_with_hash_bound_review_receipts(tmp_path: Path) -> None:
+    job = {
+        "version": 1,
+        "job_id": "compose-r2",
+        "stage": "composition",
+        "privacy": "sealed",
+        "blocks": [
+            _reviewed_block("content", "content"),
+            _reviewed_block("figure-1", "figure"),
+            {"block_id": "composition", "kind": "composition", "required": True, "state": "PENDING_BUILD"},
+        ],
+        "composition_requires": ["content", "figure-1"],
+    }
+    path = tmp_path / "resource-job.yaml"
+    path.write_text(yaml.safe_dump(job, sort_keys=False), encoding="utf-8")
+    loaded = load_job(path)
+    assert loaded["stage"] == "composition"
+
+
+def test_review_pass_without_hash_is_rejected() -> None:
+    job = {
+        "version": 1,
+        "job_id": "bad-review",
+        "stage": "resource",
+        "privacy": "public",
+        "blocks": [
+            {"block_id": "figure-1", "kind": "figure", "required": True, "state": "REVIEW_PASS"},
+        ],
+    }
+    assert "BLOCK_REVIEW_HASH_INVALID:figure-1" in validate_job(job)
