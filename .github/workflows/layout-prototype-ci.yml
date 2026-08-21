@@ -5,6 +5,9 @@ on:
     branches: ['feat/**']
     paths:
       - 'examples/question-bank-layout/**'
+      - 'src/pdf_production_engine/typst_build.py'
+      - 'tests/test_typst_build.py'
+      - 'pyproject.toml'
       - '.github/workflows/layout-prototype-ci.yml'
   workflow_dispatch:
 
@@ -32,11 +35,30 @@ jobs:
           python -m pip install -e '.[dev]' reportlab
       - name: Build ReportLab preview
         run: python examples/question-bank-layout/reportlab_preview.py
-      - name: Install native Typst CLI and build preview
+      - name: Install native Typst runtime and build through generic engine CLI
         run: |
           npm install --no-save @flukxr/typst-cli@0.15.1-npm.0
-          npx typst --version
-          npx typst compile examples/question-bank-layout/typst_preview.typ examples/question-bank-layout/typst-question-bank-preview.pdf
+          TYPST_BIN="$PWD/node_modules/.bin/typst"
+          "$TYPST_BIN" --version
+          pdf-typst-build \
+            --root "$PWD/examples/question-bank-layout" \
+            --source "$PWD/examples/question-bank-layout/typst_preview.typ" \
+            --output "$PWD/examples/question-bank-layout/typst-question-bank-preview.pdf" \
+            --typst-bin "$TYPST_BIN" \
+            --evidence "$PWD/examples/question-bank-layout/typst-question-bank-preview.typst-evidence.json"
+      - name: Validate generic Typst evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('examples/question-bank-layout/typst-question-bank-preview.typst-evidence.json').read_text())
+          assert p['capability'] == 'typst-pdf-build-v1'
+          assert p['status'] == 'MACHINE_PASS'
+          assert p['review_status'] == 'REVIEW_REQUIRED'
+          assert p['output']['page_count'] >= 2
+          assert p['runtime']['typst'].startswith('typst 0.15.1')
+          print(p['runtime']['typst'], p['output']['sha256'])
+          PY
       - name: Build shared machine review pack
         run: |
           rm -rf layout-review
@@ -61,6 +83,7 @@ jobs:
           name: question-bank-layout-prototype
           path: |
             examples/question-bank-layout/*-question-bank-preview.pdf
+            examples/question-bank-layout/*.typst-evidence.json
             layout-review/
           if-no-files-found: error
           retention-days: 7
@@ -74,7 +97,7 @@ jobs:
           payload = {
               'state':'success',
               'context':'pdf-engine/layout-prototype',
-              'description':'ReportLab and Typst previews rendered into one review pack',
+              'description':'Generic Typst build + ReportLab comparison rendered into one review pack',
               'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }
           req = urllib.request.Request(
@@ -94,7 +117,7 @@ jobs:
           payload = {
               'state':'failure',
               'context':'pdf-engine/layout-prototype',
-              'description':'Layout prototype failed; inspect workflow logs',
+              'description':'Generic Typst/layout prototype failed; inspect workflow logs',
               'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }
           req = urllib.request.Request(
