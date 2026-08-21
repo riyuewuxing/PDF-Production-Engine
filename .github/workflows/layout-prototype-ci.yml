@@ -32,9 +32,10 @@ jobs:
           python -m pip install -e '.[dev]' reportlab
       - name: Build ReportLab preview
         run: python examples/question-bank-layout/reportlab_preview.py
-      - name: Install Typst CLI and build preview
+      - name: Install native Typst CLI and build preview
         run: |
-          npm install --no-save typst@0.15.0
+          npm install --no-save @flukxr/typst-cli@0.15.1-npm.0
+          npx typst --version
           npx typst compile examples/question-bank-layout/typst_preview.typ examples/question-bank-layout/typst-question-bank-preview.pdf
       - name: Build shared machine review pack
         run: |
