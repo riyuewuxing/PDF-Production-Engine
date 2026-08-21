@@ -14,12 +14,27 @@ from reportlab.platypus.tableofcontents import TableOfContents
 OUT = Path(__file__).with_name('reportlab-question-bank-preview.pdf')
 
 
-def font_file(pattern: str) -> str:
-    return subprocess.check_output(['fc-match', '-f', '%{file}', pattern], text=True).strip()
+def first_existing(paths: list[str]) -> str:
+    for raw in paths:
+        p = Path(raw)
+        if p.is_file():
+            return str(p)
+    raise SystemExit(f'No ReportLab-compatible CJK TTF found in {paths}')
 
 
-pdfmetrics.registerFont(TTFont('CN', font_file('Noto Sans CJK SC')))
-pdfmetrics.registerFont(TTFont('CNBold', font_file('Noto Sans CJK SC:style=Bold')))
+# Noto CJK on Ubuntu is normally a TTC with CFF/PostScript outlines, which ReportLab
+# TTFont cannot embed. Use the same standalone AR PL TrueType family already proven by
+# production consumer jobs. Typst may continue to use Noto independently.
+BODY_FONT = first_existing([
+    '/usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf',
+    '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+])
+HEAD_FONT = first_existing([
+    '/usr/share/fonts/truetype/arphic-gkai00mp/gkai00mp.ttf',
+    BODY_FONT,
+])
+pdfmetrics.registerFont(TTFont('CN', BODY_FONT))
+pdfmetrics.registerFont(TTFont('CNBold', HEAD_FONT))
 
 PALETTE = {
     'ink': colors.HexColor('#172033'),
