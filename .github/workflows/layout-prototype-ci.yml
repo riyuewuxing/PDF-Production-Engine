@@ -49,7 +49,7 @@ jobs:
       - name: Package reusable pinned Typst runtime
         run: |
           mkdir -p runtime-bundle
-          RUNTIME_BIN="$(readlink -f node_modules/.bin/typst)"
+          RUNTIME_BIN="$(node -p 'require("@flukxr/typst-cli").typstPath')"
           test -x "$RUNTIME_BIN"
           cp "$RUNTIME_BIN" runtime-bundle/typst
           chmod 0755 runtime-bundle/typst
@@ -127,7 +127,7 @@ jobs:
           payload = {
               'state':'success',
               'context':'pdf-engine/layout-prototype',
-              'description':'Generic Typst build + ReportLab comparison rendered into one review pack',
+              'description':'Generic Typst build + reusable native runtime + layout review pack passed',
               'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }
           req = urllib.request.Request(
