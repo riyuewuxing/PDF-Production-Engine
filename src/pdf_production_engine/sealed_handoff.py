@@ -24,11 +24,6 @@ def generate_keypair() -> tuple[str, str]:
     return _b64e(bytes(public)), _b64e(bytes(private))
 
 
-def public_from_private(private_key_b64: str) -> str:
-    private = PrivateKey(_b64d(private_key_b64), encoder=RawEncoder)
-    return _b64e(bytes(private.public_key))
-
-
 def seal_file(public_key_b64: str, source: Path, target: Path) -> None:
     public = PublicKey(_b64d(public_key_b64), encoder=RawEncoder)
     ciphertext = SealedBox(public).encrypt(source.read_bytes())
@@ -48,9 +43,6 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("keygen", help="Generate X25519 sealed-box public/private keys")
 
-    p_public = sub.add_parser("public", help="Derive the shareable public key from a private key")
-    p_public.add_argument("--private-key", required=True)
-
     p_seal = sub.add_parser("seal")
     p_seal.add_argument("--public-key", required=True)
     p_seal.add_argument("--input", type=Path, required=True)
@@ -68,8 +60,6 @@ def main(argv: list[str] | None = None) -> int:
             print(f"PUBLIC_KEY={public}")
             print(f"PRIVATE_KEY={private}")
             print("Store PRIVATE_KEY only in a secure secret store; commit/share only PUBLIC_KEY.")
-        elif args.command == "public":
-            print(f"PUBLIC_KEY={public_from_private(args.private_key)}")
         elif args.command == "seal":
             seal_file(args.public_key, args.input, args.output)
             print(f"SEALED_OK bytes={args.output.stat().st_size}")
