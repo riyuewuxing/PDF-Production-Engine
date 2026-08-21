@@ -16,6 +16,7 @@ dependencies = [
   "PyMuPDF>=1.24,<2",
   "pypdfium2>=4.30,<5",
   "Pillow>=10,<12",
+  "PyNaCl>=1.5,<2",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,7 @@ pdf-production = "pdf_production_engine.cli:main"
 pdf-resource-job = "pdf_production_engine.job_protocol:main"
 pdf-resource-run = "pdf_production_engine.resource_runner:main"
 pdf-runtime-smoke = "pdf_production_engine.runtime_smoke:main"
+pdf-sealed = "pdf_production_engine.sealed_handoff:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
