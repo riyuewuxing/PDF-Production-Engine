@@ -9,6 +9,7 @@ import yaml
 
 from pdf_production_engine.cli import ManifestError, build, load_manifest
 from pdf_production_engine.job_protocol import load_job, validate_job
+from pdf_production_engine.resource_runner import run_block
 from pdf_production_engine.sealed_handoff import generate_keypair, seal_file, unseal_file
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,6 +165,47 @@ def test_review_pass_without_hash_is_rejected() -> None:
         ],
     }
     assert "BLOCK_REVIEW_HASH_INVALID:figure-1" in validate_job(job)
+
+
+def test_resource_runner_executes_one_image_block_and_emits_evidence(tmp_path: Path) -> None:
+    project = tmp_path / "resource-project"
+    project.mkdir()
+    maker = project / "make_image.py"
+    maker.write_text(
+        "from PIL import Image, ImageDraw\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "p = Path(sys.argv[1]); p.parent.mkdir(parents=True, exist_ok=True)\n"
+        "im = Image.new('RGB', (320, 180), 'white')\n"
+        "ImageDraw.Draw(im).rectangle((20,20,300,160), outline='black', width=3)\n"
+        "im.save(p)\n",
+        encoding="utf-8",
+    )
+    job = {
+        "version": 1,
+        "job_id": "image-block-fixture",
+        "stage": "resource",
+        "privacy": "public",
+        "blocks": [
+            {
+                "block_id": "figure",
+                "kind": "figure",
+                "required": True,
+                "state": "PENDING_BUILD",
+                "command": [sys.executable, "make_image.py", "{output_dir}/figure.png"],
+                "expected_outputs": ["figure.png"],
+            }
+        ],
+    }
+    (project / "resource-job.yaml").write_text(yaml.safe_dump(job, sort_keys=False), encoding="utf-8")
+    evidence_path = run_block(project, "resource-job.yaml", "figure", tmp_path / "out", dpi=96)
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert evidence["status"] == "MACHINE_PASS"
+    assert evidence["review_status"] == "REVIEW_REQUIRED"
+    assert evidence["block_id"] == "figure"
+    assert evidence["outputs"][0]["width_px"] == 320
+    assert evidence["outputs"][0]["height_px"] == 180
+    assert len(evidence["outputs"][0]["sha256"]) == 64
 
 
 def test_sealed_handoff_roundtrip_keeps_plaintext_out_of_transport(tmp_path: Path) -> None:
