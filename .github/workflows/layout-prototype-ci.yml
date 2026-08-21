@@ -39,8 +39,8 @@ jobs:
           npx typst compile examples/question-bank-layout/typst_preview.typ examples/question-bank-layout/typst-question-bank-preview.pdf
       - name: Build shared machine review pack
         run: |
-          rm -rf .layout-review
-          pdf-review-pack --out .layout-review --dpi 200 \
+          rm -rf layout-review
+          pdf-review-pack --out layout-review --dpi 200 \
             examples/question-bank-layout/reportlab-question-bank-preview.pdf \
             examples/question-bank-layout/typst-question-bank-preview.pdf
       - name: Assert both previews rendered completely
@@ -48,7 +48,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          p = json.loads(Path('.layout-review/review-pack.json').read_text())
+          p = json.loads(Path('layout-review/review-pack.json').read_text())
           assert p['status'] == 'MACHINE_PASS'
           assert p['document_count'] == 2
           assert p['total_page_count'] == p['total_rendered_page_count']
@@ -61,7 +61,7 @@ jobs:
           name: question-bank-layout-prototype
           path: |
             examples/question-bank-layout/*-question-bank-preview.pdf
-            .layout-review/
+            layout-review/
           if-no-files-found: error
           retention-days: 7
       - name: Publish layout prototype success status
