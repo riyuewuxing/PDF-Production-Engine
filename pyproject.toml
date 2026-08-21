@@ -30,6 +30,7 @@ pdf-runtime-smoke = "pdf_production_engine.runtime_smoke:main"
 pdf-sealed = "pdf_production_engine.sealed_handoff:main"
 pdf-locked-pages = "pdf_production_engine.locked_source:main"
 pdf-review-pack = "pdf_production_engine.review_pack_runtime:main"
+pdf-typst-build = "pdf_production_engine.typst_build:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
