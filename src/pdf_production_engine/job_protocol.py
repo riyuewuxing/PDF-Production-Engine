@@ -11,7 +11,7 @@ import yaml
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 STAGES = {"resource", "composition", "final"}
-PRIVACY = {"public", "sealed"}
+PRIVACY = {"public", "session", "sealed"}
 KINDS = {"content", "figure", "chart", "source-page", "asset", "composition", "final-pdf"}
 STATES = {"PENDING_BUILD", "MACHINE_PASS", "MACHINE_FAIL", "REVIEW_REQUIRED", "REVIEW_PASS", "REVIEW_FAIL", "BLOCKED"}
 
