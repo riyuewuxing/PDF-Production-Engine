@@ -1,0 +1,64 @@
+name: Layout Prototype CI
+
+on:
+  push:
+    branches: ['feat/**']
+    paths:
+      - 'examples/question-bank-layout/**'
+      - '.github/workflows/layout-prototype-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare-layouts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install CJK fonts and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]' reportlab
+      - name: Build ReportLab preview
+        run: python examples/question-bank-layout/reportlab_preview.py
+      - name: Install Typst CLI and build preview
+        run: |
+          npm install --no-save typst@0.15.0
+          npx typst compile examples/question-bank-layout/typst_preview.typ examples/question-bank-layout/typst-question-bank-preview.pdf
+      - name: Build shared machine review pack
+        run: |
+          rm -rf .layout-review
+          pdf-review-pack --out .layout-review --dpi 200 \
+            examples/question-bank-layout/reportlab-question-bank-preview.pdf \
+            examples/question-bank-layout/typst-question-bank-preview.pdf
+      - name: Assert both previews rendered completely
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('.layout-review/review-pack.json').read_text())
+          assert p['status'] == 'MACHINE_PASS'
+          assert p['document_count'] == 2
+          assert p['total_page_count'] == p['total_rendered_page_count']
+          assert all(d['page_count'] >= 2 for d in p['documents'])
+          print([(d['filename'], d['page_count'], len(d.get('occupancy_warnings', []))) for d in p['documents']])
+          PY
+      - name: Upload layout comparison evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: question-bank-layout-prototype
+          path: |
+            examples/question-bank-layout/*-question-bank-preview.pdf
+            .layout-review/
+          if-no-files-found: error
+          retention-days: 7
