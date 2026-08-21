@@ -55,6 +55,20 @@ The engine may report only `MACHINE_PASS + REVIEW_REQUIRED`; ChatGPT records `RE
 - PDFium full-page pixel rendering;
 - page/PDF SHA-256 evidence.
 
+### Locked source-page extraction
+
+`pdf-locked-pages` is the generic source-page primitive for stage packages that already know the immutable source identity and physical pages. It provides:
+
+- ordered multi-URL fetch/retry;
+- optional exact byte-size check;
+- PDF magic check;
+- Git blob SHA and/or SHA-256 identity check;
+- 1-based physical-page extraction into a new PDF;
+- exact extracted-page-count validation;
+- source/output evidence with `REVIEW_REQUIRED`.
+
+It does **not** decide which pages are pedagogically correct. Text ranking, page location or successful extraction never creates `REVIEW_PASS`; ChatGPT must inspect the selected page pixels.
+
 ### Document / figure runtime
 
 The public resource-runtime workflow installs and smoke-tests:
@@ -80,6 +94,8 @@ The public resource-runtime workflow installs and smoke-tests:
 - output encrypted to a one-time return public key before artifact upload;
 - no consumer-repository PAT or checkout.
 
+The engine sealed private key is a one-time repository setup prerequisite. Store it only as the Actions secret `ENGINE_SEALED_PRIVATE_KEY`. `.github/workflows/sealed-key-bootstrap.yml` derives only the matching shareable public key and publishes machine-readable status context `pdf-engine/sealed-key/<PUBLIC_KEY>`. If the secret is missing, it publishes `pdf-engine/sealed-key/missing-secret=error` and private sealed production must remain unverified.
+
 ## CLI
 
 ```bash
@@ -94,18 +110,22 @@ pdf-resource-run --root . --job resource-job.yaml --block figures --out dist --d
 # Build/preflight/render one PDF manifest
 pdf-production build --root . --manifest examples/hello/build.yaml --out dist --dpi 144
 
+# Fetch/verify an immutable PDF and extract declared physical pages
+pdf-locked-pages --spec locked-source.yaml --out dist/source-pages
+
 # Verify the full generic document/figure runtime
 pdf-runtime-smoke --out .runtime-smoke
 
-# Sealed-box transport
+# Sealed-box transport helpers
 pdf-sealed keygen
+pdf-sealed public --private-key "$ENGINE_SEALED_PRIVATE_KEY"
 ```
 
 ## Public CI
 
 The engine has two distinct public validation routes:
 
-- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture;
+- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture, including locked-source identity/extraction tests;
 - `Resource Runtime CI`: real TeX/CJK/scientific-figure/Poppler/render runtime.
 
 A generic runtime change is not accepted unless its real resource smoke passes.
