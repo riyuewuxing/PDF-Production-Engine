@@ -1,0 +1,172 @@
+name: Sealed Resource Job
+
+on:
+  push:
+    branches:
+      - 'job/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  sealed-resource-job:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout engine and sealed job payload
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install generic document/figure runtime
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            texlive-xetex \
+            texlive-lang-chinese \
+            texlive-latex-extra \
+            texlive-pictures \
+            texlive-science \
+            fonts-noto-cjk \
+            fonts-arphic-ukai \
+            fonts-arphic-uming \
+            fonts-wqy-zenhei \
+            poppler-utils \
+            fontconfig
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Require sealed input and engine private key
+        env:
+          ENGINE_SEALED_PRIVATE_KEY: ${{ secrets.ENGINE_SEALED_PRIVATE_KEY }}
+        run: |
+          test -f .engine-job/input.sealed || { echo 'missing .engine-job/input.sealed'; exit 2; }
+          test -f .engine-job/return-public-key.txt || { echo 'missing return public key'; exit 2; }
+          test -n "$ENGINE_SEALED_PRIVATE_KEY" || { echo 'ENGINE_SEALED_PRIVATE_KEY is not configured'; exit 2; }
+
+      - name: Decrypt private build package in ephemeral storage
+        env:
+          ENGINE_SEALED_PRIVATE_KEY: ${{ secrets.ENGINE_SEALED_PRIVATE_KEY }}
+        run: |
+          rm -rf /tmp/pdf-engine-job /tmp/pdf-engine-output /tmp/pdf-engine-result*
+          mkdir -p /tmp/pdf-engine-job /tmp/pdf-engine-output
+          pdf-sealed unseal \
+            --private-key "$ENGINE_SEALED_PRIVATE_KEY" \
+            --input .engine-job/input.sealed \
+            --output /tmp/pdf-engine-job.zip
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          src = Path('/tmp/pdf-engine-job.zip')
+          root = Path('/tmp/pdf-engine-job').resolve()
+          with zipfile.ZipFile(src) as z:
+              for member in z.infolist():
+                  target = (root / member.filename).resolve()
+                  if root != target and root not in target.parents:
+                      raise SystemExit(f'zip path escape rejected: {member.filename}')
+              z.extractall(root)
+          PY
+
+      - name: Read generic engine run instruction
+        run: |
+          python - <<'PY' >> "$GITHUB_ENV"
+          from pathlib import Path
+          import yaml
+          p = Path('/tmp/pdf-engine-job/engine-run.yaml')
+          data = yaml.safe_load(p.read_text(encoding='utf-8')) or {}
+          if data.get('version') != 1:
+              raise SystemExit('engine-run version must be 1')
+          job = data.get('job_file')
+          block = data.get('block_id')
+          dpi = int(data.get('dpi', 144))
+          if not isinstance(job, str) or not job or '/' in job or '\\' in job:
+              raise SystemExit('job_file must be a simple filename')
+          if not isinstance(block, str) or not block:
+              raise SystemExit('block_id missing')
+          if not 72 <= dpi <= 300:
+              raise SystemExit('dpi out of range')
+          print(f'ENGINE_JOB_FILE={job}')
+          print(f'ENGINE_BLOCK_ID={block}')
+          print(f'ENGINE_DPI={dpi}')
+          PY
+
+      - name: Validate sealed resource job
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os, yaml
+          p = Path('/tmp/pdf-engine-job') / os.environ['ENGINE_JOB_FILE']
+          data = yaml.safe_load(p.read_text(encoding='utf-8')) or {}
+          if data.get('privacy') != 'sealed':
+              raise SystemExit('sealed workflow requires privacy: sealed')
+          PY
+          pdf-resource-job "/tmp/pdf-engine-job/$ENGINE_JOB_FILE"
+
+      - name: Execute exactly one requested resource block
+        run: |
+          pdf-resource-run \
+            --root /tmp/pdf-engine-job \
+            --job "$ENGINE_JOB_FILE" \
+            --block "$ENGINE_BLOCK_ID" \
+            --out /tmp/pdf-engine-output \
+            --dpi "$ENGINE_DPI"
+
+      - name: Encrypt result to one-time return public key
+        run: |
+          python - <<'PY'
+          import shutil
+          shutil.make_archive('/tmp/pdf-engine-result', 'zip', '/tmp/pdf-engine-output')
+          PY
+          RETURN_PUBLIC_KEY="$(tr -d '\r\n ' < .engine-job/return-public-key.txt)"
+          test -n "$RETURN_PUBLIC_KEY" || { echo 'return public key empty'; exit 2; }
+          pdf-sealed seal \
+            --public-key "$RETURN_PUBLIC_KEY" \
+            --input /tmp/pdf-engine-result.zip \
+            --output /tmp/pdf-engine-result.sealed
+
+      - name: Upload encrypted result only
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealed-resource-result
+          path: /tmp/pdf-engine-result.sealed
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish success status
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          repo, sha, token = os.environ['GITHUB_REPOSITORY'], os.environ['GITHUB_SHA'], os.environ['GH_TOKEN']
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/statuses/{sha}',
+              data=json.dumps({
+                  'state':'success',
+                  'context':'pdf-engine/sealed-job',
+                  'description':'Encrypted resource block completed',
+              }).encode(),
+              headers={
+                  'Authorization':f'Bearer {token}',
+                  'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28',
+                  'Content-Type':'application/json',
+              },
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as r:
+              assert r.status == 201
+          PY
+
+      - name: Cleanup plaintext runner storage
+        if: always()
+        run: |
+          rm -rf /tmp/pdf-engine-job /tmp/pdf-engine-job.zip /tmp/pdf-engine-output /tmp/pdf-engine-result.zip
+          echo 'Plaintext consumer input/output removed from runner temp storage.'
