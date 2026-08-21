@@ -28,6 +28,7 @@ pdf-resource-job = "pdf_production_engine.job_protocol:main"
 pdf-resource-run = "pdf_production_engine.resource_runner:main"
 pdf-runtime-smoke = "pdf_production_engine.runtime_smoke:main"
 pdf-sealed = "pdf_production_engine.sealed_handoff:main"
+pdf-locked-pages = "pdf_production_engine.locked_source:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
