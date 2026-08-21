@@ -15,7 +15,7 @@ fields:
   stage:
     enum: [resource, composition, final]
   privacy:
-    enum: [public, sealed]
+    enum: [public, session, sealed]
   blocks:
     type: array
     item_required: [block_id, kind, required, state]
@@ -32,4 +32,5 @@ rules:
   - final requires every block listed in final_requires to be REVIEW_PASS
   - every REVIEW_PASS block requires accepted_sha256 matching 64 lowercase hex characters
   - changing a block output invalidates prior review receipt because the accepted hash no longer matches
-  - plaintext private build inputs are forbidden in this public repository; privacy=sealed is required for private material
+  - privacy=session means private inputs are supplied ephemerally by the orchestrator and must not be committed to this public repository
+  - privacy=sealed is an optional encrypted remote-transport fallback, not a prerequisite for session jobs
