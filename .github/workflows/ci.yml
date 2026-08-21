@@ -38,12 +38,19 @@ jobs:
 
       - name: Build public fixture at review DPI
         run: |
-          rm -rf .ci-output
+          rm -rf .ci-output .ci-review
           pdf-production build \
             --root . \
             --manifest examples/hello/build.yaml \
             --out .ci-output \
             --dpi 144
+
+      - name: Build batched final review pack
+        run: |
+          pdf-review-pack \
+            --out .ci-review \
+            --dpi 144 \
+            .ci-output/hello-engine/hello-engine.pdf
 
       - name: Enforce machine evidence
         run: |
@@ -59,14 +66,30 @@ jobs:
           assert data['qa']['page_count'] >= 1
           assert data['qa']['page_count'] == data['qa']['rendered_page_count']
           assert len(data['pdf']['sha256']) == 64
-          print('PASS: resource gate + PDF preflight/render/hash evidence complete')
+
+          review = json.loads(Path('.ci-review/review-pack.json').read_text(encoding='utf-8'))
+          assert review['capability'] == 'final-review-pack-v1'
+          assert review['status'] == 'MACHINE_PASS'
+          assert review['visual_status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert review['document_count'] == 1
+          assert review['total_page_count'] == review['total_rendered_page_count']
+          doc = review['documents'][0]
+          assert doc['preflight_backend'] == 'PyMuPDF'
+          assert doc['render_backend'] == 'PDFium'
+          assert len(doc['sha256']) == 64
+          assert len(doc['pages']) == doc['page_count']
+          assert Path('.ci-review/review-index.md').is_file()
+          assert doc['contact_sheets']
+          print('PASS: resource gate + PDF preflight/render/hash + final review-pack evidence complete')
           PY
 
       - name: Upload public fixture evidence
         uses: actions/upload-artifact@v4
         with:
           name: pdf-engine-public-fixture
-          path: .ci-output/hello-engine/
+          path: |
+            .ci-output/hello-engine/
+            .ci-review/
           if-no-files-found: error
           retention-days: 7
 
@@ -85,7 +108,7 @@ jobs:
               data=json.dumps({
                   'state': 'success',
                   'context': 'pdf-engine/ci',
-                  'description': 'Block gate, PDF build, preflight and full render passed',
+                  'description': 'Block gate, PDF build, preflight, full render and review-pack passed',
               }).encode(),
               headers={
                   'Authorization': f'Bearer {token}',
