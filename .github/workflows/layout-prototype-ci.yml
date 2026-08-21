@@ -46,6 +46,36 @@ jobs:
             --output "$PWD/examples/question-bank-layout/typst-question-bank-preview.pdf" \
             --typst-bin "$TYPST_BIN" \
             --evidence "$PWD/examples/question-bank-layout/typst-question-bank-preview.typst-evidence.json"
+      - name: Package reusable pinned Typst runtime
+        run: |
+          mkdir -p runtime-bundle
+          RUNTIME_BIN="$(readlink -f node_modules/.bin/typst)"
+          test -x "$RUNTIME_BIN"
+          cp "$RUNTIME_BIN" runtime-bundle/typst
+          chmod 0755 runtime-bundle/typst
+          runtime-bundle/typst --version
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          p = pathlib.Path('runtime-bundle/typst')
+          digest = hashlib.sha256(p.read_bytes()).hexdigest()
+          version = subprocess.check_output([str(p.resolve()), '--version'], text=True).strip()
+          pathlib.Path('runtime-bundle/manifest.json').write_text(json.dumps({
+              'capability': 'typst-runtime-bundle-v1',
+              'platform': 'linux-x86_64',
+              'source_package': '@flukxr/typst-cli@0.15.1-npm.0',
+              'runtime_version': version,
+              'binary_sha256': digest,
+              'review_status': 'REVIEW_REQUIRED',
+          }, indent=2) + '\n')
+          print(version, digest)
+          PY
+      - name: Upload reusable Typst runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-runtime-linux-x86_64
+          path: runtime-bundle/
+          if-no-files-found: error
+          retention-days: 7
       - name: Validate generic Typst evidence
         run: |
           python - <<'PY'
