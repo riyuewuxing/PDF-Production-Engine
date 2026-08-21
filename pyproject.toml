@@ -29,7 +29,7 @@ pdf-resource-run = "pdf_production_engine.resource_runner:main"
 pdf-runtime-smoke = "pdf_production_engine.runtime_smoke:main"
 pdf-sealed = "pdf_production_engine.sealed_handoff:main"
 pdf-locked-pages = "pdf_production_engine.locked_source:main"
-pdf-review-pack = "pdf_production_engine.review_pack:main"
+pdf-review-pack = "pdf_production_engine.review_pack_runtime:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
