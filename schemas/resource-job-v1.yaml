@@ -1,0 +1,35 @@
+version: 1
+id: pdf-production-resource-job-v1
+required:
+  - version
+  - job_id
+  - stage
+  - privacy
+  - blocks
+fields:
+  version:
+    const: 1
+  job_id:
+    type: string
+    pattern: '^[A-Za-z0-9._-]+$'
+  stage:
+    enum: [resource, composition, final]
+  privacy:
+    enum: [public, sealed]
+  blocks:
+    type: array
+    item_required: [block_id, kind, required, state]
+    block_id_pattern: '^[A-Za-z0-9._-]+$'
+    kind_enum: [content, figure, chart, source-page, asset, composition, final-pdf]
+    state_enum: [PENDING_BUILD, MACHINE_PASS, MACHINE_FAIL, REVIEW_REQUIRED, REVIEW_PASS, REVIEW_FAIL, BLOCKED]
+  composition_requires:
+    type: array
+  final_requires:
+    type: array
+rules:
+  - engine may emit MACHINE_PASS or MACHINE_FAIL but never invent REVIEW_PASS
+  - composition requires every block listed in composition_requires to be REVIEW_PASS
+  - final requires every block listed in final_requires to be REVIEW_PASS
+  - every REVIEW_PASS block requires accepted_sha256 matching 64 lowercase hex characters
+  - changing a block output invalidates prior review receipt because the accepted hash no longer matches
+  - plaintext private build inputs are forbidden in this public repository; privacy=sealed is required for private material
