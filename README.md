@@ -2,13 +2,13 @@
 
 Public, deterministic build runtime for PDF production and related resource artifacts.
 
-This repository is **stateless with respect to consumer projects**. It stores no project-specific business content, private documents, candidate data, source repositories, or long-lived build inputs. It owns only generic build tools, generic schemas, public fixtures, machine QA, renderers, and delivery protocols.
+This repository is **stateless with respect to consumer projects**. It stores no project-specific business content, private documents, candidate data, source repositories, or long-lived build inputs. It owns only generic build tools, schemas, public fixtures, machine QA, renderers, secure handoff utilities, and delivery protocols.
 
 ## Core responsibility
 
-`validated job package -> isolated resource builds -> block evidence -> composition -> final PDF preflight -> full-page render -> evidence bundle`
+`validated stage package -> isolated resource block build -> block evidence -> reviewed prerequisite gate -> composition -> final PDF preflight -> full-page render -> evidence bundle`
 
-The engine never decides what a project should say. Consumer projects own content, business rules, source identity, and acceptance criteria. ChatGPT acts as orchestrator/reviewer: it reads the private project's resource-operation checklist, prepares the engine job, reviews each block, and writes accepted outputs back to the source repository.
+The engine never decides what a project should say. Consumer projects own content, business rules, source identity, domain-specific figure semantics, and acceptance criteria. ChatGPT is the orchestrator/reviewer: it reads the consumer project's operation checklist, prepares the minimum stage package, reviews every required block, and writes accepted outputs back to the consumer repository.
 
 ## No direct repository relationship
 
@@ -18,99 +18,115 @@ Private and public repositories are intentionally decoupled:
 
 1. the consumer repository declares a resource-operation checklist;
 2. ChatGPT reads that checklist and the required source inputs;
-3. ChatGPT submits only the build package needed for the current resource stage to this engine;
+3. ChatGPT submits only the build package required for one resource stage;
 4. the engine runs mechanically and returns evidence/output;
-5. ChatGPT reviews the result and writes accepted outputs into the target repository.
+5. ChatGPT reviews the result and writes accepted outputs/receipts into the target repository.
 
-If a build input/output is private, the transport layer must use a sealed/encrypted job package or another privacy-preserving handoff. Plain private material must never be committed to this public repository or uploaded as a public artifact.
+For private material, use the sealed-box protocol in `docs/SEALED_PRIVATE_JOBS.md`. Plain private material must never be committed to this public repository or uploaded as a public artifact.
 
 ## Block acceptance is mandatory
 
-A complex deliverable may not be built as one opaque step. Independent resource blocks are produced and reviewed before composition.
+Complex deliverables may not be built as one opaque step.
 
 Typical document flow:
 
-`content review -> figure/resource build -> figure/resource review -> composition -> final PDF build -> final full-page visual review`
+`content review -> figure/chart/source-page build -> resource review -> composition -> final PDF build -> final full-page visual review`
 
-Examples of independent resource blocks include:
+A block may be consumed by composition only when the consumer project contains a `REVIEW_PASS` receipt bound to the current accepted SHA-256. Changing that block invalidates the old receipt.
 
-- source content / data;
-- TikZ/PGFPlots/CircuiTikZ/tkz-euclide/tikz-3dplot figures;
-- source-page extracts and contact sheets;
-- charts or generated images;
-- tables or intermediate document fragments;
-- final document composition.
-
-The engine may report `MACHINE_PASS`, but only ChatGPT may record a visual/content acceptance receipt. Composition is allowed only after every required upstream block has an acceptance receipt bound to its evidence hash.
+The engine may report only `MACHINE_PASS + REVIEW_REQUIRED`; ChatGPT records `REVIEW_PASS` or `REVIEW_FAIL` in the consumer project.
 
 ## Current v1 capabilities
 
+### Job / acceptance protocol
+
+- resource-job schema and validator;
+- hash-bound prerequisite gates for composition/final stages;
+- generic single-block resource runner;
+- machine evidence for PDF/image/other file outputs;
+- block backend logs kept inside the job output rather than echoed as consumer content.
+
+### PDF production
+
 - deterministic manifest validation;
 - ReportLab PDF build;
-- trusted command backend for project-owned publishers;
-- PyMuPDF PDF open/preflight;
+- command backend for project-owned publishers/adapters;
+- PyMuPDF independent PDF open/preflight;
 - PDFium full-page pixel rendering;
-- page/PDF SHA-256 evidence;
-- public fixture CI;
-- generic resource-stage/job protocol.
+- page/PDF SHA-256 evidence.
 
-Planned/next generic runtime capabilities are XeLaTeX/CJK, TikZ-family figure compilation, Poppler page extraction/text extraction, contact-sheet generation, and generic locked-binary fetch/hash verification. These are build-runtime capabilities only; project semantics remain in the consumer repository.
+### Document / figure runtime
 
-## Canonical CLI
+The public resource-runtime workflow installs and smoke-tests:
+
+- XeLaTeX / TeX Live;
+- CJK/fontconfig runtime;
+- TikZ;
+- PGFPlots;
+- CircuiTikZ;
+- tkz-euclide;
+- tikz-3dplot;
+- Poppler `pdftotext` / `pdftoppm`;
+- Pillow contact-sheet generation;
+- PyMuPDF preflight;
+- PDFium rendering.
+
+### Private stateless handoff
+
+- PyNaCl sealed-box encryption utility (`pdf-sealed`);
+- owner-only `job/**` sealed resource workflow;
+- encrypted input on public Git history;
+- plaintext only in ephemeral runner storage;
+- output encrypted to a one-time return public key before artifact upload;
+- no consumer-repository PAT or checkout.
+
+## CLI
 
 ```bash
 python -m pip install -e .
+
+# Validate a resource job and its review prerequisites
+pdf-resource-job resource-job.yaml
+
+# Execute exactly one resource block and produce machine evidence
+pdf-resource-run --root . --job resource-job.yaml --block figures --out dist --dpi 144
+
+# Build/preflight/render one PDF manifest
 pdf-production build --root . --manifest examples/hello/build.yaml --out dist --dpi 144
+
+# Verify the full generic document/figure runtime
+pdf-runtime-smoke --out .runtime-smoke
+
+# Sealed-box transport
+pdf-sealed keygen
 ```
 
-Successful output contains:
+## Public CI
 
-```text
-dist/<document-id>/
-├── <document>.pdf
-├── build-manifest.json
-└── rendered/
-    ├── page-0001.png
-    └── ...
-```
+The engine has two distinct public validation routes:
 
-`build-manifest.json` records PDF SHA-256, size, page count, per-page render hashes, render DPI, and:
+- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture;
+- `Resource Runtime CI`: real TeX/CJK/scientific-figure/Poppler/render runtime.
 
-`HUMAN_PIXEL_CONFIRMATION_REQUIRED`
-
-## Backends
-
-### `markdown-reportlab`
-
-Generic deterministic Markdown-to-PDF backend used for public fixture/testing and simple documents.
-
-### `command`
-
-Trusted build-package adapter. The source package supplies an argv list. Supported placeholders:
-
-- `{root}`
-- `{output_dir}`
-- `{output_pdf}`
-
-The engine executes argv without `shell=True`, captures backend stdout/stderr into a local build log, and applies the same PDF preflight/render/evidence gates.
+A generic runtime change is not accepted unless its real resource smoke passes.
 
 ## Acceptance rule
 
 Machine acceptance requires, at minimum:
 
-- manifest safety validation;
+- safe manifest/job validation;
 - builder success;
 - required output exists and is non-trivial;
-- independent preflight can open the PDF;
-- valid non-zero page geometry;
-- every page is rendered;
+- PDF/image outputs can be independently inspected;
+- PDF page count is positive;
+- every PDF page is rendered;
 - render count equals PDF page count;
-- hashes/evidence are recorded.
+- output/evidence hashes are recorded.
 
-Machine acceptance never equals final acceptance. Every visually meaningful resource block and every final composed PDF must be reviewed after real rendering.
+Machine acceptance never equals final acceptance. Every visually meaningful resource block and every final composed PDF must be reviewed from real rendered output.
 
 ## Development
 
 Current v1 implementation branch: `feat/pdf-production-engine-v1`.
 
-Do not merge to `main` until the stateless orchestration and block-acceptance protocol have passed CI and integration review.
+Do not merge to `main` until the stateless handoff, block acceptance, standard PDF CI, and full resource-runtime CI all pass.
