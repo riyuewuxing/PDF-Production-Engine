@@ -2,13 +2,13 @@
 
 Public, deterministic build runtime for PDF production and related resource artifacts.
 
-This repository is **stateless with respect to consumer projects**. It stores no project-specific business content, private documents, candidate data, source repositories, or long-lived build inputs. It owns only generic build tools, schemas, public fixtures, machine QA, renderers, secure handoff utilities, and delivery protocols.
+This repository is **stateless with respect to consumer projects**. It stores no project-specific business content, private documents, candidate data, source repositories, or long-lived build inputs. It owns only generic build tools, schemas, public fixtures, machine QA, renderers, optional transport helpers, and delivery protocols.
 
 ## Core responsibility
 
 `validated stage package -> isolated resource block build -> block evidence -> reviewed prerequisite gate -> composition -> final PDF preflight -> full-page render -> evidence bundle`
 
-The engine never decides what a project should say. Consumer projects own content, business rules, source identity, domain-specific figure semantics, and acceptance criteria. ChatGPT is the orchestrator/reviewer: it reads the consumer project's operation checklist, prepares the minimum stage package, reviews every required block, and writes accepted outputs back to the consumer repository.
+The engine never decides what a project should say. Consumer projects own content, business rules, source identity, domain-specific figure semantics, and acceptance criteria. ChatGPT is the orchestrator/reviewer: it reads the consumer project's operation checklist, prepares the minimum stage package, invokes the engine's generic build capability, reviews every required block, and writes accepted outputs back to the consumer repository.
 
 ## No direct repository relationship
 
@@ -18,11 +18,11 @@ Private and public repositories are intentionally decoupled:
 
 1. the consumer repository declares a resource-operation checklist;
 2. ChatGPT reads that checklist and the required source inputs;
-3. ChatGPT submits only the build package required for one resource stage;
-4. the engine runs mechanically and returns evidence/output;
+3. ChatGPT prepares only the build package required for one resource stage in the active session/runtime;
+4. the engine code/runtime executes mechanically against that stage package;
 5. ChatGPT reviews the result and writes accepted outputs/receipts into the target repository.
 
-For private material, use the sealed-box protocol in `docs/SEALED_PRIVATE_JOBS.md`. Plain private material must never be committed to this public repository or uploaded as a public artifact.
+**Normal private-project execution is ChatGPT/session-mediated and ephemeral.** Private consumer plaintext is not committed to this public repository. The sealed-box GitHub Actions path in `docs/SEALED_PRIVATE_JOBS.md` is an optional fallback for environments that specifically need remote workflow transport; it is not a prerequisite for normal engine use.
 
 ## Block acceptance is mandatory
 
@@ -85,16 +85,9 @@ The public resource-runtime workflow installs and smoke-tests:
 - PyMuPDF preflight;
 - PDFium rendering.
 
-### Private stateless handoff
+### Optional sealed fallback
 
-- PyNaCl sealed-box encryption utility (`pdf-sealed`);
-- owner-only `job/**` sealed resource workflow;
-- encrypted input on public Git history;
-- plaintext only in ephemeral runner storage;
-- output encrypted to a one-time return public key before artifact upload;
-- no consumer-repository PAT or checkout.
-
-The engine sealed private key is a one-time repository setup prerequisite. Store it only as the Actions secret `ENGINE_SEALED_PRIVATE_KEY`. `.github/workflows/sealed-key-bootstrap.yml` derives only the matching shareable public key and publishes machine-readable status context `pdf-engine/sealed-key/<PUBLIC_KEY>`. If the secret is missing, it publishes `pdf-engine/sealed-key/missing-secret=error` and private sealed production must remain unverified.
+The repository retains a sealed-box helper/workflow for a special case where an orchestrator explicitly chooses encrypted remote GitHub Actions transport. This is **not** the canonical path for `qiuzhidaren` or other session-mediated builds and does not create any project-level key requirement.
 
 ## CLI
 
@@ -116,9 +109,8 @@ pdf-locked-pages --spec locked-source.yaml --out dist/source-pages
 # Verify the full generic document/figure runtime
 pdf-runtime-smoke --out .runtime-smoke
 
-# Sealed-box transport helpers
+# Optional sealed-box transport helper
 pdf-sealed keygen
-pdf-sealed public --private-key "$ENGINE_SEALED_PRIVATE_KEY"
 ```
 
 ## Public CI
@@ -149,4 +141,4 @@ Machine acceptance never equals final acceptance. Every visually meaningful reso
 
 Current v1 implementation branch: `feat/pdf-production-engine-v1`.
 
-Do not merge to `main` until the stateless handoff, block acceptance, standard PDF CI, and full resource-runtime CI all pass.
+Do not merge to `main` until the stateless engine capability, block acceptance, standard PDF CI, and full resource-runtime CI all pass.
