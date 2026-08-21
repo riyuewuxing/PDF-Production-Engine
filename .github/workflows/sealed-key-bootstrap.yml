@@ -46,12 +46,12 @@ jobs:
           token = os.environ['GH_TOKEN']
           private_key = os.environ.get('ENGINE_SEALED_PRIVATE_KEY', '').strip()
 
-          def publish(state: str, description: str) -> None:
+          def publish(context: str, state: str, description: str) -> None:
               req = urllib.request.Request(
                   f'https://api.github.com/repos/{repo}/statuses/{sha}',
                   data=json.dumps({
                       'state': state,
-                      'context': 'pdf-engine/sealed-key',
+                      'context': context,
                       'description': description[:140],
                   }).encode(),
                   headers={
@@ -65,22 +65,31 @@ jobs:
               with urllib.request.urlopen(req) as response:
                   assert response.status == 201
 
+          publish('pdf-engine/sealed-key/bootstrap-started', 'success', 'bootstrap workflow reached key derivation step')
+
           if not private_key:
-              publish('error', 'ENGINE_SEALED_PRIVATE_KEY missing')
+              publish('pdf-engine/sealed-key/missing-secret', 'error', 'ENGINE_SEALED_PRIVATE_KEY missing')
               raise SystemExit('ENGINE_SEALED_PRIVATE_KEY is not configured')
 
-          proc = subprocess.run(
-              ['pdf-sealed', 'public', '--private-key', private_key],
-              check=True,
-              text=True,
-              stdout=subprocess.PIPE,
-          )
+          try:
+              proc = subprocess.run(
+                  ['pdf-sealed', 'public', '--private-key', private_key],
+                  check=True,
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+              )
+          except subprocess.CalledProcessError as exc:
+              publish('pdf-engine/sealed-key/derive-failed', 'error', 'configured private key could not be parsed')
+              print(exc.stdout)
+              raise
+
           line = next((line for line in proc.stdout.splitlines() if line.startswith('PUBLIC_KEY=')), '')
           public_key = line.partition('=')[2].strip()
           if not public_key:
-              publish('error', 'failed to derive sealed public key')
+              publish('pdf-engine/sealed-key/derive-failed', 'error', 'public key derivation produced no key')
               raise SystemExit('public key derivation produced no key')
 
-          publish('success', f'ENGINE_PUBLIC_KEY={public_key}')
+          publish('pdf-engine/sealed-key', 'success', f'ENGINE_PUBLIC_KEY={public_key}')
           print('Published shareable engine public key in commit status; private key was not exposed.')
           PY
