@@ -82,14 +82,21 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, urllib.request
-          req = urllib.request.Request(
-              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
-              data=json.dumps({'state':'success','context':'pdf-engine/public-source-stage','description':'Locked public source verified, extracted and rendered'}).encode(),
-              headers={'Authorization':f"Bearer {os.environ['GH_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
-              method='POST',
-          )
-          with urllib.request.urlopen(req) as r:
-              assert r.status == 201
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          token = os.environ['GH_TOKEN']
+          run_id = os.environ['GITHUB_RUN_ID']
+          def publish(context, description):
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/statuses/{sha}",
+                  data=json.dumps({'state':'success','context':context,'description':description}).encode(),
+                  headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+                  method='POST',
+              )
+              with urllib.request.urlopen(req) as r:
+                  assert r.status == 201
+          publish('pdf-engine/public-source-stage', 'Locked public source verified, extracted and rendered')
+          publish(f'pdf-engine/public-source-stage/run-{run_id}', 'Machine-readable workflow run id')
           PY
 
       - name: Publish failure status
@@ -99,12 +106,20 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, urllib.request
-          req = urllib.request.Request(
-              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
-              data=json.dumps({'state':'failure','context':'pdf-engine/public-source-stage','description':'Public source stage failed; inspect workflow logs'}).encode(),
-              headers={'Authorization':f"Bearer {os.environ['GH_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
-              method='POST',
-          )
-          with urllib.request.urlopen(req) as r:
-              assert r.status == 201
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          token = os.environ['GH_TOKEN']
+          run_id = os.environ['GITHUB_RUN_ID']
+          for context, description in [
+              ('pdf-engine/public-source-stage', 'Public source stage failed; inspect workflow logs'),
+              (f'pdf-engine/public-source-stage/run-{run_id}', 'Machine-readable failed workflow run id'),
+          ]:
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/statuses/{sha}",
+                  data=json.dumps({'state':'failure','context':context,'description':description}).encode(),
+                  headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+                  method='POST',
+              )
+              with urllib.request.urlopen(req) as r:
+                  assert r.status == 201
           PY
