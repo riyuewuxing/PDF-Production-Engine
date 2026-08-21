@@ -1,28 +1,66 @@
 # PDF Production Engine
 
-A public, deterministic PDF build engine for multiple projects.
+Public, deterministic build runtime for PDF production and related resource artifacts.
 
-It owns only the mechanical production layer:
+This repository is **stateless with respect to consumer projects**. It stores no project-specific business content, private documents, candidate data, source repositories, or long-lived build inputs. It owns only generic build tools, generic schemas, public fixtures, machine QA, renderers, and delivery protocols.
 
-`validated build manifest -> PDF build -> PDF open/preflight -> render every page -> SHA-256/evidence -> delivery`
+## Core responsibility
 
-It does **not** own consumer-project business content and it never treats successful rendering as final visual acceptance.
+`validated job package -> isolated resource builds -> block evidence -> composition -> final PDF preflight -> full-page render -> evidence bundle`
 
-## Why this repository exists
+The engine never decides what a project should say. Consumer projects own content, business rules, source identity, and acceptance criteria. ChatGPT acts as orchestrator/reviewer: it reads the private project's resource-operation checklist, prepares the engine job, reviews each block, and writes accepted outputs back to the source repository.
 
-Projects such as `qiuzhidaren`, PPT/document systems, reports, and future repositories may all need repeatable PDF generation. Instead of giving another AI the project and asking it to "build a PDF", this repository provides one stable execution protocol and a standard GitHub-hosted runtime.
+## No direct repository relationship
 
-Public CI uses only public fixtures. Private projects can use the owner-triggered private build workflow, which checks out a permitted private project temporarily, builds the PDF, renders every page, and writes the outputs directly back to that private repository. Private PDF bytes are not uploaded as artifacts of this public repository.
+The engine must not require a PAT that can read or write a consumer repository. It must not checkout a private consumer repository and must not commit directly into one.
+
+Private and public repositories are intentionally decoupled:
+
+1. the consumer repository declares a resource-operation checklist;
+2. ChatGPT reads that checklist and the required source inputs;
+3. ChatGPT submits only the build package needed for the current resource stage to this engine;
+4. the engine runs mechanically and returns evidence/output;
+5. ChatGPT reviews the result and writes accepted outputs into the target repository.
+
+If a build input/output is private, the transport layer must use a sealed/encrypted job package or another privacy-preserving handoff. Plain private material must never be committed to this public repository or uploaded as a public artifact.
+
+## Block acceptance is mandatory
+
+A complex deliverable may not be built as one opaque step. Independent resource blocks are produced and reviewed before composition.
+
+Typical document flow:
+
+`content review -> figure/resource build -> figure/resource review -> composition -> final PDF build -> final full-page visual review`
+
+Examples of independent resource blocks include:
+
+- source content / data;
+- TikZ/PGFPlots/CircuiTikZ/tkz-euclide/tikz-3dplot figures;
+- source-page extracts and contact sheets;
+- charts or generated images;
+- tables or intermediate document fragments;
+- final document composition.
+
+The engine may report `MACHINE_PASS`, but only ChatGPT may record a visual/content acceptance receipt. Composition is allowed only after every required upstream block has an acceptance receipt bound to its evidence hash.
+
+## Current v1 capabilities
+
+- deterministic manifest validation;
+- ReportLab PDF build;
+- trusted command backend for project-owned publishers;
+- PyMuPDF PDF open/preflight;
+- PDFium full-page pixel rendering;
+- page/PDF SHA-256 evidence;
+- public fixture CI;
+- generic resource-stage/job protocol.
+
+Planned/next generic runtime capabilities are XeLaTeX/CJK, TikZ-family figure compilation, Poppler page extraction/text extraction, contact-sheet generation, and generic locked-binary fetch/hash verification. These are build-runtime capabilities only; project semantics remain in the consumer repository.
 
 ## Canonical CLI
 
 ```bash
 python -m pip install -e .
-pdf-production build \
-  --root . \
-  --manifest examples/hello/build.yaml \
-  --out dist \
-  --dpi 144
+pdf-production build --root . --manifest examples/hello/build.yaml --out dist --dpi 144
 ```
 
 Successful output contains:
@@ -36,7 +74,7 @@ dist/<document-id>/
     └── ...
 ```
 
-`build-manifest.json` records PDF SHA-256, size, page count, per-page render hashes, render DPI, and the mandatory visual state:
+`build-manifest.json` records PDF SHA-256, size, page count, per-page render hashes, render DPI, and:
 
 `HUMAN_PIXEL_CONFIRMATION_REQUIRED`
 
@@ -48,74 +86,31 @@ Generic deterministic Markdown-to-PDF backend used for public fixture/testing an
 
 ### `command`
 
-Trusted consumer-project adapter. The private project keeps its own business-specific publisher and supplies an argv list in its manifest. Supported placeholders:
+Trusted build-package adapter. The source package supplies an argv list. Supported placeholders:
 
 - `{root}`
 - `{output_dir}`
 - `{output_pdf}`
 
-The engine runs the argv list without `shell=True`, captures detailed publisher output into temporary `backend.log`, and then applies the same PDF preflight/render/evidence gates.
-
-## Public CI
-
-`.github/workflows/ci.yml` runs on `main`, `feat/**`, pull requests, and manual dispatch. It:
-
-1. installs the engine;
-2. runs unit/safety tests;
-3. builds the public fixture;
-4. opens the PDF;
-5. renders every page;
-6. verifies page/render counts and SHA-256 evidence;
-7. uploads only the **public fixture** artifact.
-
-## Private project builds
-
-See [`docs/PRIVATE_PROJECT_INTEGRATION.md`](docs/PRIVATE_PROJECT_INTEGRATION.md).
-
-The production workflow is deliberately narrow:
-
-- owner-triggered only;
-- least-privilege `PROJECT_REPO_TOKEN`;
-- no `pull_request_target`;
-- no private output artifact upload;
-- direct commit of requested PDF/evidence/render pages back to the private consumer repository.
-
-## Build manifest example
-
-```yaml
-version: 1
-document_id: my-document
-backend:
-  type: command
-  cwd: .
-  command:
-    - python
-    - tools/publish.py
-    - --output
-    - '{output_pdf}'
-output:
-  filename: my-document.pdf
-metadata:
-  title: My document
-```
+The engine executes argv without `shell=True`, captures backend stdout/stderr into a local build log, and applies the same PDF preflight/render/evidence gates.
 
 ## Acceptance rule
 
-Machine acceptance requires all of the following:
+Machine acceptance requires, at minimum:
 
-- manifest passes safety validation;
-- publisher exits successfully;
-- expected PDF exists and is non-trivial;
-- PyMuPDF can open the PDF;
-- PDF has at least one valid page;
-- every page is rendered at the requested DPI;
-- rendered page count equals PDF page count;
-- PDF and page SHA-256 values are recorded.
+- manifest safety validation;
+- builder success;
+- required output exists and is non-trivial;
+- independent preflight can open the PDF;
+- valid non-zero page geometry;
+- every page is rendered;
+- render count equals PDF page count;
+- hashes/evidence are recorded.
 
-Even then the engine reports only `MACHINE_PASS`. Human/AI visual inspection of all rendered pages remains required before a consumer project may claim final visual acceptance.
+Machine acceptance never equals final acceptance. Every visually meaningful resource block and every final composed PDF must be reviewed after real rendering.
 
 ## Development
 
 Current v1 implementation branch: `feat/pdf-production-engine-v1`.
 
-Do not merge to `main` until CI and fixture artifact have been inspected.
+Do not merge to `main` until the stateless orchestration and block-acceptance protocol have passed CI and integration review.
