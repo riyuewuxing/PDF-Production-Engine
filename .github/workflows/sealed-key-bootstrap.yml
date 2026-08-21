@@ -90,6 +90,7 @@ jobs:
               publish('pdf-engine/sealed-key/derive-failed', 'error', 'public key derivation produced no key')
               raise SystemExit('public key derivation produced no key')
 
-          publish('pdf-engine/sealed-key', 'success', f'ENGINE_PUBLIC_KEY={public_key}')
-          print('Published shareable engine public key in commit status; private key was not exposed.')
+          publish('pdf-engine/sealed-key', 'success', 'engine sealed-box public key is available')
+          publish(f'pdf-engine/sealed-key/{public_key}', 'success', 'machine-readable public key')
+          print('Published shareable engine public key in commit status context; private key was not exposed.')
           PY
