@@ -1,0 +1,18 @@
+\documentclass[11pt,a4paper,oneside]{memoir}
+\usepackage[UTF8,fontset=none]{ctex}
+\usepackage{fontspec,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype}
+\usepackage[most]{tcolorbox}
+\setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
+\setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
+\setlrmarginsandblock{27mm}{23mm}{*}\setulmarginsandblock{23mm}{25mm}{*}\checkandfixthelayout
+\OnehalfSpacing
+\definecolor{accent}{HTML}{6A4432}\definecolor{soft}{HTML}{F5F0EA}
+\makechapterstyle{roundone}{\renewcommand\chapnamefont{\normalfont\small\sffamily\color{accent}}\renewcommand\chapnumfont{\normalfont\fontsize{46}{50}\selectfont\bfseries\color{accent}}\renewcommand\chaptitlefont{\normalfont\Huge\bfseries}\renewcommand\printchaptername{\chapnamefont CHAPTER}\renewcommand\printchapternum{\chapnumfont\thechapter}\renewcommand\afterchapternum{\par\vskip\midchapskip}}
+\chapterstyle{roundone}\pagestyle{ruled}
+\setlength{\parindent}{2em}\setlength{\parskip}{.35em}
+\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=soft,colframe=accent!65!black,boxrule=.5pt,sharp corners,title=#1,fonttitle=\bfseries]#2\end{tcolorbox}}
+\begin{document}
+\frontmatter\thispagestyle{empty}\vspace*{42mm}{\centering\Huge\bfseries LaTeX 文档模板对比基准\par\vspace{7mm}\Large L02 · Memoir Book\par}\vfill\centerline{XeLaTeX / CTeX / memoir}\clearpage\tableofcontents*\mainmatter
+\chapter{LaTeX 排印系统}
+\input{benchmark-content.tex}
+\end{document}
