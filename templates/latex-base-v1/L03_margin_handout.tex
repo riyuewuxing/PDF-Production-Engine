@@ -1,0 +1,13 @@
+\documentclass[10.5pt,a4paper]{ctexart}
+\usepackage{fontspec,geometry,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype,marginnote}
+\geometry{left=24mm,right=52mm,top=20mm,bottom=22mm,marginparwidth=38mm,marginparsep=7mm}
+\setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
+\setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
+\definecolor{accent}{HTML}{2F5D50}\definecolor{muted}{HTML}{66706B}
+\setlength{\parindent}{2em}\setlength{\parskip}{.35em}\linespread{1.17}\selectfont
+\ctexset{section={format=\Large\bfseries\sffamily\color{accent}},subsection={format=\large\bfseries\sffamily\color{accent}}}
+\newcommand{\BenchCallout}[2]{\marginnote{\small\color{muted}\textbf{#1}\par #2}}
+\begin{document}
+{\sffamily\bfseries\fontsize{25}{31}\selectfont LaTeX 文档模板对比基准}\par\vspace{2mm}{\large L03 · Margin Handout}\par\vspace{8mm}
+\input{benchmark-content.tex}
+\end{document}
