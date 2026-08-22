@@ -1,0 +1,19 @@
+\documentclass[11pt,a4paper,parskip=half]{scrreprt}
+\usepackage[UTF8,fontset=none]{ctex}
+\usepackage{fontspec,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype,scrlayer-scrpage}
+\usepackage[most]{tcolorbox}
+\setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
+\setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
+\KOMAoptions{DIV=11,headinclude=true,footinclude=false}
+\definecolor{accent}{HTML}{244A68}\definecolor{paper}{HTML}{FAFAF7}
+\setkomafont{chapter}{\sffamily\bfseries\color{accent}\Huge}
+\setkomafont{section}{\sffamily\bfseries\color{accent}\Large}
+\setkomafont{subsection}{\sffamily\bfseries\color{accent}}
+\clearpairofpagestyles\ihead{PDF Production Engine}\ohead{KOMA Report}\cfoot{\pagemark}
+\setlength{\parindent}{2em}\linespread{1.18}\selectfont
+\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=paper,colframe=accent!70!black,boxrule=.7pt,arc=1mm,title=#1,fonttitle=\sffamily\bfseries]#2\end{tcolorbox}}
+\begin{document}
+\begin{titlepage}\centering\vspace*{36mm}{\sffamily\bfseries\fontsize{28}{34}\selectfont LaTeX 文档模板对比基准\par}\vspace{8mm}{\Large L01 · KOMA-Script Report\par}\vfill XeLaTeX / CTeX / KOMA-Script\vspace{18mm}\end{titlepage}
+\chapter{LaTeX 排印系统}
+\input{benchmark-content.tex}
+\end{document}
