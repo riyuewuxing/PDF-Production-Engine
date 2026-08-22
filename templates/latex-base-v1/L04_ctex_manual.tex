@@ -1,15 +1,19 @@
 \documentclass[11pt,a4paper]{ctexart}
-\usepackage{fontspec,geometry,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype,fancyhdr}
+\usepackage{fontspec,geometry,xcolor,booktabs,tabularx,longtable,amsmath,amssymb,tikz,pgfplots,microtype,fancyhdr,graphicx,caption,setspace,enumitem,needspace,xurl}
 \usepackage[most]{tcolorbox}
-\geometry{left=22mm,right=22mm,top=20mm,bottom=22mm}
+\usetikzlibrary{positioning,arrows.meta}
+\pgfplotsset{compat=1.18}
+\geometry{left=23mm,right=23mm,top=22mm,bottom=24mm,headheight=14pt}
 \setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
 \setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
 \definecolor{accent}{HTML}{173D5B}\definecolor{soft}{HTML}{EEF3F5}
-\pagestyle{fancy}\fancyhf{}\lhead{TECHNICAL MANUAL}\rhead{L04}\cfoot{\thepage}\renewcommand{\headrulewidth}{.4pt}
-\ctexset{section={format=\Large\bfseries\sffamily\color{accent}},subsection={format=\large\bfseries\sffamily\color{accent}}}
-\setlength{\parindent}{2em}\setlength{\parskip}{.4em}\linespread{1.2}\selectfont
-\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[enhanced,breakable,colback=soft,colframe=accent,boxrule=.6pt,arc=1.5mm,title=#1,fonttitle=\sffamily\bfseries]#2\end{tcolorbox}}
+\pagestyle{fancy}\fancyhf{}\lhead{TECHNICAL MANUAL}\rhead{L04 / ROUND 2}\cfoot{\thepage}\renewcommand{\headrulewidth}{.4pt}
+\ctexset{section={format=\Large\bfseries\sffamily\color{accent},beforeskip=1.8ex,afterskip=1.0ex},subsection={format=\large\bfseries\sffamily\color{accent},beforeskip=1.4ex,afterskip=.8ex}}
+\setlength{\parindent}{2em}\setlength{\parskip}{.38em}\setstretch{1.48}
+\setlist{topsep=.5em,itemsep=.32em}\captionsetup{font=small,labelfont=bf,skip=7pt}
+\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[enhanced,breakable,colback=soft,colframe=accent,boxrule=.65pt,arc=1.5mm,title=#1,fonttitle=\sffamily\bfseries,before skip=8pt,after skip=8pt,left=10pt,right=10pt,top=8pt,bottom=8pt]#2\end{tcolorbox}}
 \begin{document}
-{\sffamily\bfseries\color{accent}\fontsize{26}{31}\selectfont LaTeX 文档模板对比基准}\par\vspace{2mm}{\large L04 · CTeX Technical Manual}\par\vspace{5mm}\hrule\vspace{8mm}
-\input{benchmark-content.tex}
+{\sffamily\bfseries\color{accent}\fontsize{27}{34}\selectfont LaTeX 第二轮压力测试}\par\vspace{3mm}{\large L04 · CTeX + tcolorbox Technical Manual}\par\vspace{2mm}{\normalsize 正文基线：1.48 倍行距}\par\vspace{5mm}\hrule\vspace{7mm}
+\tableofcontents\clearpage
+\input{round2-stress-content.tex}
 \end{document}
