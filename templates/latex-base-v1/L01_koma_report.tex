@@ -1,19 +1,24 @@
-\documentclass[11pt,a4paper,parskip=half]{scrreprt}
+\documentclass[11pt,a4paper,parskip=half,headings=big]{scrreprt}
 \usepackage[UTF8,fontset=none]{ctex}
-\usepackage{fontspec,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype,scrlayer-scrpage}
+\usepackage{fontspec,xcolor,booktabs,tabularx,longtable,amsmath,amssymb,tikz,pgfplots,microtype,scrlayer-scrpage,graphicx,caption,setspace,enumitem,needspace,xurl}
 \usepackage[most]{tcolorbox}
+\usetikzlibrary{positioning,arrows.meta}
+\pgfplotsset{compat=1.18}
 \setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
 \setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
 \KOMAoptions{DIV=11,headinclude=true,footinclude=false}
 \definecolor{accent}{HTML}{244A68}\definecolor{paper}{HTML}{FAFAF7}
 \setkomafont{chapter}{\sffamily\bfseries\color{accent}\Huge}
 \setkomafont{section}{\sffamily\bfseries\color{accent}\Large}
-\setkomafont{subsection}{\sffamily\bfseries\color{accent}}
-\clearpairofpagestyles\ihead{PDF Production Engine}\ohead{KOMA Report}\cfoot{\pagemark}
-\setlength{\parindent}{2em}\linespread{1.18}\selectfont
-\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=paper,colframe=accent!70!black,boxrule=.7pt,arc=1mm,title=#1,fonttitle=\sffamily\bfseries]#2\end{tcolorbox}}
+\setkomafont{subsection}{\sffamily\bfseries\color{accent}\large}
+\clearpairofpagestyles\ihead{LaTeX Round 2}\ohead{KOMA Report}\cfoot{\pagemark}
+\setlength{\parindent}{2em}\setlength{\parskip}{.38em}\setstretch{1.46}
+\setlist{topsep=.5em,itemsep=.3em,parsep=0pt}
+\captionsetup{font=small,labelfont=bf,skip=7pt}
+\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=paper,colframe=accent!70!black,boxrule=.7pt,arc=1mm,title=#1,fonttitle=\sffamily\bfseries,before skip=8pt,after skip=8pt]#2\end{tcolorbox}}
 \begin{document}
-\begin{titlepage}\centering\vspace*{36mm}{\sffamily\bfseries\fontsize{28}{34}\selectfont LaTeX 文档模板对比基准\par}\vspace{8mm}{\Large L01 · KOMA-Script Report\par}\vfill XeLaTeX / CTeX / KOMA-Script\vspace{18mm}\end{titlepage}
-\chapter{LaTeX 排印系统}
-\input{benchmark-content.tex}
+\begin{titlepage}\centering\vspace*{34mm}{\sffamily\bfseries\fontsize{29}{36}\selectfont LaTeX 第二轮压力测试\par}\vspace{8mm}{\Large L01 · KOMA-Script Professional Report\par}\vspace{6mm}{\large 正文基线：1.46 倍行距\par}\vfill XeLaTeX / CTeX / KOMA-Script\vspace{18mm}\end{titlepage}
+\tableofcontents\clearpage
+\chapter{排版稳定性压力测试}
+\input{round2-stress-content.tex}
 \end{document}
