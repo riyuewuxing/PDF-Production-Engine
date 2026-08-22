@@ -1,0 +1,77 @@
+version: 1
+status: ROUND1_CANDIDATES_MACHINE_RENDERED
+canonical_backend: xelatex
+engine_policy:
+  authored_pdf_backend: xelatex
+  typst_template_pool: REJECTED_LEGACY_ONLY
+  reportlab_authored_layout: NONCANONICAL_LEGACY_ONLY
+  shell_escape: false
+  cjk: CTeX_or_xeCJK
+candidate_count: 5
+random_pool_enabled: false
+benchmark:
+  file: benchmark-content.tex
+  neutral_content: true
+  same_content_for_all_candidates: true
+  required_features:
+    - chinese_long_form_prose
+    - heading_hierarchy
+    - display_math
+    - table
+    - tikz_figure
+    - callout
+    - header_footer
+    - natural_pagination
+candidates:
+  - id: L01
+    name: KOMA Report
+    file: L01_koma_report.tex
+    family: professional-report
+    upstream_basis: KOMA-Script scrreprt
+    upstream_license: LPPL-1.3c
+    round1_machine_compile: PASS
+  - id: L02
+    name: Memoir Book
+    file: L02_memoir_book.tex
+    family: long-form-book
+    upstream_basis: memoir
+    upstream_license: LPPL-1.3c
+    round1_machine_compile: PASS
+  - id: L03
+    name: Margin Handout
+    file: L03_margin_handout.tex
+    family: margin-note-handout
+    upstream_basis: CTeX article + marginnote; Tufte-style information architecture
+    upstream_license: package-specific upstream licenses
+    round1_machine_compile: PASS
+    note: direct tufte-handout class was compile-probed and rejected for this CJK path after a page-mark/lowercase incompatibility surfaced
+  - id: L04
+    name: CTeX Technical Manual
+    file: L04_ctex_manual.tex
+    family: technical-manual
+    upstream_basis: CTeX article + tcolorbox
+    upstream_license: package-specific upstream licenses
+    round1_machine_compile: PASS
+  - id: L05
+    name: CTeX Editorial Book
+    file: L05_ctex_book.tex
+    family: editorial-book
+    upstream_basis: CTeX book + standard LaTeX page-style/title packages
+    upstream_license: package-specific upstream licenses
+    round1_machine_compile: PASS
+three_round_acceptance:
+  round1:
+    status: COMPLETE_LOCAL_EVIDENCE
+    goal: migrate architecture to XeLaTeX and establish five compiling candidates
+  round2:
+    status: PENDING
+    goal: stress-test, compare and refine the five families
+  round3:
+    status: PENDING
+    goal: real consumer PDF build, full-page visual acceptance, hash-bound freeze
+final_acceptance_requires:
+  - round2_stress_gate_pass
+  - round3_real_consumer_pdf_pass
+  - full_page_render_review
+  - no_clipping_overlap_broken_glyphs
+  - accepted_sha256_receipts
