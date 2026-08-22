@@ -1,45 +1,33 @@
-version: 1
-library_state: PENDING_USER_ACCEPTANCE
+version: 2
+library_state: REJECTED_SUPERSEDED_BY_LATEX
 random_pool_enabled: false
-acceptance_rule: ALL_TEMPLATES_MUST_BE_USER_ACCEPTED
+user_decision: REJECT_ALL_CURRENT_TEN
+reason:
+  - template_count_overstated_real_design_diversity
+  - common_component_language_made_multiple_templates_visually_similar
+  - generic_content_contract_was_too_training-card-specific
+  - authored_pdf_backend_must_be_latex
+replacement: templates/latex-base-v1/
+historical_self_review:
+  note: scores are retained only as evidence of why the former rubric was insufficient; they do not confer acceptance
+  T01: 91
+  T02: 93
+  T03: 95
+  T04: 94
+  T05: 91
+  T06: 94
+  T07: 93
+  T08: 93
+  T09: 92
+  T10: 95
 templates:
-  T01:
-    self_review_score: 91
-    self_review: PASS
-    user_acceptance: PENDING
-  T02:
-    self_review_score: 93
-    self_review: PASS
-    user_acceptance: PENDING
-  T03:
-    self_review_score: 95
-    self_review: PASS
-    user_acceptance: PENDING
-  T04:
-    self_review_score: 94
-    self_review: PASS
-    user_acceptance: PENDING
-  T05:
-    self_review_score: 91
-    self_review: PASS
-    user_acceptance: PENDING
-  T06:
-    self_review_score: 94
-    self_review: PASS
-    user_acceptance: PENDING
-  T07:
-    self_review_score: 93
-    self_review: PASS
-    user_acceptance: PENDING
-  T08:
-    self_review_score: 93
-    self_review: PASS
-    user_acceptance: PENDING
-  T09:
-    self_review_score: 92
-    self_review: PASS
-    user_acceptance: PENDING
-  T10:
-    self_review_score: 95
-    self_review: PASS
-    user_acceptance: PENDING
+  T01: {user_acceptance: REJECTED}
+  T02: {user_acceptance: REJECTED}
+  T03: {user_acceptance: REJECTED}
+  T04: {user_acceptance: REJECTED}
+  T05: {user_acceptance: REJECTED}
+  T06: {user_acceptance: REJECTED}
+  T07: {user_acceptance: REJECTED}
+  T08: {user_acceptance: REJECTED}
+  T09: {user_acceptance: REJECTED}
+  T10: {user_acceptance: REJECTED}
