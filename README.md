@@ -4,6 +4,19 @@ Public, deterministic build runtime for PDF production and related resource arti
 
 This repository is **stateless with respect to consumer projects**. It stores no project-specific business content, private documents, candidate data, source repositories, or long-lived build inputs. It owns only generic build tools, schemas, public fixtures, machine QA, renderers, optional transport helpers, and delivery protocols.
 
+## Canonical authored-PDF backend
+
+**New authored PDFs are built with XeLaTeX.** This is now an architecture rule, not a per-template preference.
+
+- XeLaTeX / TeX Live is the canonical document compositor.
+- CTeX / xeCJK provides the Chinese typesetting layer.
+- TikZ/PGF/PGFPlots/tcolorbox and ordinary LaTeX packages provide figures, diagrams and structured document elements.
+- `templates/latex-base-v1/` contains the five Round-1 candidate page systems.
+- The former `templates/visual-base-v1/` Typst pool has been user-rejected and is retained only as historical visual reference.
+- ReportLab may remain in engine-side mechanical utilities and legacy fixtures, but it is not the authored-document layout authority.
+
+The migration is governed by a three-round acceptance gate: Round 1 architecture/candidates, Round 2 stress/refinement, Round 3 real consumer PDF acceptance and freeze. No template is production-accepted before Round 3.
+
 ## Core responsibility
 
 `validated stage package -> isolated resource block build -> block evidence -> reviewed prerequisite gate -> composition -> final PDF preflight -> full-page render -> evidence bundle`
@@ -30,7 +43,7 @@ Complex deliverables may not be built as one opaque step.
 
 Typical document flow:
 
-`content review -> figure/chart/source-page build -> resource review -> composition -> final PDF build -> final full-page visual review`
+`content review -> figure/chart/source-page build -> resource review -> XeLaTeX composition -> final PDF build -> final full-page visual review`
 
 A block may be consumed by composition only when the consumer project contains a `REVIEW_PASS` receipt bound to the current accepted SHA-256. Changing that block invalidates the old receipt.
 
@@ -48,9 +61,10 @@ The engine may report only `MACHINE_PASS + REVIEW_REQUIRED`; ChatGPT records `RE
 
 ### PDF production
 
-- deterministic manifest validation;
-- ReportLab PDF build;
-- command backend for project-owned publishers/adapters;
+- canonical `pdf-latex-build` XeLaTeX builder for authored `.tex -> .pdf` documents;
+- no-shell-escape default and bounded multi-pass compilation;
+- deterministic source/output SHA-256 evidence and independent PDF open/page-count validation;
+- legacy ReportLab/command fixtures retained only where still needed by mechanical tooling during migration;
 - PyMuPDF independent PDF open/preflight;
 - PDFium full-page pixel rendering;
 - page/PDF SHA-256 evidence.
@@ -110,13 +124,16 @@ The repository retains a sealed-box helper/workflow for a special case where an 
 ```bash
 python -m pip install -e .
 
+# Build an authored PDF with the canonical XeLaTeX backend
+pdf-latex-build --root . --source templates/latex-base-v1/L01_koma_report.tex --output dist/L01.pdf --passes 2
+
 # Validate a resource job and its review prerequisites
 pdf-resource-job resource-job.yaml
 
 # Execute exactly one resource block and produce machine evidence
 pdf-resource-run --root . --job resource-job.yaml --block figures --out dist --dpi 144
 
-# Build/preflight/render one PDF manifest
+# Build/preflight/render a legacy/public fixture manifest
 pdf-production build --root . --manifest examples/hello/build.yaml --out dist --dpi 144
 
 # Build one batched final-review bundle for one or more PDFs
@@ -132,12 +149,14 @@ pdf-runtime-smoke --out .runtime-smoke
 pdf-sealed keygen
 ```
 
+`pdf-typst-build` remains temporarily available only for reproducibility of rejected historical artifacts. It is not a valid backend for new production templates.
+
 ## Public CI
 
 The engine has two distinct public validation routes:
 
-- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture, plus an installed-CLI `pdf-review-pack` smoke that verifies the review index/contact sheet/full-page evidence;
-- `Resource Runtime CI`: real TeX/CJK/scientific-figure/Poppler/render runtime.
+- `PDF Engine CI`: Python/unit/job-gate/public PDF fixture, plus installed CLI smoke tests and `pdf-review-pack` evidence;
+- `Resource Runtime CI`: real XeLaTeX/TeX/CJK/scientific-figure/Poppler/render runtime.
 
 A generic runtime change is not accepted unless its real resource smoke passes.
 
@@ -156,8 +175,10 @@ Machine acceptance requires, at minimum:
 
 Machine acceptance never equals final acceptance. Every visually meaningful resource block and every final composed PDF must be reviewed from real rendered output.
 
+For the LaTeX template migration specifically, production acceptance additionally requires all three rounds in `templates/latex-base-v1/README.md` to pass.
+
 ## Development
 
-Current v1 implementation branch: `feat/pdf-production-engine-v1`.
+Current migration workline: `feat/latex-migration-round1`, based on `feat/pdf-production-engine-v1`.
 
-Do not merge to `main` until the stateless engine capability, block acceptance, standard PDF CI, and full resource-runtime CI all pass.
+Do not merge to `main` until the stateless engine capability, block acceptance, canonical XeLaTeX path, standard PDF CI, full resource-runtime CI, and the three-round template acceptance are complete.
