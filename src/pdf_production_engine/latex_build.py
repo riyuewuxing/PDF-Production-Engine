@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -51,13 +52,37 @@ def resolve_xelatex_binary(explicit: str | None = None) -> str:
     return path
 
 
+def _log_quality(pass_logs: list[str]) -> dict:
+    final_log = pass_logs[-1] if pass_logs else ""
+    patterns = {
+        "missing_characters": r"Missing character:",
+        "overfull_hbox": r"Overfull \\hbox",
+        "overfull_vbox": r"Overfull \\vbox",
+        "undefined_references": r"There were undefined references|Reference `[^']+' on page .* undefined",
+        "rerun_needed": r"Rerun to get cross-references right|Label\(s\) may have changed",
+    }
+    counts = {name: len(re.findall(pattern, final_log)) for name, pattern in patterns.items()}
+    strict_names = (
+        "missing_characters",
+        "overfull_hbox",
+        "overfull_vbox",
+        "undefined_references",
+        "rerun_needed",
+    )
+    return {
+        "counts": counts,
+        "strict_failures": [name for name in strict_names if counts[name]],
+    }
+
+
 def build_latex_pdf(
     source: Path,
     output: Path,
     *,
     root: Path | None = None,
     xelatex_bin: str | None = None,
-    passes: int = 2,
+    passes: int = 3,
+    strict_log_gate: bool = True,
 ) -> dict:
     source = _safe_source(source)
     output = _safe_output(output)
@@ -117,6 +142,12 @@ def build_latex_pdf(
                 f"XeLaTeX pass {index + 1}/{passes} failed ({proc.returncode}):\n{proc.stdout}"
             )
 
+    quality = _log_quality(pass_logs)
+    if strict_log_gate and quality["strict_failures"]:
+        raise LatexBuildError(
+            "strict LaTeX log gate failed: " + ", ".join(quality["strict_failures"])
+        )
+
     if not output.is_file() or output.stat().st_size <= 0:
         raise LatexBuildError("XeLaTeX produced no non-empty PDF")
 
@@ -128,12 +159,21 @@ def build_latex_pdf(
         page_count = doc.page_count
         if page_count <= 0:
             raise LatexBuildError("output PDF has no pages")
+        pages = [
+            {
+                "page": i + 1,
+                "width_pt": round(doc[i].rect.width, 3),
+                "height_pt": round(doc[i].rect.height, 3),
+                "text_chars": len(doc[i].get_text("text")),
+            }
+            for i in range(page_count)
+        ]
     finally:
         doc.close()
 
     return {
         "engine": "PDF-Production-Engine",
-        "capability": "xelatex-pdf-build-v1",
+        "capability": "xelatex-pdf-build-v2",
         "status": "MACHINE_PASS",
         "review_status": "REVIEW_REQUIRED",
         "canonical_document_backend": True,
@@ -154,7 +194,9 @@ def build_latex_pdf(
             "size_bytes": output.stat().st_size,
             "page_count": page_count,
             "sha256": _sha256(output),
+            "pages": pages,
         },
+        "quality": quality,
         "command": {"argv": normalized_command},
         "passes": [
             {"index": i + 1, "log_tail": log[-4000:]}
@@ -169,7 +211,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--root", type=Path)
     parser.add_argument("--xelatex-bin")
-    parser.add_argument("--passes", type=int, default=2)
+    parser.add_argument("--passes", type=int, default=3)
+    parser.add_argument("--no-strict-log-gate", action="store_true")
     parser.add_argument("--evidence", type=Path)
     args = parser.parse_args(argv)
     try:
@@ -179,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
             root=args.root,
             xelatex_bin=args.xelatex_bin,
             passes=args.passes,
+            strict_log_gate=not args.no_strict_log_gate,
         )
         evidence_path = (args.evidence or args.output.with_suffix(".latex-evidence.json")).resolve()
         evidence_path.parent.mkdir(parents=True, exist_ok=True)
