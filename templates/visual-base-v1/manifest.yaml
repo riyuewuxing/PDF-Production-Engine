@@ -1,0 +1,93 @@
+version: 1
+status: CANDIDATE_PENDING_USER_ACCEPTANCE
+contract: GENERIC_CONTENT_SLOTS_V1
+sample:
+  identity: NEUTRAL_SYNTHETIC_EXAMPLE
+  same_content_for_all_templates: true
+  business_content: false
+selection_policy:
+  after_acceptance: random_uniform_base_template
+  all_ten_must_be_accepted_before_random_pool_activation: true
+  future_templates_append_only_until_reviewed: true
+templates:
+- id: T01
+  name: Editorial Serif
+  file: T01_editorial_serif.typ
+  family: editorial-note
+  inspiration:
+  - minimal-note
+  - mousse-notes
+  - min-manual
+- id: T02
+  name: Margin Fieldnotes
+  file: T02_margin_fieldnotes.typ
+  family: margin-note
+  inspiration:
+  - marge
+  - marginalia
+  - Tufte-style margin notes
+- id: T03
+  name: Cornell Study
+  file: T03_cornell_study.typ
+  family: cornell-workbook
+  inspiration:
+  - Cornell note method
+  - hand-in
+- id: T04
+  name: Bento Modular
+  file: T04_bento_modular.typ
+  family: modular-cards
+  inspiration:
+  - justwhitee-notes
+  - non-boring-notes
+- id: T05
+  name: Classic Academic
+  file: T05_classic_academic.typ
+  family: academic-handout
+  inspiration:
+  - simple-handout
+  - tapestry
+- id: T06
+  name: Studio Workbook
+  file: T06_studio_workbook.typ
+  family: worksheet
+  inspiration:
+  - exm
+  - hand-in
+- id: T07
+  name: Atlas Navigation
+  file: T07_atlas_navigation.typ
+  family: atlas-index
+  inspiration:
+  - noteworks
+  - manual/index systems
+- id: T08
+  name: Modern Manual
+  file: T08_modern_manual.typ
+  family: manual-docs
+  inspiration:
+  - min-manual
+  - formal
+- id: T09
+  name: Dense Reference
+  file: T09_dense_reference.typ
+  family: reference-sheet
+  inspiration:
+  - knowledge-key
+  - two-column reference layouts
+- id: T10
+  name: Premium Contrast
+  file: T10_premium_contrast.typ
+  family: premium-notes
+  inspiration:
+  - ori
+  - justwhitee-notes
+  - orionotes
+contains_business_content: false
+runtime_dependency: Typst >=0.15.0; CJK font provided by runtime/staging environment
+visual_gate:
+  self_review_required: true
+  user_acceptance_required: true
+  random_pool_enabled: false
+  minimum_score: 88
+  first_glance_floor: 12

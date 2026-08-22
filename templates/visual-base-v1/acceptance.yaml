@@ -1,0 +1,45 @@
+version: 1
+library_state: PENDING_USER_ACCEPTANCE
+random_pool_enabled: false
+acceptance_rule: ALL_TEMPLATES_MUST_BE_USER_ACCEPTED
+templates:
+  T01:
+    self_review_score: 91
+    self_review: PASS
+    user_acceptance: PENDING
+  T02:
+    self_review_score: 93
+    self_review: PASS
+    user_acceptance: PENDING
+  T03:
+    self_review_score: 95
+    self_review: PASS
+    user_acceptance: PENDING
+  T04:
+    self_review_score: 94
+    self_review: PASS
+    user_acceptance: PENDING
+  T05:
+    self_review_score: 91
+    self_review: PASS
+    user_acceptance: PENDING
+  T06:
+    self_review_score: 94
+    self_review: PASS
+    user_acceptance: PENDING
+  T07:
+    self_review_score: 93
+    self_review: PASS
+    user_acceptance: PENDING
+  T08:
+    self_review_score: 93
+    self_review: PASS
+    user_acceptance: PENDING
+  T09:
+    self_review_score: 92
+    self_review: PASS
+    user_acceptance: PENDING
+  T10:
+    self_review_score: 95
+    self_review: PASS
+    user_acceptance: PENDING
