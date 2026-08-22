@@ -50,19 +50,21 @@ This is intentional: upstream inspiration does not override the machine gate.
 
 All candidates compile the same neutral benchmark containing Chinese prose, headings, display math, table, TikZ figure, callout behavior, headers/footers and pagination.
 
+The following identities are from the canonical two-pass `pdf-latex-build` equivalent session run. They identify the exact reviewed files; they are evidence identities, not a claim that raw XeLaTeX bytes are reproducible across different runtime timestamps/environments.
+
 | ID | System | Intended use | Round-1 pages | Session SHA-256 | Result |
 |---|---|---|---:|---|---|
-| L01 | KOMA-Script `scrreprt` | report / handbook | 3 | `eec171de08276c9077547c3a971c85d6e9b735e5c0d774b6234b4c712996a68a` | PASS |
-| L02 | `memoir` | long-form book / guide | 4 | `10b1c910ea178057143f21396dd3855ee2ac51a73f862f89afc3769b55011ee1` | PASS |
-| L03 | CTeX + margin-note layout | handout / annotated reading | 2 | `d4df66e1a9accc6bf0d500234b8fe169e6fd409f034ce7655d9395735d815df8` | PASS |
-| L04 | CTeX + `tcolorbox` | technical manual / workbook | 2 | `60527f3c9412c2dfa873f3aff7f65048f44db0363a626ee6284d73a76f5e6089` | PASS |
-| L05 | CTeX book | textbook / editorial guide | 4 | `47b711b28019c90957cb93d7ff6e787c145e84822b217136d9dcad24f97d8b73` | PASS |
+| L01 | KOMA-Script `scrreprt` | report / handbook | 3 | `0499ea163453c3e0c59f5c654be6410c6c50713cd9a3dd19f7daba0a68d527ea` | PASS |
+| L02 | `memoir` | long-form book / guide | 4 | `7ec05589b3191b0fe94a094860ffb0b22d0e8049fc3124e6115c388e60ce9102` | PASS |
+| L03 | CTeX + margin-note layout | handout / annotated reading | 2 | `31187d4387796b1d3de4b2bd6ad565f775e473831c814030d2596f9c8675edfa` | PASS |
+| L04 | CTeX + `tcolorbox` | technical manual / workbook | 2 | `7e7130e54412c7a20b18128b4c6020c4b70de35a379cbb9c0a79f7430ee011fa` | PASS |
+| L05 | CTeX book | textbook / editorial guide | 4 | `7ee16fcb324f30ff1014cc3920a02a37d1f4d76eb166fbfc711b12e43ec5009a` | PASS |
 
-The five PDFs total 15 pages in the refactored common-benchmark build.
+The five PDFs total 15 pages. The combined Round-1 comparison PDF used for full-page inspection has SHA-256 `b9d9a4b1c8f7a0ff05026873813ce4fb88959e63b9936b8447f293f6461db9b4`.
 
 ## Round-1 visual review
 
-All pages were rendered to pixels after compilation. The Round-1 review found:
+All 15 pages were rendered to pixels after canonical two-pass compilation. The Round-1 review found:
 
 - no clipped text;
 - no overlapping blocks;
@@ -72,7 +74,7 @@ All pages were rendered to pixels after compilation. The Round-1 review found:
 - all candidates were visibly document-first rather than card-dashboard-first;
 - the five families are not yet treated as final: L01/L04 and L02/L05 still share some typographic ancestry and must be stress-tested in Round 2 before any final diversity claim.
 
-The direct Tufte failure is retained as a negative test, not hidden.
+Independent PDF preflight confirmed the combined file is openable, unencrypted, A4, non-scanned and exactly 15 pages. The direct Tufte failure is retained as a negative test, not hidden.
 
 ## Why Round 1 is complete but not final acceptance
 
