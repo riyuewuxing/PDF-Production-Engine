@@ -4,6 +4,7 @@ import pytest
 
 from pdf_production_engine.latex_build import (
     LatexBuildError,
+    _log_quality,
     _safe_output,
     _safe_source,
     build_latex_pdf,
@@ -54,3 +55,26 @@ def test_pass_count_is_bounded(tmp_path: Path):
 
     with pytest.raises(LatexBuildError, match="between 1 and 4"):
         build_latex_pdf(source, tmp_path / "out.pdf", root=tmp_path, xelatex_bin=str(fake_xelatex), passes=0)
+
+
+def test_log_quality_uses_final_pass_only():
+    first = "LaTeX Warning: There were undefined references. Rerun to get cross-references right."
+    final = "Output written on out.pdf (3 pages)."
+    quality = _log_quality([first, final])
+    assert quality["strict_failures"] == []
+
+
+def test_log_quality_rejects_missing_glyph_and_overflow():
+    final = "\n".join(
+        [
+            "Missing character: There is no X in font Example;",
+            "Overfull \\hbox (3.0pt too wide) in paragraph",
+            "Overfull \\vbox (2.0pt too high) has occurred",
+        ]
+    )
+    quality = _log_quality([final])
+    assert set(quality["strict_failures"]) == {
+        "missing_characters",
+        "overfull_hbox",
+        "overfull_vbox",
+    }
