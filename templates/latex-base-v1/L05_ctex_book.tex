@@ -1,0 +1,17 @@
+\documentclass[11pt,a4paper,openany]{ctexbook}
+\usepackage{fontspec,geometry,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype,fancyhdr,titlesec}
+\usepackage[most]{tcolorbox}
+\geometry{inner=25mm,outer=20mm,top=22mm,bottom=24mm,headsep=7mm}
+\setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
+\setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
+\definecolor{accent}{HTML}{4A5260}\definecolor{rulec}{HTML}{A56A43}\definecolor{soft}{HTML}{F7F5F1}
+\pagestyle{fancy}\fancyhf{}\fancyhead[LE,RO]{\small\sffamily\color{accent}LaTeX Template Benchmark}\fancyhead[RE,LO]{\small\sffamily\leftmark}\fancyfoot[C]{\thepage}
+\titleformat{\chapter}[display]{\bfseries\sffamily\color{accent}}{\filleft\fontsize{44}{48}\selectfont\thechapter}{1ex}{\titlerule[1pt]\vspace{1.4ex}\Huge}
+\titleformat{\section}{\Large\bfseries\sffamily\color{accent}}{\thesection}{.8em}{}
+\setlength{\parindent}{2em}\setlength{\parskip}{.25em}\linespread{1.22}\selectfont
+\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=soft,colframe=rulec,boxrule=0pt,borderline west={2pt}{0pt}{rulec},sharp corners]\textbf{#1。} #2\end{tcolorbox}}
+\begin{document}
+\frontmatter\thispagestyle{empty}\vspace*{45mm}\begin{center}{\fontsize{30}{36}\selectfont\bfseries\sffamily LaTeX 文档模板对比基准}\par\vspace{8mm}{\Large L05 · CTeX Book / Editorial}\par\vspace{18mm}\color{accent}适合教材、指南与长篇知识文档\end{center}\clearpage\tableofcontents\mainmatter
+\chapter{LaTeX 排印系统}
+\input{benchmark-content.tex}
+\end{document}
