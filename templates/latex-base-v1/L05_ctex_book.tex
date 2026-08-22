@@ -1,17 +1,23 @@
 \documentclass[11pt,a4paper,openany]{ctexbook}
-\usepackage{fontspec,geometry,xcolor,booktabs,tabularx,amsmath,amssymb,tikz,microtype,fancyhdr,titlesec}
+\usepackage{fontspec,geometry,xcolor,booktabs,tabularx,longtable,amsmath,amssymb,tikz,pgfplots,microtype,fancyhdr,titlesec,graphicx,caption,setspace,enumitem,needspace,xurl}
 \usepackage[most]{tcolorbox}
-\geometry{inner=25mm,outer=20mm,top=22mm,bottom=24mm,headsep=7mm}
+\usetikzlibrary{positioning,arrows.meta}
+\pgfplotsset{compat=1.18}
+\geometry{inner=28mm,outer=23mm,top=24mm,bottom=27mm,headsep=7mm,headheight=14pt}
 \setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}
 \setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
 \definecolor{accent}{HTML}{4A5260}\definecolor{rulec}{HTML}{A56A43}\definecolor{soft}{HTML}{F7F5F1}
-\pagestyle{fancy}\fancyhf{}\fancyhead[LE,RO]{\small\sffamily\color{accent}LaTeX Template Benchmark}\fancyhead[RE,LO]{\small\sffamily\leftmark}\fancyfoot[C]{\thepage}
-\titleformat{\chapter}[display]{\bfseries\sffamily\color{accent}}{\filleft\fontsize{44}{48}\selectfont\thechapter}{1ex}{\titlerule[1pt]\vspace{1.4ex}\Huge}
+\pagestyle{fancy}\fancyhf{}\fancyhead[LE,RO]{\small\sffamily\color{accent}EDITORIAL BOOK}\fancyhead[RE,LO]{\small\sffamily\leftmark}\fancyfoot[C]{\thepage}\renewcommand{\headrulewidth}{.3pt}
+\titleformat{\chapter}[display]{\bfseries\sffamily\color{accent}}{\filleft\fontsize{46}{50}\selectfont\thechapter}{1ex}{\titlerule[1pt]\vspace{1.4ex}\Huge}
 \titleformat{\section}{\Large\bfseries\sffamily\color{accent}}{\thesection}{.8em}{}
-\setlength{\parindent}{2em}\setlength{\parskip}{.25em}\linespread{1.22}\selectfont
-\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=soft,colframe=rulec,boxrule=0pt,borderline west={2pt}{0pt}{rulec},sharp corners]\textbf{#1。} #2\end{tcolorbox}}
+\titleformat{\subsection}{\large\bfseries\sffamily\color{accent}}{\thesubsection}{.8em}{}
+\titlespacing*{\section}{0pt}{2.0ex plus .4ex}{1.0ex}\titlespacing*{\subsection}{0pt}{1.6ex plus .3ex}{.8ex}
+\setlength{\parindent}{2em}\setlength{\parskip}{.22em}\setstretch{1.50}
+\setlist{topsep=.45em,itemsep=.3em}\captionsetup{font=small,labelfont=bf,skip=7pt}
+\newcommand{\BenchCallout}[2]{\begin{tcolorbox}[breakable,colback=soft,colframe=rulec,boxrule=0pt,borderline west={2.2pt}{0pt}{rulec},sharp corners,before skip=8pt,after skip=8pt,left=10pt,right=8pt,top=7pt,bottom=7pt]\textbf{#1。} #2\end{tcolorbox}}
 \begin{document}
-\frontmatter\thispagestyle{empty}\vspace*{45mm}\begin{center}{\fontsize{30}{36}\selectfont\bfseries\sffamily LaTeX 文档模板对比基准}\par\vspace{8mm}{\Large L05 · CTeX Book / Editorial}\par\vspace{18mm}\color{accent}适合教材、指南与长篇知识文档\end{center}\clearpage\tableofcontents\mainmatter
-\chapter{LaTeX 排印系统}
-\input{benchmark-content.tex}
+\frontmatter\thispagestyle{empty}\vspace*{44mm}\begin{center}{\fontsize{31}{38}\selectfont\bfseries\sffamily LaTeX 第二轮压力测试}\par\vspace{8mm}{\Large L05 · CTeX Editorial Book}\par\vspace{6mm}{\large 正文基线：1.50 倍行距}\par\vspace{16mm}\color{accent}教材、指南与连续阅读型知识产品\end{center}\clearpage
+\tableofcontents\mainmatter
+\chapter{排版稳定性压力测试}
+\input{round2-stress-content.tex}
 \end{document}
