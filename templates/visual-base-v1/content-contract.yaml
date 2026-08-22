@@ -1,0 +1,31 @@
+version: 1
+id: GENERIC_CONTENT_SLOTS_V1
+purpose: >-
+  Provide one neutral content contract that can feed any accepted visual base template.
+  Business/content semantics live in the staging layer; visual templates only consume these slots.
+required:
+  id: string
+  section: string
+  code: string
+  level: string
+  duration: string
+  title: string
+  context: string
+  path: list[string]
+  points: list[string]
+  next: list[string]
+  warnings: list[string]
+optional:
+  checks: list[string]
+  labels: map[string,string]
+  practice_instruction: string
+  summary_prompt: string
+  review_prompt: string
+rules:
+  - Templates must export render(data).
+  - Templates must not import project/private business sources.
+  - Labels may be overridden per product type without changing template code.
+  - Missing optional labels fall back to neutral generic labels.
+  - Template selection happens only after content has been normalized to this contract.
+  - Random selection is permitted only from templates whose user acceptance state is ACCEPTED.
+  - Future templates are additive; they join the random pool only after independent acceptance.
