@@ -1,5 +1,5 @@
-version: 1
-status: ROUND1_CANDIDATES_MACHINE_RENDERED
+version: 2
+status: ROUND2_STRESS_ACCEPTED_SESSION_EVIDENCE
 canonical_backend: xelatex
 engine_policy:
   authored_pdf_backend: xelatex
@@ -7,21 +7,71 @@ engine_policy:
   reportlab_authored_layout: NONCANONICAL_LEGACY_ONLY
   shell_escape: false
   cjk: CTeX_or_xeCJK
+  latex_build_capability: xelatex-pdf-build-v2
+  strict_final_log_gate: true
 candidate_count: 5
 random_pool_enabled: false
-benchmark:
-  file: benchmark-content.tex
+production_acceptance: PENDING_ROUND3
+
+typography_baseline:
+  body_size_pt_range: [10.5, 11.5]
+  chinese_leading_guidance: 'For these A4 bases, approximately 1.45-1.55 line spacing; visual review remains authoritative.'
+  paragraph_indent: 2em
+  rule: >-
+    Chinese prose must remain comfortable across multi-page continuous reading. Compile success alone cannot accept
+    line spacing, line length, paragraph rhythm, heading whitespace, or page balance.
+
+round2_benchmark:
+  file: round2-stress-content.tex
+  external_page_fixture_source: source-page-fixture.tex
+  external_page_fixture_sha256: 23220bfe47ab463a996010587e4e80f87e9b0edbeba12e7b368e8aac668c5a34
   neutral_content: true
   same_content_for_all_candidates: true
   required_features:
-    - chinese_long_form_prose
-    - heading_hierarchy
-    - display_math
-    - table
+    - long_chinese_prose
+    - dense_and_intentionally_sparse_pages
+    - multi_page_sections
+    - long_wrapped_headings
+    - breakable_longtable_with_repeated_header
+    - inline_display_and_aligned_equations
     - tikz_figure
-    - callout
-    - header_footer
-    - natural_pagination
+    - pgfplots_figure
+    - externally_compiled_pdf_page_placement
+    - captions
+    - footnotes
+    - quotations
+    - lists
+    - long_url_wrapping
+    - toc_headers_footers_and_transitions
+    - orphan_heading_pressure
+    - font_coverage_pressure
+    - grayscale_structure_distinctness
+  combined_review:
+    page_count: 53
+    dpi: 200
+    sha256: a09cc17e39b8c3ddbc5759d6e481fdce8df179c0ae2c5ad697931adff507808a
+    preflight: PASS
+    every_page_rendered: true
+    chatgpt_visual_review: PASS
+    defects:
+      clipping: 0
+      overlap: 0
+      broken_cjk_glyphs: 0
+      accidental_blank_or_near_blank_pages: 0
+      table_overflow: 0
+      figure_crop: 0
+
+strict_log_gate:
+  final_pass_zero_required:
+    - missing_characters
+    - overfull_hbox
+    - overfull_vbox
+    - undefined_references
+    - rerun_needed
+  negative_test:
+    case: unsupported_emoji_missing_glyph
+    result: REJECTED_AS_EXPECTED
+
 candidates:
   - id: L01
     name: KOMA Report
@@ -29,49 +79,80 @@ candidates:
     family: professional-report
     upstream_basis: KOMA-Script scrreprt
     upstream_license: LPPL-1.3c
-    round1_machine_compile: PASS
+    line_spacing: 1.46
+    round2_pages: 12
+    round2_sha256: 860987af3e2800b2ac9f9cdbeac17005e55396c7f351fdff907511602fd464cb
+    round2_machine: PASS
+    round2_visual: PASS
+    round3_candidate: true
   - id: L02
     name: Memoir Book
     file: L02_memoir_book.tex
     family: long-form-book
     upstream_basis: memoir
     upstream_license: LPPL-1.3c
-    round1_machine_compile: PASS
+    line_spacing: approx_1.50
+    round2_pages: 10
+    round2_sha256: 3a4a200f47493f4c38c3b6c76e18898ac5798bd0eda0643833fd35979c8f52d9
+    round2_machine: PASS
+    round2_visual: PASS
+    round3_candidate: true
   - id: L03
     name: Margin Handout
     file: L03_margin_handout.tex
     family: margin-note-handout
     upstream_basis: CTeX article + marginnote; Tufte-style information architecture
     upstream_license: package-specific upstream licenses
-    round1_machine_compile: PASS
-    note: direct tufte-handout class was compile-probed and rejected for this CJK path after a page-mark/lowercase incompatibility surfaced
+    line_spacing: 1.52
+    round2_pages: 9
+    round2_sha256: 3e204501552d4179e9bfff19277118558f694b5546d08439f60840cf307a1819
+    round2_machine: PASS
+    round2_visual: PASS
+    round3_candidate: true
   - id: L04
     name: CTeX Technical Manual
     file: L04_ctex_manual.tex
     family: technical-manual
     upstream_basis: CTeX article + tcolorbox
     upstream_license: package-specific upstream licenses
-    round1_machine_compile: PASS
+    line_spacing: 1.48
+    round2_pages: 10
+    round2_sha256: 85ae63a89314a353275643473bf7e35d967c988c148b14477e93f0a1e65f4732
+    round2_machine: PASS
+    round2_visual: PASS
+    round3_candidate: true
   - id: L05
     name: CTeX Editorial Book
     file: L05_ctex_book.tex
     family: editorial-book
     upstream_basis: CTeX book + standard LaTeX page-style/title packages
     upstream_license: package-specific upstream licenses
-    round1_machine_compile: PASS
+    line_spacing: 1.50
+    round2_pages: 12
+    round2_sha256: 0c626c773df9750e3aece60ff50f17857ee675073c0d0ce3adf491f92246f257
+    round2_machine: PASS
+    round2_visual: PASS
+    round3_candidate: true
+
+round2_rejections_and_fixes:
+  - failure: round1_chinese_leading_too_tight
+    disposition: FIXED_AND_REBUILT
+  - failure: incidental_near_empty_page_after_float_list_transition_in_early_stress_build
+    disposition: FIXED_BENCHMARK_FLOW_AND_REBUILT
+
 three_round_acceptance:
   round1:
-    status: COMPLETE_LOCAL_EVIDENCE
+    status: COMPLETE
     goal: migrate architecture to XeLaTeX and establish five compiling candidates
   round2:
-    status: PENDING
+    status: COMPLETE_SESSION_EVIDENCE
     goal: stress-test, compare and refine the five families
   round3:
     status: PENDING
     goal: real consumer PDF build, full-page visual acceptance, hash-bound freeze
 final_acceptance_requires:
-  - round2_stress_gate_pass
   - round3_real_consumer_pdf_pass
   - full_page_render_review
   - no_clipping_overlap_broken_glyphs
   - accepted_sha256_receipts
+  - production_pool_activation_after_round3_only
