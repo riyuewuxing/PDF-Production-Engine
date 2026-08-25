@@ -1,0 +1,168 @@
+name: Foundation Execution Package
+
+on:
+  push:
+    branches:
+      - 'job-foundation/**'
+    paths:
+      - '.engine-job/**'
+      - '.github/workflows/foundation-execution-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  foundation-package:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout public Engine and materialized package
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install package runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'PyYAML>=6,<7'
+
+      - name: Verify bindings and execute no-PDF foundation package
+        id: execute
+        continue-on-error: true
+        run: |
+          rm -rf .engine-job/output
+          mkdir -p .engine-job/output
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess, time, yaml
+
+          manifest_path = Path('.engine-job/execution-package.yaml')
+          manifest = yaml.safe_load(manifest_path.read_text(encoding='utf-8')) or {}
+          if manifest.get('version') != 1:
+              raise SystemExit('execution-package version must be 1')
+          if manifest.get('privacy') != 'public-nonsecret':
+              raise SystemExit('foundation package must be public-nonsecret')
+          if manifest.get('product_pdf_allowed') is not False:
+              raise SystemExit('foundation package must forbid product PDF generation')
+          source_commit = manifest.get('source_commit')
+          if not isinstance(source_commit, str) or len(source_commit) != 40 or any(c not in '0123456789abcdef' for c in source_commit):
+              raise SystemExit('source_commit must be lowercase 40-hex')
+          workdir = Path(str(manifest.get('workdir') or '')).resolve()
+          repo = Path.cwd().resolve()
+          if repo != workdir and repo not in workdir.parents:
+              raise SystemExit('workdir escapes checkout')
+          if not workdir.is_dir():
+              raise SystemExit('materialized workdir missing')
+
+          def git_blob_sha1(data: bytes) -> str:
+              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
+
+          verified_files = []
+          declared_scripts = set()
+          for item in manifest.get('files') or []:
+              if not isinstance(item, dict):
+                  raise SystemExit('files item must be mapping')
+              raw = item.get('path')
+              if not isinstance(raw, str) or not raw or '/' in raw or '\\' in raw or raw in {'.','..'}:
+                  raise SystemExit(f'package file must be simple filename: {raw!r}')
+              path = (workdir / raw).resolve()
+              if path.parent != workdir or not path.is_file():
+                  raise SystemExit(f'materialized package file missing: {raw}')
+              data = path.read_bytes()
+              blob = git_blob_sha1(data)
+              sha256 = hashlib.sha256(data).hexdigest()
+              expected_blob = item.get('expected_git_blob_sha1')
+              if expected_blob is not None and blob != expected_blob:
+                  raise SystemExit(f'source materialization mismatch for {raw}: expected git blob {expected_blob}, got {blob}')
+              verified_files.append({
+                  'path': raw,
+                  'source_path': item.get('source_path'),
+                  'origin': item.get('origin', 'qiuzhidaren-source-commit'),
+                  'git_blob_sha1': blob,
+                  'sha256': sha256,
+              })
+              declared_scripts.add(raw)
+
+          commands = manifest.get('commands') or []
+          if not isinstance(commands, list) or not commands:
+              raise SystemExit('commands must be non-empty list')
+          results = []
+          for command in commands:
+              if not isinstance(command, list) or len(command) not in {2,3}:
+                  raise SystemExit(f'command shape forbidden: {command!r}')
+              if command[0] != 'python' or command[1] not in declared_scripts:
+                  raise SystemExit(f'only declared materialized Python scripts may execute: {command!r}')
+              if len(command) == 3 and command[2] != '--selftest':
+                  raise SystemExit(f'only --selftest optional argument is allowed: {command!r}')
+              if not str(command[1]).endswith('.py'):
+                  raise SystemExit('command target must be Python file')
+              started = time.monotonic()
+              proc = subprocess.run(command, cwd=workdir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+              results.append({
+                  'command': command,
+                  'exit_code': proc.returncode,
+                  'duration_seconds': round(time.monotonic() - started, 6),
+                  'output': proc.stdout[-12000:],
+              })
+
+          pdfs = sorted(p.relative_to(repo).as_posix() for p in Path('.engine-job').rglob('*.pdf'))
+          all_pass = all(x['exit_code'] == 0 for x in results) and not pdfs
+          evidence = {
+              'version': 1,
+              'kind': 'qiuzhidaren-foundation-machine-evidence',
+              'status': 'MACHINE_PASS' if all_pass else 'MACHINE_FAIL',
+              'review_status': 'REVIEW_REQUIRED',
+              'source_repository': manifest.get('source_repository'),
+              'source_commit': source_commit,
+              'engine_repository': os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
+              'private_repository_access_used': False,
+              'product_pdf_generated': bool(pdfs),
+              'product_pdf_paths': pdfs,
+              'verified_materialized_files': verified_files,
+              'commands': results,
+          }
+          out = Path('.engine-job/output/foundation-machine-evidence.json')
+          out.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(evidence, ensure_ascii=False, indent=2))
+          if not all_pass:
+              raise SystemExit('foundation execution package MACHINE_FAIL')
+          PY
+
+      - name: Upload machine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qiuzhidaren-foundation-machine-evidence
+          path: .engine-job/output/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish machine status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXECUTION_OUTCOME: ${{ steps.execute.outcome }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          outcome = os.environ.get('EXECUTION_OUTCOME')
+          state = 'success' if outcome == 'success' else 'failure'
+          description = 'Foundation materialized package passed' if state == 'success' else 'Foundation materialized package failed; inspect machine evidence'
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+              data=json.dumps({'state':state,'context':'pdf-engine/foundation-execution-package','description':description}).encode(),
+              headers={'Authorization':f"Bearer {os.environ['GH_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as response:
+              assert response.status == 201
+          if state != 'success':
+              raise SystemExit('foundation package failed')
+          PY
