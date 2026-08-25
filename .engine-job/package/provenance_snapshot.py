@@ -283,6 +283,14 @@ def validate_snapshot(snapshot: dict[str, Any], *, root: Path = ROOT, mode: str 
 
 
 def validate_snapshot_binding(root: Path, binding: Any, *, mode: str = "structure") -> tuple[dict[str, Any] | None, list[str]]:
+    """Validate a snapshot binding and hydrate its stable dependency identity.
+
+    The dependency identity is derivable only after the snapshot file itself has passed
+    exact path/hash and internal-identity checks. Callers that constructed the compact
+    `path + sha256 + kind` binding therefore receive the canonical derived field in the
+    same in-memory mapping before persisting an Artifact Job. A conflicting declared
+    value remains a hard failure.
+    """
     errors: list[str] = []
     if not isinstance(binding, dict):
         return None, ["source_snapshot_binding: must be a mapping"]
@@ -290,8 +298,6 @@ def validate_snapshot_binding(root: Path, binding: Any, *, mode: str = "structur
         errors.append("source_snapshot_binding.kind must be repository_snapshot")
     if not is_sha256(binding.get("sha256")):
         errors.append("source_snapshot_binding.sha256 invalid")
-    if not is_sha256(binding.get("dependency_identity_sha256")):
-        errors.append("source_snapshot_binding.dependency_identity_sha256 invalid")
     try:
         path = safe_repo_path(root, binding.get("path"), must_exist=True)
     except Exception as exc:
@@ -305,7 +311,14 @@ def validate_snapshot_binding(root: Path, binding: Any, *, mode: str = "structur
     except Exception as exc:
         return None, errors + [f"source_snapshot_binding: unreadable YAML: {exc}"]
     errors.extend(validate_snapshot(snapshot, root=root, mode=mode))
-    if binding.get("dependency_identity_sha256") != snapshot.get("dependency_identity_sha256"):
+    snapshot_dep = snapshot.get("dependency_identity_sha256")
+    declared_dep = binding.get("dependency_identity_sha256")
+    if declared_dep is None and is_sha256(snapshot_dep) and not errors:
+        binding["dependency_identity_sha256"] = str(snapshot_dep)
+        declared_dep = snapshot_dep
+    elif not is_sha256(declared_dep):
+        errors.append("source_snapshot_binding.dependency_identity_sha256 invalid")
+    if declared_dep != snapshot_dep:
         errors.append("source_snapshot_binding: dependency identity differs from snapshot")
     try:
         expected_path = snapshot_target(snapshot, root=root)
@@ -342,15 +355,18 @@ def selftest() -> int:
             print("FAIL: source commit disappeared from audit record identity"); return 1
         if validate_snapshot(one, root=root, mode="structure"):
             print("FAIL: valid snapshot structure rejected"); return 1
-        target = write_snapshot(one, root=root); sb = snapshot_binding(one, target, root=root)
-        _, found = validate_snapshot_binding(root, sb, mode="live")
+        target = write_snapshot(one, root=root)
+        compact = {"path": target.relative_to(root).as_posix(), "sha256": sha256_file(target), "kind": "repository_snapshot"}
+        _, found = validate_snapshot_binding(root, compact, mode="live")
         if found:
             print("FAIL: valid live snapshot rejected", found); return 1
+        if compact.get("dependency_identity_sha256") != one.get("dependency_identity_sha256"):
+            print("FAIL: verified compact binding was not hydrated with dependency identity"); return 1
         (root / "a.txt").write_text("changed\n", encoding="utf-8")
-        _, found = validate_snapshot_binding(root, sb, mode="live")
+        _, found = validate_snapshot_binding(root, compact, mode="live")
         if not found:
             print("FAIL: changed live bytes escaped snapshot verification"); return 1
-        _, historical_structure = validate_snapshot_binding(root, sb, mode="structure")
+        _, historical_structure = validate_snapshot_binding(root, compact, mode="structure")
         if historical_structure:
             print("FAIL: historical structure should not depend on current path bytes", historical_structure); return 1
     print("PASS: provenance snapshot selftest")
