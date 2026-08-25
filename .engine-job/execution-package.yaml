@@ -1,0 +1,42 @@
+version: 1
+kind: qiuzhidaren-foundation-runtime-validation
+privacy: public-nonsecret
+source_repository: riyuewuxing/qiuzhidaren
+source_commit: c748bdac0211681c19bcfc5f667de823c7f4cb45
+engine_base_commit: 03565ad9403b210ddf2d973a3059339049f6c477
+product_pdf_allowed: false
+workdir: .engine-job/package
+files:
+  - path: artifact_foundation.py
+    source_path: tools/artifact_foundation.py
+    expected_git_blob_sha1: 0fab2366b54cef81db335b97419310e6b921f359
+  - path: provenance_snapshot.py
+    source_path: tools/provenance_snapshot.py
+    expected_git_blob_sha1: b9878bb63a54a1dbc84fa00324d7fc6d1a86b5dc
+  - path: init_artifact_job.py
+    source_path: tools/init_artifact_job.py
+    expected_git_blob_sha1: 2bbd646aacce420a1bc175fa693956df65981e95
+  - path: check_execution_ledger.py
+    source_path: tools/check_execution_ledger.py
+    expected_git_blob_sha1: 7f25469306e15331d716cbcd7c9f57d2812ab99e
+  - path: check_artifact_job.py
+    source_path: tools/check_artifact_job.py
+    expected_git_blob_sha1: 34b0099c156553fec396ffea4ceef2a09cba202b
+  - path: reuse_identity_probe.py
+    origin: orchestrator-generated-runtime-probe
+commands:
+  - [python, provenance_snapshot.py, --selftest]
+  - [python, init_artifact_job.py, --selftest]
+  - [python, check_execution_ledger.py, --selftest]
+  - [python, reuse_identity_probe.py]
+  - [python, check_artifact_job.py, --selftest]
+expected_boundary:
+  private_repository_credentials: forbidden
+  private_repository_checkout: forbidden
+  private_repository_writeback: forbidden
+  human_review_pass: forbidden
+  product_pdf_generation: forbidden
+result_contract:
+  machine_status: MACHINE_PASS_or_MACHINE_FAIL
+  review_status: REVIEW_REQUIRED
+  evidence_file: .engine-job/output/foundation-machine-evidence.json
