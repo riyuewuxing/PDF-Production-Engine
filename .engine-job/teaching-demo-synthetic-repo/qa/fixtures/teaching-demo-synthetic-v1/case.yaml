@@ -18,9 +18,9 @@ input:
   source_pages:
     mode: remote-pdf
     repo: synthetic-fixtures/teaching-demo
-    ref: 1111111111111111111111111111111111111111
+    ref: '1111111111111111111111111111111111111111'
     path: fixtures/synthetic-source.pdf
-    blob_sha: 2222222222222222222222222222222222222222
+    blob_sha: '2222222222222222222222222222222222222222'
     size_bytes: 120000
     pages: [1]
 deliverables:
