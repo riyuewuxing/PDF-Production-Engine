@@ -1,0 +1,218 @@
+version: 1
+id: teacher-trial-two-pdf-v1
+
+case_manifest:
+  schema_id: teacher-trial-case-v1
+  schema_version: 1
+  formal_schema_required: true
+  ready_status:
+    source_role: evidence
+    field: scaffold_status
+    value: READY
+  scaffold:
+    source_files:
+      evidence: evidence.yaml
+      board: BOARD_PLAN.yaml
+      reference_plan: 01_训练参考教案.md
+      exam_skeleton: 02_考场骨架教案.md
+      trial: 03_逐字稿.md
+      defense: 04_课题专属答辩.md
+      analysis: 05_教材到骨架提炼解析.md
+    deliverable_templates:
+      training: '{title}｜面试训练稿.pdf'
+      extraction: '{title}｜教材到骨架提炼解析.pdf'
+    default_constraints:
+      board_sections_min: 3
+      figure_count_min: 0
+
+# Reproducibility profile. A receiving AI must plan these bytes explicitly rather than
+# relying on prior-chat knowledge of the Teaching Demo implementation.
+artifact_job_profile:
+  plan_schema_id: teaching-demo-artifact-input-plan-v1
+  module_id: teacher_teaching_demo
+  planner: tools/plan_teaching_demo_artifact_job.py
+  locker: tools/lock_artifact_input_plan.py
+  output_root: production/teaching-demo-artifact-plans
+  include_case_manifest: true
+  source_commit_required: true
+  workspace_source_roles:
+    - evidence
+    - board
+    - reference_plan
+    - exam_skeleton
+    - trial
+    - defense
+    - analysis
+  repository_dependencies:
+    # build_current_run.py is already bound separately as Artifact Job builder_binding.
+    - {path: production/contracts/module-registry-v1.yaml, kind: module_registry}
+    - {path: production/contracts/artifact-job-v1.yaml, kind: artifact_contract}
+    - {path: production/contracts/execution-ledger-v1.yaml, kind: execution_ledger_contract}
+    - {path: production/contracts/repository-provenance-snapshot-v1.yaml, kind: provenance_snapshot_contract}
+    - {path: tools/run_acceptance.py, kind: golden_path_orchestrator}
+    - {path: tools/provenance_snapshot.py, kind: provenance_snapshot_tool}
+    - {path: tools/lock_artifact_input_plan.py, kind: input_plan_locker}
+    - {path: tools/check_teaching_demo_case.py, kind: case_gate}
+    - {path: tools/check_teaching_demo_inputs.py, kind: prebuild_gate}
+    - {path: tools/publisher_core.py, kind: publisher_core}
+    - {path: tools/check_current_run.py, kind: module_checker}
+    - {path: tools/render_current_run.py, kind: render_adapter}
+    - {path: tools/pdf_text_occupancy.py, kind: render_qa_dependency}
+    - {path: tools/latex_inline.py, kind: publisher_dependency}
+    - {path: tools/physics_notation.py, kind: semantic_gate_dependency}
+    - {path: tools/physics_figures.py, kind: figure_loader_dependency}
+    - {path: tools/board_contract.py, kind: board_dependency}
+    - {path: tools/skeleton_density.py, kind: skeleton_dependency}
+    - {path: tools/plan_teaching_demo_artifact_job.py, kind: input_planner}
+  figure_dependencies:
+    marker_regex: '\[\[FIGURE:([a-z0-9-]+)\]\]'
+    registry: production/components/figures/registry.yaml
+    component_root: production/components/figures
+    include_registry_when_any_figure_used: true
+    include_only_used_components: true
+    unknown_marker: fail
+  recommended_review_blocks:
+    - id: source-boundary
+      source_roles: [evidence]
+    - id: board-skeleton
+      source_roles: [board, exam_skeleton]
+    - id: trial-script
+      source_roles: [trial]
+    - id: support-materials
+      source_roles: [reference_plan, defense, analysis]
+  invariants:
+    hidden_chat_memory_required: false
+    planner_generates_content: false
+    planner_accepts_blocks: false
+    planner_starts_pdf_build: false
+    input_plan_is_content_addressed: true
+    lock_operator_rechecks_current_hashes: true
+    plan_file_is_bound_by_locker: true
+    repository_snapshot_is_content_addressed: true
+    repository_snapshot_carries_source_commit: true
+    historical_verification_does_not_require_current_path_bytes: true
+    engine_private_repository_access_required: false
+
+documents:
+  training:
+    deliverable_role: training
+    tex_filename: 01_面试训练稿.tex
+    header_kind: 面试训练稿
+    title_suffix: 面试训练稿
+    subtitle: 题面 → 训练参考教案 → 考场骨架 → 约15分钟逐字稿 → 课题专属答辩
+    sections:
+      - role: source_pages
+        heading: 一、题目 / 教材原页
+        renderer: source_pages
+      - role: reference_plan
+        heading: 二、训练参考教案
+        renderer: markdown
+        source_role: reference_plan
+      - role: exam_skeleton
+        heading: 三、考场骨架教案
+        renderer: markdown
+        source_role: exam_skeleton
+        include_total_board: true
+      - role: trial
+        heading: 四、约15分钟逐字稿
+        renderer: markdown
+        source_role: trial
+        consume_board_markers: true
+        include_total_board: true
+      - role: defense
+        heading: 五、本课题专属答辩
+        renderer: markdown
+        source_role: defense
+  extraction:
+    deliverable_role: extraction
+    tex_filename: 02_教材到骨架提炼解析.tex
+    header_kind: 教材到骨架提炼解析
+    title_suffix: 教材到骨架提炼解析
+    subtitle: 从题面证据到考场提示词：边界、找点、串点、压缩、板书
+    renderer: markdown
+    source_role: analysis
+
+render:
+  dpi: 200
+
+publication:
+  publisher: XeLaTeX
+  require_global_typography: true
+  require_symbol_notation_lint: true
+  forbid_case_id_leak: true
+  forbidden_engineering_regexes:
+    - '\bP\d+\b'
+    - '\bB\d+\b'
+
+source_policy:
+  require_source_pages: true
+  require_locked_identity: true
+  require_resilient_transport: true
+
+manifest_constraints:
+  allowed:
+    - board_sections_min
+    - figure_count_min
+  required:
+    - board_sections_min
+    - figure_count_min
+
+qa:
+  training_deliverable_role: training
+  extraction_deliverable_role: extraction
+  require_training_section_new_page: true
+  skeleton_section_role: exam_skeleton
+  trial_section_role: trial
+  defense_section_role: defense
+  homework_solution_section_role: reference_plan
+
+  content_preflight:
+    teaching_boundary_required_fields: [must_teach, out_of_scope]
+    point_chain_min: 4
+    point_chain_max: 6
+    require_point_ids_match_board_increments: true
+    require_trial_board_marker_sequence_match_point_chain: true
+    lesson_closure_required_fields:
+      - conditions_or_boundary
+      - core_relation
+      - model_or_evidence
+      - application_or_check
+      - common_error_or_boundary
+    route_anchor_min_when_present: 4
+    route_anchor_max_when_present: 6
+
+  exam_skeleton_section_pages_max: 1
+
+  skeleton_density:
+    max_nonspace_chars: 800
+    min_content_lines: 7
+    max_content_lines: 28
+    max_avg_visible_chars_per_line: 46
+    max_single_line_visible_chars: 96
+    max_full_sentence_ratio: 0.30
+    min_cue_line_ratio: 0.60
+    max_long_prose_lines: 2
+
+  visual_occupancy:
+    enabled: true
+    min_words_for_check: 20
+    warn_below_text_bbox_height_fraction: 0.32
+    hard_fail_below_text_bbox_height_fraction: 0.26
+
+  defense_questions:
+    heading_regex: '^###\s+问题\d+'
+    min: 5
+    max: 8
+
+  homework_solution:
+    required: true
+    token: 作业参考解析
+
+  required_training_section_roles:
+    - source_pages
+    - defense
+  required_extraction_sections:
+    - 题面证据
+    - 教学边界
+    - 压缩映射
+    - 常见错误链
