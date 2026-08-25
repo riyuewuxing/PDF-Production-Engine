@@ -4,7 +4,7 @@ privacy: public-nonsecret
 synthetic_fixture: true
 source_repository: riyuewuxing/qiuzhidaren
 source_branch: sol/teaching-demo-synthetic-engine-preflight-v1
-source_commit: 18e1c743ba455df70556a012a421076fdbf87e0b
+source_commit: adaee6b73e619e74afa353fe91cb4b8cd1f47d68
 product_pdf_allowed: false
 workdir: .engine-job/teaching-demo-synthetic-repo
 manifest: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
@@ -35,10 +35,10 @@ files:
     expected_git_blob_sha1: 26356174c0693ee47c9e69b7b8ed7c8a66ed8e23
   - path: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
     source_path: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
-    expected_git_blob_sha1: 50063c84cce05008f136efe709a2c2b0f5065b57
+    expected_git_blob_sha1: 713ebc289c31dc885109567917475ed98cbb423e
   - path: qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml
     source_path: qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml
-    expected_git_blob_sha1: 5572f9e5e225ceea8bb35dd0721ea56905d4a42a
+    expected_git_blob_sha1: c7384e3a0471ce51208790262bd3bac133d00a9b
   - path: qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml
     source_path: qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml
     expected_git_blob_sha1: d592901c343bd8ef7eb3b24bb038044cdcc4cf2a
