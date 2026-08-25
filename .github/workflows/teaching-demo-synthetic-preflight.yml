@@ -1,4 +1,4 @@
-name: Teaching Demo Synthetic Preflight
+name: Teaching Demo Artifact Plan Lock
 
 on:
   push:
@@ -8,12 +8,11 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 jobs:
-  synthetic-preflight:
+  artifact-plan-lock:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - name: Checkout public Engine package
         uses: actions/checkout@v4
@@ -23,185 +22,232 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Python runtime dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install 'PyYAML>=6,<7' 'pypdf>=5,<7'
+      - name: Install lightweight runtime dependency
+        run: python -m pip install 'PyYAML>=6,<7'
 
-      - name: Install canonical XeLaTeX and fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            texlive-xetex \
-            texlive-lang-chinese \
-            texlive-latex-extra \
-            texlive-pictures \
-            texlive-science \
-            fonts-noto-cjk \
-            fonts-linuxlibertine \
-            fonts-noto-core
-          fc-cache -f
-          xelatex --version | head -n 1
-          fc-match 'Noto Serif CJK SC'
-          fc-match 'Noto Sans CJK SC'
-          fc-match 'Linux Libertine O'
-          fc-match 'Noto Sans'
-
-      - name: Verify exact materialization and run no-PDF preflight
+      - name: Plan snapshot lock and validate no-PDF Artifact Job
         id: execute
-        continue-on-error: true
         run: |
-          rm -rf .engine-job/output
-          mkdir -p .engine-job/output
           python - <<'PY'
           from pathlib import Path
-          import hashlib, json, os, subprocess, time, yaml
-
-          package_path = Path('.engine-job/teaching-demo-synthetic-execution-package.yaml')
-          package = yaml.safe_load(package_path.read_text(encoding='utf-8')) or {}
-          if package.get('version') != 1:
-              raise SystemExit('execution package version must be 1')
-          if package.get('privacy') != 'public-nonsecret':
-              raise SystemExit('synthetic preflight package must be public-nonsecret')
-          if package.get('synthetic_fixture') is not True:
-              raise SystemExit('synthetic_fixture must be true')
-          if package.get('product_pdf_allowed') is not False:
-              raise SystemExit('product PDF generation must be forbidden')
-          source_commit = package.get('source_commit')
-          if not isinstance(source_commit, str) or len(source_commit) != 40 or any(c not in '0123456789abcdef' for c in source_commit):
-              raise SystemExit('source_commit must be lowercase 40-hex')
+          import hashlib, json, os, shutil, subprocess, sys, traceback, yaml
 
           repo = Path.cwd().resolve()
-          workdir = (repo / str(package.get('workdir') or '')).resolve()
-          if repo != workdir and repo not in workdir.parents:
-              raise SystemExit('workdir escapes public Engine checkout')
-          if not workdir.is_dir():
-              raise SystemExit('materialized synthetic repository missing')
+          package_path = repo / '.engine-job/teaching-demo-artifact-plan-lock.yaml'
+          package = yaml.safe_load(package_path.read_text(encoding='utf-8')) or {}
+          out_root = repo / '.engine-job/output'
+          shutil.rmtree(out_root, ignore_errors=True)
+          out_root.mkdir(parents=True, exist_ok=True)
 
           def git_blob_sha1(data: bytes) -> str:
               return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
 
-          verified = []
-          declared_paths = set()
-          for item in package.get('files') or []:
-              if not isinstance(item, dict):
-                  raise SystemExit('files item must be mapping')
-              raw = item.get('path')
-              if not isinstance(raw, str) or not raw:
-                  raise SystemExit('materialized file path must be non-empty')
-              path = (workdir / raw).resolve()
-              if workdir != path and workdir not in path.parents:
-                  raise SystemExit(f'materialized file escapes workdir: {raw}')
-              if not path.is_file():
-                  raise SystemExit(f'materialized file missing: {raw}')
-              data = path.read_bytes()
-              blob = git_blob_sha1(data)
-              expected = item.get('expected_git_blob_sha1')
-              if blob != expected:
-                  raise SystemExit(f'exact source materialization mismatch: {raw}: expected={expected} got={blob}')
-              verified.append({
-                  'path': raw,
-                  'source_path': item.get('source_path'),
-                  'git_blob_sha1': blob,
-                  'sha256': hashlib.sha256(data).hexdigest(),
-              })
-              declared_paths.add(raw)
+          def safe_under(base: Path, raw: str) -> Path:
+              path = (base / raw).resolve()
+              if path != base and base not in path.parents:
+                  raise ValueError(f'path escapes package root: {raw}')
+              return path
 
-          manifest = str(package.get('manifest') or '')
-          if manifest not in declared_paths:
-              raise SystemExit('synthetic case manifest is not exact-source bound')
-
-          commands = package.get('commands') or []
-          if not isinstance(commands, list) or len(commands) != 2:
-              raise SystemExit('synthetic preflight must contain exactly case + prebuild commands')
-          results = []
-          for command in commands:
-              if not isinstance(command, list) or len(command) != 4:
-                  raise SystemExit(f'forbidden command shape: {command!r}')
-              if command[0] != 'python' or command[2] != '--manifest' or command[3] != manifest:
-                  raise SystemExit(f'command is outside synthetic preflight boundary: {command!r}')
-              script = command[1]
-              if script not in {'tools/check_teaching_demo_case.py', 'tools/check_teaching_demo_inputs.py'}:
-                  raise SystemExit(f'forbidden synthetic preflight script: {script}')
-              if script not in declared_paths:
-                  raise SystemExit(f'command script is not exact-source bound: {script}')
-              started = time.monotonic()
-              proc = subprocess.run(command, cwd=workdir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-              results.append({
-                  'command': command,
-                  'exit_code': proc.returncode,
-                  'duration_seconds': round(time.monotonic() - started, 6),
-                  'output': proc.stdout[-16000:],
-              })
-
-          pdfs = sorted(p.relative_to(workdir).as_posix() for p in workdir.rglob('*.pdf'))
-          case_pass = len(results) >= 1 and results[0]['exit_code'] == 0
-          prebuild_pass = len(results) >= 2 and results[1]['exit_code'] == 0
-          all_pass = case_pass and prebuild_pass and not pdfs
           evidence = {
               'version': 1,
-              'kind': 'qiuzhidaren-teaching-demo-synthetic-preflight-machine-evidence',
-              'status': 'MACHINE_PASS' if all_pass else 'MACHINE_FAIL',
+              'kind': 'qiuzhidaren-teaching-demo-artifact-plan-lock-machine-evidence',
+              'status': 'MACHINE_FAIL',
               'review_status': 'REVIEW_REQUIRED',
               'synthetic_fixture': True,
               'source_repository': package.get('source_repository'),
               'source_branch': package.get('source_branch'),
-              'source_commit': source_commit,
+              'source_commit': package.get('source_commit'),
               'engine_repository': os.environ.get('GITHUB_REPOSITORY'),
               'engine_execution_commit': os.environ.get('GITHUB_SHA'),
               'private_repository_access_used': False,
-              'case_gate_pass': case_pass,
-              'prebuild_semantic_gate_pass': prebuild_pass,
-              'canonical_xelatex_font_probe_required': True,
-              'canonical_xelatex_font_probe_pass': prebuild_pass,
-              'font_probe_product_delivery': False,
-              'product_pdf_generated': bool(pdfs),
-              'product_pdf_paths': pdfs,
-              'verified_materialized_files': verified,
-              'commands': results,
+              'product_pdf_generated': False,
+              'human_acceptance_performed': False,
+              'publication_performed': False,
+              'system_qualification_performed': False,
               'claims_not_proven': [
-                  'real_business_topic_quality',
-                  'real_textbook_source_validity',
+                  'content_block_human_acceptance',
+                  'product_build',
+                  'product_machine_verification',
                   'formal_product_pdf_generation',
                   'human_delivery_acceptance',
+                  'publication',
                   'system_qualification',
               ],
           }
-          out = Path('.engine-job/output/teaching-demo-synthetic-preflight-evidence.json')
-          out.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-          print(json.dumps(evidence, ensure_ascii=False, indent=2))
-          if not all_pass:
-              raise SystemExit('Teaching Demo synthetic preflight MACHINE_FAIL')
+
+          try:
+              if package.get('version') != 1 or package.get('privacy') != 'public-nonsecret':
+                  raise ValueError('execution package identity invalid')
+              if package.get('synthetic_fixture') is not True or package.get('product_pdf_allowed') is not False:
+                  raise ValueError('synthetic no-product-PDF boundary invalid')
+              source_commit = str(package.get('source_commit') or '')
+              if len(source_commit) != 40 or any(c not in '0123456789abcdef' for c in source_commit):
+                  raise ValueError('source_commit must be lowercase 40-hex')
+
+              workdir = safe_under(repo, str(package.get('workdir') or ''))
+              if not workdir.is_dir():
+                  raise ValueError('materialized synthetic repository missing')
+
+              verified = []
+              declared = set()
+              for item in package.get('files') or []:
+                  if not isinstance(item, dict):
+                      raise ValueError('files entry must be a mapping')
+                  raw = str(item.get('path') or '')
+                  expected = str(item.get('expected_git_blob_sha1') or '')
+                  if not raw or len(expected) != 40:
+                      raise ValueError(f'invalid source binding: {item!r}')
+                  path = safe_under(workdir, raw)
+                  if not path.is_file():
+                      raise ValueError(f'materialized source missing: {raw}')
+                  data = path.read_bytes()
+                  actual = git_blob_sha1(data)
+                  if actual != expected:
+                      raise ValueError(f'exact source mismatch: {raw}: expected={expected} got={actual}')
+                  verified.append({'path': raw, 'git_blob_sha1': actual, 'sha256': hashlib.sha256(data).hexdigest()})
+                  declared.add(raw)
+
+              required_exec = {
+                  'tools/plan_teaching_demo_artifact_job.py',
+                  'tools/init_artifact_job.py',
+                  'tools/lock_artifact_input_plan.py',
+                  'tools/manage_artifact_job.py',
+                  'tools/check_artifact_job.py',
+                  'tools/check_execution_ledger.py',
+                  'tools/provenance_snapshot.py',
+                  'tools/artifact_foundation.py',
+                  'production/contracts/module-registry-v1.yaml',
+                  'production/contracts/artifact-job-v1.yaml',
+                  'production/contracts/execution-ledger-v1.yaml',
+                  'production/contracts/repository-provenance-snapshot-v1.yaml',
+                  'production/contracts/teacher-trial-two-pdf-v1.yaml',
+                  str(package.get('manifest') or ''),
+              }
+              missing_decl = sorted(required_exec - declared)
+              if missing_decl:
+                  raise ValueError('execution dependencies are not exact-source bound: ' + ', '.join(missing_decl))
+
+              manifest = str(package['manifest'])
+              job_raw = str(package['job_path'])
+              ledger_raw = str(package['ledger_path'])
+              runtime = package.get('runtime_identity') or {}
+              runtime_name = str(runtime.get('name') or '')
+              runtime_version = str(runtime.get('version') or '')
+              if not runtime_name or not runtime_version:
+                  raise ValueError('runtime identity missing')
+
+              generated_roots = [
+                  workdir / 'production/teaching-demo-artifact-plans',
+                  workdir / 'production/provenance/repository-snapshots',
+              ]
+              for path in generated_roots:
+                  shutil.rmtree(path, ignore_errors=True)
+              for raw in (job_raw, ledger_raw):
+                  safe_under(workdir, raw).unlink(missing_ok=True)
+              existing_pdfs = sorted(p.relative_to(workdir).as_posix() for p in workdir.rglob('*.pdf'))
+              if existing_pdfs:
+                  raise ValueError('no-PDF package unexpectedly contains PDF files before planning: ' + repr(existing_pdfs))
+
+              commands = []
+              def run(command):
+                  proc = subprocess.run(command, cwd=workdir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                  commands.append({'command': command, 'exit_code': proc.returncode, 'output': proc.stdout[-16000:]})
+                  print(proc.stdout, end='')
+                  if proc.returncode:
+                      raise RuntimeError(f'command failed: {command!r}: exit={proc.returncode}')
+
+              run(['python', 'tools/plan_teaching_demo_artifact_job.py', '--manifest', manifest, '--source-commit', source_commit, '--write'])
+              plan_candidates = sorted((workdir / 'production/teaching-demo-artifact-plans/synthetic-structure-v1').glob('*.yaml'))
+              if len(plan_candidates) != 1:
+                  raise ValueError(f'exactly one content-addressed plan expected, found {len(plan_candidates)}')
+              plan_path = plan_candidates[0]
+              plan = yaml.safe_load(plan_path.read_text(encoding='utf-8')) or {}
+              if plan.get('source_commit') != source_commit:
+                  raise ValueError('plan source_commit drift')
+              job_id = str(((plan.get('execution') or {}).get('init_job_id_suggestion')) or '')
+              if not job_id:
+                  raise ValueError('planner did not provide job id suggestion')
+
+              run(['python', 'tools/init_artifact_job.py', '--module-id', 'teacher_teaching_demo', '--job-id', job_id, '--job', job_raw, '--ledger', ledger_raw])
+              plan_rel = plan_path.relative_to(workdir).as_posix()
+              run(['python', 'tools/lock_artifact_input_plan.py', '--job', job_raw, '--plan', plan_rel, '--runtime-name', runtime_name, '--runtime-version', runtime_version])
+              run(['python', 'tools/check_artifact_job.py', '--job', job_raw])
+              run(['python', 'tools/check_execution_ledger.py', '--ledger', ledger_raw, '--report'])
+
+              job_path = safe_under(workdir, job_raw)
+              ledger_path = safe_under(workdir, ledger_raw)
+              job = yaml.safe_load(job_path.read_text(encoding='utf-8')) or {}
+              ledger = yaml.safe_load(ledger_path.read_text(encoding='utf-8')) or {}
+              if job.get('state') != 'INPUTS_LOCKED':
+                  raise ValueError(f'Artifact Job did not reach INPUTS_LOCKED: {job.get("state")!r}')
+              derived = ledger.get('derived') or {}
+              if derived.get('artifact_state') != 'INPUTS_LOCKED':
+                  raise ValueError('ledger projection did not reach INPUTS_LOCKED')
+              for key in ('generation_review_cycles', 'build_count', 'final_render_count', 'review_reject_count'):
+                  if derived.get(key) != 0:
+                      raise ValueError(f'no-build phase metric must remain zero: {key}={derived.get(key)!r}')
+              human = job.get('human_acceptance') or {}
+              if human.get('state') != 'PENDING':
+                  raise ValueError('no-PDF plan/lock phase must not record HUMAN acceptance')
+              publication = job.get('publication') or {}
+              if publication.get('state') != 'NOT_PUBLISHED':
+                  raise ValueError('no-PDF plan/lock phase must not publish')
+              pdfs = sorted(p.relative_to(workdir).as_posix() for p in workdir.rglob('*.pdf'))
+              if pdfs:
+                  raise ValueError('product PDF generated during forbidden phase: ' + repr(pdfs))
+
+              snapshot_rel = str((plan.get('repository_snapshot_binding') or {}).get('path') or '')
+              snapshot_path = safe_under(workdir, snapshot_rel)
+              snapshot = yaml.safe_load(snapshot_path.read_text(encoding='utf-8')) or {}
+              provenance = job.get('build_provenance') or {}
+              fingerprint = str(provenance.get('input_fingerprint') or '')
+              if len(fingerprint) != 64:
+                  raise ValueError('Artifact Job input fingerprint missing')
+
+              evidence.update({
+                  'status': 'MACHINE_PASS',
+                  'verified_materialized_file_count': len(verified),
+                  'verified_materialized_files': verified,
+                  'commands': commands,
+                  'plan_path': plan_rel,
+                  'plan_identity_sha256': plan.get('plan_identity_sha256'),
+                  'repository_snapshot_path': snapshot_rel,
+                  'snapshot_identity_sha256': snapshot.get('snapshot_identity_sha256'),
+                  'dependency_identity_sha256': snapshot.get('dependency_identity_sha256'),
+                  'artifact_job_path': job_raw,
+                  'execution_ledger_path': ledger_raw,
+                  'artifact_state': job.get('state'),
+                  'ledger_projection': derived,
+                  'input_fingerprint': fingerprint,
+                  'runtime_identity_for_fingerprint': provenance.get('runtime_identity'),
+                  'actual_python': sys.version.split()[0],
+                  'product_pdf_generated': False,
+              })
+
+              writeback = out_root / 'writeback'
+              for src in (plan_path, snapshot_path, job_path, ledger_path):
+                  rel = src.relative_to(workdir)
+                  dst = writeback / rel
+                  dst.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, dst)
+          except Exception as exc:
+              evidence['error'] = f'{type(exc).__name__}: {exc}'
+              evidence['traceback'] = traceback.format_exc()[-16000:]
+          finally:
+              evidence_path = out_root / 'teaching-demo-artifact-plan-lock-evidence.json'
+              evidence_path.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              print(json.dumps(evidence, ensure_ascii=False, indent=2))
+
+          if evidence.get('status') != 'MACHINE_PASS':
+              raise SystemExit('Teaching Demo Artifact Plan/Lock MACHINE_FAIL')
           PY
 
-      - name: Upload machine evidence
+      - name: Upload plan lock machine evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: teaching-demo-synthetic-preflight-machine-evidence
+          name: teaching-demo-artifact-plan-lock-machine-evidence
           path: .engine-job/output/
           if-no-files-found: error
           retention-days: 7
-
-      - name: Publish machine status
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXECUTION_OUTCOME: ${{ steps.execute.outcome }}
-        run: |
-          python - <<'PY'
-          import json, os, urllib.request
-          outcome = os.environ.get('EXECUTION_OUTCOME')
-          state = 'success' if outcome == 'success' else 'failure'
-          description = 'Synthetic Teaching Demo preflight passed' if state == 'success' else 'Synthetic Teaching Demo preflight failed; inspect evidence'
-          req = urllib.request.Request(
-              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
-              data=json.dumps({'state': state, 'context': 'pdf-engine/teaching-demo-synthetic-preflight', 'description': description}).encode(),
-              headers={'Authorization': f"Bearer {os.environ['GH_TOKEN']}", 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'},
-              method='POST',
-          )
-          with urllib.request.urlopen(req) as response:
-              assert response.status == 201
-          if state != 'success':
-              raise SystemExit('synthetic Teaching Demo preflight failed')
-          PY
+          include-hidden-files: true

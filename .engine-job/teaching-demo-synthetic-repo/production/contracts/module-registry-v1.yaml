@@ -1,0 +1,87 @@
+version: 1
+id: qiuzhidaren-module-registry-v1
+authority: module-lifecycle-and-execution
+allowed_lifecycle: [ACTIVE, FROZEN, DEFERRED, EXTERNAL, RETIRED]
+legacy_contract_metadata:
+  status_fields_do_not_define_module_lifecycle: true
+  lifecycle_is_defined_only_here: true
+
+external_systems:
+  recruitment_intelligence:
+    lifecycle: EXTERNAL
+    consumer_contract: Validated Opportunity Package
+    repository_implementation: forbidden
+  pdf_production_engine:
+    lifecycle: EXTERNAL
+    repository: riyuewuxing/PDF-Production-Engine
+    role: stateless-mechanical-execution
+
+modules:
+  teacher_teaching_demo:
+    lifecycle: ACTIVE
+    entry: content/job-search/teacher/interview/teaching-demo/
+    module_contract: production/contracts/teacher-trial-two-pdf-v1.yaml
+    artifact_adapter:
+      build: tools/build_current_run.py
+      check: tools/check_current_run.py
+      render: tools/render_current_run.py
+    baseline_state: REVIEW_PASS
+    development_focus: reusable-golden-path-process-hardening
+  teacher_structured_interview:
+    lifecycle: FROZEN
+    entry: content/job-search/teacher/interview/structured/
+    module_contract: content/job-search/teacher/interview/structured/contracts/structured-material-pack-v1.yaml
+    artifact_adapter:
+      build: tools/publish_yunnan_structured.py
+      check: tools/check_structured_interview.py
+      render: null
+    baseline_state: REVIEW_PASS
+  teacher_defense:
+    lifecycle: FROZEN
+    entry: content/job-search/teacher/interview/defense/
+    module_contract: content/job-search/teacher/interview/defense/contracts/teacher-defense-material-pack-v1.yaml
+    artifact_adapter:
+      build: tools/publish_yunnan_defense.py
+      check: tools/check_teacher_defense.py
+      render: null
+    baseline_state: REVIEW_PASS
+  teacher_self_introduction:
+    lifecycle: FROZEN
+    entry: content/job-search/teacher/self-introduction/
+    module_contract: content/job-search/teacher/self-introduction/contracts/teacher-self-introduction-material-pack-v1.yaml
+    artifact_adapter:
+      build: tools/publish_yunnan_self_introduction.py
+      check: tools/check_teacher_self_introduction.py
+      render: null
+    baseline_state: REVIEW_PASS
+  teacher_resume_materials:
+    lifecycle: DEFERRED
+    entry: content/job-search/teacher/resume-materials/
+    module_contract: content/job-search/teacher/resume-materials/contracts/teacher-resume-material-pack-v1.yaml
+    artifact_adapter:
+      build: tools/publish_teacher_resume_materials_phase8.py
+      check: tools/validate_teacher_resume_materials.py
+      render: null
+    baseline_state: NOT_IN_CURRENT_GATE
+  teacher_written_exam:
+    lifecycle: DEFERRED
+    entry: content/job-search/teacher/written-exam/
+    module_contract: content/job-search/teacher/written-exam/contracts/teacher-written-exam-material-pack-v1.yaml
+    artifact_adapter:
+      build: tools/publish_teacher_written_exam_phase7.py
+      check: tools/check_teacher_written_exam.py
+      render: null
+    baseline_state: NOT_IN_CURRENT_GATE
+  teacher_position_research:
+    lifecycle: RETIRED
+    entry: content/job-search/teacher/position-research/
+    module_contract: null
+    replacement: recruitment_intelligence
+    execution_forbidden: true
+    baseline_state: HISTORICAL_REFERENCE_ONLY
+
+routing:
+  live_opportunity_input: recruitment_intelligence.Validated Opportunity Package
+  artifact_pipeline_contract: production/contracts/artifact-job-v1.yaml
+  execution_ledger_contract: production/contracts/execution-ledger-v1.yaml
+  rule: module adapters are implementation ports consumed by the unified Artifact Pipeline; they do not define independent lifecycle/state machines

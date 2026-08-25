@@ -1,0 +1,75 @@
+version: 1
+id: qiuzhidaren-repository-provenance-snapshot-v1
+authority: durable-repository-provenance
+
+repository:
+  full_name: riyuewuxing/qiuzhidaren
+  canonical_branch: main
+  source_commit_format: lowercase-40-hex
+  force_rewrite_of_canonical_history: forbidden
+
+binding:
+  identity_fields: [path, sha256, git_blob_sha1, kind]
+  path_policy: repository-relative-only
+  sha256_algorithm: SHA-256
+  git_blob_algorithm: git-blob-sha1
+  duplicate_path: forbidden
+
+snapshot:
+  schema_id: qiuzhidaren-repository-snapshot-v1
+  dependency_identity:
+    field: dependency_identity_sha256
+    algorithm: sha256-canonical-json-v1
+    basis: [version, schema_id, repository, canonical_branch, bindings]
+    excludes_source_commit: true
+    purpose: stable equality/cache-index identity for the repository dependency set
+  record_identity:
+    field: snapshot_identity_sha256
+    algorithm: sha256-canonical-json-v1
+    basis: full-record-except-snapshot_identity_sha256
+    includes_source_commit: true
+    purpose: immutable audit-record identity
+  storage_root: production/provenance/repository-snapshots
+  filename: '<snapshot_identity_sha256>.yaml'
+  immutable_content_addressed: true
+
+artifact_fingerprint_relation:
+  input_fingerprint_authority: production/contracts/artifact-job-v1.yaml
+  dependency_identity_is_recorded_and_verifiable: true
+  dependency_identity_is_double_counted_in_input_fingerprint: false
+  reason: the Artifact fingerprint already hashes module-contract bytes, builder bytes and every execution-relevant repository input byte directly
+  source_commit_is_cache_key: false
+  snapshot_record_path_is_cache_key: false
+  snapshot_record_sha256_is_cache_key: false
+  rule: byte-identical relevant repository dependencies may reuse across later commits while the exact source commit remains independently auditable
+
+live_execution_verification:
+  purpose: fail-closed-before-execution
+  current_repository_bytes_must_match_sha256: true
+  current_repository_bytes_must_match_git_blob_sha1: true
+  snapshot_file_hash_must_match_job_binding: true
+  source_commit_path_proof:
+    performed_by: orchestrator-or-git-aware-checkout
+    engine_private_repository_access_required: false
+    rule: execution package bytes must be assembled from the declared source_commit or independently proven equivalent by path/hash/git-blob identity
+
+historical_verification:
+  purpose: durable-audit-after-working-tree-changes
+  current_path_bytes_required: false
+  authoritative_record: content-addressed-snapshot-plus-source-commit
+  preferred_proof: verify each path at source_commit against sha256 and git_blob_sha1
+  git_history_checkout_allowed: true
+  github_object_fetch_by_orchestrator_allowed: true
+  engine_private_repository_access_required: false
+  rule: historical verification must never compare old job bindings to mutable current-path bytes
+
+scope:
+  repository_files: covered
+  generated_outputs: not-covered-by-repository-snapshot
+  external_locked_sources: keep-their-own-source-identity-contract
+  artifact_job_reference: build_provenance.source_snapshot_binding
+
+migration:
+  applies_to_new_artifact_jobs: true
+  legacy_jobs_without_snapshot: historical-compatibility-only
+  synthetic_backfill_for_old_jobs: forbidden

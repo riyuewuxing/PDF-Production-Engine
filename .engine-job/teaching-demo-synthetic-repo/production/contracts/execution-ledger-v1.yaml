@@ -1,0 +1,89 @@
+version: 1
+id: qiuzhidaren-execution-ledger-v1
+authority: execution-facts
+append_only: true
+sequence: contiguous-positive-integer
+required_event_fields: [seq, event_id, occurred_at, type, actor]
+
+lifecycle_transition_types:
+  - JOB_CREATED
+  - INPUTS_LOCKED
+  - BLOCKS_ACCEPTED
+  - BUILT
+  - MACHINE_VERIFIED
+  - HUMAN_ACCEPTED
+  - PUBLISHED
+lifecycle_projection:
+  ordered_prefix_required: true
+  duplicates_forbidden: true
+  artifact_state: last_lifecycle_transition
+
+event_types:
+  - JOB_CREATED
+  - INPUTS_LOCKED
+  - BLOCKS_ACCEPTED
+  - BUILT
+  - MACHINE_VERIFIED
+  - HUMAN_ACCEPTED
+  - PUBLISHED
+  - INPUT_BOUND
+  - BLOCK_REVIEW_ACCEPTED
+  - BLOCK_REVIEW_REJECTED
+  - BUILD_STARTED
+  - BUILD_COMPLETED
+  - BUILD_FAILED
+  - FINAL_RENDER_COMPLETED
+  - MACHINE_VERIFICATION_PASSED
+  - MACHINE_VERIFICATION_FAILED
+  - HUMAN_REVIEW_ACCEPTED
+  - HUMAN_REVIEW_REJECTED
+
+attempt_event_types:
+  - BUILD_STARTED
+  - BUILD_COMPLETED
+  - BUILD_FAILED
+  - MACHINE_VERIFICATION_PASSED
+  - MACHINE_VERIFICATION_FAILED
+  - FINAL_RENDER_COMPLETED
+  - HUMAN_REVIEW_ACCEPTED
+  - HUMAN_REVIEW_REJECTED
+attempt_protocol:
+  start: BUILD_STARTED
+  build_terminal_one_of: [BUILD_COMPLETED, BUILD_FAILED]
+  machine_result_after_build_completed_one_of: [MACHINE_VERIFICATION_PASSED, MACHINE_VERIFICATION_FAILED]
+  render_requires: MACHINE_VERIFICATION_PASSED
+  human_review_requires_machine_pass: true
+  visual_human_review_occurs_after_final_render: true
+  nonvisual_human_review_may_follow_machine_pass_without_final_render: true
+  once_any_final_render_observed_all_reviewed_attempts_require_own_final_render: true
+  review_terminal_one_of: [HUMAN_REVIEW_ACCEPTED, HUMAN_REVIEW_REJECTED]
+  build_failed_is_terminal_for_attempt: true
+  machine_verification_failed_is_terminal_for_attempt: true
+  accepted_review_is_terminal_for_job_attempt_sequence: true
+  duplicate_stage_per_attempt_forbidden: true
+  interleaved_attempts_forbidden: true
+  later_attempt_requires_previous_terminal_result: true
+
+# A process-evaluation full cycle is intentionally stricter than a generic nonvisual
+# delivery review: only an attempt that reached final render plus HUMAN review counts.
+cycle_derivation:
+  key: attempt_id
+  complete_when:
+    - FINAL_RENDER_COMPLETED
+    - one_of: [HUMAN_REVIEW_ACCEPTED, HUMAN_REVIEW_REJECTED]
+  rule: generation_review_cycles equals the number of distinct valid attempt_id values satisfying complete_when
+
+# Metrics describe actual process effort, not only successful stages. In particular a
+# failed build still consumed one build attempt, so build_count is BUILD_STARTED count.
+metric_semantics:
+  generation_review_cycles: count distinct valid attempt_id values satisfying cycle_derivation.complete_when
+  build_count: count BUILD_STARTED
+  final_render_count: count FINAL_RENDER_COMPLETED
+  review_reject_count: count HUMAN_REVIEW_REJECTED
+metrics_derived_only: [generation_review_cycles, build_count, final_render_count, review_reject_count]
+path_policy: repository-relative-only
+hash_algorithm: SHA-256
+
+legacy_missing_instrumentation:
+  may_backfill_synthetic_events: false
+  status: UNKNOWN_MISSING_INSTRUMENTATION

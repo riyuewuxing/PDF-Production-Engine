@@ -1,0 +1,159 @@
+version: 1
+id: qiuzhidaren-artifact-job-v1
+authority: artifact-lifecycle
+states: [JOB_CREATED, INPUTS_LOCKED, BLOCKS_ACCEPTED, BUILT, MACHINE_VERIFIED, HUMAN_ACCEPTED, PUBLISHED]
+terminal_states: [PUBLISHED]
+allowed_module_lifecycle_for_new_job: [ACTIVE, FROZEN]
+
+state_authority:
+  execution_ledger_projection: production/contracts/execution-ledger-v1.yaml
+  declared_state_must_equal_projection: true
+  skipped_or_duplicate_transitions_forbidden: true
+
+attempts:
+  authority: production/contracts/execution-ledger-v1.yaml
+  identifier: attempt_id
+  lifecycle_state_regression_for_retry: forbidden
+  detailed_attempt_events_do_not_create_artifact_states: true
+  generation_review_cycles_are_derived: true
+  legacy_missing_events_may_be_backfilled: false
+  start_operator: tools/manage_artifact_job.py start-attempt
+  reject_operator: tools/manage_artifact_job.py human-reject
+  retry_activation_operator: tools/manage_artifact_job.py activate-attempt
+  human_reject_keeps_state: MACHINE_VERIFIED
+  retry_after_first_built_state: [BUILT, MACHINE_VERIFIED]
+  activation_requires_same_attempt_build_and_machine_pass: true
+  current_candidate_fields: [outputs, machine_evidence]
+  prior_attempt_facts_remain_ledger_immutable: true
+  changed_retry_bytes_require_new_or_content_addressed_paths: true
+  rule: current-candidate pointers may change after a rejected attempt, but lifecycle state never moves backward and prior event bindings are never rewritten
+
+required_top_level:
+  - version
+  - job_id
+  - module_id
+  - state
+  - module_contract
+  - execution_ledger
+  - input_bindings
+  - build_provenance
+  - blocks
+  - outputs
+  - machine_evidence
+  - human_acceptance
+  - publication
+
+binding:
+  identity_fields: [path, sha256, kind]
+  path_policy: repository-relative-only
+  hash_algorithm: SHA-256
+  hash_change_invalidates_acceptance: true
+
+build_provenance:
+  fingerprint_algorithm: sha256-canonical-json-v1
+  required_fields:
+    - module_contract_binding
+    - builder_binding
+    - source_snapshot_binding
+    - runtime_identity
+    - input_fingerprint
+  runtime_required_fields: [name, version]
+  fingerprint_basis:
+    - module_id
+    - module_contract_binding
+    - builder_binding
+    - runtime_identity
+    - execution_relevant_input_bindings
+  fingerprint_exempt_input_kinds: [input_plan]
+  fingerprint_exemption_rule: generated audit/control records remain exact hash-bound in the Job but do not invalidate reuse when all execution-relevant bytes are unchanged
+  source_snapshot_is_parallel_audit_record: true
+  source_snapshot_dependency_identity_must_not_be_double_counted_in_fingerprint: true
+  input_binding_sort_key: [path, sha256, kind]
+  source_snapshot:
+    contract: production/contracts/repository-provenance-snapshot-v1.yaml
+    binding_kind: repository_snapshot
+    required_from_state: INPUTS_LOCKED
+    covered_bindings:
+      - module_contract_binding
+      - builder_binding
+      - repository_input_bindings
+    snapshot_exempt_input_kinds: [input_plan]
+    live_execution_verification: current-materialized-bytes
+    historical_verification: immutable-snapshot-plus-source-commit
+    historical_verification_must_not_require_current_path_bytes: true
+    historical_checker: tools/check_artifact_provenance.py
+    legacy_missing_snapshot_backfill: forbidden
+  reuse:
+    allowed_only_when_input_fingerprint_equal: true
+    prior_human_accepted_output_required: true
+    hash_change_invalidates_reuse: true
+
+verification_modes:
+  live:
+    checker: tools/check_artifact_job.py
+    purpose: execution-and-current-candidate-validation
+    validate_current_input_paths: true
+    validate_source_snapshot_against_current_materialized_bytes: true
+  historical:
+    checker: tools/check_artifact_provenance.py
+    purpose: durable-audit-after-repository-evolution
+    validate_current_input_paths: false
+    validate_source_snapshot_file_and_internal_identity: true
+    compare_job_repository_bindings_to_snapshot: true
+    current_path_bytes_are_authority: false
+
+state_requirements:
+  JOB_CREATED: [job_id, module_id, module_contract, execution_ledger]
+  INPUTS_LOCKED: [input_bindings, build_provenance]
+  BLOCKS_ACCEPTED: [blocks]
+  BUILT: [outputs]
+  MACHINE_VERIFIED: [machine_evidence]
+  HUMAN_ACCEPTED: [human_acceptance]
+  PUBLISHED: [publication]
+
+ledger_evidence_events:
+  BUILT:
+    required_event: BUILD_COMPLETED
+    must_occur_after_state: BLOCKS_ACCEPTED
+    event_bindings_must_cover: outputs
+  MACHINE_VERIFIED:
+    required_event: MACHINE_VERIFICATION_PASSED
+    must_occur_after_state: BUILT
+    event_bindings_must_include_kind: module_check
+  HUMAN_ACCEPTED:
+    required_event: HUMAN_REVIEW_ACCEPTED
+    must_occur_after_state: MACHINE_VERIFIED
+    event_bindings_must_equal: human_acceptance.accepted_outputs
+  VISUAL_HUMAN_ACCEPTED:
+    required_event: FINAL_RENDER_COMPLETED
+    must_occur_after_state: BUILT
+    event_bindings_must_include_kind: final_render_manifest
+
+block_contract:
+  accepted_state: REVIEW_PASS
+  receipt_fields: [block_id, state, reviewer, reviewed_at, artifact_binding, evidence_binding]
+  artifact_binding_fields: [path, sha256, kind]
+  evidence_binding_fields: [path, sha256, kind]
+  immutable_binding_after_acceptance: true
+  downstream_failure_does_not_invalidate_unrelated_block: true
+
+machine_boundary:
+  engine_allowed: [MACHINE_PASS, REVIEW_REQUIRED]
+  engine_forbidden: [REVIEW_PASS, HUMAN_ACCEPTED, PUBLISHED]
+  human_reviewer: ChatGPT
+  module_check_evidence_kind: module_check
+  visual_render_evidence_kind: final_render_manifest
+
+publication:
+  requires_state: HUMAN_ACCEPTED
+  must_consume_exact_human_accepted_output_hashes: true
+  provenance_record: artifact-job-file
+
+qualification:
+  part_of_delivery_state_machine: false
+  contract: production/contracts/system-qualification-v1.yaml
+
+legacy:
+  teaching_demo_delivery_state_machine_v1: historical-compatibility-only
+  teaching_demo_efficiency_experiment_v1: frozen-failed-experiment
+  artifact_jobs_without_repository_snapshot: historical-compatibility-only
