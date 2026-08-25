@@ -22,6 +22,15 @@ files:
   - path: check_artifact_job.py
     source_path: tools/check_artifact_job.py
     expected_git_blob_sha1: 34b0099c156553fec396ffea4ceef2a09cba202b
+  - path: manage_artifact_job.py
+    source_path: tools/manage_artifact_job.py
+    expected_git_blob_sha1: eed62161c30996ed470f1b20beed744ca32b64db
+  - path: lock_artifact_input_plan.py
+    source_path: tools/lock_artifact_input_plan.py
+    expected_git_blob_sha1: 4686885b7a02d96d5e24767e5dad8e74127aca80
+  - path: check_artifact_provenance.py
+    source_path: tools/check_artifact_provenance.py
+    expected_git_blob_sha1: 5e2aa047332edfaaf879bc42f4ede6d136dc08ce
   - path: reuse_identity_probe.py
     origin: orchestrator-generated-runtime-probe
 commands:
@@ -30,6 +39,9 @@ commands:
   - [python, check_execution_ledger.py, --selftest]
   - [python, reuse_identity_probe.py]
   - [python, check_artifact_job.py, --selftest]
+  - [python, manage_artifact_job.py, --selftest]
+  - [python, lock_artifact_input_plan.py, --selftest]
+  - [python, check_artifact_provenance.py, --selftest]
 expected_boundary:
   private_repository_credentials: forbidden
   private_repository_checkout: forbidden
