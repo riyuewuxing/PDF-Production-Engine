@@ -1,0 +1,207 @@
+name: Teaching Demo Synthetic Preflight
+
+on:
+  push:
+    branches:
+      - 'job-teaching-demo/synthetic-preflight-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  synthetic-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout public Engine package
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'PyYAML>=6,<7' 'pypdf>=5,<7'
+
+      - name: Install canonical XeLaTeX and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-xetex \
+            texlive-lang-chinese \
+            texlive-latex-extra \
+            texlive-pictures \
+            texlive-science \
+            fonts-noto-cjk \
+            fonts-linuxlibertine \
+            fonts-noto-core
+          fc-cache -f
+          xelatex --version | head -n 1
+          fc-match 'Noto Serif CJK SC'
+          fc-match 'Noto Sans CJK SC'
+          fc-match 'Linux Libertine O'
+          fc-match 'Noto Sans'
+
+      - name: Verify exact materialization and run no-PDF preflight
+        id: execute
+        continue-on-error: true
+        run: |
+          rm -rf .engine-job/output
+          mkdir -p .engine-job/output
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess, time, yaml
+
+          package_path = Path('.engine-job/teaching-demo-synthetic-execution-package.yaml')
+          package = yaml.safe_load(package_path.read_text(encoding='utf-8')) or {}
+          if package.get('version') != 1:
+              raise SystemExit('execution package version must be 1')
+          if package.get('privacy') != 'public-nonsecret':
+              raise SystemExit('synthetic preflight package must be public-nonsecret')
+          if package.get('synthetic_fixture') is not True:
+              raise SystemExit('synthetic_fixture must be true')
+          if package.get('product_pdf_allowed') is not False:
+              raise SystemExit('product PDF generation must be forbidden')
+          source_commit = package.get('source_commit')
+          if not isinstance(source_commit, str) or len(source_commit) != 40 or any(c not in '0123456789abcdef' for c in source_commit):
+              raise SystemExit('source_commit must be lowercase 40-hex')
+
+          repo = Path.cwd().resolve()
+          workdir = (repo / str(package.get('workdir') or '')).resolve()
+          if repo != workdir and repo not in workdir.parents:
+              raise SystemExit('workdir escapes public Engine checkout')
+          if not workdir.is_dir():
+              raise SystemExit('materialized synthetic repository missing')
+
+          def git_blob_sha1(data: bytes) -> str:
+              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
+
+          verified = []
+          declared_paths = set()
+          for item in package.get('files') or []:
+              if not isinstance(item, dict):
+                  raise SystemExit('files item must be mapping')
+              raw = item.get('path')
+              if not isinstance(raw, str) or not raw:
+                  raise SystemExit('materialized file path must be non-empty')
+              path = (workdir / raw).resolve()
+              if workdir != path and workdir not in path.parents:
+                  raise SystemExit(f'materialized file escapes workdir: {raw}')
+              if not path.is_file():
+                  raise SystemExit(f'materialized file missing: {raw}')
+              data = path.read_bytes()
+              blob = git_blob_sha1(data)
+              expected = item.get('expected_git_blob_sha1')
+              if blob != expected:
+                  raise SystemExit(f'exact source materialization mismatch: {raw}: expected={expected} got={blob}')
+              verified.append({
+                  'path': raw,
+                  'source_path': item.get('source_path'),
+                  'git_blob_sha1': blob,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+              declared_paths.add(raw)
+
+          manifest = str(package.get('manifest') or '')
+          if manifest not in declared_paths:
+              raise SystemExit('synthetic case manifest is not exact-source bound')
+
+          commands = package.get('commands') or []
+          if not isinstance(commands, list) or len(commands) != 2:
+              raise SystemExit('synthetic preflight must contain exactly case + prebuild commands')
+          results = []
+          for command in commands:
+              if not isinstance(command, list) or len(command) != 4:
+                  raise SystemExit(f'forbidden command shape: {command!r}')
+              if command[0] != 'python' or command[2] != '--manifest' or command[3] != manifest:
+                  raise SystemExit(f'command is outside synthetic preflight boundary: {command!r}')
+              script = command[1]
+              if script not in {'tools/check_teaching_demo_case.py', 'tools/check_teaching_demo_inputs.py'}:
+                  raise SystemExit(f'forbidden synthetic preflight script: {script}')
+              if script not in declared_paths:
+                  raise SystemExit(f'command script is not exact-source bound: {script}')
+              started = time.monotonic()
+              proc = subprocess.run(command, cwd=workdir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+              results.append({
+                  'command': command,
+                  'exit_code': proc.returncode,
+                  'duration_seconds': round(time.monotonic() - started, 6),
+                  'output': proc.stdout[-16000:],
+              })
+
+          pdfs = sorted(p.relative_to(workdir).as_posix() for p in workdir.rglob('*.pdf'))
+          case_pass = len(results) >= 1 and results[0]['exit_code'] == 0
+          prebuild_pass = len(results) >= 2 and results[1]['exit_code'] == 0
+          all_pass = case_pass and prebuild_pass and not pdfs
+          evidence = {
+              'version': 1,
+              'kind': 'qiuzhidaren-teaching-demo-synthetic-preflight-machine-evidence',
+              'status': 'MACHINE_PASS' if all_pass else 'MACHINE_FAIL',
+              'review_status': 'REVIEW_REQUIRED',
+              'synthetic_fixture': True,
+              'source_repository': package.get('source_repository'),
+              'source_branch': package.get('source_branch'),
+              'source_commit': source_commit,
+              'engine_repository': os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
+              'private_repository_access_used': False,
+              'case_gate_pass': case_pass,
+              'prebuild_semantic_gate_pass': prebuild_pass,
+              'canonical_xelatex_font_probe_required': True,
+              'canonical_xelatex_font_probe_pass': prebuild_pass,
+              'font_probe_product_delivery': False,
+              'product_pdf_generated': bool(pdfs),
+              'product_pdf_paths': pdfs,
+              'verified_materialized_files': verified,
+              'commands': results,
+              'claims_not_proven': [
+                  'real_business_topic_quality',
+                  'real_textbook_source_validity',
+                  'formal_product_pdf_generation',
+                  'human_delivery_acceptance',
+                  'system_qualification',
+              ],
+          }
+          out = Path('.engine-job/output/teaching-demo-synthetic-preflight-evidence.json')
+          out.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(evidence, ensure_ascii=False, indent=2))
+          if not all_pass:
+              raise SystemExit('Teaching Demo synthetic preflight MACHINE_FAIL')
+          PY
+
+      - name: Upload machine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teaching-demo-synthetic-preflight-machine-evidence
+          path: .engine-job/output/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish machine status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXECUTION_OUTCOME: ${{ steps.execute.outcome }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          outcome = os.environ.get('EXECUTION_OUTCOME')
+          state = 'success' if outcome == 'success' else 'failure'
+          description = 'Synthetic Teaching Demo preflight passed' if state == 'success' else 'Synthetic Teaching Demo preflight failed; inspect evidence'
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+              data=json.dumps({'state': state, 'context': 'pdf-engine/teaching-demo-synthetic-preflight', 'description': description}).encode(),
+              headers={'Authorization': f"Bearer {os.environ['GH_TOKEN']}", 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'},
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as response:
+              assert response.status == 201
+          if state != 'success':
+              raise SystemExit('synthetic Teaching Demo preflight failed')
+          PY
