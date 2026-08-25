@@ -1,0 +1,26 @@
+version: 1
+cases:
+  - id: synthetic-structure-v1
+    route:
+      - 识别对象
+      - 找总述句
+      - 对齐分述句
+      - 归纳结构
+    increments:
+      P1:
+        label: 识别对象
+        text: 说明对象：校园图书角
+      P2:
+        label: 找总句
+        text: 总述句：图书角服务阅读需求
+      P3:
+        label: 找分句
+        text: 分述：分类清楚；取阅方便；归还有序
+      P4:
+        label: 归纳结构
+        text: 结构：总述统领，分述展开
+    total_board:
+      - 说明对象：校园图书角
+      - 总述句：图书角服务阅读需求
+      - 分述：分类清楚；取阅方便；归还有序
+      - 结构：总述统领，分述展开
