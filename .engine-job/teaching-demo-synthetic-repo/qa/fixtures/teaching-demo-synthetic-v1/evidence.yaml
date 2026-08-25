@@ -6,9 +6,9 @@ title: 说明文中的总分结构（合成流程验证）
 printed_pages: [1]
 source_locator:
   repo: synthetic-fixtures/teaching-demo
-  ref: 1111111111111111111111111111111111111111
+  ref: '1111111111111111111111111111111111111111'
   path: fixtures/synthetic-source.pdf
-  blob_sha: 2222222222222222222222222222222222222222
+  blob_sha: '2222222222222222222222222222222222222222'
   pdf_pages: [1]
 verification:
   synthetic_fixture: true
