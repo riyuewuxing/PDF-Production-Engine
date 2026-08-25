@@ -112,6 +112,9 @@ def selftest() -> None:
                      .replace('&', r'\&')
                      .replace('$', r'\$'))
 
+    # Deliberately mimics the legacy sequential escaping order that corrupts
+    # braces introduced by the backslash replacement. The parser boundary must
+    # normalize it without requiring a topic or caller special-case.
     def legacy_sequential_esc(value: str) -> str:
         for a, b in [
             ('\\', r'\textbackslash{}'), ('_', r'\_'), ('{', r'\{'), ('}', r'\}'),
