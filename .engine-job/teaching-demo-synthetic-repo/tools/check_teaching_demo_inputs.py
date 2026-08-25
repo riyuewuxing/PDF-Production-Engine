@@ -305,6 +305,7 @@ def validate(manifest: str | None = None, *, root: Path = ROOT, run_font_probe: 
             fragment = issue.fragment.replace("\n", " ")
             errors.append(f"PREBUILD_{issue.code}: {role}:{path.name}: {fragment}")
 
+    # Avoid spending even the small XeLaTeX probe when cheaper semantic/contract checks already failed.
     if run_font_probe and not errors:
         errors.extend(font_and_codepoint_preflight(source_texts))
     return errors
