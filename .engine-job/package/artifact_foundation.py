@@ -69,7 +69,7 @@ def binding_key(binding: dict[str, Any]) -> tuple[str, str, str]:
 
 
 def source_snapshot_fingerprint_projection(binding: Any) -> dict[str, str]:
-    """Project a durable audit record to the stable dependency-set cache identity."""
+    """Expose the stable snapshot dependency identity for comparison/indexing."""
     if not isinstance(binding, dict):
         raise ValueError("source_snapshot_binding must be a mapping")
     dep = binding.get("dependency_identity_sha256")
@@ -81,14 +81,7 @@ def source_snapshot_fingerprint_projection(binding: Any) -> dict[str, str]:
 
 
 def fingerprint_input_bindings(input_bindings: Any, exempt_kinds: Any = None) -> list[dict[str, Any]]:
-    """Return execution-relevant input bindings for the reusable content identity.
-
-    Some generated records are deliberately audit/control records rather than execution
-    dependencies. Their exact bytes remain hash-bound in the Artifact Job, but including
-    them in the reuse fingerprint would make an unrelated source commit invalidate an
-    otherwise byte-identical warm path. Exemptions are contract-controlled, never
-    inferred from filenames.
-    """
+    """Return execution-relevant input bindings for the reusable content identity."""
     if not isinstance(input_bindings, list) or not all(isinstance(x, dict) for x in input_bindings):
         raise ValueError("input_bindings must be a list of mappings")
     exempt = set(exempt_kinds or [])
@@ -109,16 +102,24 @@ def artifact_input_fingerprint(
 ) -> str:
     """Canonical execution/reuse fingerprint.
 
-    New jobs include the Repository Snapshot's *dependency identity*, not its audit
-    record path/hash/source commit. Contract-declared audit-only inputs (currently the
-    generated input_plan) are also excluded from this reusable identity while remaining
-    exact hash-bound records in the Job. When the optional snapshot and exemptions are
-    omitted, the exact pre-ADR-010 basis is retained for historical compatibility.
+    The reusable identity is derived directly from every explicit execution dependency:
+    Module Contract bytes, builder bytes, runtime, and execution-relevant input bytes.
+    A Repository Snapshot is a parallel durable audit record over exactly those repository
+    bindings, so inserting the snapshot record identity again would be redundant and would
+    couple reuse to source_commit. New snapshot-backed jobs therefore use the snapshot only
+    to activate the contract-defined audit-record exemption (`input_plan` by default).
+
+    With no Repository Snapshot this preserves the pre-ADR-010 basis exactly.
     """
     if not isinstance(module_contract_binding, dict) or not isinstance(builder_binding, dict):
         raise ValueError("module_contract_binding and builder_binding must be mappings")
     if not isinstance(runtime_identity, dict):
         raise ValueError("runtime_identity must be a mapping")
+    if source_snapshot_binding is not None:
+        if not isinstance(source_snapshot_binding, dict) or source_snapshot_binding.get("kind") != "repository_snapshot":
+            raise ValueError("source_snapshot_binding must be a repository_snapshot binding")
+        if fingerprint_exempt_input_kinds is None:
+            fingerprint_exempt_input_kinds = {"input_plan"}
     basis: dict[str, Any] = {
         "module_id": module_id,
         "module_contract_binding": module_contract_binding,
@@ -126,8 +127,6 @@ def artifact_input_fingerprint(
         "runtime_identity": runtime_identity,
         "input_bindings": fingerprint_input_bindings(input_bindings, fingerprint_exempt_input_kinds),
     }
-    if source_snapshot_binding is not None:
-        basis["source_snapshot_binding"] = source_snapshot_fingerprint_projection(source_snapshot_binding)
     return canonical_sha256(basis)
 
 
