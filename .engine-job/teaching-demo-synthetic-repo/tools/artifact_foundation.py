@@ -69,6 +69,7 @@ def binding_key(binding: dict[str, Any]) -> tuple[str, str, str]:
 
 
 def source_snapshot_fingerprint_projection(binding: Any) -> dict[str, str]:
+    """Expose the stable snapshot dependency identity for comparison/indexing."""
     if not isinstance(binding, dict):
         raise ValueError("source_snapshot_binding must be a mapping")
     dep = binding.get("dependency_identity_sha256")
@@ -80,6 +81,7 @@ def source_snapshot_fingerprint_projection(binding: Any) -> dict[str, str]:
 
 
 def fingerprint_input_bindings(input_bindings: Any, exempt_kinds: Any = None) -> list[dict[str, Any]]:
+    """Return execution-relevant input bindings for the reusable content identity."""
     if not isinstance(input_bindings, list) or not all(isinstance(x, dict) for x in input_bindings):
         raise ValueError("input_bindings must be a list of mappings")
     exempt = set(exempt_kinds or [])
@@ -89,7 +91,26 @@ def fingerprint_input_bindings(input_bindings: Any, exempt_kinds: Any = None) ->
     return sorted(projected, key=binding_key)
 
 
-def artifact_input_fingerprint(module_id: Any,module_contract_binding: Any,builder_binding: Any,runtime_identity: Any,input_bindings: Any,source_snapshot_binding: Any = None,fingerprint_exempt_input_kinds: Any = None,) -> str:
+def artifact_input_fingerprint(
+    module_id: Any,
+    module_contract_binding: Any,
+    builder_binding: Any,
+    runtime_identity: Any,
+    input_bindings: Any,
+    source_snapshot_binding: Any = None,
+    fingerprint_exempt_input_kinds: Any = None,
+) -> str:
+    """Canonical execution/reuse fingerprint.
+
+    The reusable identity is derived directly from every explicit execution dependency:
+    Module Contract bytes, builder bytes, runtime, and execution-relevant input bytes.
+    A Repository Snapshot is a parallel durable audit record over exactly those repository
+    bindings, so inserting the snapshot record identity again would be redundant and would
+    couple reuse to source_commit. New snapshot-backed jobs therefore use the snapshot only
+    to activate the contract-defined audit-record exemption (`input_plan` by default).
+
+    With no Repository Snapshot this preserves the pre-ADR-010 basis exactly.
+    """
     if not isinstance(module_contract_binding, dict) or not isinstance(builder_binding, dict):
         raise ValueError("module_contract_binding and builder_binding must be mappings")
     if not isinstance(runtime_identity, dict):
@@ -99,7 +120,13 @@ def artifact_input_fingerprint(module_id: Any,module_contract_binding: Any,build
             raise ValueError("source_snapshot_binding must be a repository_snapshot binding")
         if fingerprint_exempt_input_kinds is None:
             fingerprint_exempt_input_kinds = {"input_plan"}
-    basis: dict[str, Any] = {"module_id": module_id,"module_contract_binding": module_contract_binding,"builder_binding": builder_binding,"runtime_identity": runtime_identity,"input_bindings": fingerprint_input_bindings(input_bindings, fingerprint_exempt_input_kinds),}
+    basis: dict[str, Any] = {
+        "module_id": module_id,
+        "module_contract_binding": module_contract_binding,
+        "builder_binding": builder_binding,
+        "runtime_identity": runtime_identity,
+        "input_bindings": fingerprint_input_bindings(input_bindings, fingerprint_exempt_input_kinds),
+    }
     return canonical_sha256(basis)
 
 
@@ -111,25 +138,34 @@ def validate_binding(root: Path, binding: Any, label: str, *, require_file: bool
     errors: list[str] = []
     if not isinstance(binding, dict):
         return [f"{label}: binding must be a mapping"]
-    raw = binding.get("path"); digest = binding.get("sha256"); kind = binding.get("kind")
+    raw = binding.get("path")
+    digest = binding.get("sha256")
+    kind = binding.get("kind")
     if not isinstance(kind, str) or not kind:
         errors.append(f"{label}: kind is required")
     try:
         path = safe_repo_path(root, raw)
     except ValueError as exc:
-        errors.append(f"{label}: {exc}"); return errors
+        errors.append(f"{label}: {exc}")
+        return errors
     if not is_sha256(digest):
-        errors.append(f"{label}: sha256 must be lowercase 64-char SHA-256"); return errors
+        errors.append(f"{label}: sha256 must be lowercase 64-char SHA-256")
+        return errors
     if require_file:
-        if not path.is_file(): errors.append(f"{label}: bound file missing: {raw}")
+        if not path.is_file():
+            errors.append(f"{label}: bound file missing: {raw}")
         else:
             actual = sha256_file(path)
-            if actual != digest: errors.append(f"{label}: hash mismatch for {raw}: declared={digest} actual={actual}")
+            if actual != digest:
+                errors.append(f"{label}: hash mismatch for {raw}: declared={digest} actual={actual}")
     return errors
 
 
 def parse_iso8601(value: Any) -> bool:
-    if not isinstance(value, str) or not value: return False
-    try: datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError: return False
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
     return True
