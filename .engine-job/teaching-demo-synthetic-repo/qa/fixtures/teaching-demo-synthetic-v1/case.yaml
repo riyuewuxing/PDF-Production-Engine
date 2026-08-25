@@ -1,0 +1,31 @@
+version: 1
+schema_id: teacher-trial-case-v1
+instance_revision: 1
+case_id: synthetic-structure-v1
+title: 说明文中的总分结构（合成流程验证）
+product_contract: teacher-trial-two-pdf-v1
+workspace: qa/fixtures/teaching-demo-synthetic-v1
+source:
+  evidence: evidence.yaml
+  board: BOARD_PLAN.yaml
+  reference_plan: 01_训练参考教案.md
+  exam_skeleton: 02_考场骨架教案.md
+  trial: 03_逐字稿.md
+  defense: 04_课题专属答辩.md
+  analysis: 05_教材到骨架提炼解析.md
+input:
+  printed_pages: [1]
+  source_pages:
+    mode: remote-pdf
+    repo: synthetic-fixtures/teaching-demo
+    ref: 1111111111111111111111111111111111111111
+    path: fixtures/synthetic-source.pdf
+    blob_sha: 2222222222222222222222222222222222222222
+    size_bytes: 120000
+    pages: [1]
+deliverables:
+  training: 说明文中的总分结构（合成流程验证）｜面试训练稿.pdf
+  extraction: 说明文中的总分结构（合成流程验证）｜教材到骨架提炼解析.pdf
+constraints:
+  board_sections_min: 3
+  figure_count_min: 0
