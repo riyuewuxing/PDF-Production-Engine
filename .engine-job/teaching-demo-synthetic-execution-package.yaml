@@ -1,0 +1,73 @@
+version: 1
+kind: qiuzhidaren-teaching-demo-synthetic-preflight
+privacy: public-nonsecret
+synthetic_fixture: true
+source_repository: riyuewuxing/qiuzhidaren
+source_branch: sol/teaching-demo-synthetic-engine-preflight-v1
+source_commit: 18e1c743ba455df70556a012a421076fdbf87e0b
+product_pdf_allowed: false
+workdir: .engine-job/teaching-demo-synthetic-repo
+manifest: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
+files:
+  - path: tools/artifact_foundation.py
+    source_path: tools/artifact_foundation.py
+    expected_git_blob_sha1: bb55345664781a974fdcdc7039d457cab601622d
+  - path: tools/check_teaching_demo_case.py
+    source_path: tools/check_teaching_demo_case.py
+    expected_git_blob_sha1: ac15f3b31d14f96a17149a05f5ea3b7dd7302467
+  - path: tools/check_teaching_demo_inputs.py
+    source_path: tools/check_teaching_demo_inputs.py
+    expected_git_blob_sha1: d2742c6ad0baf63035312577fff1df819a11af3d
+  - path: tools/publisher_core.py
+    source_path: tools/publisher_core.py
+    expected_git_blob_sha1: ad1230ef6cdb48d8d4dcf782828b862383b2e620
+  - path: tools/latex_inline.py
+    source_path: tools/latex_inline.py
+    expected_git_blob_sha1: 337fac30a0079f2ee00c3185a34d70b8b7cac0b7
+  - path: tools/physics_notation.py
+    source_path: tools/physics_notation.py
+    expected_git_blob_sha1: b47c3f75999017a8a97d95a0e52e4ae7c1dd199c
+  - path: tools/physics_figures.py
+    source_path: tools/physics_figures.py
+    expected_git_blob_sha1: 574db7f44cd4fdcb7283172ae427942f5aaedecb
+  - path: production/contracts/teacher-trial-two-pdf-v1.yaml
+    source_path: production/contracts/teacher-trial-two-pdf-v1.yaml
+    expected_git_blob_sha1: 26356174c0693ee47c9e69b7b8ed7c8a66ed8e23
+  - path: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
+    expected_git_blob_sha1: 50063c84cce05008f136efe709a2c2b0f5065b57
+  - path: qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml
+    expected_git_blob_sha1: 5572f9e5e225ceea8bb35dd0721ea56905d4a42a
+  - path: qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml
+    expected_git_blob_sha1: d592901c343bd8ef7eb3b24bb038044cdcc4cf2a
+  - path: qa/fixtures/teaching-demo-synthetic-v1/01_训练参考教案.md
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/01_训练参考教案.md
+    expected_git_blob_sha1: 4a0e1ebfca845be745c38f046389e50f864fd83c
+  - path: qa/fixtures/teaching-demo-synthetic-v1/02_考场骨架教案.md
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/02_考场骨架教案.md
+    expected_git_blob_sha1: d6a7f373ea82926cacfaf5bc0ab202689ee40d20
+  - path: qa/fixtures/teaching-demo-synthetic-v1/03_逐字稿.md
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/03_逐字稿.md
+    expected_git_blob_sha1: 931bd968f58706029f0ff112ba303c6016e866fd
+  - path: qa/fixtures/teaching-demo-synthetic-v1/04_课题专属答辩.md
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/04_课题专属答辩.md
+    expected_git_blob_sha1: 0935bcf0f8c8fdd63d4f4e9c838da995ea0d0926
+  - path: qa/fixtures/teaching-demo-synthetic-v1/05_教材到骨架提炼解析.md
+    source_path: qa/fixtures/teaching-demo-synthetic-v1/05_教材到骨架提炼解析.md
+    expected_git_blob_sha1: 1169b88c459ba184ed05a88cba994a35bee69d77
+commands:
+  - [python, tools/check_teaching_demo_case.py, --manifest, qa/fixtures/teaching-demo-synthetic-v1/case.yaml]
+  - [python, tools/check_teaching_demo_inputs.py, --manifest, qa/fixtures/teaching-demo-synthetic-v1/case.yaml]
+expected_boundary:
+  private_repository_credentials: forbidden
+  private_repository_checkout: forbidden
+  private_repository_writeback: forbidden
+  human_review_pass: forbidden
+  product_pdf_generation: forbidden
+  font_probe_compilation: required
+result_contract:
+  machine_status: MACHINE_PASS_or_MACHINE_FAIL
+  review_status: REVIEW_REQUIRED
+  evidence_file: .engine-job/output/teaching-demo-synthetic-preflight-evidence.json
