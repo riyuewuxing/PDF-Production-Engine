@@ -9,10 +9,10 @@ workdir: .engine-job/package
 files:
   - path: artifact_foundation.py
     source_path: tools/artifact_foundation.py
-    expected_git_blob_sha1: 0fab2366b54cef81db335b97419310e6b921f359
+    expected_git_blob_sha1: bb55345664781a974fdcdc7039d457cab601622d
   - path: provenance_snapshot.py
     source_path: tools/provenance_snapshot.py
-    expected_git_blob_sha1: b9878bb63a54a1dbc84fa00324d7fc6d1a86b5dc
+    expected_git_blob_sha1: 738e9a38c34a540a09d4d77d4df91506301dc1cc
   - path: init_artifact_job.py
     source_path: tools/init_artifact_job.py
     expected_git_blob_sha1: 2bbd646aacce420a1bc175fa693956df65981e95
