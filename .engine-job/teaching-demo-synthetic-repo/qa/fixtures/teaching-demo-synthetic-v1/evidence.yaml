@@ -1,0 +1,35 @@
+version: 1
+fixture_kind: synthetic-runtime-validation
+scaffold_status: READY
+case_id: synthetic-structure-v1
+title: 说明文中的总分结构（合成流程验证）
+printed_pages: [1]
+source_locator:
+  repo: synthetic-fixtures/teaching-demo
+  ref: 1111111111111111111111111111111111111111
+  path: fixtures/synthetic-source.pdf
+  blob_sha: 2222222222222222222222222222222222222222
+  pdf_pages: [1]
+verification:
+  synthetic_fixture: true
+  exact_pages_verified: true
+  page_text_verified: true
+  canonical_pdf_pixels_inspected: true
+teaching_boundary:
+  must_teach:
+    - 识别说明文中的总述句与分述句
+    - 用总分关系复述段落结构
+  out_of_scope:
+    - 不评价真实教材版本与考试要求
+    - 不产生真实招聘或教学结论
+point_chain:
+  - P1 识别说明对象
+  - P2 定位总述句
+  - P3 对齐分述信息
+  - P4 归纳总分结构
+lesson_closure:
+  conditions_or_boundary: 仅用于合成流程验证，不代表真实教材内容
+  core_relation: 总述句统领，分述句展开
+  model_or_evidence: 通过一段合成说明文字识别句间层级
+  application_or_check: 能用一句话说明总句与分句的关系
+  common_error_or_boundary: 不把并列分述句误判为新的总述层级
