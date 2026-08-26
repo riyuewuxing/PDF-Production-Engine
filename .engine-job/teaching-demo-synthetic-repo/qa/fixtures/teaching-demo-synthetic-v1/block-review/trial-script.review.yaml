@@ -1,0 +1,23 @@
+version: 1
+kind: human-content-block-review-evidence
+case_id: synthetic-structure-v1
+block_id: trial-script
+synthetic_fixture: true
+reviewer: ChatGPT
+review_state: REVIEW_PASS
+scope_limit: validates internal lineage and controllability of the synthetic script; does not claim real classroom timing or subject quality
+reviewed_sources:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/03_逐字稿.md
+    sha256: c07961c27fe598cde0c677b45bdbd233becf3397387f9ab7b44ffc57175f05a2
+criteria:
+  board_marker_sequence_P1_to_P4: PASS
+  each_marker_has_matching_explanatory_step: PASS
+  script_preserves_source_boundary: PASS
+  final_recap_matches_four_step_route: PASS
+  no_unrelated_content_padding: PASS
+review_notes:
+  - marker order is exactly P1, P2, P3, P4
+  - prose expands object identification, total statement, detail statements, then total-detail relation in the same order as the upstream chain
+  - final recap returns to the same four-step route instead of introducing a second structure
+  - synthetic fixture is intentionally short; this review does not treat it as evidence of a real 15-minute delivery duration
+result_reason: internally coherent one-pass expansion of the accepted synthetic structure and suitable for no-PDF block acceptance
