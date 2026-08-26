@@ -1,0 +1,24 @@
+version: 1
+kind: human-content-block-review-evidence
+case_id: synthetic-structure-v1
+block_id: board-skeleton
+synthetic_fixture: true
+reviewer: ChatGPT
+review_state: REVIEW_PASS
+scope_limit: validates structural alignment and memory-index behavior of the synthetic fixture only
+reviewed_sources:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml
+    sha256: 9f0acffba4c65762b396faa4934e11b4c6ab677df07b8f7dfdd8adebd0a80491
+  - path: qa/fixtures/teaching-demo-synthetic-v1/02_考场骨架教案.md
+    sha256: 9de1652e458133aaea83a1b1123c3577ac52eb8d5242b979469fc9d8623bd174
+criteria:
+  point_ids_match_board_increments: PASS
+  route_anchor_count_4_to_6: PASS
+  route_and_skeleton_progression_align: PASS
+  board_is_cue_oriented_not_second_lecture: PASS
+  skeleton_contains_check_and_summary: PASS
+review_notes:
+  - Board increments are exactly P1-P4 and route anchors are 识别对象、找总述句、对齐分述句、归纳结构
+  - exam skeleton follows the same causal order and adds only check/summary operations downstream
+  - total board remains compact enough to function as a memory index for this synthetic case
+result_reason: Board Plan and exam skeleton form one coherent structural lineage suitable for the next no-PDF lifecycle state
