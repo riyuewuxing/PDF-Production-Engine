@@ -1,0 +1,16 @@
+version: 1
+kind: public-textbook-source-locator
+privacy: public-nonsecret
+product_pdf_allowed: false
+source_repository: TapXWorld/ChinaTextbook
+source_ref: d7c6ed0b95952cdb159100501627be1bfbe1a266
+source_path: 高中/物理/人教版-人民教育出版社/普通高中教科书·物理选择性必修 第二册.pdf
+source_blob_sha1: 0c3afecd87fee080aee47ec913942ad4fd76d6cd
+source_size_bytes: 14339668
+target_title: 变压器
+target_printed_pages: [58, 59]
+keywords:
+  - 变压器的原理
+  - 互感现象
+  - 探究变压器原、副线圈电压与匝数的关系
+  - 实验中要注意控制变量
