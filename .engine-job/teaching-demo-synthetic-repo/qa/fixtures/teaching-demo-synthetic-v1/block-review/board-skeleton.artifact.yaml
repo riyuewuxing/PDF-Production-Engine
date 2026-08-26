@@ -1,0 +1,14 @@
+version: 1
+schema_id: synthetic-teaching-demo-content-block-v1
+case_id: synthetic-structure-v1
+block_id: board-skeleton
+synthetic_fixture: true
+source_roles: [board, exam_skeleton]
+member_bindings:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml
+    sha256: 9f0acffba4c65762b396faa4934e11b4c6ab677df07b8f7dfdd8adebd0a80491
+    kind: case_source_board
+  - path: qa/fixtures/teaching-demo-synthetic-v1/02_考场骨架教案.md
+    sha256: 9de1652e458133aaea83a1b1123c3577ac52eb8d5242b979469fc9d8623bd174
+    kind: case_source_exam_skeleton
+purpose: bind Board Plan and exam skeleton as one structural-memory review block
