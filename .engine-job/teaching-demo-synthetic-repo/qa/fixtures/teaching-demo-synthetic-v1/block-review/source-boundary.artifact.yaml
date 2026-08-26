@@ -1,0 +1,11 @@
+version: 1
+schema_id: synthetic-teaching-demo-content-block-v1
+case_id: synthetic-structure-v1
+block_id: source-boundary
+synthetic_fixture: true
+source_roles: [evidence]
+member_bindings:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml
+    sha256: ad5fd3cde35fd50bdf6aa29b79a6d47e14f676c17a1e0f08a3af08915c39dbcd
+    kind: case_source_evidence
+purpose: bind the synthetic Teaching Boundary, Point Chain, lesson closure, and explicit non-real-content scope as one reviewable content block
