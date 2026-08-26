@@ -1,0 +1,110 @@
+name: Teaching Demo Real Transformer Source Locator
+
+on:
+  push:
+    branches:
+      - 'job-teaching-demo/real-transformer-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locate-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install lightweight PDF parser
+        run: python -m pip install 'PyYAML>=6,<7' 'pypdf>=5,<6'
+      - name: Resolve exact printed pages without product composition
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, urllib.request, urllib.parse, yaml
+          from pypdf import PdfReader
+
+          root = Path.cwd()
+          cfg = yaml.safe_load((root/'.engine-job/real-transformer-source-locator.yaml').read_text(encoding='utf-8'))
+          assert cfg['version'] == 1 and cfg['privacy'] == 'public-nonsecret'
+          assert cfg['product_pdf_allowed'] is False
+          repo, ref, path = cfg['source_repository'], cfg['source_ref'], cfg['source_path']
+          enc = '/'.join(urllib.parse.quote(part, safe='') for part in path.split('/'))
+          urls = [
+              f'https://raw.githubusercontent.com/{repo}/{ref}/{enc}',
+              f'https://media.githubusercontent.com/media/{repo}/{ref}/{enc}',
+              f'https://api.github.com/repos/{repo}/contents/{enc}?ref={ref}',
+          ]
+          data = None; transport = None; errors = []
+          for i, url in enumerate(urls):
+              try:
+                  headers = {'User-Agent':'qiuzhidaren-source-locator/1.0','Accept-Encoding':'identity'}
+                  if 'api.github.com' in url:
+                      headers['Accept']='application/vnd.github.raw+json'
+                  req = urllib.request.Request(url, headers=headers)
+                  with urllib.request.urlopen(req, timeout=90) as r:
+                      candidate = r.read()
+                  if not candidate.startswith(b'%PDF-'):
+                      raise ValueError('not PDF')
+                  data = candidate; transport = ['github-raw','github-media','github-api-raw'][i]; break
+              except Exception as exc:
+                  errors.append(f'{type(exc).__name__}: {exc}')
+          if data is None:
+              raise SystemExit('all transports failed: ' + ' | '.join(errors))
+          if len(data) != int(cfg['source_size_bytes']):
+              raise SystemExit(f"size mismatch: {len(data)} != {cfg['source_size_bytes']}")
+          blob = hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
+          if blob != cfg['source_blob_sha1']:
+              raise SystemExit(f'blob mismatch: {blob}')
+          pdf = root/'.engine-job/source.pdf'; pdf.write_bytes(data)
+          reader = PdfReader(str(pdf))
+          texts = [(i+1, (page.extract_text() or '').replace('\u3000',' ')) for i,page in enumerate(reader.pages)]
+          matches = {}
+          for keyword in cfg['keywords']:
+              hits = [n for n,text in texts if keyword in text]
+              matches[keyword] = hits
+          p58_hits = sorted(set(matches.get('变压器的原理', [])) & set(matches.get('互感现象', [])))
+          p59_hits = matches.get('实验中要注意控制变量', [])
+          if len(p58_hits) != 1 or len(p59_hits) != 1:
+              raise SystemExit(f'ambiguous source mapping: p58={p58_hits} p59={p59_hits} matches={matches}')
+          p58, p59 = p58_hits[0], p59_hits[0]
+          if p59 != p58 + 1:
+              raise SystemExit(f'expected adjacent pages, got {p58},{p59}')
+          snippets = {}
+          for n in (p58,p59):
+              text = dict(texts)[n]
+              snippets[str(n)] = ' '.join(text.split())[:1600]
+          evidence = {
+              'version':1,
+              'kind':'teaching-demo-real-transformer-source-locator-evidence',
+              'status':'MACHINE_PASS',
+              'source_repository':repo,
+              'source_ref':ref,
+              'source_path':path,
+              'source_blob_sha1':blob,
+              'source_size_bytes':len(data),
+              'transport':transport,
+              'target_printed_pages':[58,59],
+              'resolved_pdf_physical_pages':[p58,p59],
+              'keyword_matches':matches,
+              'page_text_snippets':snippets,
+              'product_pdf_generated':False,
+              'private_repository_access_used':False,
+          }
+          out = root/'.engine-job/output'; out.mkdir(parents=True, exist_ok=True)
+          (out/'source-locator-evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(evidence,ensure_ascii=False,indent=2))
+          pdf.unlink(missing_ok=True)
+          PY
+      - name: Upload source locator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teaching-demo-real-transformer-source-locator
+          path: .engine-job/output/
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: true
