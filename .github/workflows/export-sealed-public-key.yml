@@ -1,0 +1,48 @@
+name: Export Sealed Public Key
+
+on:
+  push:
+    branches:
+      - 'job-teaching-demo/real-transformer-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-public-key:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install engine package
+        run: python -m pip install -e .
+      - name: Derive public key from configured sealed private key
+        env:
+          ENGINE_SEALED_PRIVATE_KEY: ${{ secrets.ENGINE_SEALED_PRIVATE_KEY }}
+        run: |
+          test -n "$ENGINE_SEALED_PRIVATE_KEY" || { echo 'ENGINE_SEALED_PRIVATE_KEY is not configured'; exit 2; }
+          python - <<'PY'
+          import base64, os
+          from pathlib import Path
+          from nacl.encoding import RawEncoder
+          from nacl.public import PrivateKey
+          def d(value):
+              value=value.strip(); value += '=' * (-len(value)%4)
+              return base64.urlsafe_b64decode(value)
+          def e(value): return base64.urlsafe_b64encode(value).decode('ascii').rstrip('=')
+          private=PrivateKey(d(os.environ['ENGINE_SEALED_PRIVATE_KEY']), encoder=RawEncoder)
+          public=e(bytes(private.public_key))
+          out=Path('.engine-job/output'); out.mkdir(parents=True, exist_ok=True)
+          (out/'engine-sealed-public-key.txt').write_text(public+'\n', encoding='ascii')
+          print('PUBLIC_KEY_READY')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-sealed-public-key
+          path: .engine-job/output/engine-sealed-public-key.txt
+          if-no-files-found: error
+          retention-days: 1
