@@ -1,0 +1,11 @@
+version: 1
+schema_id: synthetic-teaching-demo-content-block-v1
+case_id: synthetic-structure-v1
+block_id: trial-script
+synthetic_fixture: true
+source_roles: [trial]
+member_bindings:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/03_逐字稿.md
+    sha256: c07961c27fe598cde0c677b45bdbd233becf3397387f9ab7b44ffc57175f05a2
+    kind: case_source_trial
+purpose: bind the synthetic trial-script expansion for HUMAN lineage review before any product build
