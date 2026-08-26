@@ -18,14 +18,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install lightweight PDF parser
-        run: python -m pip install 'PyYAML>=6,<7' 'pypdf>=5,<6'
-      - name: Resolve exact printed pages without product composition
+      - name: Install lightweight PDF parser and renderer
+        run: python -m pip install 'PyYAML>=6,<7' 'pypdf>=5,<6' 'PyMuPDF>=1.24,<2'
+      - name: Resolve and render exact printed pages without product composition
         run: |
           python - <<'PY'
           from pathlib import Path
           import hashlib, json, urllib.request, urllib.parse, yaml
           from pypdf import PdfReader
+          import fitz
 
           root = Path.cwd()
           cfg = yaml.safe_load((root/'.engine-job/real-transformer-source-locator.yaml').read_text(encoding='utf-8'))
@@ -41,7 +42,7 @@ jobs:
           data = None; transport = None; errors = []
           for i, url in enumerate(urls):
               try:
-                  headers = {'User-Agent':'qiuzhidaren-source-locator/1.0','Accept-Encoding':'identity'}
+                  headers = {'User-Agent':'qiuzhidaren-source-locator/1.1','Accept-Encoding':'identity'}
                   if 'api.github.com' in url:
                       headers['Accept']='application/vnd.github.raw+json'
                   req = urllib.request.Request(url, headers=headers)
@@ -77,6 +78,27 @@ jobs:
           for n in (p58,p59):
               text = dict(texts)[n]
               snippets[str(n)] = ' '.join(text.split())[:1600]
+
+          out = root/'.engine-job/output'; out.mkdir(parents=True, exist_ok=True)
+          doc = fitz.open(str(pdf))
+          rendered = []
+          for printed, physical in zip(cfg['target_printed_pages'], (p58,p59)):
+              page = doc.load_page(physical - 1)
+              pix = page.get_pixmap(matrix=fitz.Matrix(2.0,2.0), alpha=False)
+              rel = f'printed-{printed}_physical-{physical}.png'
+              target = out/rel
+              pix.save(str(target))
+              png = target.read_bytes()
+              rendered.append({
+                  'printed_page': printed,
+                  'physical_page': physical,
+                  'path': rel,
+                  'sha256': hashlib.sha256(png).hexdigest(),
+                  'width_px': pix.width,
+                  'height_px': pix.height,
+              })
+          doc.close()
+
           evidence = {
               'version':1,
               'kind':'teaching-demo-real-transformer-source-locator-evidence',
@@ -91,10 +113,10 @@ jobs:
               'resolved_pdf_physical_pages':[p58,p59],
               'keyword_matches':matches,
               'page_text_snippets':snippets,
+              'canonical_page_renders':rendered,
               'product_pdf_generated':False,
               'private_repository_access_used':False,
           }
-          out = root/'.engine-job/output'; out.mkdir(parents=True, exist_ok=True)
           (out/'source-locator-evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           print(json.dumps(evidence,ensure_ascii=False,indent=2))
           pdf.unlink(missing_ok=True)
