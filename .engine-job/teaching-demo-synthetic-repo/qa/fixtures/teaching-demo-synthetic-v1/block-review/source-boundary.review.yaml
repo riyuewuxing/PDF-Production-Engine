@@ -1,0 +1,24 @@
+version: 1
+kind: human-content-block-review-evidence
+case_id: synthetic-structure-v1
+block_id: source-boundary
+synthetic_fixture: true
+reviewer: ChatGPT
+review_state: REVIEW_PASS
+scope_limit: validates internal process-fixture consistency only; does not assert real教材、学段、考试、招聘或教学结论
+reviewed_sources:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml
+    sha256: ad5fd3cde35fd50bdf6aa29b79a6d47e14f676c17a1e0f08a3af08915c39dbcd
+criteria:
+  explicit_synthetic_boundary: PASS
+  scaffold_ready: PASS
+  must_teach_and_out_of_scope_present: PASS
+  point_chain_count_4_to_6: PASS
+  lesson_closure_five_fields_present: PASS
+  boundary_and_closure_internally_consistent: PASS
+review_notes:
+  - fixture explicitly says it is synthetic and forbids interpreting the case as real教材、考试或招聘事实
+  - must_teach focuses on identifying and restating a total-detail relation; out_of_scope preserves the synthetic-only boundary
+  - P1-P4 forms one coherent chain from object identification to structure summary
+  - lesson_closure covers boundary, relation, evidence/model, application/check, and common error
+result_reason: sufficient and internally consistent as a synthetic source/boundary block for process validation
