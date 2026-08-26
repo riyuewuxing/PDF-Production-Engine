@@ -1,0 +1,45 @@
+name: Export qiuzhidaren generic mirror
+
+on:
+  push:
+    branches:
+      - 'job-teaching-demo/real-transformer-v1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact synthetic mirror commit
+        uses: actions/checkout@v4
+        with:
+          ref: 5a9bd4628408545a5af6b30e5f76b616ff59d745
+          path: mirror
+      - name: Package exact generic mirror only
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp -a mirror/.engine-job/teaching-demo-synthetic-repo/tools out/tools
+          mkdir -p out/production
+          cp -a mirror/.engine-job/teaching-demo-synthetic-repo/production/contracts out/production/contracts
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          root=Path('out')
+          rows=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file()):
+              rows.append({'path':p.relative_to(root).as_posix(),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'SESSION_GENERIC_MIRROR_MANIFEST.json').write_text(json.dumps({'source_commit':'5a9bd4628408545a5af6b30e5f76b616ff59d745','files':rows},indent=2)+'\n',encoding='utf-8')
+          print(f'files={len(rows)}')
+          PY
+      - name: Upload exact generic mirror
+        uses: actions/upload-artifact@v4
+        with:
+          name: qiuzhidaren-session-generic-mirror
+          path: out/
+          if-no-files-found: error
+          retention-days: 2
