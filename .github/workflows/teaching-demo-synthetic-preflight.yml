@@ -1,16 +1,19 @@
-name: Teaching Demo Artifact Plan Lock
+name: Teaching Demo Synthetic Block Acceptance
 
 on:
   push:
     branches:
       - 'job-teaching-demo/synthetic-preflight-v1'
+    paths:
+      - '.engine-job/run-block-acceptance.flag'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  artifact-plan-lock:
+  block-acceptance:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -25,228 +28,177 @@ jobs:
       - name: Install lightweight runtime dependency
         run: python -m pip install 'PyYAML>=6,<7'
 
-      - name: Plan snapshot lock and validate no-PDF Artifact Job
-        id: execute
+      - name: Recover exact prior INPUTS_LOCKED writeback
+        uses: actions/download-artifact@v4
+        with:
+          name: teaching-demo-artifact-plan-lock-machine-evidence
+          path: .engine-job/prior
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 32844323031
+
+      - name: Apply ChatGPT-reviewed synthetic blocks and validate
         run: |
           python - <<'PY'
           from pathlib import Path
-          import hashlib, json, os, shutil, subprocess, sys, traceback, yaml
+          import hashlib, json, shutil, subprocess, traceback, yaml
 
-          repo = Path.cwd().resolve()
-          package_path = repo / '.engine-job/teaching-demo-artifact-plan-lock.yaml'
-          package = yaml.safe_load(package_path.read_text(encoding='utf-8')) or {}
-          out_root = repo / '.engine-job/output'
-          shutil.rmtree(out_root, ignore_errors=True)
-          out_root.mkdir(parents=True, exist_ok=True)
+          root = Path('.engine-job/teaching-demo-synthetic-repo').resolve()
+          prior = Path('.engine-job/prior/writeback').resolve()
+          out = Path('.engine-job/output').resolve()
+          shutil.rmtree(out, ignore_errors=True)
+          (out / 'writeback').mkdir(parents=True, exist_ok=True)
 
-          def git_blob_sha1(data: bytes) -> str:
-              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
+          job_rel = 'qa/fixtures/teaching-demo-synthetic-v1/artifact-job.yaml'
+          ledger_rel = 'qa/fixtures/teaching-demo-synthetic-v1/execution-ledger.yaml'
+          plan_rel = 'production/teaching-demo-artifact-plans/synthetic-structure-v1/405fdcd25c1b14b816208451d89bfaf9c1ad4a650c426e7571082909845aa224.yaml'
+          snapshot_rel = 'production/provenance/repository-snapshots/13895002cff0d76d98a5b81d5211272c464134bb2bed5bc4b3395bde28566a2a.yaml'
 
-          def safe_under(base: Path, raw: str) -> Path:
-              path = (base / raw).resolve()
-              if path != base and base not in path.parents:
-                  raise ValueError(f'path escapes package root: {raw}')
-              return path
+          review_blocks = [
+              ('source-boundary',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/source-boundary.artifact.yaml',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/source-boundary.review.yaml'),
+              ('board-skeleton',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/board-skeleton.artifact.yaml',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/board-skeleton.review.yaml'),
+              ('trial-script',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/trial-script.artifact.yaml',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/trial-script.review.yaml'),
+              ('support-materials',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/support-materials.artifact.yaml',
+               'qa/fixtures/teaching-demo-synthetic-v1/block-review/support-materials.review.yaml'),
+          ]
 
           evidence = {
               'version': 1,
-              'kind': 'qiuzhidaren-teaching-demo-artifact-plan-lock-machine-evidence',
+              'kind': 'qiuzhidaren-teaching-demo-synthetic-block-acceptance-machine-evidence',
               'status': 'MACHINE_FAIL',
               'review_status': 'REVIEW_REQUIRED',
               'synthetic_fixture': True,
-              'source_repository': package.get('source_repository'),
-              'source_branch': package.get('source_branch'),
-              'source_commit': package.get('source_commit'),
-              'engine_repository': os.environ.get('GITHUB_REPOSITORY'),
-              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
-              'private_repository_access_used': False,
+              'prior_engine_run_id': 32844323031,
+              'prior_artifact_state': 'INPUTS_LOCKED',
+              'human_block_reviewer': 'ChatGPT',
+              'engine_decided_human_review': False,
               'product_pdf_generated': False,
-              'human_acceptance_performed': False,
+              'human_delivery_acceptance_performed': False,
               'publication_performed': False,
               'system_qualification_performed': False,
-              'claims_not_proven': [
-                  'content_block_human_acceptance',
-                  'product_build',
-                  'product_machine_verification',
-                  'formal_product_pdf_generation',
-                  'human_delivery_acceptance',
-                  'publication',
-                  'system_qualification',
-              ],
           }
 
+          def sha256(path: Path) -> str:
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          def run(cmd):
+              proc = subprocess.run(cmd, cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+              print(proc.stdout, end='')
+              if proc.returncode:
+                  raise RuntimeError(f'command failed {cmd!r}: exit={proc.returncode}: {proc.stdout[-4000:]}')
+              return {'command': cmd, 'exit_code': proc.returncode, 'output': proc.stdout[-8000:]}
+
           try:
-              if package.get('version') != 1 or package.get('privacy') != 'public-nonsecret':
-                  raise ValueError('execution package identity invalid')
-              if package.get('synthetic_fixture') is not True or package.get('product_pdf_allowed') is not False:
-                  raise ValueError('synthetic no-product-PDF boundary invalid')
-              source_commit = str(package.get('source_commit') or '')
-              if len(source_commit) != 40 or any(c not in '0123456789abcdef' for c in source_commit):
-                  raise ValueError('source_commit must be lowercase 40-hex')
+              for rel in (job_rel, ledger_rel, plan_rel, snapshot_rel):
+                  src = prior / rel
+                  dst = root / rel
+                  if not src.is_file():
+                      raise FileNotFoundError(f'prior writeback missing: {rel}')
+                  dst.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, dst)
 
-              workdir = safe_under(repo, str(package.get('workdir') or ''))
-              if not workdir.is_dir():
-                  raise ValueError('materialized synthetic repository missing')
+              job_before = yaml.safe_load((root / job_rel).read_text(encoding='utf-8')) or {}
+              ledger_before = yaml.safe_load((root / ledger_rel).read_text(encoding='utf-8')) or {}
+              if job_before.get('state') != 'INPUTS_LOCKED':
+                  raise ValueError('prior job is not INPUTS_LOCKED')
+              if (ledger_before.get('derived') or {}).get('artifact_state') != 'INPUTS_LOCKED':
+                  raise ValueError('prior ledger projection is not INPUTS_LOCKED')
 
-              verified = []
-              declared = set()
-              for item in package.get('files') or []:
-                  if not isinstance(item, dict):
-                      raise ValueError('files entry must be a mapping')
-                  raw = str(item.get('path') or '')
-                  expected = str(item.get('expected_git_blob_sha1') or '')
-                  if not raw or len(expected) != 40:
-                      raise ValueError(f'invalid source binding: {item!r}')
-                  path = safe_under(workdir, raw)
-                  if not path.is_file():
-                      raise ValueError(f'materialized source missing: {raw}')
-                  data = path.read_bytes()
-                  actual = git_blob_sha1(data)
-                  if actual != expected:
-                      raise ValueError(f'exact source mismatch: {raw}: expected={expected} got={actual}')
-                  verified.append({'path': raw, 'git_blob_sha1': actual, 'sha256': hashlib.sha256(data).hexdigest()})
-                  declared.add(raw)
-
-              required_exec = {
-                  'tools/plan_teaching_demo_artifact_job.py',
-                  'tools/init_artifact_job.py',
-                  'tools/lock_artifact_input_plan.py',
-                  'tools/manage_artifact_job.py',
-                  'tools/check_artifact_job.py',
-                  'tools/check_execution_ledger.py',
-                  'tools/provenance_snapshot.py',
-                  'tools/artifact_foundation.py',
-                  'production/contracts/module-registry-v1.yaml',
-                  'production/contracts/artifact-job-v1.yaml',
-                  'production/contracts/execution-ledger-v1.yaml',
-                  'production/contracts/repository-provenance-snapshot-v1.yaml',
-                  'production/contracts/teacher-trial-two-pdf-v1.yaml',
-                  str(package.get('manifest') or ''),
-              }
-              missing_decl = sorted(required_exec - declared)
-              if missing_decl:
-                  raise ValueError('execution dependencies are not exact-source bound: ' + ', '.join(missing_decl))
-
-              manifest = str(package['manifest'])
-              job_raw = str(package['job_path'])
-              ledger_raw = str(package['ledger_path'])
-              runtime = package.get('runtime_identity') or {}
-              runtime_name = str(runtime.get('name') or '')
-              runtime_version = str(runtime.get('version') or '')
-              if not runtime_name or not runtime_version:
-                  raise ValueError('runtime identity missing')
-
-              generated_roots = [
-                  workdir / 'production/teaching-demo-artifact-plans',
-                  workdir / 'production/provenance/repository-snapshots',
-              ]
-              for path in generated_roots:
-                  shutil.rmtree(path, ignore_errors=True)
-              for raw in (job_raw, ledger_raw):
-                  safe_under(workdir, raw).unlink(missing_ok=True)
-              existing_pdfs = sorted(p.relative_to(workdir).as_posix() for p in workdir.rglob('*.pdf'))
-              if existing_pdfs:
-                  raise ValueError('no-PDF package unexpectedly contains PDF files before planning: ' + repr(existing_pdfs))
-
+              reviewed = []
               commands = []
-              def run(command):
-                  proc = subprocess.run(command, cwd=workdir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                  commands.append({'command': command, 'exit_code': proc.returncode, 'output': proc.stdout[-16000:]})
-                  print(proc.stdout, end='')
-                  if proc.returncode:
-                      raise RuntimeError(f'command failed: {command!r}: exit={proc.returncode}')
+              for block_id, artifact_rel, review_rel in review_blocks:
+                  artifact = root / artifact_rel
+                  review = root / review_rel
+                  if not artifact.is_file() or not review.is_file():
+                      raise FileNotFoundError(f'block review files missing: {block_id}')
+                  review_data = yaml.safe_load(review.read_text(encoding='utf-8')) or {}
+                  if review_data.get('reviewer') != 'ChatGPT' or review_data.get('review_state') != 'REVIEW_PASS':
+                      raise ValueError(f'block lacks explicit ChatGPT REVIEW_PASS: {block_id}')
+                  if review_data.get('block_id') != block_id or review_data.get('synthetic_fixture') is not True:
+                      raise ValueError(f'block review identity mismatch: {block_id}')
+                  commands.append(run([
+                      'python', 'tools/manage_artifact_job.py', 'accept-block',
+                      '--job', job_rel,
+                      '--block-id', block_id,
+                      '--artifact', f'{artifact_rel}=content_block_manifest',
+                      '--evidence', f'{review_rel}=human_block_review_evidence',
+                  ]))
+                  reviewed.append({
+                      'block_id': block_id,
+                      'artifact_path': artifact_rel,
+                      'artifact_sha256': sha256(artifact),
+                      'review_path': review_rel,
+                      'review_sha256': sha256(review),
+                  })
 
-              run(['python', 'tools/plan_teaching_demo_artifact_job.py', '--manifest', manifest, '--source-commit', source_commit, '--write'])
-              plan_candidates = sorted((workdir / 'production/teaching-demo-artifact-plans/synthetic-structure-v1').glob('*.yaml'))
-              if len(plan_candidates) != 1:
-                  raise ValueError(f'exactly one content-addressed plan expected, found {len(plan_candidates)}')
-              plan_path = plan_candidates[0]
-              plan = yaml.safe_load(plan_path.read_text(encoding='utf-8')) or {}
-              if plan.get('source_commit') != source_commit:
-                  raise ValueError('plan source_commit drift')
-              job_id = str(((plan.get('execution') or {}).get('init_job_id_suggestion')) or '')
-              if not job_id:
-                  raise ValueError('planner did not provide job id suggestion')
+              commands.append(run(['python', 'tools/manage_artifact_job.py', 'advance', '--job', job_rel, '--to', 'BLOCKS_ACCEPTED']))
+              commands.append(run(['python', 'tools/check_artifact_job.py', '--job', job_rel]))
+              commands.append(run(['python', 'tools/check_execution_ledger.py', '--ledger', ledger_rel, '--report']))
 
-              run(['python', 'tools/init_artifact_job.py', '--module-id', 'teacher_teaching_demo', '--job-id', job_id, '--job', job_raw, '--ledger', ledger_raw])
-              plan_rel = plan_path.relative_to(workdir).as_posix()
-              run(['python', 'tools/lock_artifact_input_plan.py', '--job', job_raw, '--plan', plan_rel, '--runtime-name', runtime_name, '--runtime-version', runtime_version])
-              run(['python', 'tools/check_artifact_job.py', '--job', job_raw])
-              run(['python', 'tools/check_execution_ledger.py', '--ledger', ledger_raw, '--report'])
-
-              job_path = safe_under(workdir, job_raw)
-              ledger_path = safe_under(workdir, ledger_raw)
-              job = yaml.safe_load(job_path.read_text(encoding='utf-8')) or {}
-              ledger = yaml.safe_load(ledger_path.read_text(encoding='utf-8')) or {}
-              if job.get('state') != 'INPUTS_LOCKED':
-                  raise ValueError(f'Artifact Job did not reach INPUTS_LOCKED: {job.get("state")!r}')
+              job = yaml.safe_load((root / job_rel).read_text(encoding='utf-8')) or {}
+              ledger = yaml.safe_load((root / ledger_rel).read_text(encoding='utf-8')) or {}
               derived = ledger.get('derived') or {}
-              if derived.get('artifact_state') != 'INPUTS_LOCKED':
-                  raise ValueError('ledger projection did not reach INPUTS_LOCKED')
+              block_ids = [x.get('block_id') for x in (job.get('blocks') or []) if isinstance(x, dict)]
+              expected_ids = [x[0] for x in review_blocks]
+              if job.get('state') != 'BLOCKS_ACCEPTED' or derived.get('artifact_state') != 'BLOCKS_ACCEPTED':
+                  raise ValueError('job/ledger did not reach BLOCKS_ACCEPTED')
+              if block_ids != expected_ids:
+                  raise ValueError(f'block receipt order/set mismatch: {block_ids!r}')
+              if any((x.get('state'), x.get('reviewer')) != ('REVIEW_PASS', 'ChatGPT') for x in job.get('blocks') or []):
+                  raise ValueError('all accepted blocks must be ChatGPT REVIEW_PASS')
               for key in ('generation_review_cycles', 'build_count', 'final_render_count', 'review_reject_count'):
                   if derived.get(key) != 0:
                       raise ValueError(f'no-build phase metric must remain zero: {key}={derived.get(key)!r}')
-              human = job.get('human_acceptance') or {}
-              if human.get('state') != 'PENDING':
-                  raise ValueError('no-PDF plan/lock phase must not record HUMAN acceptance')
-              publication = job.get('publication') or {}
-              if publication.get('state') != 'NOT_PUBLISHED':
-                  raise ValueError('no-PDF plan/lock phase must not publish')
-              pdfs = sorted(p.relative_to(workdir).as_posix() for p in workdir.rglob('*.pdf'))
+              if job.get('outputs') or job.get('machine_evidence'):
+                  raise ValueError('BLOCKS_ACCEPTED no-PDF phase must not contain outputs/machine evidence')
+              if (job.get('human_acceptance') or {}).get('state') != 'PENDING':
+                  raise ValueError('delivery HUMAN acceptance must remain pending')
+              if (job.get('publication') or {}).get('state') != 'NOT_PUBLISHED':
+                  raise ValueError('publication must remain NOT_PUBLISHED')
+              pdfs = sorted(p.relative_to(root).as_posix() for p in root.rglob('*.pdf'))
               if pdfs:
-                  raise ValueError('product PDF generated during forbidden phase: ' + repr(pdfs))
-
-              snapshot_rel = str((plan.get('repository_snapshot_binding') or {}).get('path') or '')
-              snapshot_path = safe_under(workdir, snapshot_rel)
-              snapshot = yaml.safe_load(snapshot_path.read_text(encoding='utf-8')) or {}
-              provenance = job.get('build_provenance') or {}
-              fingerprint = str(provenance.get('input_fingerprint') or '')
-              if len(fingerprint) != 64:
-                  raise ValueError('Artifact Job input fingerprint missing')
+                  raise ValueError('product PDF present/generated in no-PDF block phase: ' + repr(pdfs))
 
               evidence.update({
                   'status': 'MACHINE_PASS',
-                  'verified_materialized_file_count': len(verified),
-                  'verified_materialized_files': verified,
-                  'commands': commands,
-                  'plan_path': plan_rel,
-                  'plan_identity_sha256': plan.get('plan_identity_sha256'),
-                  'repository_snapshot_path': snapshot_rel,
-                  'snapshot_identity_sha256': snapshot.get('snapshot_identity_sha256'),
-                  'dependency_identity_sha256': snapshot.get('dependency_identity_sha256'),
-                  'artifact_job_path': job_raw,
-                  'execution_ledger_path': ledger_raw,
+                  'review_status': 'BLOCKS_REVIEW_PASS_BY_CHATGPT',
+                  'accepted_block_ids': block_ids,
+                  'accepted_blocks': reviewed,
                   'artifact_state': job.get('state'),
                   'ledger_projection': derived,
-                  'input_fingerprint': fingerprint,
-                  'runtime_identity_for_fingerprint': provenance.get('runtime_identity'),
-                  'actual_python': sys.version.split()[0],
-                  'product_pdf_generated': False,
+                  'input_fingerprint': (job.get('build_provenance') or {}).get('input_fingerprint'),
+                  'commands': commands,
               })
 
-              writeback = out_root / 'writeback'
-              for src in (plan_path, snapshot_path, job_path, ledger_path):
-                  rel = src.relative_to(workdir)
-                  dst = writeback / rel
+              for rel in (job_rel, ledger_rel):
+                  src = root / rel
+                  dst = out / 'writeback' / rel
                   dst.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copy2(src, dst)
           except Exception as exc:
               evidence['error'] = f'{type(exc).__name__}: {exc}'
               evidence['traceback'] = traceback.format_exc()[-16000:]
           finally:
-              evidence_path = out_root / 'teaching-demo-artifact-plan-lock-evidence.json'
-              evidence_path.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              (out / 'teaching-demo-synthetic-block-acceptance-evidence.json').write_text(
+                  json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
               print(json.dumps(evidence, ensure_ascii=False, indent=2))
 
           if evidence.get('status') != 'MACHINE_PASS':
-              raise SystemExit('Teaching Demo Artifact Plan/Lock MACHINE_FAIL')
+              raise SystemExit('Teaching Demo synthetic block acceptance MACHINE_FAIL')
           PY
 
-      - name: Upload plan lock machine evidence
+      - name: Upload block acceptance machine evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: teaching-demo-artifact-plan-lock-machine-evidence
+          name: teaching-demo-synthetic-block-acceptance-machine-evidence
           path: .engine-job/output/
           if-no-files-found: error
           retention-days: 7
