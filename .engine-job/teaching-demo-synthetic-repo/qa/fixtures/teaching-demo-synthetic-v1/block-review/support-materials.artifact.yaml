@@ -1,0 +1,17 @@
+version: 1
+schema_id: synthetic-teaching-demo-content-block-v1
+case_id: synthetic-structure-v1
+block_id: support-materials
+synthetic_fixture: true
+source_roles: [reference_plan, defense, analysis]
+member_bindings:
+  - path: qa/fixtures/teaching-demo-synthetic-v1/01_训练参考教案.md
+    sha256: 26dfe766a14f1d446dce2d4c30394fe79c36abe977d39b6f5aba4a5ceb2cd49e
+    kind: case_source_reference_plan
+  - path: qa/fixtures/teaching-demo-synthetic-v1/04_课题专属答辩.md
+    sha256: 589ef9e169793bb7820a94331e08a3e860efd9d5b3112451a4482a2f78097cfa
+    kind: case_source_defense
+  - path: qa/fixtures/teaching-demo-synthetic-v1/05_教材到骨架提炼解析.md
+    sha256: dee8ff2c388642234c1de014c594f71226631493febc7fc281e1ebe73c607e39
+    kind: case_source_analysis
+purpose: bind training-plan, defense, and extraction-analysis support content as one synthetic review block
