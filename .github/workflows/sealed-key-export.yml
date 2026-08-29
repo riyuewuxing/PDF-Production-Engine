@@ -1,0 +1,55 @@
+name: Export Sealed Public Key
+
+on:
+  push:
+    branches:
+      - 'job-engine/sealed-key-export-20260828'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-public-key:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install sealed-box helper
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Derive public key from configured private secret
+        env:
+          ENGINE_SEALED_PRIVATE_KEY: ${{ secrets.ENGINE_SEALED_PRIVATE_KEY }}
+        run: |
+          test -n "$ENGINE_SEALED_PRIVATE_KEY" || { echo 'ENGINE_SEALED_PRIVATE_KEY is not configured'; exit 2; }
+          python - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          from nacl.public import PrivateKey
+
+          encoded = os.environ['ENGINE_SEALED_PRIVATE_KEY'].strip()
+          padded = encoded + '=' * (-len(encoded) % 4)
+          private = PrivateKey(base64.urlsafe_b64decode(padded))
+          public = base64.urlsafe_b64encode(bytes(private.public_key)).decode('ascii').rstrip('=')
+          Path('engine-sealed-public-key.txt').write_text(public + '\n', encoding='utf-8')
+          PY
+
+      - name: Upload public key only
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-sealed-public-key
+          path: engine-sealed-public-key.txt
+          if-no-files-found: error
+          retention-days: 1
