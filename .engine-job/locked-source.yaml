@@ -1,0 +1,12 @@
+version: 1
+source_id: qiuzhidaren-pep-physics-selective-3-slot2-formal
+urls:
+  - https://raw.githubusercontent.com/TapXWorld/ChinaTextbook/5a80345f2043ba6f8db8d7be9cf3db82725ff1f7/%E9%AB%98%E4%B8%AD/%E7%89%A9%E7%90%86/%E4%BA%BA%E6%95%99%E7%89%88-%E4%BA%BA%E6%B0%91%E6%95%99%E8%82%B2%E5%87%BA%E7%89%88%E7%A4%BE/%E6%99%AE%E9%80%9A%E9%AB%98%E4%B8%AD%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E7%89%A9%E7%90%86%E9%80%89%E6%8B%A9%E6%80%A7%E5%BF%85%E4%BF%AE%20%E7%AC%AC%E4%B8%89%E5%86%8C.pdf
+expected:
+  size_bytes: 12278176
+  magic: "%PDF-"
+  git_blob_sha: 02960424e060dd2278c34ba973d9ab3fd204a5ec
+  sha256: 960f28711d79dbf844625afb6aacc2aec43684235f80edd4210753dfc1ef9ae0
+selected_pages: [7, 8, 9, 10]
+retries_per_url: 2
+timeout_seconds: 90
