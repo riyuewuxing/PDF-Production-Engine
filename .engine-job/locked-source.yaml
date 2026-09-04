@@ -9,4 +9,4 @@ expected:
   sha256: 960f28711d79dbf844625afb6aacc2aec43684235f80edd4210753dfc1ef9ae0
 selected_pages: [7, 8, 9, 10]
 retries_per_url: 2
-timeout_seconds: 90
+timeout_seconds: 91
