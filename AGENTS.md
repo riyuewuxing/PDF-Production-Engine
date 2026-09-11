@@ -86,3 +86,8 @@ pdf-production build --root <build-package-root> --manifest <manifest-relative-t
 ## Branch discipline
 
 Develop on feature branches. Do not merge to `main` or create PRs unless explicitly authorized. Keep runtime outputs out of source control except synthetic fixtures and intentionally versioned generic evidence.
+
+
+## Release validation
+
+For an explicitly authorized promotion candidate, a short-lived `feat/**` release-validation branch may update this section to force both generic PDF CI and full resource-runtime CI on the exact candidate commit. This never relaxes the privacy boundary: only public/synthetic fixtures may be used, and no private consumer package may be committed or uploaded as a public artifact.
