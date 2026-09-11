@@ -1,0 +1,108 @@
+name: P1 Required Negatives Runtime
+
+on:
+  push:
+    branches:
+      - 'job-architecture/p1-state-derivation-*'
+    paths:
+      - '.engine-job/p1-state-negatives/**'
+      - '.github/workflows/p1-required-negatives-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  required-negatives:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml
+      - name: Verify exact source and execute P1 suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess, sys, time
+
+          checkout=Path.cwd().resolve()
+          base=checkout/'.engine-job/p1-state-negatives'
+          root=base/'repo'
+          manifest=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
+          out=base/'output'
+          out.mkdir(parents=True,exist_ok=True)
+
+          def blob_sha(data: bytes) -> str:
+              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii')+data).hexdigest()
+
+          verified=[]
+          for item in manifest['files']:
+              path=(root/item['path']).resolve()
+              if root.resolve()!=path and root.resolve() not in path.parents:
+                  raise SystemExit(f'path escape: {item["path"]}')
+              data=path.read_bytes()
+              actual=blob_sha(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(f'exact source mismatch: {item["path"]}: expected={item["git_blob_sha1"]} actual={actual}')
+              verified.append({'path':item['path'],'git_blob_sha1':actual,'sha256':hashlib.sha256(data).hexdigest()})
+          if len(verified) != manifest['expected_file_count']:
+              raise SystemExit('verified source count drift')
+
+          commands=[
+              [sys.executable,'-m','py_compile',
+               'tools/artifact_foundation.py','tools/derive_state.py','tools/gen_handoff.py',
+               'tools/check_state_derivation.py','examples/selftest_state_derivation.py'],
+              [sys.executable,'examples/selftest_state_derivation.py'],
+          ]
+          results=[]
+          status='MACHINE_PASS'
+          for command in commands:
+              started=time.monotonic()
+              proc=subprocess.run(command,cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+              output=proc.stdout or ''
+              print('>>>',' '.join(command))
+              print(output,end='')
+              results.append({'command':command,'exit_code':proc.returncode,'duration_seconds':round(time.monotonic()-started,6),'output':output[-12000:]})
+              if proc.returncode != 0:
+                  status='MACHINE_FAIL'
+                  break
+
+          evidence={
+              'version':1,
+              'kind':'qiuzhidaren-p1-required-negatives-runtime-evidence-v1',
+              'status':status,
+              'review_status':'REVIEW_REQUIRED',
+              'source_repository':manifest['source_repository'],
+              'source_commit':manifest['source_commit'],
+              'engine_execution_repository':os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit':os.environ.get('GITHUB_SHA'),
+              'engine_run_id':os.environ.get('GITHUB_RUN_ID'),
+              'execution_surface':'public-engine-github-hosted-runner',
+              'private_repository_access_used':False,
+              'private_repository_credentials_used':False,
+              'product_pdf_generated':False,
+              'required_negatives':[
+                  'PASS_WITHOUT_EXECUTION_SURFACE_REJECTED',
+                  'DUPLICATE_CURRENT_DELIVERABLE_REJECTED',
+                  'BLOCKED_WITHOUT_BLOCKED_BY_REJECTED',
+              ],
+              'verified_source':verified,
+              'commands':results,
+          }
+          (out/'evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(evidence,ensure_ascii=False,indent=2))
+          if status != 'MACHINE_PASS':
+              raise SystemExit('P1 required negatives MACHINE_FAIL')
+          PY
+      - name: Upload public-safe P1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-required-negatives-runtime-evidence
+          path: .engine-job/p1-state-negatives/output/evidence.json
+          if-no-files-found: error
