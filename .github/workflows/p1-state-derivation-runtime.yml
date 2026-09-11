@@ -136,6 +136,10 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Projection mutates only the staged input workspace. Restore that workspace
+          # before rebasing so only the copied output/evidence remains as a change.
+          git restore .engine-input/p1-actual/repo
+          git clean -fd .engine-input/p1-actual/repo
           git add .engine-job/p1-state-derivation/output/actual
           if ! git diff --cached --quiet; then
             git commit -m 'job: record P1 actual repository projection'
