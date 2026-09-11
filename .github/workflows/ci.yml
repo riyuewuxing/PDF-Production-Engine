@@ -1,0 +1,152 @@
+name: PDF Engine CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  public-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install engine and tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Run unit tests
+        run: pytest
+
+      - name: Validate block-gated resource job protocol
+        run: pdf-resource-job examples/block-gate/resource-job.yaml
+
+      - name: Build public fixture at review DPI
+        run: |
+          rm -rf .ci-output .ci-review
+          pdf-production build \
+            --root . \
+            --manifest examples/hello/build.yaml \
+            --out .ci-output \
+            --dpi 144
+
+      - name: Build batched final review pack
+        run: |
+          pdf-review-pack \
+            --out .ci-review \
+            --dpi 144 \
+            .ci-output/hello-engine/hello-engine.pdf
+
+      - name: Enforce machine evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('.ci-output/hello-engine/build-manifest.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          assert data['status'] == 'MACHINE_PASS'
+          assert data['visual_status'] == 'HUMAN_PIXEL_CONFIRMATION_REQUIRED'
+          assert data['qa']['preflight_backend'] == 'PyMuPDF'
+          assert data['qa']['render_backend'] == 'PDFium'
+          assert data['qa']['page_count'] >= 1
+          assert data['qa']['page_count'] == data['qa']['rendered_page_count']
+          assert len(data['pdf']['sha256']) == 64
+
+          review = json.loads(Path('.ci-review/review-pack.json').read_text(encoding='utf-8'))
+          assert review['capability'] == 'final-review-pack-v1'
+          assert review['status'] == 'MACHINE_PASS'
+          assert review['visual_status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert review['document_count'] == 1
+          assert review['total_page_count'] == review['total_rendered_page_count']
+          doc = review['documents'][0]
+          assert doc['preflight_backend'] == 'PyMuPDF'
+          assert doc['render_backend'] == 'PDFium'
+          assert len(doc['sha256']) == 64
+          assert len(doc['pages']) == doc['page_count']
+          assert Path('.ci-review/review-index.md').is_file()
+          assert doc['contact_sheets']
+          print('PASS: resource gate + PDF preflight/render/hash + final review-pack evidence complete')
+          PY
+
+      - name: Upload public fixture evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-engine-public-fixture
+          path: |
+            .ci-output/hello-engine/
+            .ci-review/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish success status
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          token = os.environ['GH_TOKEN']
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/statuses/{sha}',
+              data=json.dumps({
+                  'state': 'success',
+                  'context': 'pdf-engine/ci',
+                  'description': 'Block gate, PDF build, preflight, full render and review-pack passed',
+              }).encode(),
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+              },
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as r:
+              assert r.status == 201
+          PY
+
+      - name: Publish failure status
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          token = os.environ['GH_TOKEN']
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/statuses/{sha}',
+              data=json.dumps({
+                  'state': 'failure',
+                  'context': 'pdf-engine/ci',
+                  'description': 'PDF engine CI failed; inspect workflow logs',
+              }).encode(),
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json',
+              },
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as r:
+              assert r.status == 201
+          PY

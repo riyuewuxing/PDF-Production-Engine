@@ -1,0 +1,159 @@
+name: Layout Prototype CI
+
+on:
+  push:
+    branches: ['feat/**']
+    paths:
+      - 'examples/question-bank-layout/**'
+      - 'src/pdf_production_engine/typst_build.py'
+      - 'tests/test_typst_build.py'
+      - 'pyproject.toml'
+      - '.github/workflows/layout-prototype-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  compare-layouts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install CJK fonts and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-arphic-gbsn00lp fonts-arphic-gkai00mp
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]' reportlab
+      - name: Build ReportLab preview
+        run: python examples/question-bank-layout/reportlab_preview.py
+      - name: Install native Typst runtime and build through generic engine CLI
+        run: |
+          npm install --no-save @flukxr/typst-cli@0.15.1-npm.0
+          TYPST_BIN="$PWD/node_modules/.bin/typst"
+          "$TYPST_BIN" --version
+          pdf-typst-build \
+            --root "$PWD/examples/question-bank-layout" \
+            --source "$PWD/examples/question-bank-layout/typst_preview.typ" \
+            --output "$PWD/examples/question-bank-layout/typst-question-bank-preview.pdf" \
+            --typst-bin "$TYPST_BIN" \
+            --evidence "$PWD/examples/question-bank-layout/typst-question-bank-preview.typst-evidence.json"
+      - name: Package reusable pinned Typst runtime
+        run: |
+          mkdir -p runtime-bundle
+          RUNTIME_BIN="$(node -p 'require("@flukxr/typst-cli").typstPath')"
+          test -x "$RUNTIME_BIN"
+          cp "$RUNTIME_BIN" runtime-bundle/typst
+          chmod 0755 runtime-bundle/typst
+          runtime-bundle/typst --version
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          p = pathlib.Path('runtime-bundle/typst')
+          digest = hashlib.sha256(p.read_bytes()).hexdigest()
+          version = subprocess.check_output([str(p.resolve()), '--version'], text=True).strip()
+          pathlib.Path('runtime-bundle/manifest.json').write_text(json.dumps({
+              'capability': 'typst-runtime-bundle-v1',
+              'platform': 'linux-x86_64',
+              'source_package': '@flukxr/typst-cli@0.15.1-npm.0',
+              'runtime_version': version,
+              'binary_sha256': digest,
+              'review_status': 'REVIEW_REQUIRED',
+          }, indent=2) + '\n')
+          print(version, digest)
+          PY
+      - name: Upload reusable Typst runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-runtime-linux-x86_64
+          path: runtime-bundle/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Validate generic Typst evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('examples/question-bank-layout/typst-question-bank-preview.typst-evidence.json').read_text())
+          assert p['capability'] == 'typst-pdf-build-v1'
+          assert p['status'] == 'MACHINE_PASS'
+          assert p['review_status'] == 'REVIEW_REQUIRED'
+          assert p['output']['page_count'] >= 2
+          assert p['runtime']['typst'].startswith('typst 0.15.1')
+          print(p['runtime']['typst'], p['output']['sha256'])
+          PY
+      - name: Build shared machine review pack
+        run: |
+          rm -rf layout-review
+          pdf-review-pack --out layout-review --dpi 200 \
+            examples/question-bank-layout/reportlab-question-bank-preview.pdf \
+            examples/question-bank-layout/typst-question-bank-preview.pdf
+      - name: Assert both previews rendered completely
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('layout-review/review-pack.json').read_text())
+          assert p['status'] == 'MACHINE_PASS'
+          assert p['document_count'] == 2
+          assert p['total_page_count'] == p['total_rendered_page_count']
+          assert all(d['page_count'] >= 2 for d in p['documents'])
+          print([(d['filename'], d['page_count'], len(d.get('occupancy_warnings', []))) for d in p['documents']])
+          PY
+      - name: Upload layout comparison evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: question-bank-layout-prototype
+          path: |
+            examples/question-bank-layout/*-question-bank-preview.pdf
+            examples/question-bank-layout/*.typst-evidence.json
+            layout-review/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish layout prototype success status
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          payload = {
+              'state':'success',
+              'context':'pdf-engine/layout-prototype',
+              'description':'Generic Typst build + reusable native runtime + layout review pack passed',
+              'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+              data=json.dumps(payload).encode(),
+              headers={'Authorization':f"Bearer {os.environ['GH_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+              method='POST')
+          with urllib.request.urlopen(req) as r: assert r.status == 201
+          PY
+      - name: Publish layout prototype failure status
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          payload = {
+              'state':'failure',
+              'context':'pdf-engine/layout-prototype',
+              'description':'Generic Typst/layout prototype failed; inspect workflow logs',
+              'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+              data=json.dumps(payload).encode(),
+              headers={'Authorization':f"Bearer {os.environ['GH_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+              method='POST')
+          with urllib.request.urlopen(req) as r: assert r.status == 201
+          PY

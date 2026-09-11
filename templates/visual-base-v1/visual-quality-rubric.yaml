@@ -1,0 +1,123 @@
+rubric:
+  first_glance: 15
+  hierarchy: 20
+  spacing: 15
+  chinese_readability: 15
+  scan_efficiency: 15
+  training_operability: 10
+  consistency: 5
+  technical: 5
+  pass_total: 88
+  first_glance_floor: 12
+scores:
+  T01:
+    first_glance: 13
+    hierarchy: 18
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 13
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 91
+    self_review: PASS
+  T02:
+    first_glance: 14
+    hierarchy: 18
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 93
+    self_review: PASS
+  T03:
+    first_glance: 14
+    hierarchy: 19
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 10
+    consistency: 5
+    technical: 5
+    total: 95
+    self_review: PASS
+  T04:
+    first_glance: 14
+    hierarchy: 19
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 94
+    self_review: PASS
+  T05:
+    first_glance: 13
+    hierarchy: 18
+    spacing: 14
+    chinese_readability: 15
+    scan_efficiency: 13
+    training_operability: 8
+    consistency: 5
+    technical: 5
+    total: 91
+    self_review: PASS
+  T06:
+    first_glance: 14
+    hierarchy: 18
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 10
+    consistency: 5
+    technical: 5
+    total: 94
+    self_review: PASS
+  T07:
+    first_glance: 14
+    hierarchy: 19
+    spacing: 13
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 93
+    self_review: PASS
+  T08:
+    first_glance: 13
+    hierarchy: 19
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 93
+    self_review: PASS
+  T09:
+    first_glance: 13
+    hierarchy: 18
+    spacing: 13
+    chinese_readability: 14
+    scan_efficiency: 15
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 92
+    self_review: PASS
+  T10:
+    first_glance: 15
+    hierarchy: 19
+    spacing: 14
+    chinese_readability: 14
+    scan_efficiency: 14
+    training_operability: 9
+    consistency: 5
+    technical: 5
+    total: 95
+    self_review: PASS
+user_acceptance: REQUIRED_BEFORE_ACTIVATION

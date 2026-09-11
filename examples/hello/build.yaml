@@ -1,0 +1,10 @@
+version: 1
+document_id: hello-engine
+backend:
+  type: markdown-reportlab
+source:
+  path: examples/hello/source.md
+output:
+  filename: hello-engine.pdf
+metadata:
+  title: PDF Production Engine · Build Fixture

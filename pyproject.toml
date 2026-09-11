@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-production-engine"
+version = "0.1.0"
+description = "Deterministic stateless resource build, XeLaTeX PDF production, preflight, full-page render, and evidence engine"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "riyuewuxing"}]
+dependencies = [
+  "PyYAML>=6.0,<7",
+  "reportlab>=4.2,<5",
+  "PyMuPDF>=1.24,<2",
+  "pypdfium2>=4.30,<5",
+  "Pillow>=10,<12",
+  "PyNaCl>=1.5,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+pdf-production = "pdf_production_engine.cli:main"
+pdf-resource-job = "pdf_production_engine.job_protocol:main"
+pdf-resource-run = "pdf_production_engine.resource_runner:main"
+pdf-runtime-smoke = "pdf_production_engine.runtime_smoke:main"
+pdf-sealed = "pdf_production_engine.sealed_handoff:main"
+pdf-locked-pages = "pdf_production_engine.locked_source:main"
+pdf-review-pack = "pdf_production_engine.review_pack_runtime:main"
+pdf-latex-build = "pdf_production_engine.latex_build:main"
+pdf-typst-build = "pdf_production_engine.typst_build:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

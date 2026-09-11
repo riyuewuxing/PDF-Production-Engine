@@ -1,0 +1,29 @@
+version: 3
+status: REJECTED_LEGACY_ONLY
+contract: GENERIC_CONTENT_SLOTS_V1
+renderer_api: render(data)
+canonical_for_new_authored_pdfs: false
+replacement: templates/latex-base-v1/
+selection_policy:
+  random_pool_enabled: false
+  production_selection_forbidden: true
+sample:
+  identity: NEUTRAL_SYNTHETIC_EXAMPLE
+  same_content_for_all_templates: true
+  business_content: false
+templates:
+- {id: T01, name: Editorial Serif, file: T01_editorial_serif.typ, family: editorial-note, status: REJECTED}
+- {id: T02, name: Margin Fieldnotes, file: T02_margin_fieldnotes.typ, family: margin-note, status: REJECTED}
+- {id: T03, name: Cornell Study, file: T03_cornell_study.typ, family: cornell-workbook, status: REJECTED}
+- {id: T04, name: Bento Modular, file: T04_bento_modular.typ, family: modular-cards, status: REJECTED}
+- {id: T05, name: Classic Academic, file: T05_classic_academic.typ, family: academic-handout, status: REJECTED}
+- {id: T06, name: Studio Workbook, file: T06_studio_workbook.typ, family: worksheet, status: REJECTED}
+- {id: T07, name: Atlas Navigation, file: T07_atlas_navigation.typ, family: atlas-index, status: REJECTED}
+- {id: T08, name: Modern Manual, file: T08_modern_manual.typ, family: manual-docs, status: REJECTED}
+- {id: T09, name: Dense Reference, file: T09_dense_reference.typ, family: reference-sheet, status: REJECTED}
+- {id: T10, name: Premium Contrast, file: T10_premium_contrast.typ, family: premium-notes, status: REJECTED}
+contains_business_content: false
+historical_runtime_dependency: Typst >=0.15.0
+rejection_reason: >-
+  User audit found insufficient true design diversity and rejected Typst as the authored-PDF foundation.
+  Keep these files only as historical visual references; do not activate or randomly select them.

@@ -1,0 +1,26 @@
+\documentclass[tikz,border=8pt]{standalone}
+\usepackage[UTF8,fontset=none]{ctex}
+\usepackage{fontspec,tikz,xcolor}
+\usetikzlibrary{positioning,arrows.meta}
+\setmainfont{DejaVu Serif}\setsansfont{DejaVu Sans}\setCJKmainfont{Noto Serif CJK SC}\setCJKsansfont{Noto Sans CJK SC}
+\definecolor{navy}{HTML}{244A68}\definecolor{soft}{HTML}{EEF3F5}\definecolor{warm}{HTML}{A56A43}
+\begin{document}
+\begin{tikzpicture}[font=\sffamily]
+  \draw[navy,line width=1pt,rounded corners=2mm] (0,0) rectangle (12,16.4);
+  \node[anchor=west,font=\bfseries\Large,text=navy] at (.7,15.45) {锁定来源页 / SOURCE PAGE FIXTURE};
+  \draw[gray!55] (.7,14.95)--(11.3,14.95);
+  \node[anchor=north west,text width=10.6cm,align=left,font=\small] at (.7,14.55) {这是一张中性测试页，用于验证 LaTeX 中的真实外部资源嵌入、缩放、图注与分页关系。它不包含任何业务信息。最终生产环境中，这个位置可以替换为教材页、附件页、图表或其他已验收资源。};
+  \begin{scope}[yshift=5.7cm]
+    \draw[fill=soft,draw=navy!65,rounded corners=2mm] (1.0,0) rectangle (11.0,4.8);
+    \foreach \x/\n/\t in {2.2/1/Source identity,4.7/2/Page selection,7.2/3/Render review,9.7/4/Hash receipt}{
+      \fill[navy] (\x,2.75) circle (.38);
+      \node[text=white,font=\bfseries] at (\x,2.75) {\n};
+      \node[font=\scriptsize,align=center] at (\x,1.8) {\t};
+    }
+    \draw[-{Stealth[length=3mm]},warm,line width=1.2pt] (2.65,2.75)--(4.2,2.75);
+    \draw[-{Stealth[length=3mm]},warm,line width=1.2pt] (5.15,2.75)--(6.7,2.75);
+    \draw[-{Stealth[length=3mm]},warm,line width=1.2pt] (7.65,2.75)--(9.2,2.75);
+  \end{scope}
+  \node[anchor=west,font=\small,text=gray!70!black] at (.7,.75) {Fixture ID: LATEX-R2-SOURCE-PAGE-001};
+\end{tikzpicture}
+\end{document}

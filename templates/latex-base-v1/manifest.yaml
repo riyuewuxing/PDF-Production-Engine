@@ -1,0 +1,137 @@
+version: 3
+status: ROUND3_PRODUCTION_QUALIFIED
+canonical_backend: xelatex
+engine_policy:
+  authored_pdf_backend: xelatex
+  typst_template_pool: REJECTED_LEGACY_ONLY
+  reportlab_authored_layout: NONCANONICAL_LEGACY_ONLY
+  shell_escape: false
+  cjk: CTeX_or_xeCJK
+  latex_build_capability: xelatex-pdf-build-v2
+  strict_final_log_gate: true
+candidate_count: 5
+production_library_enabled: true
+random_pool_enabled: false
+selection_policy:
+  mode: DOCUMENT_FAMILY_ROUTING
+  reason: >-
+    Round 3 proved that all five systems can render real consumer content, but a global uniform random choice is not
+    a quality-preserving policy. Select by document structure and intended use; randomization, if ever used, must be
+    limited to an explicitly compatible routed subset.
+  routes:
+    professional_report_or_handbook: [L01]
+    long_form_book_or_guide: [L02, L05]
+    annotated_handout_or_margin_notes: [L03]
+    training_manual_or_workbook: [L04, L01]
+    editorial_textbook_or_knowledge_book: [L05, L02]
+  fallback: L01
+
+typography_baseline:
+  body_size_pt_range: [10.5, 11.5]
+  chinese_leading_guidance: 'For the qualified A4 bases, approximately 1.45-1.55 line spacing; rendered-page review remains authoritative.'
+  paragraph_indent: 2em
+  rule: >-
+    Chinese prose must remain comfortable across multi-page reading. Compile success alone cannot accept line spacing,
+    line length, paragraph rhythm, heading whitespace, page balance, or workbook writing-space behavior.
+
+strict_log_gate:
+  final_pass_zero_required:
+    - missing_characters
+    - overfull_hbox
+    - overfull_vbox
+    - undefined_references
+    - rerun_needed
+  negative_test:
+    case: unsupported_missing_glyph
+    result: REJECTED_AS_EXPECTED
+
+candidates:
+  - id: L01
+    name: KOMA Report
+    file: L01_koma_report.tex
+    family: professional-report
+    upstream_basis: KOMA-Script scrreprt
+    upstream_license: LPPL-1.3c
+    line_spacing: 1.46
+    round2: PASS
+    round3: PASS
+    production_routes: [professional_report_or_handbook, training_manual_or_workbook]
+  - id: L02
+    name: Memoir Book
+    file: L02_memoir_book.tex
+    family: long-form-book
+    upstream_basis: memoir
+    upstream_license: LPPL-1.3c
+    line_spacing: approx_1.50
+    round2: PASS
+    round3: PASS
+    production_routes: [long_form_book_or_guide, editorial_textbook_or_knowledge_book]
+  - id: L03
+    name: Margin Handout
+    file: L03_margin_handout.tex
+    family: margin-note-handout
+    upstream_basis: CTeX article + marginnote; Tufte-style information architecture
+    upstream_license: package-specific upstream licenses
+    line_spacing: 1.52
+    round2: PASS
+    round3: PASS
+    production_routes: [annotated_handout_or_margin_notes]
+  - id: L04
+    name: CTeX Technical Manual
+    file: L04_ctex_manual.tex
+    family: technical-manual
+    upstream_basis: CTeX article + tcolorbox
+    upstream_license: package-specific upstream licenses
+    line_spacing: 1.48
+    round2: PASS
+    round3: PASS
+    production_routes: [training_manual_or_workbook]
+  - id: L05
+    name: CTeX Editorial Book
+    file: L05_ctex_book.tex
+    family: editorial-book
+    upstream_basis: CTeX book + standard LaTeX page-style/title packages
+    upstream_license: package-specific upstream licenses
+    line_spacing: 1.50
+    round2: PASS
+    round3: PASS
+    production_routes: [editorial_textbook_or_knowledge_book, long_form_book_or_guide]
+
+round3_real_consumer_validation:
+  privacy: >-
+    Consumer plaintext and source PDFs were session-staged and are not stored in this public repository. Public evidence
+    records only generic result counts and opaque hashes.
+  consumer_product_classes:
+    - real_training_card_product
+    - real_self_editing_workbook_product
+  generated_variants: 10
+  final_pages: 157
+  rendered_pages: 157
+  render_dpi: 200
+  all_a4: true
+  strict_final_log_issues: 0
+  missing_required_content_markers: 0
+  edge_clip_risks_after_rebuild: 0
+  accidental_blank_or_near_blank_pages: 0
+  intentional_sparse_chapter_dividers: 4
+  chatgpt_every_page_visual_review: PASS
+  defects_found_and_closed:
+    - generated_source_escape_corruption
+    - incompatible_section_command_in_article_classes
+    - duplicate_explicit_plus_automatic_section_numbering
+    - workbook_forced_page_break_whitespace
+    - margin_handout_orphan_heading_and_split_box_at_page_top
+  combined_session_artifact:
+    pages: 157
+    sha256: 28b20480f3a99be0aa5d6796b169c2d8f1324bc31fab8b1ce86bd05e767a47a5
+
+three_round_acceptance:
+  round1: {status: COMPLETE, goal: xelatex_architecture_and_five_candidates}
+  round2: {status: COMPLETE, goal: stress_test_and_refinement}
+  round3: {status: COMPLETE, goal: real_consumer_pdf_full_page_acceptance_and_freeze}
+final_acceptance:
+  status: PASS
+  production_library: FROZEN_V1
+  selection: ROUTED_NOT_GLOBAL_RANDOM
+  user_review_still_required_for_each_new_final_pdf: true
+  hash_change_invalidates_acceptance: true
