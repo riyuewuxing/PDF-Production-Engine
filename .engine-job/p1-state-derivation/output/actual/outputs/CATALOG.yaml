@@ -1,0 +1,41 @@
+version: 1
+generated: true
+scope: artifact-job-outputs-only
+as_of: '2026-09-04T08:21:47.614949Z'
+derived_from:
+  artifact_jobs: production/artifact-jobs
+  execution_ledger_contract: production/contracts/execution-ledger-v1.yaml
+legacy_catalog:
+  path: outputs/CATALOG.md
+  role: historical narrative and receipt inventory; not rewritten by this projection
+deliverables:
+- id: teaching-demo-transformer-principle-v1-r6::outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+  logical_key: teacher_teaching_demo::pdf::变压器的原理｜教材到骨架提炼解析.pdf
+  module_id: teacher_teaching_demo
+  job_id: teaching-demo-transformer-principle-v1-r6
+  kind: pdf
+  path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+  sha256: da89077ce49dfb18430e265a41d2227552694d0e2f9c361e2c5c847dae147dda
+  revision: teaching-demo-transformer-principle-v1-r6
+  job_stage: PUBLISHED
+  acceptance:
+    machine: PRESENT
+    human: ACCEPTED
+    ref: production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r6.yaml
+  current: true
+  superseded_by: null
+- id: teaching-demo-transformer-principle-v1-r6::outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+  logical_key: teacher_teaching_demo::pdf::变压器的原理｜面试训练稿.pdf
+  module_id: teacher_teaching_demo
+  job_id: teaching-demo-transformer-principle-v1-r6
+  kind: pdf
+  path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+  sha256: 3dd2fb88bb8b39cf4b7473eb300f429d8ad6fcb633b9c289f1c0dfa3a72c9023
+  revision: teaching-demo-transformer-principle-v1-r6
+  job_stage: PUBLISHED
+  acceptance:
+    machine: PRESENT
+    human: ACCEPTED
+    ref: production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r6.yaml
+  current: true
+  superseded_by: null
