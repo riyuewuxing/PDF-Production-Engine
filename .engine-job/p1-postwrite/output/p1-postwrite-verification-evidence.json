@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p1-postwrite-verification-evidence-v1",
+  "status": "MACHINE_PASS",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "10025398534381571abaf60b9102dd327783997b",
+  "engine_repository": "riyuewuxing/PDF-Production-Engine",
+  "engine_execution_commit": "a5e0f726f80dbecb49468d01400feb5aab8f9898",
+  "engine_run_id": "34605632231",
+  "execution_surface": "public-engine-github-hosted-runner",
+  "private_repository_access_used": false,
+  "private_repository_credentials_used": false,
+  "product_pdf_generated": false,
+  "verified_view_count": 4,
+  "verified_views": [
+    {
+      "path": "CURRENT_STATE.yaml",
+      "git_blob_sha1": "36c235115c983bb577b4a1c6dc29aac336ff51ed",
+      "sha256": "b494f9ce056000af829f714da9e7c82870a735664e79c7b117c89879d3c7bc0e"
+    },
+    {
+      "path": "HANDOFF.md",
+      "git_blob_sha1": "af52c542cae9c0c6fd93113427f7941d5d327e89",
+      "sha256": "a5b1c58cfad7d8a23da0ea5c07e0e6c5cb2d0de2130e95a746eb95071d2dd939"
+    },
+    {
+      "path": "NEXT_ACTION.yaml",
+      "git_blob_sha1": "9059dbf003ad930aca14716e8b7a7cd1b7b37295",
+      "sha256": "9626ae4e85746157344b440614f03d26262e3178adec7c8c9176d244924a1530"
+    },
+    {
+      "path": "outputs/CATALOG.yaml",
+      "git_blob_sha1": "53112e72ddee137ba683cdcf8cf61d99bdd38929",
+      "sha256": "f834e94a2ccbced5ccbbbc2b3e105455c2e9a3accbe3adcf63b345abd4075820"
+    }
+  ],
+  "command": [
+    "python",
+    "tools/check_state_derivation.py",
+    "--root",
+    "."
+  ],
+  "exit_code": 0,
+  "duration_seconds": 1.313372,
+  "output_tail": "PASS: execution state derivation is deterministic and committed views match\n",
+  "product_pdf_paths": [],
+  "runtime": {
+    "os": "Linux",
+    "python": "3.12.14"
+  }
+}
