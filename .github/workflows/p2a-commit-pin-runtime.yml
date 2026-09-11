@@ -1,0 +1,126 @@
+name: P2a Commit Pin Runtime
+
+on:
+  push:
+    branches:
+      - 'job-architecture/p1-state-derivation-*'
+    paths:
+      - '.engine-job/p2a-commit-pin/**'
+      - '.github/workflows/p2a-commit-pin-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  commit-pin:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml
+
+      - name: Verify exact staged source and execute checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=".engine-job/p2a-commit-pin/repo"
+          MANIFEST=".engine-job/p2a-commit-pin/manifest.json"
+          OUT=".engine-job/p2a-commit-pin/output"
+          mkdir -p "$OUT"
+
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess, sys, os, time
+
+          checkout=pathlib.Path.cwd().resolve()
+          root=checkout/'.engine-job/p2a-commit-pin/repo'
+          manifest=json.loads((checkout/'.engine-job/p2a-commit-pin/manifest.json').read_text(encoding='utf-8'))
+          out=checkout/'.engine-job/p2a-commit-pin/output'
+
+          def blob_sha(data: bytes) -> str:
+              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii')+data).hexdigest()
+
+          verified=[]
+          for item in manifest['files']:
+              path=(root/item['path']).resolve()
+              if root.resolve() != path and root.resolve() not in path.parents:
+                  raise SystemExit(f'path escape: {item["path"]}')
+              data=path.read_bytes()
+              actual=blob_sha(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(f'exact source mismatch: {item["path"]}: expected={item["git_blob_sha1"]} actual={actual}')
+              verified.append({'path':item['path'],'git_blob_sha1':actual,'sha256':hashlib.sha256(data).hexdigest()})
+
+          if len(verified) != manifest['expected_file_count']:
+              raise SystemExit('verified file count drift')
+
+          commands=[
+              [sys.executable,'-m','py_compile','tools/check_engine_handoff.py'],
+              [sys.executable,'tools/check_engine_handoff.py','--self-test'],
+              [sys.executable,'tools/check_engine_handoff.py','--strict'],
+          ]
+          results=[]
+          for command in commands:
+              started=time.monotonic()
+              proc=subprocess.run(command,cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+              output=proc.stdout or ''
+              print('>>>',' '.join(command))
+              print(output,end='')
+              results.append({
+                  'command':command,
+                  'exit_code':proc.returncode,
+                  'duration_seconds':round(time.monotonic()-started,6),
+                  'output':output[-12000:],
+              })
+              if proc.returncode != 0:
+                  evidence={
+                      'version':1,
+                      'kind':'qiuzhidaren-p2a-commit-pin-runtime-evidence-v1',
+                      'status':'MACHINE_FAIL',
+                      'review_status':'REVIEW_REQUIRED',
+                      'source_repository':manifest['source_repository'],
+                      'source_commit':manifest['source_commit'],
+                      'engine_execution_repository':os.environ.get('GITHUB_REPOSITORY'),
+                      'engine_execution_commit':os.environ.get('GITHUB_SHA'),
+                      'engine_run_id':os.environ.get('GITHUB_RUN_ID'),
+                      'execution_surface':'public-engine-github-hosted-runner',
+                      'private_repository_access_used':False,
+                      'private_repository_credentials_used':False,
+                      'product_pdf_generated':False,
+                      'verified_source':verified,
+                      'commands':results,
+                  }
+                  (out/'evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+                  raise SystemExit(proc.returncode)
+
+          evidence={
+              'version':1,
+              'kind':'qiuzhidaren-p2a-commit-pin-runtime-evidence-v1',
+              'status':'MACHINE_PASS',
+              'review_status':'REVIEW_REQUIRED',
+              'source_repository':manifest['source_repository'],
+              'source_commit':manifest['source_commit'],
+              'engine_execution_repository':os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit':os.environ.get('GITHUB_SHA'),
+              'engine_run_id':os.environ.get('GITHUB_RUN_ID'),
+              'execution_surface':'public-engine-github-hosted-runner',
+              'private_repository_access_used':False,
+              'private_repository_credentials_used':False,
+              'product_pdf_generated':False,
+              'verified_source':verified,
+              'commands':results,
+          }
+          (out/'evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(evidence,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload public-safe P2a evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2a-commit-pin-runtime-evidence
+          path: .engine-job/p2a-commit-pin/output/evidence.json
+          if-no-files-found: error
