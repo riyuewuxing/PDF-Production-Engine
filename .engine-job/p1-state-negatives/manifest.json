@@ -3,7 +3,7 @@
   "kind": "qiuzhidaren-p1-required-negatives-runtime-input-v1",
   "privacy": "public-nonsecret-generic-code-and-contract-only",
   "source_repository": "riyuewuxing/qiuzhidaren",
-  "source_commit": "375d59e95e50deb117628619bf9ce0bf20aa6e18",
+  "source_commit": "ad9ad0385bc790eb6e1bcb42fee4091dccccb3d5",
   "expected_file_count": 6,
   "files": [
     {
@@ -28,7 +28,7 @@
     },
     {
       "path": "examples/selftest_state_derivation.py",
-      "git_blob_sha1": "2d6b082d277fea044a18e7de97dff39409b401af"
+      "git_blob_sha1": "ec4ada7d272e4f07b0a0f264283eae869d5894b7"
     }
   ],
   "product_pdf_expected": false

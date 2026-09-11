@@ -227,7 +227,25 @@ def main() -> int:
         dump(demo_ledger_path, baseline)
         checks += 1
 
-        # 9. Duplicate committed current deliverables for one logical key are rejected.
+        # 9. PASS-class assertion with a non-empty execution_surface is accepted.
+        good = deepcopy(baseline)
+        good["events"][-1]["assertion"] = "PASS"
+        good["events"][-1]["execution_surface"] = "public-engine-github-hosted-runner"
+        dump(demo_ledger_path, good)
+        project_repository(root)
+        dump(demo_ledger_path, baseline)
+        checks += 1
+
+        # 10. BLOCKED assertion with a non-empty blocked_by list is accepted.
+        good = deepcopy(baseline)
+        good["events"][-1]["assertion"] = "BLOCKED"
+        good["events"][-1]["blocked_by"] = ["SYNTHETIC_EXTERNAL_DEPENDENCY"]
+        dump(demo_ledger_path, good)
+        project_repository(root)
+        dump(demo_ledger_path, baseline)
+        checks += 1
+
+        # 11. Duplicate committed current deliverables for one logical key are rejected.
         catalog_path = root / "outputs/CATALOG.yaml"
         baseline_catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
         bad_catalog = deepcopy(baseline_catalog)
@@ -245,7 +263,7 @@ def main() -> int:
         dump(catalog_path, baseline_catalog)
         checks += 1
 
-        # 10. declared job state must equal ledger projection.
+        # 12. declared job state must equal ledger projection.
         demo_job_path = root / "production/artifact-jobs/teacher_teaching_demo/demo-r1.yaml"
         baseline_job = yaml.safe_load(demo_job_path.read_text(encoding="utf-8"))
         bad_job = deepcopy(baseline_job)
@@ -255,7 +273,7 @@ def main() -> int:
         dump(demo_job_path, baseline_job)
         checks += 1
 
-        # 11. Unknown module cannot bypass the canonical module registry.
+        # 13. Unknown module cannot bypass the canonical module registry.
         bad_job = deepcopy(baseline_job)
         bad_job["module_id"] = "invented_parallel_module"
         dump(demo_job_path, bad_job)
@@ -263,10 +281,10 @@ def main() -> int:
         dump(demo_job_path, baseline_job)
         checks += 1
 
-    if checks != 11:
-        print(f"FAIL: expected 11 checks, got {checks}")
+    if checks != 13:
+        print(f"FAIL: expected 13 checks, got {checks}")
         return 1
-    print("SELFTEST OK: 11/11")
+    print("SELFTEST OK: 13/13")
     return 0
 
 
