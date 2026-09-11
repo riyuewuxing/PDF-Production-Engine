@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p1-state-derivation-runtime-v1",
+  "privacy": "public-nonsecret-generic-source",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "ec91ebf47972be3bfc1fa478496674ef653a84df",
+  "engine_base_commit": "606490985f7d7c3d6338332b2bea69c632d8f8b2",
+  "product_pdf_allowed": false,
+  "private_repository_access_allowed": false,
+  "expected_file_count": 5,
+  "files": [
+    {"path":"tools/artifact_foundation.py","git_blob_sha1":"bb55345664781a974fdcdc7039d457cab601622d"},
+    {"path":"tools/derive_state.py","git_blob_sha1":"77d44ea1cf542e45c05ef7584fa54d506b1b0025"},
+    {"path":"tools/gen_handoff.py","git_blob_sha1":"defbcb33f44ec10d001e89fba392061a0727c2ab"},
+    {"path":"tools/check_state_derivation.py","git_blob_sha1":"031dacd3ecfa9c982bf36d8d0062c78094e69d3a"},
+    {"path":"examples/selftest_state_derivation.py","git_blob_sha1":"7911496e26579062eb2ba16cd9b6fc74443c74a1"}
+  ],
+  "commands": [
+    ["python","-m","py_compile","tools/artifact_foundation.py","tools/derive_state.py","tools/gen_handoff.py","tools/check_state_derivation.py","examples/selftest_state_derivation.py"],
+    ["python","examples/selftest_state_derivation.py"]
+  ],
+  "expected_selftest": "SELFTEST OK: 8/8"
+}
