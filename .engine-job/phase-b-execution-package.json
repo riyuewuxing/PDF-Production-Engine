@@ -1,0 +1,1305 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-teaching-demo-phase-b-materialized-runtime-v1",
+  "privacy": "public-nonsecret-bounded-source",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "a912b63cfc5f8f6d679703df6f838aafe473786c",
+  "source_branch": "main",
+  "transport_job_id": 103217408970,
+  "archive_sha256": "b8029840d850e7d82f3d72e37c14a514a06cda61b96d5fb1bdc16c348dbd582e",
+  "expected_file_count": 251,
+  "exact_source_blob_verification_required": true,
+  "product_pdf_allowed": false,
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "git_blob_sha1": "2a7d3f9e7d87b577b595c3c60bd5b5141967aaa8",
+      "size_bytes": 10223
+    },
+    {
+      "path": "architecture/adr/ADR-001-modular-monolith.md",
+      "git_blob_sha1": "e127d03ea100dc1a65585c87f483280eb21b500f",
+      "size_bytes": 298
+    },
+    {
+      "path": "architecture/adr/ADR-002-external-boundaries.md",
+      "git_blob_sha1": "a7a850454dfc3ab7af0a281fb623180e870a08be",
+      "size_bytes": 554
+    },
+    {
+      "path": "architecture/adr/ADR-003-unified-artifact-pipeline.md",
+      "git_blob_sha1": "9e7aa6b2cfa24ec3f78b83753a27955a9d468cbb",
+      "size_bytes": 587
+    },
+    {
+      "path": "architecture/adr/ADR-004-execution-ledger.md",
+      "git_blob_sha1": "11cb01a48374dc68708c6998e16fd59a761c8b47",
+      "size_bytes": 546
+    },
+    {
+      "path": "architecture/adr/ADR-005-content-addressed-provenance.md",
+      "git_blob_sha1": "560ecce5c8a6b3268e3a90c0bbc12587be877a3e",
+      "size_bytes": 473
+    },
+    {
+      "path": "architecture/adr/ADR-006-delivery-vs-qualification.md",
+      "git_blob_sha1": "310841f917878c4340ee67fc232c66ec8f6eb2ca",
+      "size_bytes": 425
+    },
+    {
+      "path": "architecture/adr/ADR-007-single-authority-and-lifecycle.md",
+      "git_blob_sha1": "fccb3e584de88f2588b35a63bf14f2ebc08b7687",
+      "size_bytes": 459
+    },
+    {
+      "path": "architecture/adr/ADR-008-git-authority.md",
+      "git_blob_sha1": "ae02448f32d23935fc11763f6176b87049f5b9b4",
+      "size_bytes": 469
+    },
+    {
+      "path": "architecture/adr/ADR-009-process-as-product-and-agent-portability.md",
+      "git_blob_sha1": "4d672c3485b14e4dfe02c648659ee9d9a70764bc",
+      "size_bytes": 3726
+    },
+    {
+      "path": "architecture/adr/ADR-010-durable-repository-provenance.md",
+      "git_blob_sha1": "b612899f6c37c81ed708a0d8cb33e6e050c16da0",
+      "size_bytes": 3333
+    },
+    {
+      "path": "architecture/adr/ADR-011-reuse-fingerprint-vs-audit-snapshot.md",
+      "git_blob_sha1": "20a4be8165020a7aa0987b356132ac4a57837fd5",
+      "size_bytes": 3008
+    },
+    {
+      "path": "architecture/adr/ADR-012-evidence-carrying-teaching-script-compiler.md",
+      "git_blob_sha1": "bb613398818b4ad6cf85189e8474bb22317b2a3f",
+      "size_bytes": 8903
+    },
+    {
+      "path": "architecture/adr/ADR-013-teaching-demo-authority-provenance-and-phase-b-lock.md",
+      "git_blob_sha1": "1746c041616c03dbe5cdfb0731c2ae24f1e6faaa",
+      "size_bytes": 7222
+    },
+    {
+      "path": "architecture/adr/ADR-014-teaching-demo-capability-removal-and-first-full-exposure.md",
+      "git_blob_sha1": "e06fbb37203237238492f5fdd583f32dd0303f55",
+      "size_bytes": 6934
+    },
+    {
+      "path": "architecture/adr/ADR-015-teaching-demo-protected-operation-capability-graph.md",
+      "git_blob_sha1": "6e540cbcf2a9836bb63e41c072b77c5cb61c9e53",
+      "size_bytes": 8578
+    },
+    {
+      "path": "architecture/adr/ADR-016-teaching-demo-protected-capability-consumer-closure.md",
+      "git_blob_sha1": "f6944b99d7b41af089d1b01622d074888d0716df",
+      "size_bytes": 17123
+    },
+    {
+      "path": "architecture/adr/ADR-017-teaching-demo-phase-b-semantic-controller-provenance.md",
+      "git_blob_sha1": "61d96a93b43c7f4f5a437c6252fbcb4a966dd532",
+      "size_bytes": 8076
+    },
+    {
+      "path": "architecture/MIGRATION.md",
+      "git_blob_sha1": "d59c0955ef3f9750904dc096b257e93cd31fb5cd",
+      "size_bytes": 3462
+    },
+    {
+      "path": "architecture/plans/2026-09-07-teaching-demo-content-phase-a-architecture-contract-phase-b-eval-harness-first-detailed-construction-plan.md",
+      "git_blob_sha1": "eb53291326a1608aee36c6c21acdfe2ea834ea48",
+      "size_bytes": 24323
+    },
+    {
+      "path": "architecture/README.md",
+      "git_blob_sha1": "45d2bff9415447e7bce021c686fce1042ad6f6c6",
+      "size_bytes": 13938
+    },
+    {
+      "path": "content/job-search/teacher/AGENTS.md",
+      "git_blob_sha1": "6f1719312cfa00ad9c6eb385a3ce377c0b047cac",
+      "size_bytes": 1878
+    },
+    {
+      "path": "content/job-search/teacher/interview/AGENTS.md",
+      "git_blob_sha1": "be9f316dc39971d0d67e6d60f665839863a2bb32",
+      "size_bytes": 2262
+    },
+    {
+      "path": "content/job-search/teacher/interview/defense/AGENTS.md",
+      "git_blob_sha1": "67182c08dd0a219e1c2639a653a1c171a4c65ad8",
+      "size_bytes": 9855
+    },
+    {
+      "path": "content/job-search/teacher/interview/defense/contracts/defense-pdf-layout-selection-v1.yaml",
+      "git_blob_sha1": "f6c194621936ad41718098e07e2e1c30e153902c",
+      "size_bytes": 3930
+    },
+    {
+      "path": "content/job-search/teacher/interview/defense/contracts/teacher-defense-material-pack-v1.yaml",
+      "git_blob_sha1": "1869128eb8e173355debe22524b5a128b966f1a5",
+      "size_bytes": 8047
+    },
+    {
+      "path": "content/job-search/teacher/interview/structured/AGENTS.md",
+      "git_blob_sha1": "25af574aebaf28b7fe14810b1059fc14fe911c4b",
+      "size_bytes": 9614
+    },
+    {
+      "path": "content/job-search/teacher/interview/structured/contracts/structured-interview-v1.yaml",
+      "git_blob_sha1": "bc6daebcd855f1e5cb70951c60f6fa1b8789ee08",
+      "size_bytes": 7102
+    },
+    {
+      "path": "content/job-search/teacher/interview/structured/contracts/structured-material-pack-v1.yaml",
+      "git_blob_sha1": "39f90a2e738ba458e3fabaf9b133078f6ff57ae6",
+      "size_bytes": 2903
+    },
+    {
+      "path": "content/job-search/teacher/interview/teaching-demo/AGENTS.md",
+      "git_blob_sha1": "6babb9f9cdcd0b2f7a7b42c2c7434c9a938a1b9b",
+      "size_bytes": 1645
+    },
+    {
+      "path": "content/job-search/teacher/position-research/AGENTS.md",
+      "git_blob_sha1": "048244d766e7fa943c4d6612e92b539a9bc8fe3b",
+      "size_bytes": 1892
+    },
+    {
+      "path": "content/job-search/teacher/position-research/contracts/phase9-source-acquisition-v1.yaml",
+      "git_blob_sha1": "60e99be3a7df8cfc2d5b03ce23a7d54fc6035881",
+      "size_bytes": 3927
+    },
+    {
+      "path": "content/job-search/teacher/position-research/contracts/teacher-finalization-two-round-v1.yaml",
+      "git_blob_sha1": "14a406eb62ee972635b4222dc20e8088ccdd7711",
+      "size_bytes": 5669
+    },
+    {
+      "path": "content/job-search/teacher/resume-materials/AGENTS.md",
+      "git_blob_sha1": "80702ccbb25e6805567a921b916ff665aafce447",
+      "size_bytes": 4932
+    },
+    {
+      "path": "content/job-search/teacher/resume-materials/contracts/phase8-first-wave-publication-v1.yaml",
+      "git_blob_sha1": "37830fa85035f6c0c0b0e06edd3691b161fff567",
+      "size_bytes": 1201
+    },
+    {
+      "path": "content/job-search/teacher/resume-materials/contracts/teacher-resume-material-pack-v1.yaml",
+      "git_blob_sha1": "0ed2dbd544bee74e34ab02ca906f49792ab308cf",
+      "size_bytes": 3010
+    },
+    {
+      "path": "content/job-search/teacher/self-introduction/AGENTS.md",
+      "git_blob_sha1": "e442b001adaa8240ffc07132d804ab37cf749eb3",
+      "size_bytes": 7449
+    },
+    {
+      "path": "content/job-search/teacher/self-introduction/contracts/teacher-self-introduction-material-pack-v1.yaml",
+      "git_blob_sha1": "5d59500d4a728664b3a8d657bb2ff7f9636be8db",
+      "size_bytes": 4435
+    },
+    {
+      "path": "content/job-search/teacher/written-exam/AGENTS.md",
+      "git_blob_sha1": "55148223325ea6428588311869b6506d2db09398",
+      "size_bytes": 7415
+    },
+    {
+      "path": "content/job-search/teacher/written-exam/contracts/phase7-first-wave-publication-v1.yaml",
+      "git_blob_sha1": "d8a0da864036c2f34013f8d884b8405876231eb1",
+      "size_bytes": 6588
+    },
+    {
+      "path": "content/job-search/teacher/written-exam/contracts/teacher-written-exam-material-pack-v1.yaml",
+      "git_blob_sha1": "cc502a8b3dc3e09975d5a49f932efcedae590995",
+      "size_bytes": 7493
+    },
+    {
+      "path": "CURRENT_STATE.yaml",
+      "git_blob_sha1": "535530fb86a261bab23b5a51c49bfa5136dfcf99",
+      "size_bytes": 16837
+    },
+    {
+      "path": "production/architecture-foundation-v1-migration.yaml",
+      "git_blob_sha1": "a330be1dfc56fadf0d2a4e12cd632fbbad3f0ea4",
+      "size_bytes": 3194
+    },
+    {
+      "path": "production/components/figures/convex-lens-ray-diagram.tex",
+      "git_blob_sha1": "4b28191f6204ee7ebd509e6f2dd3ded5b257aced",
+      "size_bytes": 994
+    },
+    {
+      "path": "production/components/figures/kinematics-vt-graph.tex",
+      "git_blob_sha1": "f2fd04d9438ac7861c004a061af255ef660898df",
+      "size_bytes": 690
+    },
+    {
+      "path": "production/components/figures/mechanical-energy-surface-ab.tex",
+      "git_blob_sha1": "459e19c932ad5eae72175b96bd8969e81c98e3f8",
+      "size_bytes": 396
+    },
+    {
+      "path": "production/components/figures/pendulum-extrema.tex",
+      "git_blob_sha1": "c3c4841442463b4c3622dd462bcecab664c83a4c",
+      "size_bytes": 382
+    },
+    {
+      "path": "production/components/figures/README.md",
+      "git_blob_sha1": "0ec0c865343ff50276a96ff208e2789672e958f6",
+      "size_bytes": 1351
+    },
+    {
+      "path": "production/components/figures/registry.yaml",
+      "git_blob_sha1": "60437fc63891972aa9b705898833ac768768364a",
+      "size_bytes": 730
+    },
+    {
+      "path": "production/components/figures/transformer-experiment.tex",
+      "git_blob_sha1": "db99e7ec306b77b5bcca6ea5177f8d7bf595c863",
+      "size_bytes": 1799
+    },
+    {
+      "path": "production/components/figures/transformer-structure.tex",
+      "git_blob_sha1": "13e97ff9dd5129bc090f7b145287925ccfb90e70",
+      "size_bytes": 1139
+    },
+    {
+      "path": "production/components/figures/work-energy-homework.tex",
+      "git_blob_sha1": "b4c1b75fc6f2c624f549de95fd5ab4728f1b4870",
+      "size_bytes": 790
+    },
+    {
+      "path": "production/components/figures/work-energy-model.tex",
+      "git_blob_sha1": "cfbbfd5323809444e27c7dc0788237ecbad55108",
+      "size_bytes": 806
+    },
+    {
+      "path": "production/contracts/artifact-job-template-v1.yaml",
+      "git_blob_sha1": "e704134d860328f4e4f72630517e0087b545b6df",
+      "size_bytes": 545
+    },
+    {
+      "path": "production/contracts/artifact-job-v1.yaml",
+      "git_blob_sha1": "ccc947fc199343644bb17737ebc46f7c71b719d3",
+      "size_bytes": 7656
+    },
+    {
+      "path": "production/contracts/execution-ledger-template-v1.yaml",
+      "git_blob_sha1": "cc4c0f8145fdc4125c0569e78d53bf3f5c90830a",
+      "size_bytes": 288
+    },
+    {
+      "path": "production/contracts/execution-ledger-v1.yaml",
+      "git_blob_sha1": "40d0443b8a0814f477dce262abc8cd85d34855fa",
+      "size_bytes": 3123
+    },
+    {
+      "path": "production/contracts/module-registry-v1.yaml",
+      "git_blob_sha1": "7bad289dcb6ab32718c7ea8c1ff826b892a47a97",
+      "size_bytes": 3799
+    },
+    {
+      "path": "production/contracts/repository-provenance-snapshot-v1.yaml",
+      "git_blob_sha1": "fc08d1a229529c17e8ed6447aa36720389b141f2",
+      "size_bytes": 3233
+    },
+    {
+      "path": "production/contracts/system-qualification-v1.yaml",
+      "git_blob_sha1": "20bb57f580d0a94b4ad00badc1be25c7bdea16b8",
+      "size_bytes": 2012
+    },
+    {
+      "path": "production/contracts/teacher-trial-two-pdf-v1.yaml",
+      "git_blob_sha1": "f46fa902a0be9c5092f65ee4c846847aa37304cb",
+      "size_bytes": 16070
+    },
+    {
+      "path": "production/contracts/teaching-demo-content.yaml",
+      "git_blob_sha1": "59fd5ad754657751615463f4fb3d86bd9695bc0a",
+      "size_bytes": 51390
+    },
+    {
+      "path": "production/contracts/teaching-demo-delivery-job-template-v1.yaml",
+      "git_blob_sha1": "d4cd4de7c30930a386be80fbaaf46ef0cb6a1eb3",
+      "size_bytes": 1609
+    },
+    {
+      "path": "production/contracts/teaching-demo-delivery-state-machine-v1.yaml",
+      "git_blob_sha1": "89721adc8966edc14b919ab27c2d4d9310cf6840",
+      "size_bytes": 9110
+    },
+    {
+      "path": "production/contracts/teaching-demo-efficiency-experiment-v1.yaml",
+      "git_blob_sha1": "a4a16fc13510e9aeee1d57bb362a5bf07ad2c495",
+      "size_bytes": 1634
+    },
+    {
+      "path": "production/contracts/teaching-demo-efficiency-record-template-v1.yaml",
+      "git_blob_sha1": "62f0ee762ab8ba34bc3cee139f64ca4d676ca4f2",
+      "size_bytes": 855
+    },
+    {
+      "path": "production/contracts/teaching-demo-final-score-evidence-template-v1.yaml",
+      "git_blob_sha1": "c3f8f45d3c48f9893af0f7ae0ed04a878c5d4e5b",
+      "size_bytes": 499
+    },
+    {
+      "path": "production/contracts/teaching-demo-final-score-v1.yaml",
+      "git_blob_sha1": "b2e4d0088be0a7daeb5ab6ec1b20a50543604fa9",
+      "size_bytes": 2145
+    },
+    {
+      "path": "production/contracts/teaching-demo-final-scorecard-template-v1.yaml",
+      "git_blob_sha1": "c60f7a1c10c92038c30786949de02550f8b60f68",
+      "size_bytes": 848
+    },
+    {
+      "path": "production/contracts/teaching-demo-three-pass-series-template-v1.yaml",
+      "git_blob_sha1": "fbdcab2ca050ff59d786eefe0a589d71c2ef75c3",
+      "size_bytes": 385
+    },
+    {
+      "path": "production/process/teaching-demo-content/PROCESS.md",
+      "git_blob_sha1": "ba3a7d88962c96630e67a8c38b34cb1b3ad0438b",
+      "size_bytes": 25009
+    },
+    {
+      "path": "production/process/teaching-demo-content/STATUS.yaml",
+      "git_blob_sha1": "8dd3680c0ee97012203d71e556b652b9cae06511",
+      "size_bytes": 16758
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/2026-09-06-two-topic-calibration/INDEPENDENT_ROUND1_REVIEW.md",
+      "git_blob_sha1": "4639bf0f73178f0e12c6380465800a0b730fab43",
+      "size_bytes": 14397
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/2026-09-06-two-topic-calibration/ROUND1_RESULT.yaml",
+      "git_blob_sha1": "24e01122d5e82776b2676aa1de697e38ed17aaa2",
+      "size_bytes": 2335
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/GOLD_CORPUS.yaml",
+      "git_blob_sha1": "92ad90f6e33520303d7742c339d0c0ee4e32ce96",
+      "size_bytes": 9926
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_CANDIDATE.yaml",
+      "git_blob_sha1": "8a2f74a89ae9c1ace29fd6f5b55227f0b6168653",
+      "size_bytes": 7482
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_HUMAN_REVIEW_INPUT.yaml",
+      "git_blob_sha1": "ff9d2bf2c588f8a6c8de0d3fd96bcfdddf1bd94b",
+      "size_bytes": 2834
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_HUMAN_REVIEW_RESULT.yaml",
+      "git_blob_sha1": "9d683ebdb79e2f3b5344a8f37622f8b93930e576",
+      "size_bytes": 4116
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/RUNTIME_DIAGNOSTIC_CLOSEOUT.yaml",
+      "git_blob_sha1": "7f7e0e839754b28d38bb83f41a10327fdf32ea05",
+      "size_bytes": 2003
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml",
+      "git_blob_sha1": "995507dc8093c79aecf8793a05da68ef9de870c1",
+      "size_bytes": 3803
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/SOURCE_REVIEW.md",
+      "git_blob_sha1": "8b1fe569e0e18b2fdbc6aabbeaa0ea6680ce6d70",
+      "size_bytes": 26025
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml",
+      "git_blob_sha1": "496d854eaf0a88234972111a9050ecdc6ec0f679",
+      "size_bytes": 6932
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/round2/INDEPENDENT_ROUND2_REVIEW.md",
+      "git_blob_sha1": "7911c432d186b01998f75f088bdef75c3a3e3a30",
+      "size_bytes": 9662
+    },
+    {
+      "path": "production/process/teaching-demo-content/validation/round2/ROUND2_RESULT.yaml",
+      "git_blob_sha1": "ad3e43de64cd93c92a011cd4125b08571da32283",
+      "size_bytes": 1044
+    },
+    {
+      "path": "production/reference-materials/teacher_teaching_demo/purchased-transcript-selection-2026-08-27/REFERENCE_USE_CONTRACT.yaml",
+      "git_blob_sha1": "612adcebfddea783f122acf065e821ebba78b656",
+      "size_bytes": 6190
+    },
+    {
+      "path": "production/resource-build-efficiency-policy-v1.yaml",
+      "git_blob_sha1": "9401f8d6a68e40769ab75354c7cf1a410e854df4",
+      "size_bytes": 5884
+    },
+    {
+      "path": "production/resource-build-operation-checklist-v1.yaml",
+      "git_blob_sha1": "11af58781d0233d412cf3901552085bfb7284996",
+      "size_bytes": 2454
+    },
+    {
+      "path": "PROJECT_MEMORY_RULES.md",
+      "git_blob_sha1": "d76a6495f1b4dad9467b3d400ff5a86c1afc2a28",
+      "size_bytes": 8545
+    },
+    {
+      "path": "qa/current-run.md",
+      "git_blob_sha1": "3fac92773b07d82191ecb53b50cd2c205522de4d",
+      "size_bytes": 6357
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/01_训练参考教案.md",
+      "git_blob_sha1": "4a0e1ebfca845be745c38f046389e50f864fd83c",
+      "size_bytes": 845
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/02_考场骨架教案.md",
+      "git_blob_sha1": "d6a7f373ea82926cacfaf5bc0ab202689ee40d20",
+      "size_bytes": 520
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/03_逐字稿.md",
+      "git_blob_sha1": "931bd968f58706029f0ff112ba303c6016e866fd",
+      "size_bytes": 998
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/04_课题专属答辩.md",
+      "git_blob_sha1": "0935bcf0f8c8fdd63d4f4e9c838da995ea0d0926",
+      "size_bytes": 796
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/05_教材到骨架提炼解析.md",
+      "git_blob_sha1": "1169b88c459ba184ed05a88cba994a35bee69d77",
+      "size_bytes": 1056
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/artifact-job.yaml",
+      "git_blob_sha1": "eb20ac06d69e97b2349204617eb1893e475cd6c2",
+      "size_bytes": 7957
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/board-skeleton.artifact.yaml",
+      "git_blob_sha1": "b8e8f53ba1f5c5e75c9c39a52b5621af2b8e472d",
+      "size_bytes": 636
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/board-skeleton.review.yaml",
+      "git_blob_sha1": "bbe8d764fbc50e4b8b4c98a78e11604607386da1",
+      "size_bytes": 1265
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/source-boundary.artifact.yaml",
+      "git_blob_sha1": "8504f2e3250b55232ce8b4fc18906d053eb457d3",
+      "size_bytes": 502
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/source-boundary.review.yaml",
+      "git_blob_sha1": "6ecfa5cc98d4a5812a81c70b23aa2c62bf6e8011",
+      "size_bytes": 1263
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/support-materials.artifact.yaml",
+      "git_blob_sha1": "523df4eeadd85efadba63706a774021504e1a860",
+      "size_bytes": 882
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/support-materials.review.yaml",
+      "git_blob_sha1": "7cbbbb67298e810a612bc1db107b74c14f5344f8",
+      "size_bytes": 1701
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/trial-script.artifact.yaml",
+      "git_blob_sha1": "43b12d9622dbb18ec763fb1125b570f68475f257",
+      "size_bytes": 452
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/block-review/trial-script.review.yaml",
+      "git_blob_sha1": "d3752097208608e3dee866cd17bdc15aff2aec86",
+      "size_bytes": 1250
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/BOARD_PLAN.yaml",
+      "git_blob_sha1": "d592901c343bd8ef7eb3b24bb038044cdcc4cf2a",
+      "size_bytes": 734
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/case.yaml",
+      "git_blob_sha1": "713ebc289c31dc885109567917475ed98cbb423e",
+      "size_bytes": 1054
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/evidence.yaml",
+      "git_blob_sha1": "c7384e3a0471ce51208790262bd3bac133d00a9b",
+      "size_bytes": 1251
+    },
+    {
+      "path": "qa/fixtures/teaching-demo-synthetic-v1/execution-ledger.yaml",
+      "git_blob_sha1": "add488bcbd312a3d7d28533e3eeda6a0c20b8b06",
+      "size_bytes": 18969
+    },
+    {
+      "path": "qa/generalization-architecture.md",
+      "git_blob_sha1": "9016d5961998aa44e48edc3d727b918be7206ade",
+      "size_bytes": 10774
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/molecular-kinetic-theory-v1/round3-precomposition.yaml",
+      "git_blob_sha1": "27f2ffd02dd1f51d6576cbd2a6ba25d51ac875ce",
+      "size_bytes": 2222
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/process-development/topic-atlas-round2.yaml",
+      "git_blob_sha1": "c6567a19990efe92a420643cec7aff5539052c2e",
+      "size_bytes": 882
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/phase-d-r9-cycle1-failure.yaml",
+      "git_blob_sha1": "38524e9bf9dd48af8412b3bdbca1b2e27d841242",
+      "size_bytes": 2411
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/quality-v2-phase-a.yaml",
+      "git_blob_sha1": "d52de2e31cff04d835112742197ca24c7e6481a2",
+      "size_bytes": 5958
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/quality-v2-phase-b-correction-r8.yaml",
+      "git_blob_sha1": "77abedbc9b6ab66b5babe1dbe871ed2ec9575aec",
+      "size_bytes": 4780
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/quality-v2-phase-b-textbook-migration-r9.yaml",
+      "git_blob_sha1": "3da9026cb1ee6fb756a7f1171c19faf4765163fa",
+      "size_bytes": 2259
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/quality-v2-phase-b.yaml",
+      "git_blob_sha1": "aef823c0f0ef483f8ad3fb2ae9f7e3df76d1e57d",
+      "size_bytes": 6900
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/quality-v2-phase-c-r8.yaml",
+      "git_blob_sha1": "a2efcaa13570d161a97412cb44d091a710e1c490",
+      "size_bytes": 4161
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/quality-v2-phase-c-r9.yaml",
+      "git_blob_sha1": "3601e480a86edbebb695c98867421d9d2f214e10",
+      "size_bytes": 1386
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/r6-a1-module-check.yaml",
+      "git_blob_sha1": "c38be022147de2cfca981f2adbcaee4fcc680a6e",
+      "size_bytes": 889
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/runtime-repair-r10.yaml",
+      "git_blob_sha1": "9130bd2a9b2311cbcfc496be581fd7e2e9d95649",
+      "size_bytes": 2016
+    },
+    {
+      "path": "qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/textbook-store-migration-r9.yaml",
+      "git_blob_sha1": "79679e0a2d2cfaca2868c16b01a37c4aa2c7fe78",
+      "size_bytes": 2487
+    },
+    {
+      "path": "qa/post-freeze-route-audit-2026-08-17.md",
+      "git_blob_sha1": "0835fa1131cf032f5b13a0f131260720b92f8980",
+      "size_bytes": 2772
+    },
+    {
+      "path": "qa/process-learning/teaching-demo-transformer-principle-v1-figure-loader-partial-package-v1.yaml",
+      "git_blob_sha1": "5f76e4455dd6d2f60ab0e305bed6345310ca89ac",
+      "size_bytes": 1833
+    },
+    {
+      "path": "qa/process-telemetry/transformer-principle-v1/20260829T035757352668Z.yaml",
+      "git_blob_sha1": "91ca41f77976fdd430286ed61bba5f2fada5db8c",
+      "size_bytes": 669
+    },
+    {
+      "path": "qa/product-contract-role-gate.md",
+      "git_blob_sha1": "054b39d3cd3962089545e8cbf93f7abb8bafbe6c",
+      "size_bytes": 2339
+    },
+    {
+      "path": "qa/product-policy-derivation.md",
+      "git_blob_sha1": "2d46f361c788207904af9430c448684b53195f6c",
+      "size_bytes": 4462
+    },
+    {
+      "path": "qa/regression-product-contract.md",
+      "git_blob_sha1": "491480f7b5ffabd171c53e8cfebd5deae3bae8da",
+      "size_bytes": 3196
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/molecular-kinetic-theory-v1/content-quality-v2-review-r1.yaml",
+      "git_blob_sha1": "d997026ffab6c5e9f5daf69b17f0927fd82965d7",
+      "size_bytes": 4829
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/molecular-kinetic-theory-v1/round4-r1-blocks/board-skeleton-review.yaml",
+      "git_blob_sha1": "6767f89dc89b4ecabf138a8a37238f3a47aeee21",
+      "size_bytes": 425
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/molecular-kinetic-theory-v1/round4-r1-blocks/source-boundary-review.yaml",
+      "git_blob_sha1": "7d33dd9eacc77816ccb609e2432af172fd428673",
+      "size_bytes": 427
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/molecular-kinetic-theory-v1/round4-r1-blocks/support-materials-review.yaml",
+      "git_blob_sha1": "4509546c0c48545287e4e67456cdf19c7d17ede6",
+      "size_bytes": 431
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/molecular-kinetic-theory-v1/round4-r1-blocks/trial-script-review.yaml",
+      "git_blob_sha1": "00e05cbb2fd721bd78c88560e8120078204d2a19",
+      "size_bytes": 421
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/board-skeleton-review.yaml",
+      "git_blob_sha1": "ae8fac4dbbfc1922d820d420c41725c038078843",
+      "size_bytes": 730
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/content-quality-v2-review-r2.yaml",
+      "git_blob_sha1": "9a17e562fbb1259f32eb6893e33214cf6718410f",
+      "size_bytes": 4679
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/content-quality-v2-review.yaml",
+      "git_blob_sha1": "98bc846a06097360b66ed102681a986802b6314b",
+      "size_bytes": 5828
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/figures-review.yaml",
+      "git_blob_sha1": "526b7a11da59b493feb1665de7e964ef15bfb310",
+      "size_bytes": 1096
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/final-r4-review.yaml",
+      "git_blob_sha1": "ca4e2e52cf11ff3ac702b77c7f9da3e41ff99f10",
+      "size_bytes": 1150
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/final-r6-structural-latex-review.yaml",
+      "git_blob_sha1": "47844c7af9f00df6f8146283a6406d2c1f6324ec",
+      "size_bytes": 1873
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/phase-b-r7-board-skeleton-review.yaml",
+      "git_blob_sha1": "f418f3d3810817f2f13d7db8dd1a7d82fc10cc20",
+      "size_bytes": 1288
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/phase-b-r7-source-boundary-review.yaml",
+      "git_blob_sha1": "179c8874a9834e394b4a2a6f57911ff3456ad26a",
+      "size_bytes": 1355
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/phase-b-r7-support-materials-review.yaml",
+      "git_blob_sha1": "d8d2214512d047bb3060eee9fc74d1958448068e",
+      "size_bytes": 1330
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/phase-b-r7-trial-script-review.yaml",
+      "git_blob_sha1": "de14e441fe2243c2110885102a49108d523e91ef",
+      "size_bytes": 1292
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/phase-b-r9-source-boundary-review.yaml",
+      "git_blob_sha1": "960ed7801dbc1efbdf5928852e0cd18345bc37d4",
+      "size_bytes": 1444
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/source-boundary-review.yaml",
+      "git_blob_sha1": "82ff08942dca0a5e96ae0fcb35146f4b1894d392",
+      "size_bytes": 1085
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/support-materials-review-v2.yaml",
+      "git_blob_sha1": "19b18c8daafb044d235b7229a183c1318f17b4eb",
+      "size_bytes": 852
+    },
+    {
+      "path": "qa/reviews/teacher_teaching_demo/transformer-principle-v1/trial-script-review.yaml",
+      "git_blob_sha1": "cd7286d14bf916314e471128c0904eedc3d50090",
+      "size_bytes": 610
+    },
+    {
+      "path": "qa/round-1-closeout-2026-08-17.md",
+      "git_blob_sha1": "24c4a22b3b64ad4ea6a93631fb45d2715e79b525",
+      "size_bytes": 6566
+    },
+    {
+      "path": "qa/round-2-closeout-2026-08-17.md",
+      "git_blob_sha1": "1da492ec6467090618e321f1fa0e0d477def7dc1",
+      "size_bytes": 8852
+    },
+    {
+      "path": "qa/shared-source-role-migration.md",
+      "git_blob_sha1": "036eb1f2bcf237da67894450a7f0c28ecc43e871",
+      "size_bytes": 3251
+    },
+    {
+      "path": "qa/source-evidence/teacher_teaching_demo/transformer-principle-v1/source-locator-evidence.json",
+      "git_blob_sha1": "4dda5af7e4bd733718c7b79359bcbca13fd71265",
+      "size_bytes": 4731
+    },
+    {
+      "path": "qa/structural-acceptance-2026-08-17.md",
+      "git_blob_sha1": "9775a8243df61664b561a5ab81c9084c2a676e61",
+      "size_bytes": 3880
+    },
+    {
+      "path": "qa/synthetic-generalization-acceptance.md",
+      "git_blob_sha1": "bcfe1c5ec42df1cecf34a185a1919fd6393ce045",
+      "size_bytes": 1893
+    },
+    {
+      "path": "qa/teaching-demo/transformer-principle-v1-rendered/render-manifest.yaml",
+      "git_blob_sha1": "787f49e3501580862b2930b68454ea09bf4e1ea6",
+      "size_bytes": 3419
+    },
+    {
+      "path": "qa/transformer-content-stress.md",
+      "git_blob_sha1": "2109d2b49c4b129f1a0748d5e782eb4e6fd9450c",
+      "size_bytes": 9108
+    },
+    {
+      "path": "README.md",
+      "git_blob_sha1": "7d8cb0dce240bf81054976552c5a6b756134529c",
+      "size_bytes": 3684
+    },
+    {
+      "path": "requirements-pdf.txt",
+      "git_blob_sha1": "13bcb4692e48f9296f7a5b96ad290d2f8055b70d",
+      "size_bytes": 43
+    },
+    {
+      "path": "RESOURCE_BUILD_RULES.md",
+      "git_blob_sha1": "ef4a4ff6c84cb0aeac769048c3e6aaccc4b48721",
+      "size_bytes": 8385
+    },
+    {
+      "path": "tools/_teaching_demo_content_architecture_impl.py",
+      "git_blob_sha1": "3ea5e5f9ff71961e40e8dedfb3c4388fa8a4014c",
+      "size_bytes": 27554
+    },
+    {
+      "path": "tools/_teaching_demo_content_core.inc",
+      "git_blob_sha1": "e10f306cb92c3547b5cfeea126f319f2b98f21d2",
+      "size_bytes": 61988
+    },
+    {
+      "path": "tools/artifact_foundation.py",
+      "git_blob_sha1": "bb55345664781a974fdcdc7039d457cab601622d",
+      "size_bytes": 7265
+    },
+    {
+      "path": "tools/board_contract.py",
+      "git_blob_sha1": "2633da451b9ded53c9d23d58fb415d2a4e8c4558",
+      "size_bytes": 6333
+    },
+    {
+      "path": "tools/build_current_run.py",
+      "git_blob_sha1": "e74a3b1dff5dad834cb8843bdecc82923aa3e4c1",
+      "size_bytes": 16094
+    },
+    {
+      "path": "tools/build_defense_final_bank.py",
+      "git_blob_sha1": "efe7625f67d82c024fcf49e9606b8bc9a7788c4f",
+      "size_bytes": 15697
+    },
+    {
+      "path": "tools/build_figure_review_block.py",
+      "git_blob_sha1": "c6134af1441eae0e47d73fc520f152c7524e6d5b",
+      "size_bytes": 7542
+    },
+    {
+      "path": "tools/build_physics_textbook_topic_atlas.py",
+      "git_blob_sha1": "d8ed9f23298f033baab3c1c4d476b622ab15737d",
+      "size_bytes": 21206
+    },
+    {
+      "path": "tools/build_regression_case.py",
+      "git_blob_sha1": "a32f5c0ccc31fc96fb77a5eef69cd6e586859b56",
+      "size_bytes": 7257
+    },
+    {
+      "path": "tools/check_artifact_job.py",
+      "git_blob_sha1": "c55f46b34133f5273aa245ba0a19eb25b6020f5e",
+      "size_bytes": 32569
+    },
+    {
+      "path": "tools/check_artifact_provenance.py",
+      "git_blob_sha1": "5e2aa047332edfaaf879bc42f4ede6d136dc08ce",
+      "size_bytes": 9118
+    },
+    {
+      "path": "tools/check_current_run.py",
+      "git_blob_sha1": "c6a376f231f5c662fd3f0915195c201603ec90dc",
+      "size_bytes": 20452
+    },
+    {
+      "path": "tools/check_defense_final_bank.py",
+      "git_blob_sha1": "72fd19296ae45e62c9d2ffebd0bd5f42a31ca77c",
+      "size_bytes": 6819
+    },
+    {
+      "path": "tools/check_defense_finalization_seed.py",
+      "git_blob_sha1": "89b91f64c27adb60af3551bfbb3b37e5d907682d",
+      "size_bytes": 3248
+    },
+    {
+      "path": "tools/check_execution_ledger.py",
+      "git_blob_sha1": "7f25469306e15331d716cbcd7c9f57d2812ab99e",
+      "size_bytes": 21002
+    },
+    {
+      "path": "tools/check_figure_toolchain.py",
+      "git_blob_sha1": "e739edd7a674e8edf86fcdbcb0f19f686b6c48ae",
+      "size_bytes": 4223
+    },
+    {
+      "path": "tools/check_generalization_architecture.py",
+      "git_blob_sha1": "eb2c011aa3f426d4d1e1f750c7e9e168b03f5bdf",
+      "size_bytes": 15694
+    },
+    {
+      "path": "tools/check_private_actions_boundary.py",
+      "git_blob_sha1": "8d51427a71a9beed7957c2c671c1b95079dd496a",
+      "size_bytes": 733
+    },
+    {
+      "path": "tools/check_project_state.py",
+      "git_blob_sha1": "6a477827695ce2ed2c247c0bc5f4e2e5662318ac",
+      "size_bytes": 19022
+    },
+    {
+      "path": "tools/check_publisher_core.py",
+      "git_blob_sha1": "7456e3723c2810ceddc89e6da21cbef7fb6c5b4c",
+      "size_bytes": 9942
+    },
+    {
+      "path": "tools/check_regression_case.py",
+      "git_blob_sha1": "b14c7101af98ee0fd286c014a51d01f827e82269",
+      "size_bytes": 855
+    },
+    {
+      "path": "tools/check_skeleton_density.py",
+      "git_blob_sha1": "ca11200f241df5a17300ab595968ddc73bf921db",
+      "size_bytes": 3188
+    },
+    {
+      "path": "tools/check_structured_interview.py",
+      "git_blob_sha1": "c3f9a1d7c50850eaeec326cd102bad9114fe2474",
+      "size_bytes": 14529
+    },
+    {
+      "path": "tools/check_structured_pagination.py",
+      "git_blob_sha1": "7920ac774beff678e015b5696b20512457263d15",
+      "size_bytes": 2613
+    },
+    {
+      "path": "tools/check_structured_training_cases.py",
+      "git_blob_sha1": "dea44ce8eefd65bc3813b21d320bf8cb50676ba9",
+      "size_bytes": 12169
+    },
+    {
+      "path": "tools/check_structured_training_state.py",
+      "git_blob_sha1": "a9bf3d20423c87cbfce57c45f482d9d7cc2f3c3b",
+      "size_bytes": 4775
+    },
+    {
+      "path": "tools/check_teacher_defense.py",
+      "git_blob_sha1": "6801d39738c9c3255507d03f4047dc2d8e1ba270",
+      "size_bytes": 26252
+    },
+    {
+      "path": "tools/check_teacher_self_introduction.py",
+      "git_blob_sha1": "3125f1b94942180b1d024adebc4528afbd211399",
+      "size_bytes": 10876
+    },
+    {
+      "path": "tools/check_teacher_written_exam.py",
+      "git_blob_sha1": "cd3ba385cffdc0a022cd797e5a8ff1a9539105fd",
+      "size_bytes": 14005
+    },
+    {
+      "path": "tools/check_teaching_demo_case.py",
+      "git_blob_sha1": "ed15aebbeb745c9e26386967b86f11d3ec14db28",
+      "size_bytes": 10030
+    },
+    {
+      "path": "tools/check_teaching_demo_content.py",
+      "git_blob_sha1": "f0efa06df40e12643a0fef1a1c80630869415fcc",
+      "size_bytes": 34762
+    },
+    {
+      "path": "tools/check_teaching_demo_delivery.py",
+      "git_blob_sha1": "ae173c2a1889a3bed4ce9a698dbb2c771e080c39",
+      "size_bytes": 37169
+    },
+    {
+      "path": "tools/check_teaching_demo_efficiency.py",
+      "git_blob_sha1": "2902f352ffcfe192e4ead27220f4be7ab779349a",
+      "size_bytes": 9179
+    },
+    {
+      "path": "tools/check_teaching_demo_inputs.py",
+      "git_blob_sha1": "e516a6a2050003591eb12aa9452393dd7d1b07e3",
+      "size_bytes": 9851
+    },
+    {
+      "path": "tools/check_teaching_demo_phase_b_eval.py",
+      "git_blob_sha1": "1db2615d50421b2a2dcba89cdc82b20c3bba76bf",
+      "size_bytes": 111643
+    },
+    {
+      "path": "tools/check_teaching_demo_process_evaluation.py",
+      "git_blob_sha1": "647528f1cc179ebef091b0c5b106fdab382095e2",
+      "size_bytes": 1789
+    },
+    {
+      "path": "tools/check_teaching_demo_score.py",
+      "git_blob_sha1": "be6ea4e59686e45a7fb99ade366ed33da164b611",
+      "size_bytes": 4059
+    },
+    {
+      "path": "tools/check_textbook_store.py",
+      "git_blob_sha1": "f971f80c80cd93377371d7e214066bd2d2ba52d6",
+      "size_bytes": 2809
+    },
+    {
+      "path": "tools/check_textbook_topic_atlas_round2.py",
+      "git_blob_sha1": "499873889079c8cc7d9e0c8a95e2ed1d8ce768e7",
+      "size_bytes": 2810
+    },
+    {
+      "path": "tools/check_tooling_routes.py",
+      "git_blob_sha1": "d04f4f16d45524d7604335163e87a2501b84e98f",
+      "size_bytes": 34799
+    },
+    {
+      "path": "tools/curate_physics_topic_atlas_retrieval.py",
+      "git_blob_sha1": "c2861d8c9875a35e3af5cf5d1fd18355dcd342b0",
+      "size_bytes": 8466
+    },
+    {
+      "path": "tools/fetch_teacher_recruitment_attachments_browser.py",
+      "git_blob_sha1": "594ec2b5521eaa9f36e428ccd602a6e458574454",
+      "size_bytes": 10485
+    },
+    {
+      "path": "tools/fetch_teacher_recruitment_attachments.py",
+      "git_blob_sha1": "839ace888541717264a522b9797e75f943510f5a",
+      "size_bytes": 20975
+    },
+    {
+      "path": "tools/import_structured_references.py",
+      "git_blob_sha1": "db12be1281f1cb1d784ffc40eb05573b7009e8ce",
+      "size_bytes": 4739
+    },
+    {
+      "path": "tools/import_written_exam_references.py",
+      "git_blob_sha1": "9b1f4da568fd575b06404fbf8a65f2115c1ce958",
+      "size_bytes": 3475
+    },
+    {
+      "path": "tools/init_artifact_job.py",
+      "git_blob_sha1": "2bbd646aacce420a1bc175fa693956df65981e95",
+      "size_bytes": 7550
+    },
+    {
+      "path": "tools/init_teaching_demo_case.py",
+      "git_blob_sha1": "656843fc6506151b7c2e177c240b451d53de60bc",
+      "size_bytes": 16522
+    },
+    {
+      "path": "tools/latex_inline.py",
+      "git_blob_sha1": "337fac30a0079f2ee00c3185a34d70b8b7cac0b7",
+      "size_bytes": 5908
+    },
+    {
+      "path": "tools/locate_locked_textbook_pages.py",
+      "git_blob_sha1": "653dc9d03b7b8c63544b3c4cb2e7fa9a0979a58f",
+      "size_bytes": 8909
+    },
+    {
+      "path": "tools/lock_artifact_input_plan.py",
+      "git_blob_sha1": "4686885b7a02d96d5e24767e5dad8e74127aca80",
+      "size_bytes": 8714
+    },
+    {
+      "path": "tools/manage_artifact_job.py",
+      "git_blob_sha1": "ab0e8ecb87bb5746dce9e2202e14d8f6431649a2",
+      "size_bytes": 38395
+    },
+    {
+      "path": "tools/normalize_structured_references.py",
+      "git_blob_sha1": "af3afd88b256531808c5250c71d7886b0029ec0a",
+      "size_bytes": 3832
+    },
+    {
+      "path": "tools/normalize_written_exam_references.py",
+      "git_blob_sha1": "125cbd7c1ee2badd4c8b05aa687413d8b491c770",
+      "size_bytes": 5146
+    },
+    {
+      "path": "tools/pdf_text_occupancy.py",
+      "git_blob_sha1": "92970e9499e6fc130a870db08d05c04871692b5a",
+      "size_bytes": 6261
+    },
+    {
+      "path": "tools/physics_figures.py",
+      "git_blob_sha1": "98c118d371298ef0e4f798c32c8f4d782765714b",
+      "size_bytes": 5507
+    },
+    {
+      "path": "tools/physics_notation.py",
+      "git_blob_sha1": "b47c3f75999017a8a97d95a0e52e4ae7c1dd199c",
+      "size_bytes": 7601
+    },
+    {
+      "path": "tools/plan_teacher_position_acquisition.py",
+      "git_blob_sha1": "e8887ed336c098209c6129df2c80902df56b93ab",
+      "size_bytes": 22698
+    },
+    {
+      "path": "tools/plan_teaching_demo_artifact_job.py",
+      "git_blob_sha1": "2f1019a6fa5f2597ae5eedff9db5bb53d0a1717c",
+      "size_bytes": 26219
+    },
+    {
+      "path": "tools/process_telemetry.py",
+      "git_blob_sha1": "f00d8d72a6d3923293f336d46d37b70f72270477",
+      "size_bytes": 6458
+    },
+    {
+      "path": "tools/provenance_snapshot.py",
+      "git_blob_sha1": "738e9a38c34a540a09d4d77d4df91506301dc1cc",
+      "size_bytes": 19007
+    },
+    {
+      "path": "tools/publish_teacher_resume_materials_phase8.py",
+      "git_blob_sha1": "db458aed244d2a75c0aa209b5f6bb8877633ee57",
+      "size_bytes": 13107
+    },
+    {
+      "path": "tools/publish_teacher_written_exam_phase7.py",
+      "git_blob_sha1": "26080a13edf2e7f41bc5c241932a6dd95c9d3992",
+      "size_bytes": 9395
+    },
+    {
+      "path": "tools/publish_yunnan_defense.py",
+      "git_blob_sha1": "716a0aba37a17ffdea800ff80a3b2fd4f0d45030",
+      "size_bytes": 12427
+    },
+    {
+      "path": "tools/publish_yunnan_self_introduction.py",
+      "git_blob_sha1": "4aff98b683dc3cda829bba064d8f3ded2a230b1e",
+      "size_bytes": 9953
+    },
+    {
+      "path": "tools/publish_yunnan_structured.py",
+      "git_blob_sha1": "f39094275bd515bb27a33dbf2ae8824ec8ce3f88",
+      "size_bytes": 11333
+    },
+    {
+      "path": "tools/publisher_core_legacy.py",
+      "git_blob_sha1": "9f790c7ab15844249f79b55abe34623f3f058232",
+      "size_bytes": 31177
+    },
+    {
+      "path": "tools/publisher_core.py",
+      "git_blob_sha1": "9ed2b3cb6a5c9f3bebf8d424a837cec450463f49",
+      "size_bytes": 13899
+    },
+    {
+      "path": "tools/README.md",
+      "git_blob_sha1": "5c038403118403e68c8701f84b285a0e9640bcee",
+      "size_bytes": 6311
+    },
+    {
+      "path": "tools/regression_case.py",
+      "git_blob_sha1": "715b65622422b5aa3c96e04fce675dd2cfaf79dc",
+      "size_bytes": 14061
+    },
+    {
+      "path": "tools/render_current_run.py",
+      "git_blob_sha1": "1e07bd5660699bd94169c48a42dfa20df5adf9e0",
+      "size_bytes": 8741
+    },
+    {
+      "path": "tools/render_regression_suite.py",
+      "git_blob_sha1": "863ea14c8d8fa38d8c746930c0194bf4eb0d2e77",
+      "size_bytes": 2685
+    },
+    {
+      "path": "tools/run_acceptance.py",
+      "git_blob_sha1": "0ffd2063e954c3b8b83648d9fe5b00305dfb0dcd",
+      "size_bytes": 22613
+    },
+    {
+      "path": "tools/run_regression_suite.py",
+      "git_blob_sha1": "c06062e55607d00d96636e16e654d718b57c4555",
+      "size_bytes": 4180
+    },
+    {
+      "path": "tools/run_structured_acceptance.py",
+      "git_blob_sha1": "837ebc043713dafcc1f7e9ba3992e46bfd659295",
+      "size_bytes": 1681
+    },
+    {
+      "path": "tools/run_teacher_recruitment_attachment_capture.py",
+      "git_blob_sha1": "024b65b6001155b7bf6e593e2d4cdd3e5b3f70b5",
+      "size_bytes": 2135
+    },
+    {
+      "path": "tools/sanitize_teacher_recruitment_attachment_artifacts.py",
+      "git_blob_sha1": "fdc24bc3333c90ff6967d46b821d8835e4afd7e8",
+      "size_bytes": 3924
+    },
+    {
+      "path": "tools/search_physics_topic_atlas.py",
+      "git_blob_sha1": "ad598ecde01cd59e172628ce1f332ce4829b2197",
+      "size_bytes": 2023
+    },
+    {
+      "path": "tools/skeleton_density.py",
+      "git_blob_sha1": "1cfa0ba527af656a4b421e0e1c1bc3af60d31a6d",
+      "size_bytes": 7656
+    },
+    {
+      "path": "tools/teaching_demo_artifact_plan_primitives.py",
+      "git_blob_sha1": "60c7e87347c7910cd964661e27f18a9f13f49711",
+      "size_bytes": 7467
+    },
+    {
+      "path": "tools/teaching_demo_content_architecture.py",
+      "git_blob_sha1": "194ff7f14178460c66137540bcb7ae393e0e3354",
+      "size_bytes": 1732
+    },
+    {
+      "path": "tools/teaching_demo_content_enforcement.py",
+      "git_blob_sha1": "a342870e886e757d29478da099ad81bba2867a19",
+      "size_bytes": 50341
+    },
+    {
+      "path": "tools/teaching_demo_process_eval_common.py",
+      "git_blob_sha1": "870f2313f51452dcb730015bfc3168cb3dcddadd",
+      "size_bytes": 7678
+    },
+    {
+      "path": "tools/teaching_demo_process_eval_execution.py",
+      "git_blob_sha1": "c6c0f8b24d046a48d01e28147975c1c06b8ba1e4",
+      "size_bytes": 13684
+    },
+    {
+      "path": "tools/teaching_demo_process_eval_policy.py",
+      "git_blob_sha1": "09e40524cb03617ca45b3050202e242e7d29e0fb",
+      "size_bytes": 8391
+    },
+    {
+      "path": "tools/teaching_demo_process_eval_regression.py",
+      "git_blob_sha1": "28f9e0dadadd2c4f21644caf3ef8ef815b181488",
+      "size_bytes": 16145
+    },
+    {
+      "path": "tools/tooling-manifest.yaml",
+      "git_blob_sha1": "378b0054a6f2c1e592837c492d4dda87e64e97db",
+      "size_bytes": 14027
+    },
+    {
+      "path": "tools/validate_structured_reference_bank.py",
+      "git_blob_sha1": "df73988987e9a6fd0ea385675ceb7cf847d71d6e",
+      "size_bytes": 6402
+    },
+    {
+      "path": "tools/validate_teacher_position_attachments.py",
+      "git_blob_sha1": "6917e30e2e2e90f433bbf968ab7c95c7c09a3a63",
+      "size_bytes": 5943
+    },
+    {
+      "path": "tools/validate_teacher_position_phase9.py",
+      "git_blob_sha1": "f15d6dd31ea75d67dd01d279357dd91528a8db50",
+      "size_bytes": 5327
+    },
+    {
+      "path": "tools/validate_teacher_position_sources.py",
+      "git_blob_sha1": "fb22fc104babe3668c9b9e6ab73a17a24d525358",
+      "size_bytes": 10945
+    },
+    {
+      "path": "tools/validate_teacher_resume_materials.py",
+      "git_blob_sha1": "4c3acad9ffbd55ee0fed30ee8669a7097dc966ce",
+      "size_bytes": 6071
+    },
+    {
+      "path": "tools/validate_written_exam_knowledge_links.py",
+      "git_blob_sha1": "5a48e26f9150c4956fc6ed50a647481b49e6bf26",
+      "size_bytes": 9338
+    },
+    {
+      "path": "tools/validate_written_exam_reference_bank.py",
+      "git_blob_sha1": "f675c83ef27cc3eff9b86fed8f7dc6763a745476",
+      "size_bytes": 5654
+    },
+    {
+      "path": "tools/verify_teaching_demo_artifact_plan.py",
+      "git_blob_sha1": "f6736982eaf50a0534c0f7dcc14f4ac880cfe017",
+      "size_bytes": 29281
+    },
+    {
+      "path": "tools/verify_teaching_demo_semantic_provenance.py",
+      "git_blob_sha1": "4cef3c4e2af637992fba384783abe284aca13440",
+      "size_bytes": 11431
+    }
+  ],
+  "commands": [
+    [
+      "python",
+      "tools/check_teaching_demo_content.py",
+      "--selftest"
+    ],
+    [
+      "python",
+      "tools/check_teaching_demo_phase_b_eval.py",
+      "--selftest"
+    ],
+    [
+      "python",
+      "tools/check_tooling_routes.py"
+    ],
+    [
+      "python",
+      "tools/run_acceptance.py",
+      "--scope",
+      "foundation"
+    ],
+    [
+      "python",
+      "tools/run_acceptance.py",
+      "--scope",
+      "phase-b"
+    ]
+  ],
+  "claims_forbidden": [
+    "live_trusted_semantic_execution",
+    "gate_b_pass",
+    "accepted_mode_unlock",
+    "process_calibrated",
+    "product_pdf_delivery"
+  ]
+}
