@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p1-state-derivation-runtime-evidence-v1",
+  "status": "MACHINE_PASS",
+  "review_status": "REVIEW_REQUIRED",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "ec91ebf47972be3bfc1fa478496674ef653a84df",
+  "engine_repository": "riyuewuxing/PDF-Production-Engine",
+  "engine_execution_commit": "512d01bb0a260e5128c38fa3b69a6dffe5387eaf",
+  "engine_run_id": "34604741600",
+  "execution_surface": "public-engine-github-hosted-runner",
+  "private_repository_access_used": false,
+  "private_repository_credentials_used": false,
+  "product_pdf_generated": false,
+  "verified_file_count": 5,
+  "verified_files": [
+    {
+      "path": "tools/artifact_foundation.py",
+      "git_blob_sha1": "bb55345664781a974fdcdc7039d457cab601622d",
+      "sha256": "35722102ce1b7b286aa723f69a874f0eeb3b990510f40de2941b34a36e68a2b8"
+    },
+    {
+      "path": "tools/derive_state.py",
+      "git_blob_sha1": "77d44ea1cf542e45c05ef7584fa54d506b1b0025",
+      "sha256": "50cb7ca9d5f3bd5820bdfe3c0280f6c4c4c9ec009a869fa8fdba27157057b0ab"
+    },
+    {
+      "path": "tools/gen_handoff.py",
+      "git_blob_sha1": "defbcb33f44ec10d001e89fba392061a0727c2ab",
+      "sha256": "0f82266ed604c29441bf8a3dd10708d2044401d93a6305bdfc5afe5e9865de70"
+    },
+    {
+      "path": "tools/check_state_derivation.py",
+      "git_blob_sha1": "031dacd3ecfa9c982bf36d8d0062c78094e69d3a",
+      "sha256": "0c956657c114dde695308467c492501defc92e82b85eb9acba1b76fee3171158"
+    },
+    {
+      "path": "examples/selftest_state_derivation.py",
+      "git_blob_sha1": "7911496e26579062eb2ba16cd9b6fc74443c74a1",
+      "sha256": "89425227f9a0bfea6eb1a009a665f8083b4406e954b6742a32cbe8d6522e0733"
+    }
+  ],
+  "commands": [
+    {
+      "command": [
+        "python",
+        "-m",
+        "py_compile",
+        "tools/artifact_foundation.py",
+        "tools/derive_state.py",
+        "tools/gen_handoff.py",
+        "tools/check_state_derivation.py",
+        "examples/selftest_state_derivation.py"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.049129,
+      "output_tail": ""
+    },
+    {
+      "command": [
+        "python",
+        "examples/selftest_state_derivation.py"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.23027,
+      "output_tail": "SELFTEST OK: 8/8\n"
+    }
+  ],
+  "selftest_expected": "SELFTEST OK: 8/8",
+  "selftest_observed": true,
+  "product_pdf_paths": [],
+  "runtime": {
+    "os": "Linux",
+    "python": "3.12.14"
+  }
+}
