@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p1-actual-repository-projection-v1",
+  "privacy": "public-nonsecret-metadata-only",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "e850af5999945c376d6457b31e99f1751fd56ca7",
+  "private_repository_access_allowed": false,
+  "product_pdf_allowed": false,
+  "expected_metadata_file_count": 16,
+  "files": [
+    {"path":"CURRENT_STATE.yaml","git_blob_sha1":"ebc92b9c49b04061ffd5f4116e2c3d6d0416b715"},
+    {"path":"HANDOFF.md","git_blob_sha1":"8b70eea6abb75ab0bacdc125c65941abd0adfc0d"},
+    {"path":"production/contracts/execution-ledger-v1.yaml","git_blob_sha1":"40d0443b8a0814f477dce262abc8cd85d34855fa"},
+    {"path":"production/contracts/module-registry-v1.yaml","git_blob_sha1":"7bad289dcb6ab32718c7ea8c1ff826b892a47a97"},
+    {"path":"production/artifact-jobs/teacher_teaching_demo/molecular-kinetic-theory-v1-r1.yaml","git_blob_sha1":"73992de2bb656f9abcce7a627a2a335f97990b7e"},
+    {"path":"production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r6.yaml","git_blob_sha1":"766cbbdf51e4adafbd8593c68e46b3beebc28f03"},
+    {"path":"production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r7.yaml","git_blob_sha1":"3cbfc77dbfcfe3728ce7400411e6d1e2572d937c"},
+    {"path":"production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r8.yaml","git_blob_sha1":"4baab6ea68dac9f209982ed4c45792efc9226a35"},
+    {"path":"production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r9.yaml","git_blob_sha1":"92e7929445f2d2940ca50fe26de212b8c4c5b9e8"},
+    {"path":"production/artifact-jobs/teacher_teaching_demo/transformer-principle-v1-r10.yaml","git_blob_sha1":"3c850db9b16828050f5793ea3a3b1523c7cf1bd2"},
+    {"path":"production/execution-ledgers/teacher_teaching_demo/molecular-kinetic-theory-v1-r1.yaml","git_blob_sha1":"3f4cf00c0583a01eaf17453f8617517e29e14001"},
+    {"path":"production/execution-ledgers/teacher_teaching_demo/transformer-principle-v1-r6.yaml","git_blob_sha1":"9929ca45baf88a20a2b5a5ad528cb5b7dbbef197"},
+    {"path":"production/execution-ledgers/teacher_teaching_demo/transformer-principle-v1-r7.yaml","git_blob_sha1":"469304d22220282ae143a77ab8e1aee478f6c2a7"},
+    {"path":"production/execution-ledgers/teacher_teaching_demo/transformer-principle-v1-r8.yaml","git_blob_sha1":"c81836c2289cabdace19cf01e9e86bc8f17c60fa"},
+    {"path":"production/execution-ledgers/teacher_teaching_demo/transformer-principle-v1-r9.yaml","git_blob_sha1":"832be4d48375d716d3c8e1571d4dc6cb9a14f305"},
+    {"path":"production/execution-ledgers/teacher_teaching_demo/transformer-principle-v1-r10.yaml","git_blob_sha1":"9a375795765ce167862738428d1966ab518e2f5c"}
+  ]
+}
