@@ -74,7 +74,7 @@ def resolve_commit_pin(repository: str, ref: str) -> str:
 def _safe_remote_path(relative_path: str) -> str:
     if not isinstance(relative_path, str) or not relative_path:
         raise ValueError("engine contract path must be a non-empty relative path")
-    if relative_path.startswith("/") or "\" in relative_path:
+    if relative_path.startswith("/") or "\\" in relative_path:
         raise ValueError(f"unsafe engine contract path: {relative_path!r}")
     pure = PurePosixPath(relative_path)
     if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):

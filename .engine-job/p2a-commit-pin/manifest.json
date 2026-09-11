@@ -3,7 +3,7 @@
   "kind": "qiuzhidaren-p2a-commit-pin-runtime-input-v1",
   "privacy": "public-nonsecret-metadata-and-generic-code-only",
   "source_repository": "riyuewuxing/qiuzhidaren",
-  "source_commit": "dc995e9a197a6161d35aa3c0cc5d99ad33b19395",
+  "source_commit": "9c3c5f8e7658cb94fef183822700f9094c5a1549",
   "files": [
     {
       "path": "contracts/engine-handoff.yaml",
@@ -11,7 +11,7 @@
     },
     {
       "path": "tools/check_engine_handoff.py",
-      "git_blob_sha1": "de299201c25598072135225ab9b4632ec0a97c0d"
+      "git_blob_sha1": "43644970c2927ccfda826da9917f125b2d43cc3f"
     }
   ],
   "expected_file_count": 2,
