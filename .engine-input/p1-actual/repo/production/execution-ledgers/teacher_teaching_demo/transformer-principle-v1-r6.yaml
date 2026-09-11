@@ -1,0 +1,648 @@
+version: 1
+contract: production/contracts/execution-ledger-v1.yaml
+job_id: teaching-demo-transformer-principle-v1-r6
+events:
+- seq: 1
+  event_id: teaching-demo-transformer-principle-v1-r6:0001
+  occurred_at: '2026-08-26T13:19:14.142208Z'
+  type: JOB_CREATED
+  actor: ChatGPT
+- seq: 2
+  event_id: teaching-demo-transformer-principle-v1-r6:0002
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/components/figures/registry.yaml
+    sha256: 1d591aaf923272b51cfdd56b5f4fbadcad55602a2994801380049d1052322c17
+    kind: figure_registry
+- seq: 3
+  event_id: teaching-demo-transformer-principle-v1-r6:0003
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/components/figures/transformer-experiment.tex
+    sha256: 4cf1aff13ee2c119268b41ce22050838f7b7aefc362e1149a997387eaa40db9a
+    kind: figure_component
+- seq: 4
+  event_id: teaching-demo-transformer-principle-v1-r6:0004
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/components/figures/transformer-structure.tex
+    sha256: 64f1f3b4406b5d66762235dd70adfeb2a80be54ea0e05d953c4d2ab1da7517a3
+    kind: figure_component
+- seq: 5
+  event_id: teaching-demo-transformer-principle-v1-r6:0005
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/contracts/artifact-job-v1.yaml
+    sha256: 999bfff41468038d31177349e5cb864c03a059e890b6ffa97636a8aca045ca28
+    kind: artifact_contract
+- seq: 6
+  event_id: teaching-demo-transformer-principle-v1-r6:0006
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/contracts/execution-ledger-v1.yaml
+    sha256: d4e4176cf90b34b43c6c6e5f559753cf369c5bbc6dd0abe3dc5242b8b9f45fe5
+    kind: execution_ledger_contract
+- seq: 7
+  event_id: teaching-demo-transformer-principle-v1-r6:0007
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/contracts/module-registry-v1.yaml
+    sha256: 147275e3feb38236cd67b381395c749c575d9bd2e4b3361b375717488b2d9510
+    kind: module_registry
+- seq: 8
+  event_id: teaching-demo-transformer-principle-v1-r6:0008
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/contracts/repository-provenance-snapshot-v1.yaml
+    sha256: d5b91e109e0fb8716ed38d8c8f98edeef57090152feacb212329b4d514480b6c
+    kind: provenance_snapshot_contract
+- seq: 9
+  event_id: teaching-demo-transformer-principle-v1-r6:0009
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/01_训练参考教案.md
+    sha256: 20fec56eb1d42cea36849a7a02e8dfc40ee210565e208d20a37c9f7f5719408f
+    kind: case_source_reference_plan
+- seq: 10
+  event_id: teaching-demo-transformer-principle-v1-r6:0010
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/02_考场骨架教案.md
+    sha256: 32d7900a8341ee1e617274396ad1b77d87c1f5e669d6c994265a47bdaf1554f8
+    kind: case_source_exam_skeleton
+- seq: 11
+  event_id: teaching-demo-transformer-principle-v1-r6:0011
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/03_逐字稿.md
+    sha256: ab8c33d6df314e63d08323ad7b32fcbb0a4bf07a7a5c11ce2707d868ee3138e6
+    kind: case_source_trial
+- seq: 12
+  event_id: teaching-demo-transformer-principle-v1-r6:0012
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/04_课题专属答辩.md
+    sha256: 1074048c577bdbf22978b7c913afcd56b8868a9860dd846ea79b0b964db2d82d
+    kind: case_source_defense
+- seq: 13
+  event_id: teaching-demo-transformer-principle-v1-r6:0013
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/05_教材到骨架提炼解析.md
+    sha256: 1277ec39839dc0d062af016b9372071dd2e60968a387fc4a16ccb371626030ec
+    kind: case_source_analysis
+- seq: 14
+  event_id: teaching-demo-transformer-principle-v1-r6:0014
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/BOARD_PLAN.yaml
+    sha256: 5a6c392876b9e5373949ba0d3cb47ef3fb358019f9a3178948dc45c35a903d95
+    kind: case_source_board
+- seq: 15
+  event_id: teaching-demo-transformer-principle-v1-r6:0015
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/evidence.yaml
+    sha256: 3101426d53f8e32c6360d2afa897da66a73978352efa4f61070af9f56feff92c
+    kind: case_source_evidence
+- seq: 16
+  event_id: teaching-demo-transformer-principle-v1-r6:0016
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-cases/transformer-principle-v1/manifest.yaml
+    sha256: e17971c351f4ad6fb1adaac631b5965fa6768ce5642e43753eee592fc8043191
+    kind: case_manifest
+- seq: 17
+  event_id: teaching-demo-transformer-principle-v1-r6:0017
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/templates/teacher_teaching_demo/user-latex-baseline-v2.tex
+    sha256: bfbf35045d110c56d20347f24515814fb27eb9cc65697ebbb1b62c3ced457ddf
+    kind: latex_visual_baseline
+- seq: 18
+  event_id: teaching-demo-transformer-principle-v1-r6:0018
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/templates/teacher_teaching_demo/user-latex-baseline-v2.yaml
+    sha256: ec3d9e1b2c0400735be4b6251bab6b431b629332c76d65a9ffcd4b52b72a9c44
+    kind: latex_visual_baseline_provenance
+- seq: 19
+  event_id: teaching-demo-transformer-principle-v1-r6:0019
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/board_contract.py
+    sha256: cafb3df14b758f50e6d89663ef263a1cce4bfd5fd400ab3736101f932f088482
+    kind: board_dependency
+- seq: 20
+  event_id: teaching-demo-transformer-principle-v1-r6:0020
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/check_current_run.py
+    sha256: 884c5bbeb3379319aa0e47ae008e223065ec1f57cf9c94c08ff9ac36c855263e
+    kind: module_checker
+- seq: 21
+  event_id: teaching-demo-transformer-principle-v1-r6:0021
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/check_teaching_demo_case.py
+    sha256: d76c152766f4dced3239dd48575a3018c259a0e964a653bf41bcb4431397054e
+    kind: case_gate
+- seq: 22
+  event_id: teaching-demo-transformer-principle-v1-r6:0022
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/check_teaching_demo_inputs.py
+    sha256: 8163acc9e2102175e229bc0ba5bfa75aaa6a46222e024cd71aa560af7feec21f
+    kind: prebuild_gate
+- seq: 23
+  event_id: teaching-demo-transformer-principle-v1-r6:0023
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/latex_inline.py
+    sha256: 1c8c8bd3f9b1fb0d2bb5f26b7dbca9f8d422cc22041efb91368e901adba7e994
+    kind: publisher_dependency
+- seq: 24
+  event_id: teaching-demo-transformer-principle-v1-r6:0024
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/lock_artifact_input_plan.py
+    sha256: 8527d3b2efa517e32a71704be49724cbd4abf52171be1208aad1f2828750b98c
+    kind: input_plan_locker
+- seq: 25
+  event_id: teaching-demo-transformer-principle-v1-r6:0025
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/pdf_text_occupancy.py
+    sha256: f6030a74d8aed254d3d1087788ebd8b3c0bcb50120f2c5d547bf2eabf2d5f461
+    kind: render_qa_dependency
+- seq: 26
+  event_id: teaching-demo-transformer-principle-v1-r6:0026
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/physics_figures.py
+    sha256: 994364c5aba4bbd1f3f45ff4dcb6416e56b0ebcf3fbe8943845705665d49723e
+    kind: figure_loader_dependency
+- seq: 27
+  event_id: teaching-demo-transformer-principle-v1-r6:0027
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/physics_notation.py
+    sha256: 8aef0c3e51c8c6efbef1c19e00d1f21d6909c9feb50b5dcb23621c60f20f5e42
+    kind: semantic_gate_dependency
+- seq: 28
+  event_id: teaching-demo-transformer-principle-v1-r6:0028
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/plan_teaching_demo_artifact_job.py
+    sha256: 0542f6456cc6280cb1663a7042ef5522c9023a1f00be2bae45dc2b46ee7181dc
+    kind: input_planner
+- seq: 29
+  event_id: teaching-demo-transformer-principle-v1-r6:0029
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/process_telemetry.py
+    sha256: 4c1fa79b0d42aee70f35b6b1ccb489863c1b42fb86f54ffb4f9ac08f9993f686
+    kind: process_telemetry
+- seq: 30
+  event_id: teaching-demo-transformer-principle-v1-r6:0030
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/provenance_snapshot.py
+    sha256: f006988bef7d98f801575d00b21da5f2d84bf11d110cfc5f1b2b609679f5eeab
+    kind: provenance_snapshot_tool
+- seq: 31
+  event_id: teaching-demo-transformer-principle-v1-r6:0031
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/publisher_core.py
+    sha256: 684caeba6f95327daae7ed50ea0c6f26b27699c3e4a1e7248f407013d33f1d2c
+    kind: publisher_core
+- seq: 32
+  event_id: teaching-demo-transformer-principle-v1-r6:0032
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/publisher_core_legacy.py
+    sha256: f32d5a06e8ba0fbe6e8b014f2a563cf41542f7281936c3dafaa91a4478ba6451
+    kind: publisher_core_legacy
+- seq: 33
+  event_id: teaching-demo-transformer-principle-v1-r6:0033
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/render_current_run.py
+    sha256: 0656117ba39548e23b6226a2a6e9a342f2dbf2b95dbb450c2bf360db21955072
+    kind: render_adapter
+- seq: 34
+  event_id: teaching-demo-transformer-principle-v1-r6:0034
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/run_acceptance.py
+    sha256: 94a588d88195c7599b86cdf2fbb7e3e1ac04631317a16fc49a4a93d13f621f83
+    kind: golden_path_orchestrator
+- seq: 35
+  event_id: teaching-demo-transformer-principle-v1-r6:0035
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: tools/skeleton_density.py
+    sha256: 3de44a8a851a46f88a362abbcca43c3b43595f24f4ff6d0f7f1f4068954a4d5c
+    kind: skeleton_dependency
+- seq: 36
+  event_id: teaching-demo-transformer-principle-v1-r6:0036
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/teaching-demo-artifact-plans/transformer-principle-v1/9aad8ce6b704a46f3a810fca5cee5f52f3f61e7d8cce84445218419348be7132.yaml
+    sha256: 1f641604f84d5d302d2c0a668eaf7ce6e2a90487dc9c38bb7b4d575e0961615b
+    kind: input_plan
+- seq: 37
+  event_id: teaching-demo-transformer-principle-v1-r6:0037
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUT_BOUND
+  actor: ChatGPT
+  bindings:
+  - path: production/provenance/repository-snapshots/dbe9eb3c0aac707bef6c53d6314056e4e9ba251459c47d0a93b322b30c2a1b84.yaml
+    sha256: d4ed4d69e461c6189e3837c97a4ceb18dfe8ed361150ca49b706a13cbcca5935
+    kind: repository_snapshot
+    dependency_identity_sha256: 2239dbda467a1900a71b1b5b88abf322298703233fa67f08ae2b4206228edc76
+- seq: 38
+  event_id: teaching-demo-transformer-principle-v1-r6:0038
+  occurred_at: '2026-08-26T13:19:15.016126Z'
+  type: INPUTS_LOCKED
+  actor: ChatGPT
+  bindings:
+  - path: production/components/figures/registry.yaml
+    sha256: 1d591aaf923272b51cfdd56b5f4fbadcad55602a2994801380049d1052322c17
+    kind: figure_registry
+  - path: production/components/figures/transformer-experiment.tex
+    sha256: 4cf1aff13ee2c119268b41ce22050838f7b7aefc362e1149a997387eaa40db9a
+    kind: figure_component
+  - path: production/components/figures/transformer-structure.tex
+    sha256: 64f1f3b4406b5d66762235dd70adfeb2a80be54ea0e05d953c4d2ab1da7517a3
+    kind: figure_component
+  - path: production/contracts/artifact-job-v1.yaml
+    sha256: 999bfff41468038d31177349e5cb864c03a059e890b6ffa97636a8aca045ca28
+    kind: artifact_contract
+  - path: production/contracts/execution-ledger-v1.yaml
+    sha256: d4e4176cf90b34b43c6c6e5f559753cf369c5bbc6dd0abe3dc5242b8b9f45fe5
+    kind: execution_ledger_contract
+  - path: production/contracts/module-registry-v1.yaml
+    sha256: 147275e3feb38236cd67b381395c749c575d9bd2e4b3361b375717488b2d9510
+    kind: module_registry
+  - path: production/contracts/repository-provenance-snapshot-v1.yaml
+    sha256: d5b91e109e0fb8716ed38d8c8f98edeef57090152feacb212329b4d514480b6c
+    kind: provenance_snapshot_contract
+  - path: production/teaching-demo-cases/transformer-principle-v1/01_训练参考教案.md
+    sha256: 20fec56eb1d42cea36849a7a02e8dfc40ee210565e208d20a37c9f7f5719408f
+    kind: case_source_reference_plan
+  - path: production/teaching-demo-cases/transformer-principle-v1/02_考场骨架教案.md
+    sha256: 32d7900a8341ee1e617274396ad1b77d87c1f5e669d6c994265a47bdaf1554f8
+    kind: case_source_exam_skeleton
+  - path: production/teaching-demo-cases/transformer-principle-v1/03_逐字稿.md
+    sha256: ab8c33d6df314e63d08323ad7b32fcbb0a4bf07a7a5c11ce2707d868ee3138e6
+    kind: case_source_trial
+  - path: production/teaching-demo-cases/transformer-principle-v1/04_课题专属答辩.md
+    sha256: 1074048c577bdbf22978b7c913afcd56b8868a9860dd846ea79b0b964db2d82d
+    kind: case_source_defense
+  - path: production/teaching-demo-cases/transformer-principle-v1/05_教材到骨架提炼解析.md
+    sha256: 1277ec39839dc0d062af016b9372071dd2e60968a387fc4a16ccb371626030ec
+    kind: case_source_analysis
+  - path: production/teaching-demo-cases/transformer-principle-v1/BOARD_PLAN.yaml
+    sha256: 5a6c392876b9e5373949ba0d3cb47ef3fb358019f9a3178948dc45c35a903d95
+    kind: case_source_board
+  - path: production/teaching-demo-cases/transformer-principle-v1/evidence.yaml
+    sha256: 3101426d53f8e32c6360d2afa897da66a73978352efa4f61070af9f56feff92c
+    kind: case_source_evidence
+  - path: production/teaching-demo-cases/transformer-principle-v1/manifest.yaml
+    sha256: e17971c351f4ad6fb1adaac631b5965fa6768ce5642e43753eee592fc8043191
+    kind: case_manifest
+  - path: production/templates/teacher_teaching_demo/user-latex-baseline-v2.tex
+    sha256: bfbf35045d110c56d20347f24515814fb27eb9cc65697ebbb1b62c3ced457ddf
+    kind: latex_visual_baseline
+  - path: production/templates/teacher_teaching_demo/user-latex-baseline-v2.yaml
+    sha256: ec3d9e1b2c0400735be4b6251bab6b431b629332c76d65a9ffcd4b52b72a9c44
+    kind: latex_visual_baseline_provenance
+  - path: tools/board_contract.py
+    sha256: cafb3df14b758f50e6d89663ef263a1cce4bfd5fd400ab3736101f932f088482
+    kind: board_dependency
+  - path: tools/check_current_run.py
+    sha256: 884c5bbeb3379319aa0e47ae008e223065ec1f57cf9c94c08ff9ac36c855263e
+    kind: module_checker
+  - path: tools/check_teaching_demo_case.py
+    sha256: d76c152766f4dced3239dd48575a3018c259a0e964a653bf41bcb4431397054e
+    kind: case_gate
+  - path: tools/check_teaching_demo_inputs.py
+    sha256: 8163acc9e2102175e229bc0ba5bfa75aaa6a46222e024cd71aa560af7feec21f
+    kind: prebuild_gate
+  - path: tools/latex_inline.py
+    sha256: 1c8c8bd3f9b1fb0d2bb5f26b7dbca9f8d422cc22041efb91368e901adba7e994
+    kind: publisher_dependency
+  - path: tools/lock_artifact_input_plan.py
+    sha256: 8527d3b2efa517e32a71704be49724cbd4abf52171be1208aad1f2828750b98c
+    kind: input_plan_locker
+  - path: tools/pdf_text_occupancy.py
+    sha256: f6030a74d8aed254d3d1087788ebd8b3c0bcb50120f2c5d547bf2eabf2d5f461
+    kind: render_qa_dependency
+  - path: tools/physics_figures.py
+    sha256: 994364c5aba4bbd1f3f45ff4dcb6416e56b0ebcf3fbe8943845705665d49723e
+    kind: figure_loader_dependency
+  - path: tools/physics_notation.py
+    sha256: 8aef0c3e51c8c6efbef1c19e00d1f21d6909c9feb50b5dcb23621c60f20f5e42
+    kind: semantic_gate_dependency
+  - path: tools/plan_teaching_demo_artifact_job.py
+    sha256: 0542f6456cc6280cb1663a7042ef5522c9023a1f00be2bae45dc2b46ee7181dc
+    kind: input_planner
+  - path: tools/process_telemetry.py
+    sha256: 4c1fa79b0d42aee70f35b6b1ccb489863c1b42fb86f54ffb4f9ac08f9993f686
+    kind: process_telemetry
+  - path: tools/provenance_snapshot.py
+    sha256: f006988bef7d98f801575d00b21da5f2d84bf11d110cfc5f1b2b609679f5eeab
+    kind: provenance_snapshot_tool
+  - path: tools/publisher_core.py
+    sha256: 684caeba6f95327daae7ed50ea0c6f26b27699c3e4a1e7248f407013d33f1d2c
+    kind: publisher_core
+  - path: tools/publisher_core_legacy.py
+    sha256: f32d5a06e8ba0fbe6e8b014f2a563cf41542f7281936c3dafaa91a4478ba6451
+    kind: publisher_core_legacy
+  - path: tools/render_current_run.py
+    sha256: 0656117ba39548e23b6226a2a6e9a342f2dbf2b95dbb450c2bf360db21955072
+    kind: render_adapter
+  - path: tools/run_acceptance.py
+    sha256: 94a588d88195c7599b86cdf2fbb7e3e1ac04631317a16fc49a4a93d13f621f83
+    kind: golden_path_orchestrator
+  - path: tools/skeleton_density.py
+    sha256: 3de44a8a851a46f88a362abbcca43c3b43595f24f4ff6d0f7f1f4068954a4d5c
+    kind: skeleton_dependency
+  - path: production/teaching-demo-artifact-plans/transformer-principle-v1/9aad8ce6b704a46f3a810fca5cee5f52f3f61e7d8cce84445218419348be7132.yaml
+    sha256: 1f641604f84d5d302d2c0a668eaf7ce6e2a90487dc9c38bb7b4d575e0961615b
+    kind: input_plan
+  - path: production/provenance/repository-snapshots/dbe9eb3c0aac707bef6c53d6314056e4e9ba251459c47d0a93b322b30c2a1b84.yaml
+    sha256: d4ed4d69e461c6189e3837c97a4ceb18dfe8ed361150ca49b706a13cbcca5935
+    kind: repository_snapshot
+    dependency_identity_sha256: 2239dbda467a1900a71b1b5b88abf322298703233fa67f08ae2b4206228edc76
+- seq: 39
+  event_id: teaching-demo-transformer-principle-v1-r6:0039
+  occurred_at: '2026-08-26T08:14:11Z'
+  type: BLOCK_REVIEW_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/source-boundary.yaml
+    sha256: 16868a8b8b85dd1f0d7c1ccf12519d4418f855c3846147a3d79fa51534a245c4
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/source-boundary-review.yaml
+    sha256: ff583763dcdbc45298ab56576a4145b4182ebfc28d809f301a9420ab3e4e074a
+    kind: human_review_evidence
+- seq: 40
+  event_id: teaching-demo-transformer-principle-v1-r6:0040
+  occurred_at: '2026-08-26T08:14:11Z'
+  type: BLOCK_REVIEW_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/board-skeleton.yaml
+    sha256: 1247178d2107622cd2133eef42e131896195819cd989b998ae1f22bb32311a51
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/board-skeleton-review.yaml
+    sha256: b244d9e74757b26d5be0e027155e4377f8a08016fe7c3d697a303ec8fde363c8
+    kind: human_review_evidence
+- seq: 41
+  event_id: teaching-demo-transformer-principle-v1-r6:0041
+  occurred_at: '2026-08-26T08:14:11Z'
+  type: BLOCK_REVIEW_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/trial-script.yaml
+    sha256: aa36a5dfdc3e5a7493c3cc229497009959394e6ffddd9fd15bd22c333e868235
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/trial-script-review.yaml
+    sha256: f5aa52537735d27bc68c948afbf5e68fad69e43e66c6b38e001c84b5cd2df39e
+    kind: human_review_evidence
+- seq: 42
+  event_id: teaching-demo-transformer-principle-v1-r6:0042
+  occurred_at: '2026-08-26T08:14:11Z'
+  type: BLOCK_REVIEW_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/figures.yaml
+    sha256: c82952b244da1c8a8bfe9669936de830a028b24756a92deb5d2bbee4244e8c0f
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/figures-review.yaml
+    sha256: 30c7ecf6beddc95411292127ad7ea43f889a9129438f7614c471e99fd5f622d3
+    kind: human_review_evidence
+- seq: 43
+  event_id: teaching-demo-transformer-principle-v1-r6:0043
+  occurred_at: '2026-08-26T13:18:56Z'
+  type: BLOCK_REVIEW_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/support-materials.yaml
+    sha256: 3c5061d7f4f433053ba737069cef189e6c98fcf7e59f91aa7e9065946b5d5118
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/support-materials-review-v2.yaml
+    sha256: 5fade4b6a4bdd26d2c1f954d6ce5412040b9614be854b483c45e9348b456c80e
+    kind: human_review_evidence
+- seq: 44
+  event_id: teaching-demo-transformer-principle-v1-r6:0044
+  occurred_at: '2026-08-26T13:19:51.589074Z'
+  type: BLOCKS_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/source-boundary.yaml
+    sha256: 16868a8b8b85dd1f0d7c1ccf12519d4418f855c3846147a3d79fa51534a245c4
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/source-boundary-review.yaml
+    sha256: ff583763dcdbc45298ab56576a4145b4182ebfc28d809f301a9420ab3e4e074a
+    kind: human_review_evidence
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/board-skeleton.yaml
+    sha256: 1247178d2107622cd2133eef42e131896195819cd989b998ae1f22bb32311a51
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/board-skeleton-review.yaml
+    sha256: b244d9e74757b26d5be0e027155e4377f8a08016fe7c3d697a303ec8fde363c8
+    kind: human_review_evidence
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/trial-script.yaml
+    sha256: aa36a5dfdc3e5a7493c3cc229497009959394e6ffddd9fd15bd22c333e868235
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/trial-script-review.yaml
+    sha256: f5aa52537735d27bc68c948afbf5e68fad69e43e66c6b38e001c84b5cd2df39e
+    kind: human_review_evidence
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/figures.yaml
+    sha256: c82952b244da1c8a8bfe9669936de830a028b24756a92deb5d2bbee4244e8c0f
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/figures-review.yaml
+    sha256: 30c7ecf6beddc95411292127ad7ea43f889a9129438f7614c471e99fd5f622d3
+    kind: human_review_evidence
+  - path: production/artifact-blocks/teacher_teaching_demo/transformer-principle-v1/support-materials.yaml
+    sha256: 3c5061d7f4f433053ba737069cef189e6c98fcf7e59f91aa7e9065946b5d5118
+    kind: reviewed_block_manifest
+  - path: qa/reviews/teacher_teaching_demo/transformer-principle-v1/support-materials-review-v2.yaml
+    sha256: 5fade4b6a4bdd26d2c1f954d6ce5412040b9614be854b483c45e9348b456c80e
+    kind: human_review_evidence
+- seq: 45
+  event_id: teaching-demo-transformer-principle-v1-r6:0045
+  occurred_at: '2026-08-26T13:20:07.526798Z'
+  type: BUILD_STARTED
+  actor: Engine
+  attempt_id: a1
+- seq: 46
+  event_id: teaching-demo-transformer-principle-v1-r6:0046
+  occurred_at: '2026-08-26T13:20:45.945681Z'
+  type: BUILD_COMPLETED
+  actor: Engine
+  attempt_id: a1
+  bindings:
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+    sha256: 3dd2fb88bb8b39cf4b7473eb300f429d8ad6fcb633b9c289f1c0dfa3a72c9023
+    kind: pdf
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+    sha256: da89077ce49dfb18430e265a41d2227552694d0e2f9c361e2c5c847dae147dda
+    kind: pdf
+- seq: 47
+  event_id: teaching-demo-transformer-principle-v1-r6:0047
+  occurred_at: '2026-08-26T13:20:46.784355Z'
+  type: BUILT
+  actor: ChatGPT
+  bindings:
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+    sha256: 3dd2fb88bb8b39cf4b7473eb300f429d8ad6fcb633b9c289f1c0dfa3a72c9023
+    kind: pdf
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+    sha256: da89077ce49dfb18430e265a41d2227552694d0e2f9c361e2c5c847dae147dda
+    kind: pdf
+- seq: 48
+  event_id: teaching-demo-transformer-principle-v1-r6:0048
+  occurred_at: '2026-08-26T13:21:28.997917Z'
+  type: MACHINE_VERIFICATION_PASSED
+  actor: ChatGPT
+  attempt_id: a1
+  bindings:
+  - path: qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/r6-a1-module-check.yaml
+    sha256: 7c07749124a75f116d48fa666b1e047de32c3f6692917e297495befa48465582
+    kind: module_check
+- seq: 49
+  event_id: teaching-demo-transformer-principle-v1-r6:0049
+  occurred_at: '2026-08-26T13:21:29.873592Z'
+  type: MACHINE_VERIFIED
+  actor: ChatGPT
+  bindings:
+  - path: qa/machine-evidence/teacher_teaching_demo/transformer-principle-v1/r6-a1-module-check.yaml
+    sha256: 7c07749124a75f116d48fa666b1e047de32c3f6692917e297495befa48465582
+    kind: module_check
+- seq: 50
+  event_id: teaching-demo-transformer-principle-v1-r6:0050
+  occurred_at: '2026-08-26T13:27:32.823168Z'
+  type: FINAL_RENDER_COMPLETED
+  actor: Engine
+  attempt_id: a1
+  bindings:
+  - path: qa/teaching-demo/transformer-principle-v1-rendered/render-manifest.yaml
+    sha256: 60a8d1551444ea234fbbb0bfe2bbf9d2feab0fd3e197bc1601c5cf9bba54c31b
+    kind: final_render_manifest
+- seq: 51
+  event_id: teaching-demo-transformer-principle-v1-r6:0051
+  occurred_at: '2026-08-26T13:27:32.823168Z'
+  type: HUMAN_REVIEW_ACCEPTED
+  actor: ChatGPT
+  attempt_id: a1
+  bindings:
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+    sha256: 3dd2fb88bb8b39cf4b7473eb300f429d8ad6fcb633b9c289f1c0dfa3a72c9023
+    kind: pdf
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+    sha256: da89077ce49dfb18430e265a41d2227552694d0e2f9c361e2c5c847dae147dda
+    kind: pdf
+- seq: 52
+  event_id: teaching-demo-transformer-principle-v1-r6:0052
+  occurred_at: '2026-08-26T13:27:32.823168Z'
+  type: HUMAN_ACCEPTED
+  actor: ChatGPT
+  bindings:
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+    sha256: 3dd2fb88bb8b39cf4b7473eb300f429d8ad6fcb633b9c289f1c0dfa3a72c9023
+    kind: pdf
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+    sha256: da89077ce49dfb18430e265a41d2227552694d0e2f9c361e2c5c847dae147dda
+    kind: pdf
+- seq: 53
+  event_id: teaching-demo-transformer-principle-v1-r6:0053
+  occurred_at: '2026-08-26T13:27:32.823168Z'
+  type: PUBLISHED
+  actor: ChatGPT
+  bindings:
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜面试训练稿.pdf
+    sha256: 3dd2fb88bb8b39cf4b7473eb300f429d8ad6fcb633b9c289f1c0dfa3a72c9023
+    kind: pdf
+  - path: outputs/teaching-demo/transformer-principle-v1/变压器的原理｜教材到骨架提炼解析.pdf
+    sha256: da89077ce49dfb18430e265a41d2227552694d0e2f9c361e2c5c847dae147dda
+    kind: pdf
+derived:
+  artifact_state: PUBLISHED
+  generation_review_cycles: 1
+  build_count: 1
+  final_render_count: 1
+  review_reject_count: 0
