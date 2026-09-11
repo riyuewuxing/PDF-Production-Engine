@@ -92,6 +92,7 @@ jobs:
         with:
           name: pdf-engine-resource-runtime-smoke
           path: .runtime-smoke/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
