@@ -1,0 +1,367 @@
+version: 27
+as_of: '2026-09-11'
+authority: current-project-state
+architecture:
+  foundation_version: 1
+  status: RELEASED_MAIN_CANONICAL
+  definition: architecture/README.md
+  migration_record: architecture/MIGRATION.md
+  adr_directory: architecture/adr/
+architecture_execution:
+  plan: docs/ARCHITECTURE-EXECUTION-PLAN.md
+  memory: MEMORY.md
+  records: RECORDS.md
+  scope: whole-project-foundation-not-teaching-demo-only
+  start_main: 67e28358fff35b11976e84c75560f4dff8307548
+  current_phase: P1_EXECUTION_STATE_DERIVATION
+  p1_generic_engine_runtime: MACHINE_PASS
+  p1_generic_engine_run_id: 34604741600
+  p1_generic_engine_execution_commit: 512d01bb0a260e5128c38fa3b69a6dffe5387eaf
+  p1_actual_repository_projection: NOT_YET_EXECUTED
+  p0_authority_reconciliation: COMPLETE
+  p0_post_write_review: PASS_NO_NEW_BLOCKING_P0_P1_FINDING
+  next_phase: P2_ENGINE_ANCHOR_AND_EXECUTION_PLUS_P3_DELIVERY_DECOUPLING
+  p1_execution_fact_authority: production/contracts/execution-ledger-v1.yaml
+  p1_second_event_ledger_forbidden: true
+  module_lifecycle_authority: production/contracts/module-registry-v1.yaml
+  engine_handoff_contract: contracts/engine-handoff.yaml
+  engine_handoff_binding: PENDING_ENGINE_COMMIT_AND_SCHEMA_HASH
+  p2_p3_joint_delivery_milestone: true
+  gate_a_reopen: forbidden_without_new_current_path_blocking_evidence
+  runtime_validation_for_p0_docs: NOT_APPLICABLE_DOCUMENT_AUTHORITY_RECONCILIATION
+project_essence:
+  authority: architecture/adr/ADR-009-process-as-product-and-agent-portability.md
+  efficiency_policy: production/resource-build-efficiency-policy-v1.yaml
+  system_qualification: production/contracts/system-qualification-v1.yaml
+version_control:
+  canonical_branch: main
+  default_branch:
+    name: main
+    status: CANONICAL
+  architecture_foundation_v1_release:
+    source_branch: sol/architecture-foundation-v1
+    source_head: dcc6a44da4d11bdc1b2c8a31d29ae8678e3e7ed1
+    integration: FAST_FORWARD
+    released: true
+  branch_policy:
+    main_is_single_long_lived_authority: true
+    feature_fix_branches_short_lived: true
+    force_update: forbidden
+  architecture_migration_branch:
+    name: sol/architecture-foundation-v1
+    status: HISTORICAL_RELEASED
+  latest_completed_feature:
+    name: sol/teaching-demo-real-heterogeneous-case-v1
+    status: HISTORICAL_RELEASED
+    integration: FAST_FORWARD
+    release_scope: real-heterogeneous-teaching-demo-transformer-v1
+runtime_constraints:
+  private_github_hosted_actions:
+    status: AVAILABLE_OBSERVED_2026_09_03_ONE_TIME_MIGRATION_ONLY
+    forbidden_as_normal_dependency: true
+    active_workflows_on_main: 0
+    gate: tools/check_private_actions_boundary.py
+    last_observed_use: canonical-textbook-store-migration
+    architectural_dependency: false
+  local_codex:
+    role: SPECIAL_COMPATIBILITY_DEBUG_FALLBACK_ONLY
+external_boundaries:
+  authority: architecture/adr/ADR-002-external-boundaries.md
+  execution_registry: production/contracts/module-registry-v1.yaml
+  recruitment_intelligence:
+    consumer_contract: Validated Opportunity Package
+    development_inside_qiuzhidaren: forbidden
+  pdf_production_engine:
+    repository: riyuewuxing/PDF-Production-Engine
+    role: STATELESS_MECHANICAL_EXECUTION_RESOURCE
+    direct_repository_link: false
+    private_repo_token: forbidden
+    private_repo_checkout: forbidden
+    private_repo_writeback: forbidden
+    human_review_pass: forbidden
+    receives_materialized_execution_package: true
+module_registry:
+  authority: production/contracts/module-registry-v1.yaml
+artifact_architecture:
+  contract: production/contracts/artifact-job-v1.yaml
+  template: production/contracts/artifact-job-template-v1.yaml
+  initializer: tools/init_artifact_job.py
+  input_plan_locker: tools/lock_artifact_input_plan.py
+execution_ledger:
+  contract: production/contracts/execution-ledger-v1.yaml
+  template: production/contracts/execution-ledger-template-v1.yaml
+  attempt_protocol_status: MONOTONIC_RETRY_ENGINE_CORE_RUNTIME_PASS
+  source_branch: sol/execution-ledger-attempt-semantics-v1
+  checker: tools/check_execution_ledger.py
+  artifact_checker: tools/check_artifact_job.py
+  operator: tools/manage_artifact_job.py
+  start_attempt: tools/manage_artifact_job.py start-attempt
+  human_reject: tools/manage_artifact_job.py human-reject
+  retry_activation: tools/manage_artifact_job.py activate-attempt
+  lifecycle_regression_for_retry: forbidden
+  current_candidate_fields:
+  - outputs
+  - machine_evidence
+  current_candidate_must_resolve_to_one_attempt: true
+  changed_retry_must_not_overwrite_historical_attempt_path: true
+  generation_review_cycles_source: checker-derived-ledger-events
+  repository_native_runtime_validation: NOT_RUN
+  stateless_engine_materialized_runtime_validation: MACHINE_PASS
+  runtime_evidence: production/resource-review-evidence/foundation-engine-runtime-v1/development-evidence.yaml
+  development_evidence: production/resource-review-evidence/execution-ledger-attempt-semantics-v1/development-evidence.yaml
+  real_transformer_serialization_boundary:
+    raw_r2_r3_r4_runtime_ledgers_recoverable_after_session_reclamation: false
+    exact_event_timestamps_recoverable_after_session_reclamation: false
+    synthetic_backfill: forbidden
+    preserved_summary_evidence: production/resource-review-evidence/teaching-demo-real-transformer-v1/final-completion-evidence.yaml
+durable_repository_provenance:
+  status: RELEASED_MAIN_ENGINE_CORE_RUNTIME_PASS
+  source_branch: sol/durable-provenance-v1
+  source_branch_status_after_integration: HISTORICAL_RELEASED
+  integration: FAST_FORWARD
+  architecture_decision: architecture/adr/ADR-010-durable-repository-provenance.md
+  reuse_identity_decision: architecture/adr/ADR-011-reuse-fingerprint-vs-audit-snapshot.md
+  extends: architecture/adr/ADR-005-content-addressed-provenance.md
+  contract: production/contracts/repository-provenance-snapshot-v1.yaml
+  snapshot_tool: tools/provenance_snapshot.py
+  live_checker: tools/check_artifact_job.py
+  historical_checker: tools/check_artifact_provenance.py
+  plan_locker: tools/lock_artifact_input_plan.py
+  source_snapshot_binding_required_for_new_jobs: true
+  snapshot_entry_identity:
+  - path
+  - sha256
+  - git_blob_sha1
+  - kind
+  dependency_identity_field: dependency_identity_sha256
+  snapshot_record_identity_field: snapshot_identity_sha256
+  source_commit_required_for_new_teaching_demo_plans: true
+  source_commit_is_cache_key: false
+  snapshot_record_hash_is_cache_key: false
+  input_plan_is_cache_key: false
+  input_fingerprint_basis: explicit-execution-dependency-bytes-plus-runtime
+  live_verification:
+    current_materialized_bytes_must_match: true
+    fail_closed: true
+  historical_verification:
+    current_path_bytes_required: false
+    authority: immutable-snapshot-plus-source-commit
+    git_history_mode_available: true
+  engine_private_repository_access_required: false
+  engine_receives_materialized_package_and_snapshot_metadata: true
+  legacy_snapshot_backfill: forbidden
+  repository_native_runtime_validation: NOT_RUN
+  engine_execution_package_validation: MACHINE_PASS
+  engine_execution_package_evidence: production/resource-review-evidence/foundation-engine-runtime-v1/development-evidence.yaml
+  engine_execution_run_id: 32824259467
+  engine_execution_commit: 606490985f7d7c3d6338332b2bea69c632d8f8b2
+  product_pdf_generated_in_current_phase: true
+  teaching_demo_plan_lock_runtime_validation: MACHINE_PASS
+  teaching_demo_plan_lock_evidence: production/resource-review-evidence/teaching-demo-synthetic-engine-preflight-v1/development-evidence.yaml
+  teaching_demo_plan_lock_source_commit: adaee6b73e619e74afa353fe91cb4b8cd1f47d68
+  teaching_demo_plan_lock_snapshot_identity: 13895002cff0d76d98a5b81d5211272c464134bb2bed5bc4b3395bde28566a2a
+  teaching_demo_plan_lock_dependency_identity: 76d7058aea56cb63cd115ac3496dddfe3dd572497cbcfed5ed0e064088690e2a
+  teaching_demo_block_acceptance_runtime_validation: MACHINE_PASS
+  teaching_demo_block_acceptance_engine_run_id: 32936637294
+  real_transformer_final_source_commit: 07b0905b875c8355753c07770293a35d023134ee
+  real_transformer_r4_plan_identity_prefix: cea248ca7d48
+  real_transformer_r4_snapshot_identity_prefix: b655bcf21070
+  real_transformer_serialized_final_plan_snapshot_retained: false
+  real_transformer_missing_serialization_backfill: forbidden
+  next_gate: AWAIT_USER_DECISION_SYSTEM_QUALIFICATION
+system_qualification:
+  contract: production/contracts/system-qualification-v1.yaml
+  current_status: NOT_STARTED_USER_APPROVAL_REQUIRED
+teaching_demo_process_development:
+  status: REAL_HETEROGENEOUS_CASE_PUBLISHED_HUMAN_ACCEPTED
+  canonical_textbook_store:
+    status: PRIVATE_REPOSITORY_CANONICAL
+    manifest: assets/textbooks/physics/pep/MANIFEST.json
+    current_map: assets/textbooks/physics/pep/CURRENT.json
+    book_count: 6
+    total_size_bytes: 91185191
+    formal_build_external_fetch_required: false
+  module_contract: production/contracts/teacher-trial-two-pdf-v1.yaml
+  case_schema: teacher-trial-case-v1
+  case_initializer: tools/init_teaching_demo_case.py
+  case_gate: tools/check_teaching_demo_case.py
+  content_prebuild_gate: tools/check_teaching_demo_inputs.py
+  artifact_input_profile: production/contracts/teacher-trial-two-pdf-v1.yaml#artifact_job_profile
+  artifact_input_planner: tools/plan_teaching_demo_artifact_job.py
+  artifact_input_locker: tools/lock_artifact_input_plan.py
+  artifact_plan_history: production/teaching-demo-artifact-plans/<case_id>/<plan_identity_sha256>.yaml
+  repository_snapshot_history: production/provenance/repository-snapshots/<snapshot_identity_sha256>.yaml
+  artifact_plan_dependency_policy:
+    case_manifest_and_all_standard_source_roles: true
+    shared_repository_dependencies_hash_bound: true
+    actual_figure_markers_resolved: true
+    only_used_figure_components_bound: true
+    plan_is_content_addressed: true
+    plan_hashes_rechecked_before_inputs_lock: true
+    plan_file_itself_bound: true
+    plan_file_excluded_from_reuse_fingerprint: true
+    exact_source_commit_recorded: true
+    source_commit_excluded_from_reuse_fingerprint: true
+    repository_snapshot_content_addressed: true
+    repository_snapshot_live_verified_before_lock: true
+    dependency_identity_stable_across_unrelated_commits: true
+  process_telemetry: tools/process_telemetry.py
+  preflight_entry: tools/run_acceptance.py --scope preflight
+  formal_entry: tools/run_acceptance.py --scope formal
+  telemetry_history: qa/process-telemetry/<case_id>/<run_id>.yaml
+  development_evidence:
+    golden_path: production/resource-review-evidence/teacher-teaching-demo-golden-path-v1/development-evidence.yaml
+    artifact_input_planning: production/resource-review-evidence/teaching-demo-artifact-input-planning-v1/development-evidence.yaml
+    durable_provenance: production/resource-review-evidence/durable-repository-provenance-v1/development-evidence.yaml
+    foundation_engine_runtime: production/resource-review-evidence/foundation-engine-runtime-v1/development-evidence.yaml
+    synthetic_engine_preflight_plan_lock_and_blocks: production/resource-review-evidence/teaching-demo-synthetic-engine-preflight-v1/development-evidence.yaml
+    real_transformer_completion: production/resource-review-evidence/teaching-demo-real-transformer-v1/final-completion-evidence.yaml
+    real_transformer_publication: production/resource-review-evidence/teaching-demo-real-transformer-v1/final-publication-record.yaml
+    real_transformer_human_review: qa/reviews/teacher_teaching_demo/transformer-principle-v1/final-r4-review.yaml
+  synthetic_case:
+    manifest: qa/fixtures/teaching-demo-synthetic-v1/case.yaml
+    source_commit: adaee6b73e619e74afa353fe91cb4b8cd1f47d68
+    artifact_job: qa/fixtures/teaching-demo-synthetic-v1/artifact-job.yaml
+    execution_ledger: qa/fixtures/teaching-demo-synthetic-v1/execution-ledger.yaml
+    artifact_state: BLOCKS_ACCEPTED
+    accepted_blocks:
+    - source-boundary
+    - board-skeleton
+    - trial-script
+    - support-materials
+    block_review_evidence_root: qa/fixtures/teaching-demo-synthetic-v1/block-review
+    plan: production/teaching-demo-artifact-plans/synthetic-structure-v1/405fdcd25c1b14b816208451d89bfaf9c1ad4a650c426e7571082909845aa224.yaml
+    plan_identity_sha256: 405fdcd25c1b14b816208451d89bfaf9c1ad4a650c426e7571082909845aa224
+    repository_snapshot: production/provenance/repository-snapshots/13895002cff0d76d98a5b81d5211272c464134bb2bed5bc4b3395bde28566a2a.yaml
+    snapshot_identity_sha256: 13895002cff0d76d98a5b81d5211272c464134bb2bed5bc4b3395bde28566a2a
+    dependency_identity_sha256: 76d7058aea56cb63cd115ac3496dddfe3dd572497cbcfed5ed0e064088690e2a
+    input_fingerprint: e46f883bed838b863b2e53aca3cdb473b05cd7a34ed068915b32adefe1a1a2ae
+    generation_review_cycles: 0
+    build_count: 0
+    final_render_count: 0
+    review_reject_count: 0
+  real_case:
+    case_id: transformer-principle-v1
+    manifest: production/teaching-demo-cases/transformer-principle-v1/manifest.yaml
+    source_commit: 07b0905b875c8355753c07770293a35d023134ee
+    source_textbook_blob_sha1: 0c3afecd87fee080aee47ec913942ad4fd76d6cd
+    artifact_state: PUBLISHED
+    machine_verification: PASS
+    human_review: REVIEW_PASS
+    pages_visually_reviewed: 13
+    canonical_output_hashes:
+      training: e2ad96efcac341157e2d19efb9ebd9cc33c8f7cf7b17026b122a4aa9611fd348
+      extraction: a1b85595c73286c76fdb450b24f438820c1326a48322a0176a8f6f6ee2217bcd
+    recovered_delivery_replay:
+      visual_parity: PIXEL_IDENTICAL
+      dpi: 200
+      pages_compared: 13
+      differing_pixels: 0
+      training_sha256: ee9f2dd74b6cf987e4677cc376918e06bd4137d6f24d6e34fb7aff91a48d5bef
+      extraction_sha256: ee8c426c7bfdda29422a9cdc284bd74643b577e59c44d2e451fd198c5af60a5e
+      canonical_byte_identity_preserved: false
+    process_metrics:
+      full_generation_review_cycles: 2
+      max_full_generation_review_cycles: 3
+      successful_cycle_number: 2
+      stop_limit_triggered: false
+      final_r4_build_count: 1
+      final_r4_final_render_count: 1
+      final_r4_review_reject_count: 0
+      observed_final_r4_build_seconds: 30.05
+    process_learning:
+    - artifact acceptance scopes self-contained from project-wide foundation gates
+    - contract-driven engineering-label bans moved into prebuild validation
+    - bare Markdown blockquote control line forbidden before composition
+    raw_runtime_ledger_serializations_retained_after_session_reclamation: false
+    synthetic_ledger_backfill: forbidden
+  product_pdf_generated_in_current_phase: true
+  repository_native_runtime_validation: NOT_RUN
+  preflight_runtime_evidence: MACHINE_PASS
+  preflight_engine_run_id: 32838822737
+  preflight_engine_execution_commit: f6fa45eb4cf88916d90a1a837111631c3f4630ba
+  artifact_plan_runtime_evidence: MACHINE_PASS
+  artifact_plan_engine_run_id: 32844323031
+  artifact_plan_engine_execution_commit: 5a9bd4628408545a5af6b30e5f76b616ff59d745
+  block_acceptance_runtime_evidence: MACHINE_PASS
+  block_acceptance_human_review: REVIEW_PASS
+  block_acceptance_engine_run_id: 32936637294
+  block_acceptance_engine_execution_commit: 683e884379f692cfff2d9d98775bfc1422007eb9
+  block_acceptance_machine_evidence: production/resource-review-evidence/teaching-demo-synthetic-engine-preflight-v1/block-acceptance-machine-evidence.json
+  next_gate: AWAIT_USER_DECISION_SYSTEM_QUALIFICATION
+legacy_governance:
+  teaching_demo_delivery_state_machine_v1: COMPATIBILITY_ONLY
+  teaching_demo_score_series_v1: COMPATIBILITY_ONLY
+  teaching_demo_efficiency_experiment_v1: FROZEN_FAILED_EXPERIMENT
+  rule: legacy contracts preserve historical evidence but do not define new Artifact
+    Jobs
+historical_failures:
+  teaching_demo_efficiency_round1_mechanical_energy:
+    status: STOP_LIMIT
+    quality_pass: false
+    efficiency_pass: false
+    warm_path_claim: false
+    observed_generation_review_cycles: 5
+    timing_status: UNKNOWN_MISSING_INSTRUMENTATION
+    receipts_retroactive_backfill: forbidden
+    pdfs_are_delivery: false
+accepted_quality_baselines:
+  teaching_demo:
+    state: REVIEW_PASS
+    accepted_sha256: 161c799d40bc3ae2378ee3373294383038e153054385840673bc070234f4b09f
+    documents: 2
+    pages: 12
+  teaching_demo_real_transformer_v1:
+    state: REVIEW_PASS
+    documents: 2
+    pages: 13
+    pages_visually_reviewed: 13
+    training_sha256: e2ad96efcac341157e2d19efb9ebd9cc33c8f7cf7b17026b122a4aa9611fd348
+    extraction_sha256: a1b85595c73286c76fdb450b24f438820c1326a48322a0176a8f6f6ee2217bcd
+  structured_interview:
+    state: REVIEW_PASS
+    accepted_sha256: c04f68e21ed73bae74b0b025ce4de7b105cb16c05733293a32ff63d104b394fd
+    documents: 2
+    pages: 24
+  defense:
+    state: REVIEW_PASS
+    accepted_sha256: 7525d9f986237d9a19f73cb25e63e4aa8874ff4571625747c52b16f182211acc
+    documents: 7
+    pages: 101
+  self_introduction:
+    state: REVIEW_PASS
+    accepted_sha256: 37979707e904662844c0e3b839c06420d43e7dc630d5ce9a92ecfec4026e8d52
+    documents: 2
+    pages: 9
+  teacher_quick_start_master_index:
+    state: REVIEW_PASS
+    accepted_sha256: b398392f8b86fb5e8a4a2bd20ceba9ee546643e47e5997d0162a72c25a124029
+    documents: 1
+    pages: 2
+  teacher_product_round2:
+    state: REVIEW_PASS
+    accepted_sha256: da697f56c54b25b008a6eb64b9bd304327eaf49e398325faa00cabe84f3b0718
+    documents: 10
+    pages: 112
+    pages_visually_reviewed: 112
+teacher_product_line:
+  historical_rounds: 2
+  product_round1: COMPLETE_FROZEN
+  product_round2: COMPLETE_FROZEN
+  product_round3: forbidden
+  full_accepted_inventory:
+    documents: 14
+    pages: 148
+migration_validation:
+  evidence: production/architecture-foundation-v1-migration.yaml
+  state: RELEASED
+  next_gate: TEACHING_DEMO_PROCESS_DEVELOPMENT
+teaching_demo_content:
+  canonical_branch: main
+  process: production/process/teaching-demo-content/PROCESS.md
+  status_authority: production/process/teaching-demo-content/STATUS.yaml
+  contract: production/contracts/teaching-demo-content.yaml
+  checker: tools/check_teaching_demo_content.py
+  in_place_only: true
+  new_branch_or_copy: FORBIDDEN
+  historical_branch_or_commit_as_entry: FORBIDDEN
