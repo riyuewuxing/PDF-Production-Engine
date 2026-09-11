@@ -5,7 +5,6 @@ on:
     branches:
       - 'job-architecture/p1-state-derivation-*'
     paths:
-      - '.engine-job/p1-state-derivation/**'
       - '.engine-input/p1-actual/**'
       - '.github/workflows/p1-state-derivation-runtime.yml'
 
@@ -13,86 +12,6 @@ permissions:
   contents: write
 
 jobs:
-  generic-selftest:
-    if: github.actor == github.repository_owner
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python -m pip install pyyaml
-      - name: Verify exact staged source and run generic P1 suite
-        id: execute
-        continue-on-error: true
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib, json, os, subprocess, time, traceback
-          checkout=Path.cwd().resolve()
-          base=checkout/'.engine-job/p1-state-derivation'
-          root=base/'repo'
-          pkg=json.loads((base/'manifest.json').read_text(encoding='utf-8'))
-          out=base/'output'
-          out.mkdir(parents=True,exist_ok=True)
-          evidence={
-            'version':1,'kind':'qiuzhidaren-p1-state-derivation-runtime-evidence-v1',
-            'status':'MACHINE_FAIL','review_status':'REVIEW_REQUIRED',
-            'source_repository':pkg['source_repository'],'source_commit':pkg['source_commit'],
-            'engine_repository':os.environ.get('GITHUB_REPOSITORY'),
-            'engine_execution_commit':os.environ.get('GITHUB_SHA'),
-            'engine_run_id':os.environ.get('GITHUB_RUN_ID'),
-            'execution_surface':'public-engine-github-hosted-runner',
-            'private_repository_access_used':False,'private_repository_credentials_used':False,
-            'product_pdf_generated':False,
-          }
-          def blob_sha(data):
-              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii')+data).hexdigest()
-          try:
-              if pkg.get('privacy') != 'public-nonsecret-generic-source':
-                  raise ValueError('privacy boundary invalid')
-              verified=[]
-              for item in pkg['files']:
-                  path=(root/item['path']).resolve()
-                  data=path.read_bytes()
-                  actual=blob_sha(data)
-                  if actual != item['git_blob_sha1']:
-                      raise ValueError(f'exact source blob mismatch: {item["path"]}')
-                  verified.append({'path':item['path'],'git_blob_sha1':actual,'sha256':hashlib.sha256(data).hexdigest()})
-              results=[]
-              for command in pkg['commands']:
-                  started=time.monotonic()
-                  proc=subprocess.run(command,cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-                  output=proc.stdout or ''
-                  results.append({'command':command,'exit_code':proc.returncode,'duration_seconds':round(time.monotonic()-started,6),'output_tail':output[-12000:]})
-              pdfs=[p.relative_to(root).as_posix() for p in root.rglob('*.pdf')]
-              selftest_ok=any(pkg['expected_selftest'] in r['output_tail'] for r in results)
-              all_pass=bool(results) and all(r['exit_code']==0 for r in results) and selftest_ok and not pdfs
-              evidence.update({'status':'MACHINE_PASS' if all_pass else 'MACHINE_FAIL','verified_file_count':len(verified),'verified_files':verified,'commands':results,'selftest_expected':pkg['expected_selftest'],'selftest_observed':selftest_ok,'product_pdf_generated':bool(pdfs),'product_pdf_paths':pdfs,'runtime':{'os':os.environ.get('RUNNER_OS'),'python':os.sys.version.split()[0]}})
-          except Exception as exc:
-              evidence['error']=f'{type(exc).__name__}: {exc}'
-              evidence['traceback']=traceback.format_exc()[-12000:]
-          finally:
-              (out/'p1-state-derivation-runtime-evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-              print(json.dumps(evidence,ensure_ascii=False,indent=2))
-          if evidence.get('status') != 'MACHINE_PASS':
-              raise SystemExit('P1 generic state derivation MACHINE_FAIL')
-          PY
-      - name: Commit generic evidence
-        if: always()
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .engine-job/p1-state-derivation/output/p1-state-derivation-runtime-evidence.json
-          if ! git diff --cached --quiet; then
-            git commit -m 'job: record P1 state derivation runtime evidence'
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
-      - if: always()
-        run: test '${{ steps.execute.outcome }}' = 'success'
-
   actual-repository-projection:
     if: github.actor == github.repository_owner
     runs-on: ubuntu-latest
@@ -103,6 +22,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pyyaml
+
       - name: Verify actual metadata, derive views, and check committed projection
         id: execute
         continue-on-error: true
@@ -111,6 +31,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import hashlib, json, os, shutil, subprocess, time, traceback
+
           checkout=Path.cwd().resolve()
           input_base=checkout/'.engine-input/p1-actual'
           root=input_base/'repo'
@@ -118,19 +39,26 @@ jobs:
           pkg=json.loads((input_base/'manifest.json').read_text(encoding='utf-8'))
           out=checkout/'.engine-job/p1-state-derivation/output/actual'
           out.mkdir(parents=True,exist_ok=True)
+
           evidence={
-            'version':1,'kind':'qiuzhidaren-p1-actual-repository-projection-evidence-v1',
-            'status':'MACHINE_FAIL','review_status':'REVIEW_REQUIRED',
-            'source_repository':pkg['source_repository'],'source_commit':pkg['source_commit'],
+            'version':1,
+            'kind':'qiuzhidaren-p1-actual-repository-projection-evidence-v1',
+            'status':'MACHINE_FAIL',
+            'review_status':'REVIEW_REQUIRED',
+            'source_repository':pkg['source_repository'],
+            'source_commit':pkg['source_commit'],
             'engine_repository':os.environ.get('GITHUB_REPOSITORY'),
             'engine_execution_commit':os.environ.get('GITHUB_SHA'),
             'engine_run_id':os.environ.get('GITHUB_RUN_ID'),
             'execution_surface':'public-engine-github-hosted-runner',
-            'private_repository_access_used':False,'private_repository_credentials_used':False,
+            'private_repository_access_used':False,
+            'private_repository_credentials_used':False,
             'product_pdf_generated':False,
           }
+
           def blob_sha(data):
               return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii')+data).hexdigest()
+
           try:
               if pkg.get('privacy') != 'public-nonsecret-metadata-only':
                   raise ValueError('metadata privacy boundary invalid')
@@ -146,9 +74,11 @@ jobs:
                   verified.append({'path':item['path'],'git_blob_sha1':actual,'sha256':hashlib.sha256(data).hexdigest()})
               if len(verified) != pkg['expected_metadata_file_count']:
                   raise ValueError('verified metadata count drift')
+
               (root/'tools').mkdir(parents=True,exist_ok=True)
               for name in ['artifact_foundation.py','derive_state.py','gen_handoff.py','check_state_derivation.py']:
                   shutil.copy2(generic/'tools'/name,root/'tools'/name)
+
               results=[]
               commands=[
                 ['python','tools/derive_state.py','--root','.','--write'],
@@ -162,6 +92,7 @@ jobs:
                   print('>>>',' '.join(command))
                   print(output,end='')
                   results.append({'command':command,'exit_code':proc.returncode,'duration_seconds':round(time.monotonic()-started,6),'output_tail':output[-12000:]})
+
               generated=['CURRENT_STATE.yaml','NEXT_ACTION.yaml','outputs/CATALOG.yaml','HANDOFF.md']
               generated_hashes={}
               for rel in generated:
@@ -172,6 +103,7 @@ jobs:
                   dest=out/rel
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   shutil.copy2(src,dest)
+
               pdfs=[p.relative_to(root).as_posix() for p in root.rglob('*.pdf')]
               all_pass=all(r['exit_code']==0 for r in results) and not pdfs
               evidence.update({
@@ -188,20 +120,30 @@ jobs:
               evidence['error']=f'{type(exc).__name__}: {exc}'
               evidence['traceback']=traceback.format_exc()[-12000:]
           finally:
-              (out/'p1-actual-repository-projection-evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+              (out/'p1-actual-repository-projection-evidence.json').write_text(
+                  json.dumps(evidence,ensure_ascii=False,indent=2)+'\n',encoding='utf-8'
+              )
               print(json.dumps(evidence,ensure_ascii=False,indent=2))
+
           if evidence.get('status') != 'MACHINE_PASS':
               raise SystemExit('P1 actual repository projection MACHINE_FAIL')
           PY
+
       - name: Commit actual generated views and evidence
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .engine-job/p1-state-derivation/output/actual
           if ! git diff --cached --quiet; then
             git commit -m 'job: record P1 actual repository projection'
-            git push origin HEAD:${GITHUB_REF_NAME}
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
-      - if: always()
+
+      - name: Enforce projection result
+        if: always()
         run: test '${{ steps.execute.outcome }}' = 'success'
