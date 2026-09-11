@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p1-postwrite-check-v1",
+  "privacy": "public-nonsecret-metadata-only",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "10025398534381571abaf60b9102dd327783997b",
+  "base_facts_source_commit": "e850af5999945c376d6457b31e99f1751fd56ca7",
+  "private_repository_access_allowed": false,
+  "product_pdf_allowed": false,
+  "views": [
+    {"path":"CURRENT_STATE.yaml","git_blob_sha1":"36c235115c983bb577b4a1c6dc29aac336ff51ed"},
+    {"path":"HANDOFF.md","git_blob_sha1":"af52c542cae9c0c6fd93113427f7941d5d327e89"},
+    {"path":"NEXT_ACTION.yaml","git_blob_sha1":"9059dbf003ad930aca14716e8b7a7cd1b7b37295"},
+    {"path":"outputs/CATALOG.yaml","git_blob_sha1":"53112e72ddee137ba683cdcf8cf61d99bdd38929"}
+  ],
+  "expected_view_count": 4
+}
