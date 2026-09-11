@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-teaching-demo-phase-b-materialized-runtime-evidence-v1",
+  "status": "MACHINE_FAIL",
+  "review_status": "REVIEW_REQUIRED",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "a912b63cfc5f8f6d679703df6f838aafe473786c",
+  "archive_sha256": "b8029840d850e7d82f3d72e37c14a514a06cda61b96d5fb1bdc16c348dbd582e",
+  "engine_repository": "riyuewuxing/PDF-Production-Engine",
+  "engine_execution_commit": "961346c012b047b726184e7b29ad993de2fd2dd4",
+  "engine_run_id": "34585288769",
+  "private_repository_access_used": false,
+  "private_repository_credentials_used": false,
+  "live_trusted_semantic_execution": "NOT_EXECUTED",
+  "gate_b_claimed": false,
+  "product_pdf_generated": false,
+  "verified_file_count": 251,
+  "commands": [
+    {
+      "command": [
+        "python",
+        "tools/check_teaching_demo_content.py",
+        "--selftest"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.18067,
+      "output_tail": "PASS: canonical Teaching Demo content gate selftest (Phase A RRA4 hardened)\n"
+    },
+    {
+      "command": [
+        "python",
+        "tools/check_teaching_demo_phase_b_eval.py",
+        "--selftest"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 2.47639,
+      "output_tail": "Traceback (most recent call last):\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 2102, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 2087, in main\n    selftest()\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 2074, in selftest\n    _machine_mutants()\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 1799, in _machine_mutants\n    expected = content_gate.core.expected_submission_bindings(root, manifest_path, manifest, workspace, [])\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_content.py\", line 375, in _expanded_expected_submission_bindings\n    out[key] = {\"path\": core._repo_rel(root, path), \"sha256\": _sha256(path)}\n                                                              ^^^^^^^^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_content.py\", line 79, in _sha256\n    return arch.file_sha256(path)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/_teaching_demo_content_architecture_impl.py\", line 84, in file_sha256\n    with path.open(\"rb\") as fh:\n         ^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/pathlib.py\", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/qz-phase-b-m14-tusgrxyt/tools/_teaching_demo_content_core.inc'\n"
+    },
+    {
+      "command": [
+        "python",
+        "tools/check_tooling_routes.py"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.719033,
+      "output_tail": "/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/latex_inline.py:129: SyntaxWarning: invalid escape sequence '\\m'\n  '**量纲：$\\mathrm{m/s}$；先统一单位**': r'\\textbf{量纲：$\\mathrm{m/s}$；先统一单位}',\ncanonical tooling roles + ADR-016 protected capability graph: PASS\n"
+    },
+    {
+      "command": [
+        "python",
+        "tools/run_acceptance.py",
+        "--scope",
+        "foundation"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 4.744163,
+      "output_tail": "/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/latex_inline.py:129: SyntaxWarning: invalid escape sequence '\\m'\n  '**量纲：$\\mathrm{m/s}$；先统一单位**': r'\\textbf{量纲：$\\mathrm{m/s}$；先统一单位}',\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_project_state.py\nPASS: Architecture Foundation v1 + durable provenance project state\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_tooling_routes.py\n/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/latex_inline.py:129: SyntaxWarning: invalid escape sequence '\\m'\n  '**量纲：$\\mathrm{m/s}$；先统一单位**': r'\\textbf{量纲：$\\mathrm{m/s}$；先统一单位}',\ncanonical tooling roles + ADR-016 protected capability graph: PASS\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_private_actions_boundary.py\nPASS: no private GitHub-hosted Actions workflow dependency\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/provenance_snapshot.py --selftest\nPASS: provenance snapshot selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/init_artifact_job.py --selftest\nPASS: init artifact job selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/manage_artifact_job.py --selftest\nPASS: manage artifact job selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/lock_artifact_input_plan.py --selftest\nPASS: Artifact input plan locker selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_artifact_job.py --selftest\nPASS: artifact job live selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_artifact_provenance.py --selftest\nPASS: historical artifact provenance selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_execution_ledger.py --selftest\nPASS: execution ledger selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/init_teaching_demo_case.py --selftest\nPASS: canonical Teaching Demo case initializer selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/plan_teaching_demo_artifact_job.py --selftest\nPASS: canonical Teaching Demo Artifact planner selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/process_telemetry.py --selftest\nPASS: Teaching Demo process telemetry selftest\n>>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_generalization_architecture.py\n<unknown>:129: SyntaxWarning: invalid escape sequence '\\m'\nLITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/board_contract.py\nAST_LITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/build_physics_textbook_topic_atlas.py\nLITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/check_structured_interview.py\nLITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/check_structured_training_cases.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_CANDIDATE.yaml: field=case_id: token='POS-GOLD-01': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_HUMAN_REVIEW_INPUT.yaml: field=case_id: token='POS-GOLD-01': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml: field=case_id: token='M01': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml: field=case_id: token='M02': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml: field=case_id: token='M03': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml: field=case_id: token='M04': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml: field=case_id: token='M21': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml: field=case_id: token='M01': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml: field=case_id: token='M02': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml: field=case_id: token='M03': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml: field=case_id: token='M04': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml: field=case_id: token='M21': file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml: field=case_id: token='POS-GOLD-01': file=tools/check_teaching_demo_phase_b_eval.py\nLITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/check_teaching_demo_phase_b_eval.py\nAST_LITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/check_teaching_demo_phase_b_eval.py\nBUSINESS_IDENTITY_LEAK: source=content/job-search/teacher/resume-materials/contracts/phase8-first-wave-publication-v1.yaml: field=title: token='教师求职事实与证据主档填写册': file=tools/publish_teacher_resume_materials_phase8.py\nBUSINESS_IDENTITY_LEAK: source=content/job-search/teacher/resume-materials/contracts/phase8-first-wave-publication-v1.yaml: field=title: token='云南教师报名材料路由与缺口检查手册': file=tools/publish_teacher_resume_materials_phase8.py\nBUSINESS_IDENTITY_LEAK: source=content/job-search/teacher/resume-materials/contracts/phase8-first-wave-publication-v1.yaml: field=title: token='教师简历证据化写作与四类变体模板': file=tools/publish_teacher_resume_materials_phase8.py\nAST_LITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/teaching_demo_process_eval_execution.py\nLITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/teaching_demo_process_eval_policy.py\nAST_LITERAL_BUSINESS_IDENTITY_BRANCH: file=tools/teaching_demo_process_eval_policy.py\nacceptance stage failed: check_generalization_architecture.py: exit=1\n"
+    },
+    {
+      "command": [
+        "python",
+        "tools/run_acceptance.py",
+        "--scope",
+        "phase-b"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 2.697685,
+      "output_tail": ">>> /opt/hostedtoolcache/Python/3.12.14/x64/bin/python /home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py --selftest\nTraceback (most recent call last):\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 2102, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 2087, in main\n    selftest()\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 2074, in selftest\n    _machine_mutants()\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_phase_b_eval.py\", line 1799, in _machine_mutants\n    expected = content_gate.core.expected_submission_bindings(root, manifest_path, manifest, workspace, [])\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_content.py\", line 375, in _expanded_expected_submission_bindings\n    out[key] = {\"path\": core._repo_rel(root, path), \"sha256\": _sha256(path)}\n                                                              ^^^^^^^^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/check_teaching_demo_content.py\", line 79, in _sha256\n    return arch.file_sha256(path)\n           ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/PDF-Production-Engine/PDF-Production-Engine/.engine-job/phase-b-repo/tools/_teaching_demo_content_architecture_impl.py\", line 84, in file_sha256\n    with path.open(\"rb\") as fh:\n         ^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/pathlib.py\", line 1013, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/qz-phase-b-m14-xbiikxsy/tools/_teaching_demo_content_core.inc'\nacceptance stage failed: check_teaching_demo_phase_b_eval.py: exit=1\n"
+    }
+  ],
+  "product_pdf_paths": [],
+  "runtime": {
+    "os": "Linux",
+    "python": "3.12.14"
+  }
+}
