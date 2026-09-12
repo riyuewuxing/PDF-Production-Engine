@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p2b-build-package-runtime-input-v1",
+  "privacy": "public-nonsecret-synthetic-fixture-only",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "911824bc9b081b4a097c1dc973486d4df75d2fb4",
+  "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
+  "engine_source_blobs": {
+    "src/pdf_production_engine/job_protocol.py": "c80e3e0861e1d701288959429f24ea5a30bf2237",
+    "src/pdf_production_engine/resource_runner.py": "728862e4d20bf39ee721af91ceb9694ef8976d7a"
+  },
+  "files": [
+    {
+      "path": "tools/artifact_foundation.py",
+      "git_blob_sha1": "bb55345664781a974fdcdc7039d457cab601622d"
+    },
+    {
+      "path": "tools/check_execution_ledger.py",
+      "git_blob_sha1": "7f25469306e15331d716cbcd7c9f57d2812ab99e"
+    },
+    {
+      "path": "tools/provenance_snapshot.py",
+      "git_blob_sha1": "738e9a38c34a540a09d4d77d4df91506301dc1cc"
+    },
+    {
+      "path": "tools/check_artifact_job.py",
+      "git_blob_sha1": "c55f46b34133f5273aa245ba0a19eb25b6020f5e"
+    },
+    {
+      "path": "tools/build_packager.py",
+      "git_blob_sha1": "2017e63910559373dccfe11314ca82ee4a279852"
+    },
+    {
+      "path": "examples/p2b_build_package_fixture.py",
+      "git_blob_sha1": "86df540c2dfa224a3ce1ed4e50b2d46b7c454cd1"
+    }
+  ],
+  "expected_file_count": 6,
+  "product_pdf_expected": false
+}
