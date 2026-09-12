@@ -1,0 +1,43 @@
+version: 2
+id: qiuzhidaren-system-qualification-v1
+authority: system-qualification
+architecture_decision: architecture/adr/ADR-009-process-as-product-and-agent-portability.md
+separate_from_delivery: true
+status: NOT_STARTED_USER_APPROVAL_REQUIRED
+purpose: qualify the reusable AI-operable production process, not merely the eventual quality of isolated artifacts
+quality_threshold_default: 90
+requires:
+  - explicit_user_start
+  - quality_evidence
+  - efficiency_evidence_from_execution_ledger
+  - warm_path_reuse_evidence
+  - agent_portability_evidence
+  - no_hidden_conversation_state_dependency
+
+series_policy:
+  default_required_consecutive_passes: 3
+  distinct_case_ids: true
+  most_recent_attempts_only: true
+  failure_resets_qualification_counter_only: true
+  each_attempt_requires_quality_and_efficiency_pass: true
+  process_evaluation_full_cycle_limit: 3
+  fourth_full_cycle_for_same_case: forbidden
+
+warm_path_policy:
+  minimum_warm_path_passes: 2
+  generic_implementation_change_during_warm_attempt: forbidden
+  accepted_block_reuse_when_hash_unchanged: required
+
+agent_portability:
+  operator_bootstrap_from_repository_authorities_only: required
+  undisclosed_prior_chat_memory: forbidden_as_requirement
+  model_quality_rule: stronger_models_may_raise_semantic_ceiling_but_must_not_require_a_different_pipeline
+  architecture_floor_rule: structural_source_provenance_machine_and_human_acceptance_guards_apply_independent_of_model_strength
+
+process_evidence:
+  authoritative_execution_facts: production/contracts/execution-ledger-v1.yaml
+  required_metrics: [generation_review_cycles, build_count, final_render_count, review_reject_count]
+  preferred_observations: [warm_path_success_without_generic_change, reused_accepted_block_ratio, generic_code_change_count, manual_orchestration_steps, time_to_first_machine_valid, time_to_first_human_acceptable]
+  single_artifact_eventual_pass_is_sufficient: false
+
+rule: qualification failure never invalidates an already accepted immutable delivery artifact
