@@ -1,0 +1,317 @@
+version: 57
+id: teaching-demo-content-status
+status: ROUND2_REJECTED_PROCESS_NOT_CALIBRATED
+as_of: '2026-09-11'
+
+canonical:
+  branch: main
+  process: production/process/teaching-demo-content/PROCESS.md
+  content_contract: production/contracts/teaching-demo-content.yaml
+  product_contract: production/contracts/teacher-trial-two-pdf-v1.yaml
+  content_checker: tools/check_teaching_demo_content.py
+  artifact_plan_entry: tools/plan_teaching_demo_artifact_job.py
+  artifact_plan_verifier: tools/verify_teaching_demo_artifact_plan.py
+  artifact_live_gate: tools/check_artifact_job.py
+  artifact_transaction_operator: tools/manage_artifact_job.py
+  build_adapter: tools/build_current_run.py
+  formal_render_entry: tools/render_current_run.py
+  tooling_manifest: tools/tooling-manifest.yaml
+  tooling_gate: tools/check_tooling_routes.py
+  phase_b_eval_harness: tools/check_teaching_demo_phase_b_eval.py
+  semantic_provenance_verifier: tools/verify_teaching_demo_semantic_provenance.py
+  phase_b_gold_corpus: production/process/teaching-demo-content/validation/phase-b/GOLD_CORPUS.yaml
+
+immutable_history:
+  round1: {decision: REJECT, scores: [85, 83], first_complete_package_immutable: true}
+  round2: {decision: REJECT, scores: [77, 87], first_complete_package_immutable: true}
+  process_calibration: NOT_CALIBRATED
+  automatic_third_topic: forbidden
+
+independent_gate_a_history:
+  first: {review_commit: b9d8574cff3a6c357c04ab79f60394a151df5c33, decision: GATE_A_REJECT, blockers: [GATEA-P0-01, GATEA-P1-02]}
+  rra3: {review_commit: d4b0174e83fd3106b0d5b81bd036199681634b22, decision: GATE_A_REJECT, blockers: [GATEA-RRA3-P0-04, GATEA-RRA3-P1-05]}
+  rra4:
+    review_commit: a5d1e6ebedca0b6a1ed947451b9396e4ae944026
+    review_start_main: 7032c78b2b63032f7ffac4c0345b66bbdcbac1b8
+    decision: GATE_A_REJECT
+    blockers: [GATEA-RRA4-P0-06, GATEA-RRA4-P1-07]
+  rra5:
+    review_start_main: 0627e3aa03aa574e7526f338c02ff754ca55b487
+    final_runtime_control_head: 52bde0a6e8b88b44c2ebe0833dcac69d26d15100
+    review_path: production/process/teaching-demo-content/validation/phase-a/INDEPENDENT_GATE_A_RRA5_FINAL_REVIEW.md
+    review_commit: a548ddec430a84f7139b20f7d071238d685022b1
+    decision: GATE_A_PASS
+    scope: PHASE_A_ARCHITECTURE_CONTROL_BOUNDARY_ACCEPTED_FOR_PHASE_B_EVAL_HARNESS_FIRST
+    runtime_pass_claimed: false
+    calibrated_claim: false
+
+rra5_followup:
+  phase_reopened_from: RRA4_INDEPENDENT_GATE_A_REJECT
+  initial_source_closeout_superseded: true
+  major_runtime_control_anchor: c9c9acebd27ea8037997dbd6a77fadb78c8a28eb
+  verifier_followup_anchor: 7c446f465c0d0f8a6a9ed689342a430e1cab40b2
+  final_runtime_control_head: 52bde0a6e8b88b44c2ebe0833dcac69d26d15100
+  repairs:
+    publisher_and_planner_capability_removal: COMPLETE_SOURCE_LEVEL
+    protected_operation_graph: COMPLETE_SOURCE_LEVEL
+    formal_render_gate_before_mutation: COMPLETE_SOURCE_LEVEL
+    artifact_plan_acceptance_capsule: COMPLETE_SOURCE_LEVEL
+    source_commit_cross_binding: COMPLETE_SOURCE_LEVEL
+    direct_generic_input_lock_consumer_verification: COMPLETE_SOURCE_LEVEL
+    transaction_precommit_zero_write_on_gate_failure: COMPLETE_SOURCE_LEVEL
+    engine_runtime_and_governance_control_closures: COMPLETE_SOURCE_LEVEL
+    verifier_self_contained_bootstrap: COMPLETE_SOURCE_LEVEL
+    isolated_fresh_planner_reconstruction: COMPLETE_SOURCE_LEVEL
+    tooling_consumer_call_order_legal_path: COMPLETE_SOURCE_LEVEL
+  findings:
+    RRA5-FOLLOWUP-P1-01: ambient repository-module verifier bootstrap removed
+    RRA5-FOLLOWUP-P1-02: helper self-validation bootstrap candidate rejected before main
+    RRA5-FOLLOWUP-LEGAL-01: Product Contract key-rename deadlock candidate rejected before main
+    RRA5-FOLLOWUP-LEGAL-02: tooling call-order facade/self-deadlock repaired at 52bde0a6e8b88b44c2ebe0833dcac69d26d15100
+  static_rereview:
+    exact_git_readback_completed: true
+    new_current_blocking_p0_p1_found_after_legal_02_repair: false
+    result: INDEPENDENT_GATE_A_ACCEPTED_FOR_PHASE_B
+    independent_gate_a_pass_claim: true
+    runtime_pass_claim: false
+
+records_integrity:
+  exact_preappend_blob: fc9ffff36a7ab18418e7c52c204e485feaad47ab
+  first_invalid_followup_append_commit: 822e0b6ff9fea49bf2782e7efcedc2bcbf8e7e3b
+  first_corrective_commit: b3c9902ae1c3190d0efeb42c2a13ff177080ac87
+  verified_final_blob: 9d65c9c419617865205bb0851f2c79fa177bea43
+  append_only_detached_proof_commit: 101b0dce584e2aa765bcd09679fd5ca5e14ec662
+  append_only_proof_result: PASS_WITH_EOF_NEWLINE_NORMALIZATION_EXCEPTION
+  append_only_proof_scope: ONLY_EOF_HUNK_OLD_FINAL_LINE_TEXT_IDENTICAL
+  concurrent_invalid_append_commit: 7e44272628b92114d0faf9eab223d25d00a342a1
+  concurrent_invalid_append_had_preexisting_history_drift: true
+  verified_blob_restore_commit: 949c7002e9a2a7a10d37501abd0d1ba3d7e5d452
+  current_history_prefix_restored_exactly: true
+  final_followup_append: COMPLETE_VERIFIED_BLOB_ON_MAIN
+
+final_consistency:
+  runtime_control_base: 52bde0a6e8b88b44c2ebe0833dcac69d26d15100
+  review_start_main: 0627e3aa03aa574e7526f338c02ff754ca55b487
+  runtime_contract_tooling_or_adr_drift_after_final_runtime_head: false
+  round1_round2_frozen_package_changed: false
+  pdf_or_artifact_output_changed: false
+  result: PASS_FOR_GATE_A_ARCHITECTURE_TRANSITION
+
+runtime_evidence:
+  exact_private_repository_checkout_shell_available: false
+  shell_command_executed: false
+  content_selftest: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  tooling_route_gate: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  foundation_acceptance: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  phase_b_acceptance: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  phase_b_eval_harness_runtime: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  runtime_pass_claimed: false
+  git_static_readback_performed: true
+  disposition: CARRY_FORWARD_AS_PHASE_B_EXECUTION_EVIDENCE_DEBT_NOT_GATE_A_BLOCKER
+
+semantic_judge_provenance:
+  architecture_decision: architecture/adr/ADR-017-teaching-demo-phase-b-semantic-controller-provenance.md
+  payload_binding: IMPLEMENTED
+  producer_identity_provenance_verifier: IMPLEMENTED_SOURCE_LEVEL
+  trusted_fresh_invocation_challenge_binding: IMPLEMENTED_SOURCE_LEVEL
+  phase_b_eval_harness: IMPLEMENTED_SOURCE_LEVEL
+  synthetic_controller_positive_gold: IMPLEMENTED_TEST_ONLY_NO_PRODUCTION_AUTHORITY
+  live_trusted_controller_execution: NOT_EXECUTED
+  owner: PHASE_B_CONTROLLER
+  current_safety_state: ACCEPTED_MODE_FAIL_CLOSED_PENDING_LIVE_PROVENANCE_AND_GATE_B
+  solved_claim: false
+
+phase_b_eval_harness:
+  historical_round1_round2_gold_bindings: IMPLEMENTED_SOURCE_LEVEL
+  gold_corpus_path: production/process/teaching-demo-content/validation/phase-b/GOLD_CORPUS.yaml
+  semantic_mutant_catalog: IMPLEMENTED_SOURCE_LEVEL
+  corpus_enforcement_class_alignment: IMPLEMENTED_SOURCE_LEVEL
+  machine_mutant_wiring_commit: de5157870578a59ed5290990b7c49a4d72b0caf2
+  corpus_alignment_commit: 235eaa54c83cb2cdb89f572ddfcaa8ca0b86d68e
+  fixture_bootstrap_repair_commit: 16e9fae6f79a26bc7e981e30247d4003d0d8c82c
+  machine_mutants_m05_m15: IMPLEMENTED_EXECUTABLE_SOURCE_HARNESS_NOT_RUNTIME_EXECUTED
+  machine_mutant_targeted_repair_oracles: M05_M07_M08_M09_IMPLEMENTED_SOURCE_LEVEL
+  machine_mutant_oracle_source_head: 7d13f17415e80b38f562872715e466448a4302a6
+  machine_mutant_oracle_runtime_execution: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  post_write_static_rereview: COMPLETED_NO_NEW_BLOCKING_SOURCE_FINDING_AFTER_M08_FIX
+  semantic_mutants_m01_m04: MATERIALIZED_AWAITING_LIVE_TRUSTED_SEMANTIC_JUDGE
+  semantic_calibration_packet_path: production/process/teaching-demo-content/validation/phase-b/SEMANTIC_CALIBRATION_CASES.yaml
+  semantic_calibration_packet: SOURCE_BOUND_INPUTS_ONLY_AWAITING_TRUSTED_EXECUTION
+  semantic_calibration_packet_source_head: a4ad9ff0e81a1ed6cfa4aba54c437ba790d7bd16
+  semantic_calibration_packet_runtime_execution: NOT_EXECUTED
+  positive_semantic_gold_candidate_path: production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_CANDIDATE.yaml
+  positive_semantic_gold_candidate: HUMAN_REVIEWED_PASS_EXACT_BYTES_LOCKED
+  positive_semantic_gold_candidate_candidate_blob: 8a2f74a89ae9c1ace29fd6f5b55227f0b6168653
+  positive_semantic_gold_candidate_semantic_input_digest: 0973826ca396cbca1abb4018f91b47a198ecba2251bd3cd5ece7bda70258af0b
+  positive_semantic_gold_candidate_harness_binding_head: de02de4c8d52e09d9d4175bd6f51652072edc9f5
+  positive_semantic_gold_candidate_current_source_head: 1fbe08f1ab7c81fba075efe026a894b406025ae5
+  positive_semantic_gold_candidate_exact_formation_in_student_response: true
+  positive_semantic_gold_candidate_formation_mode: scaffolded_formation
+  positive_semantic_gold_candidate_practice_mode: independent_transfer
+  positive_semantic_gold_candidate_modes_bound_to_canonical_registry: true
+  positive_semantic_gold_candidate_typed_timing_path: true
+  positive_semantic_gold_candidate_review_decision_domain: PASS_OR_REJECT
+  positive_semantic_gold_candidate_yaml_readback_repair: COMPLETE_SOURCE_LEVEL
+  positive_semantic_gold_candidate_is_gold: true
+  positive_semantic_gold_candidate_runtime_execution: NOT_EXECUTED_NO_REPOSITORY_SHELL
+  positive_semantic_gold_human_review_input_path: production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_HUMAN_REVIEW_INPUT.yaml
+  positive_semantic_gold_human_review_input: CONSUMED_EXTERNAL_PASS
+  positive_semantic_gold_human_review_input_candidate_blob: 8a2f74a89ae9c1ace29fd6f5b55227f0b6168653
+  positive_semantic_gold_human_review_input_semantic_digest: 0973826ca396cbca1abb4018f91b47a198ecba2251bd3cd5ece7bda70258af0b
+  positive_semantic_gold_human_review_input_creation_commit: d30a08ed59da5c25c4bff04fd94ca62436f101a3
+  positive_semantic_gold_human_review_input_output_contract_commit: a7b0f08c37537b9997bcd4fcd803f027e19808e0
+  positive_semantic_gold_human_review_input_harness_switch_commit: 187feba220902f083ca02210cf8b3af9c764cf02
+  positive_semantic_gold_human_review_input_gold_corpus_commit: 061aa246c2a02932df86dcb921eeac69721e36a7
+  positive_semantic_gold_human_review_input_independence_contract_commit: 2b595a0db1a5da59ec6d48939cef7167bb115d5a
+  positive_semantic_gold_human_review_input_harness_binding_head: c668395ec3a039c534e9ba64125b36ed64ee5a02
+  superseded_human_review_packet_removed_from_current_tree_commit: 12a49762e09892d461a14f6739283bb5155faead
+  positive_semantic_gold_human_review_performed: true
+  positive_semantic_gold_human_review_result_path: production/process/teaching-demo-content/validation/phase-b/POSITIVE_SEMANTIC_GOLD_HUMAN_REVIEW_RESULT.yaml
+  positive_semantic_gold_human_review_result_commit: c9f67035fca4f2f29ed3d5cb13ad673436514323
+  positive_semantic_gold_human_review_result_blob: 9d683ebdb79e2f3b5344a8f37622f8b93930e576
+  positive_semantic_gold_human_review_source_sha256: 961821d1afcaee8960beb12916f90d495aaf81a934d353ab7aad8d79b2857d52
+  positive_semantic_gold_human_review_decision: PASS
+  positive_semantic_gold_human_review_check_count: 10
+  positive_semantic_gold_human_review_harness_result_validation_commit: 3bc96c1e336318aa2046904d07dac51e8f018a5a
+  positive_semantic_gold_human_review_gold_corpus_promotion_commit: 3dfe08ba980c057593bbc1634efc29cec1c5bf53
+  positive_semantic_gold_human_review_corpus_binding_head: f60051d1151d9f1c93d7124c3ca92e23bfd4d601
+  semantic_calibration_source_closeout:
+    historical_snapshot: true
+    final_runtime_source_head: 6a1f647b27c6261292b93b31d5187fe66222d101
+    pre_final_state_sync_head: a5c82ed0bca8ed9416e09183955345575383153c
+    executable_runtime_code_drift_after_source_head: false
+    superseded_for_current_source_by_positive_candidate_rereview: true
+    prior_positive_candidate_source_head: 3d350b66181386723b7aa19e99015c1979a9db2c
+    current_positive_candidate_source_head: 5779557cf7b72563096c8525aabf2ce096957103
+    current_positive_candidate_harness_head: ffaea5671fae50bc8800534f5961eb9dda1a54c5
+    round1_round2_frozen_package_changed: false
+    formal_pdf_or_artifact_output_changed: false
+    external_evidence_still_required: true
+  m20_bare_release_mutant: IMPLEMENTED_EXECUTABLE_SOURCE_HARNESS_NOT_RUNTIME_EXECUTED
+  m21_semantic_insufficiency_mutant: FAIL_CLOSED_UNKNOWN_PROBE_PRESENT_AWAITING_LIVE_SEMANTIC_CALIBRATION
+  permanent_rra4_and_provenance_mutants: IMPLEMENTED_SOURCE_LEVEL
+  corpus_binding_selftest: IMPLEMENTED_SOURCE_LEVEL
+  synthetic_provenance_positive_gold: IMPLEMENTED_TEST_ONLY
+  human_reviewed_positive_semantic_gold: CURATED_EXTERNAL_HUMAN_PASS
+  trusted_semantic_execution_input_path: production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_INPUT.yaml
+  trusted_semantic_execution_input: SOURCE_BOUND_READY_FOR_EXTERNAL_RUNTIME
+  trusted_semantic_execution_input_creation_commit: 695081da49977577f16863bf69b921f907352b92
+  trusted_semantic_execution_input_blob: 151badcbbad2714dfd952249fb7ca1432d9d17dd
+  trusted_semantic_execution_input_harness_binding_commit: a5d785c45170b2a127f2d82bcc750d87e7ce5c5a
+  trusted_semantic_execution_input_gold_corpus_commit: c04a8ac5dd18d05e59b905a1aafb734a13852396
+  trusted_semantic_execution_input_corpus_binding_head: c04a8ac5dd18d05e59b905a1aafb734a13852396
+  trusted_semantic_live_result_verifier: SOURCE_LEVEL_READY_NOT_EXECUTED
+  trusted_semantic_live_result_verifier_commit: 7a2e20b29d8f28a37fd46ba5889ce9a53dc34b7a
+  trusted_semantic_live_result_acceptance_route_commit: 92a2c2f823a7d39c875a6808d0749aa31bb9d3c5
+  trusted_semantic_live_result_path: production/process/teaching-demo-content/validation/phase-b/TRUSTED_SEMANTIC_EXECUTION_RESULT.yaml
+  trusted_semantic_execution_input_repository_verifier_blobs:
+    semantic_provenance_verifier: 4cef3c4e2af637992fba384783abe284aca13440
+    phase_b_eval_verifier: a45758b1589abcd59b674112b1e26119ea93a80f
+    acceptance_router: 0ffd2063e954c3b8b83648d9fe5b00305dfb0dcd
+  trusted_semantic_live_result_requires_trusted_now: true
+  trusted_semantic_live_result_trusted_now_source: EXTERNAL_TRUSTED_CONTEXT_ONLY
+  runtime_diagnostic_closeout_path: production/process/teaching-demo-content/validation/phase-b/RUNTIME_DIAGNOSTIC_CLOSEOUT.yaml
+  runtime_diagnostic_closeout_commit: 527810f1a0cf183e547e178121f1ef1e0cda0c9d
+  exact_checkout_diagnostic_runs: 3
+  exact_checkout_diagnostic_result: FAILURES_OBSERVED_AND_TARGETED_REPAIRS_APPLIED
+  exact_checkout_diagnostic_final_gate_b_authority: NONE
+  policy_admissible_post_repair_shell_rerun: REQUIRED
+  trusted_semantic_execution_live_run: NOT_EXECUTED
+  semantic_judge_calibration_report: NOT_EXECUTED
+  mutation_score_report: NOT_EXECUTED
+  full_regression_rerun: NOT_EXECUTED
+  independent_gate_b: NOT_STARTED
+
+
+product_direction_review:
+  decision: PRODUCT_DIRECTION_ACCEPTED
+  reviewer_role: TOTAL_PLANNER
+  reviewed_main_head: 728335485983877129e242573db6ba29b3d2ca27
+  preview_path: production/process/teaching-demo-content/validation/phase-b/NON_FORMAL_PRODUCT_PREVIEW_ELECTRIC_FIELD_STRENGTH.md
+  scope: PRODUCT_SHAPE_CONTENT_DIRECTION_USER_VISIBLE_RESULT_ONLY
+  stop_preview_polishing: true
+  continue_mainline: true
+  gate_b_pass_claimed: false
+  calibrated_claimed: false
+  fresh_topic_unlocked: false
+  formal_pdf_unlocked: false
+  note: >-
+    Total-planner direction review accepted the preview as sufficient proof that
+    the corrected teaching-demo product direction works. P2/P3 polish is debt,
+    not a blocker. Do not modify this preview again unless later real runtime
+    evidence exposes an actual product-impacting defect.
+
+
+delivery:
+  schema_version: 1
+  formal_pdf:
+    policy: bounded_release
+    state: BLOCKED
+    requires:
+      - accepted_content
+      - source_provenance
+      - stable_engine_anchor
+      - machine_verification
+      - final_render
+      - full_page_human_acceptance
+    blocked_by:
+      - STABLE_ENGINE_ANCHOR_PENDING
+      - MACHINE_AND_RENDER_EVIDENCE_PENDING
+      - FULL_PAGE_HUMAN_ACCEPTANCE_PENDING
+    qualification_prerequisites: []
+  rule: >-
+    Delivery is decided only by product-specific content, source, engine,
+    machine/render and HUMAN evidence. Gate B or calibrated_claim is not a
+    prerequisite for formal_pdf delivery.
+
+qualification:
+  schema_version: 1
+  calibrated_claim:
+    state: BLOCKED
+    gate: INDEPENDENT_GATE_B
+    requires:
+      - trusted_semantic_runtime
+      - semantic_calibration
+      - mutation_score
+      - full_regression
+      - independent_gate_b
+    affects_delivery: false
+  rule: >-
+    Qualification measures the reusable process. Qualification failure or an
+    uncalibrated claim does not invalidate an otherwise accepted immutable
+    delivery artifact.
+
+unlock_policy:
+  formal_pdf: bounded_release
+  calibrated_claim: independent_gate_b_only
+
+protected_downstream:
+  compatibility_mirror: true
+  authoritative_delivery_state: delivery.formal_pdf
+  authoritative_qualification_state: qualification.calibrated_claim
+  cross_lane_prerequisite_authority: false
+  phase_b: AUTHORIZED_EVAL_HARNESS_FIRST_ONLY
+  fresh_topics: BLOCKED
+  formal_pdf: BLOCKED
+  artifact_jobs: NOT_STARTED_BY_CURRENT_PHASE
+  execution_ledgers: NOT_STARTED_BY_CURRENT_PHASE
+  public_pdf_engine: NOT_STARTED_BY_CURRENT_PHASE
+  machine_pdf_qa: NOT_STARTED_BY_CURRENT_PHASE
+  calibrated_claim: FORBIDDEN
+
+current_gate:
+  id: PHASE_B_EVAL_HARNESS_FIRST_IN_PROGRESS
+  independent_gate_a_on_final_followup_bytes: PASS
+  independent_review_path: production/process/teaching-demo-content/validation/phase-a/INDEPENDENT_GATE_A_RRA5_FINAL_REVIEW.md
+  independent_review_commit: a548ddec430a84f7139b20f7d071238d685022b1
+  review_start_main: 0627e3aa03aa574e7526f338c02ff754ca55b487
+  gate_a_scope: ARCHITECTURE_TRANSITION_ONLY
+  gate_a_does_not_mean_runtime_pass: true
+  gate_a_does_not_mean_calibrated: true
+  gate_a_does_not_authorize_fresh_topics_or_formal_pdf: true
+  gate_b_state: BLOCKED
+  accepted_mode: FAIL_CLOSED
+  next_action: >-
+    Continue the qualification lane only: trusted semantic-controller/judge runtime must execute M01-M04, M21 and POS-GOLD-01, materialize provenance-bound judge outputs, then verify them through `run_acceptance.py --scope phase-b --phase-b-live-result`. These steps govern calibrated_claim and Independent Gate B only; they are not a prerequisite for formal PDF delivery. Do not self-activate Gate B or reopen Phase A. Formal PDF work follows delivery.formal_pdf and remains blocked only by the delivery-specific evidence listed there; fresh-topic authorization remains separately blocked.
+  delivery_next_action: >-
+    Resolve delivery.formal_pdf.blocked_by in order: stable Engine anchor, machine/final-render evidence, then full-page HUMAN acceptance. Do not use Gate B or calibrated_claim as a delivery blocker.
