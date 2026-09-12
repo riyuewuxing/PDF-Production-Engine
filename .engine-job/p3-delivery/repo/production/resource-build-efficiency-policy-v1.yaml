@@ -1,0 +1,133 @@
+version: 8
+id: qiuzhidaren-resource-build-efficiency-policy-v1
+authority: artifact-production-efficiency
+architecture_decision: architecture/adr/ADR-009-process-as-product-and-agent-portability.md
+purpose: build a high-quality repeatable AI-operable production process with less repeated work; never optimize only for one artifact and never weaken acceptance
+
+process_as_product:
+  primary_product: reusable_agent_operable_process
+  artifact_role: user_deliverable_and_process_validation_sample
+  single_artifact_pass_proves_system_maturity: false
+  model_semantic_quality: determines_quality_ceiling
+  architecture_role: protects_quality_floor_repeatability_routing_provenance_and_failure_convergence
+  hidden_conversation_state_required_for_normal_operation: false
+
+principles:
+  - golden_path_first
+  - explicit_inputs_and_contracts
+  - hash_stable_block_reuse
+  - minimum_causal_rerun
+  - batched_mechanical_execution
+  - failure_class_to_machine_gate_when_possible
+  - repeated_manual_fix_must_create_enduring_learning
+  - final_human_review_preserved
+
+job_classes:
+  cold_path:
+    definition: genuinely missing reusable capability, contract, adapter, runtime or failure-class gate
+    generic_code_change_allowed: true
+    completion_requires: [reusable_implementation, selftest_or_regression, documented_gap, warm_reuse_plan]
+    anti_pattern: polishing_current_sample_without_reusable_improvement
+  warm_path:
+    definition: required generic capabilities already exist
+    generic_code_change_allowed: false
+    target: data_and_contract_in__artifact_and_review_evidence_out
+    success_signal: acceptable_delivery_without_generic_implementation_change
+
+feedback_loop:
+  process_evaluation_full_cycle_definition: generation_then_final_render_then_human_review
+  target_full_generation_review_cycles: 1
+  max_full_generation_review_cycles: 3
+  on_limit_without_pass: STOP_LIMIT_PROCESS_FAILURE
+  fourth_full_cycle: forbidden
+  wall_clock_time:
+    tracked: true
+    hard_gate_by_itself: false
+    reason: external_wait_and_human_orchestration_are_not_fully_controllable
+  rejection_rule:
+    classify_first: [instance_content_defect, reusable_process_defect]
+    reusable_process_defect_action: repair_shared_contract_adapter_or_gate_and_add_regression
+    blind_full_regeneration_without_root_cause: forbidden
+
+process_metrics:
+  authoritative_source: production/contracts/execution-ledger-v1.yaml
+  primary:
+    - generation_review_cycles
+    - build_count
+    - final_render_count
+    - review_reject_count
+  semantics:
+    generation_review_cycles: same-attempt FINAL_RENDER_COMPLETED plus HUMAN review result
+    build_count: count every BUILD_STARTED, including attempts that later BUILD_FAILED
+    final_render_count: count FINAL_RENDER_COMPLETED
+    review_reject_count: count HUMAN_REVIEW_REJECTED
+  evaluation:
+    - warm_path_success_without_generic_change
+    - reused_accepted_block_ratio
+    - generic_code_change_count
+    - manual_orchestration_steps_when_recorded
+    - time_to_first_machine_valid_when_recorded
+    - time_to_first_human_acceptable_when_recorded
+  rule: metrics describe consumed process effort; failed mechanical attempts must not disappear merely because they produced no accepted artifact
+
+agent_portability:
+  normal_bootstrap_authorities:
+    - CURRENT_STATE.yaml
+    - architecture/README.md
+    - architecture/adr/
+    - production/contracts/module-registry-v1.yaml
+    - current Module Contract
+    - production/contracts/artifact-job-v1.yaml
+    - production/contracts/execution-ledger-v1.yaml
+  undisclosed_prior_chat_memory: forbidden_as_requirement
+  weaker_ai_expectation: must_receive_structural_source_format_and_state_guardrails_from_architecture
+  stronger_ai_expectation: may_raise_semantic_quality_without_changing_pipeline_contract
+
+execution_facts:
+  authority: production/contracts/execution-ledger-v1.yaml
+  append_only: true
+  summary_fields_are_derived: true
+  derived_metrics: [generation_review_cycles, build_count, final_render_count, review_reject_count]
+  build_count_includes_failed_attempts: true
+  historical_missing_instrumentation: UNKNOWN_MISSING_INSTRUMENTATION
+  synthetic_backfill: forbidden
+
+cache_keys:
+  content: normalized_input_hashes_plus_module_contract_hash
+  figure: source_hashes_plus_builder_runtime_plus_render_policy
+  source_page: locked_source_identity_plus_page_selection_plus_extraction_policy
+  composition: ordered_upstream_accepted_bindings_plus_adapter_version
+  final_artifact: final_bytes_sha256
+
+rerun_scope:
+  content_failure: content_plus_downstream
+  figure_failure: failed_figure_plus_downstream
+  source_failure: failed_source_block_plus_downstream
+  composition_failure: composition_plus_downstream
+  final_visual_failure: classify_then_minimum_causal_block_plus_downstream
+  unrelated_accepted_block_invalidation: forbidden
+
+mechanical_batching:
+  preferred_execution: one_engine_invocation_per_changed_mechanical_block_when_practical
+  final_review_pack: [preflight, every-page-render, artifact-and-page-hashes, font-or-media-evidence, review-index, occupancy-warning-when-available]
+
+runtime_constraints:
+  private_github_hosted_actions_dependency: forbidden
+  public_engine_role: stateless_mechanical_execution
+  local_codex_role: compatibility_debug_fallback_only
+
+system_qualification:
+  contract: production/contracts/system-qualification-v1.yaml
+  separate_from_delivery: true
+  efficiency_proof_uses_ledger_derived_evidence: true
+  validates_process_not_sample_polish: true
+
+legacy_failed_experiment:
+  id: round-01-mechanical-energy-conservation
+  status: STOP_LIMIT
+  observed_generation_review_cycles: 5
+  quality_pass: false
+  efficiency_pass: false
+  timing_status: UNKNOWN_MISSING_INSTRUMENTATION
+  lesson: final_output_repair_without_process_convergence_is_not_success
+  rule: preserve history; do not restart or backfill events without user authorization
