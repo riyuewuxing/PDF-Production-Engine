@@ -3,7 +3,7 @@
   "kind": "qiuzhidaren-p2b-build-package-runtime-input-v1",
   "privacy": "public-nonsecret-synthetic-fixture-only",
   "source_repository": "riyuewuxing/qiuzhidaren",
-  "source_commit": "911824bc9b081b4a097c1dc973486d4df75d2fb4",
+  "source_commit": "eee931fc95fb06ad497236d931c18a16ec55381a",
   "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
   "engine_source_blobs": {
     "src/pdf_production_engine/job_protocol.py": "c80e3e0861e1d701288959429f24ea5a30bf2237",
@@ -28,13 +28,17 @@
     },
     {
       "path": "tools/build_packager.py",
-      "git_blob_sha1": "2017e63910559373dccfe11314ca82ee4a279852"
+      "git_blob_sha1": "126850f65adfb125616423f9790e7863af507d0b"
     },
     {
       "path": "examples/p2b_build_package_fixture.py",
       "git_blob_sha1": "86df540c2dfa224a3ce1ed4e50b2d46b7c454cd1"
+    },
+    {
+      "path": "examples/p2b_composition_fixture.py",
+      "git_blob_sha1": "d1ae02000b4540c19f96e30b4daea67cd4327ea0"
     }
   ],
-  "expected_file_count": 6,
+  "expected_file_count": 7,
   "product_pdf_expected": false
 }
