@@ -330,6 +330,11 @@ def prepare_fixture(root: Path) -> Path:
             "blob_sha": blob,
             "pdf_pages": [1],
         },
+        "verification": {
+            "exact_pages_verified": True,
+            "page_text_verified": True,
+            "canonical_pdf_pixels_inspected": True,
+        },
         "evidence_units": [
             {
                 "id": "E1",
