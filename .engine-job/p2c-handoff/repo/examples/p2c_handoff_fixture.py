@@ -73,6 +73,13 @@ def main() -> int:
     root = base / "private-side"
     job_path = prepare_fixture(root, include_helper_in_stage=True)
 
+    # P2b's historical synthetic helper carries a deliberately minimal handoff
+    # contract. P2c must exercise the current single authority, not that old copy.
+    current_handoff = REPO_ROOT / "contracts/engine-handoff.yaml"
+    fixture_handoff = root / "contracts/engine-handoff.yaml"
+    fixture_handoff.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(current_handoff, fixture_handoff)
+
     out_dir = root / "handoff-output"
     package, manifest, request = handoff.prepare(
         root,
