@@ -12,11 +12,11 @@
     },
     {
       "path": "production/contracts/teacher-trial-two-pdf-v1.yaml",
-      "git_blob_sha1": "f5157019625782395ab5f10bdc81138fb2f78c17"
+      "git_blob_sha1": "f46fa902a0be9c5092f65ee4c846847aa37304cb"
     },
     {
       "path": "production/process/teaching-demo-content/PROCESS.md",
-      "git_blob_sha1": "6f648fc7d3a77577f1dacbfdb4d52c7a8b980946"
+      "git_blob_sha1": "ba3a7d88962c96630e67a8c38b34cb1b3ad0438b"
     },
     {
       "path": "tools/artifact_foundation.py",
@@ -28,23 +28,23 @@
     },
     {
       "path": "tools/_teaching_demo_content_core.inc",
-      "git_blob_sha1": "f669821e656c4521d1bb9912053866baa57182ad"
+      "git_blob_sha1": "e10f306cb92c3547b5cfeea126f319f2b98f21d2"
     },
     {
       "path": "tools/teaching_demo_content_architecture.py",
-      "git_blob_sha1": "1b45a9713327628570001dc4b94ee9ed37c6891a"
+      "git_blob_sha1": "194ff7f14178460c66137540bcb7ae393e0e3354"
     },
     {
       "path": "tools/_teaching_demo_content_architecture_impl.py",
-      "git_blob_sha1": "dfef93bd34ab8e2de92524cd501de82635aef723"
+      "git_blob_sha1": "3ea5e5f9ff71961e40e8dedfb3c4388fa8a4014c"
     },
     {
       "path": "tools/teaching_demo_content_enforcement.py",
-      "git_blob_sha1": "06736dd975624d52b698ab138305f92b5e95a576"
+      "git_blob_sha1": "a342870e886e757d29478da099ad81bba2867a19"
     },
     {
       "path": "tools/check_teaching_demo_case.py",
-      "git_blob_sha1": "4cc3fd5abe1e2f55e1b3fd9971cd58bec06c30fd"
+      "git_blob_sha1": "ed15aebbeb745c9e26386967b86f11d3ec14db28"
     },
     {
       "path": "examples/p3_canonical_accepted_fixture.py",
