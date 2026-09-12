@@ -1,0 +1,171 @@
+name: Session Mailbox Resource Job
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.engine-session/**/request.json'
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  session-mailbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard and locate request
+        run: |
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER" || exit 2
+          case "$HEAD_MESSAGE" in 'session: open '*) ;; *) exit 2 ;; esac
+          python - <<'PY' >> "$GITHUB_ENV"
+          import hashlib, json, re, subprocess
+          from pathlib import Path
+          changed = subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'], text=True).splitlines()
+          paths = [p for p in changed if re.fullmatch(r'\.engine-session/[A-Za-z0-9._-]{8,80}/request\.json', p)]
+          if len(paths) != 1:
+              raise SystemExit(f'exactly one request.json required: {paths}')
+          path = Path(paths[0]); raw = path.read_bytes(); data = json.loads(raw)
+          if data.get('version') != 1 or data.get('schema') != 'pdf-engine-session-request-v1':
+              raise SystemExit('bad request schema')
+          rid = data.get('request_id')
+          if rid != path.parent.name:
+              raise SystemExit('request id/path mismatch')
+          key = data.get('return_public_key')
+          pin = data.get('engine_commit')
+          if not isinstance(key,str) or not re.fullmatch(r'[A-Za-z0-9_-]{40,60}', key):
+              raise SystemExit('bad return public key')
+          if not isinstance(pin,str) or not re.fullmatch(r'[0-9a-f]{40}', pin):
+              raise SystemExit('bad engine pin')
+          if subprocess.run(['git','merge-base','--is-ancestor',pin,'HEAD']).returncode:
+              raise SystemExit('engine pin not ancestor')
+          drift=[p for p in subprocess.check_output(['git','diff','--name-only',pin,'HEAD'],text=True).splitlines() if not p.startswith('.engine-session/')]
+          if drift:
+              raise SystemExit(f'engine code drift after pin: {drift}')
+          print(f'REQUEST_ID={rid}')
+          print(f'REQUEST_DIR={path.parent.as_posix()}')
+          print(f'RETURN_PUBLIC_KEY={key}')
+          print(f'ENGINE_CODE_COMMIT={pin}')
+          print(f'REQUEST_SHA256={hashlib.sha256(raw).hexdigest()}')
+          PY
+        env:
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install engine and publish one-time receive key
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          pdf-session keygen --private-out /tmp/session-private.key --public-out /tmp/session-public.txt
+          echo "SESSION_PUBLIC_KEY=$(cat /tmp/session-public.txt)"
+          python - <<'PY'
+          import json, os, urllib.request
+          key=open('/tmp/session-public.txt',encoding='ascii').read().strip()
+          req=urllib.request.Request(
+            f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+            data=json.dumps({'state':'pending','context':'pdf-engine/session-key','description':f"key={key} request={os.environ['REQUEST_ID']}"[:140]}).encode(),
+            headers={'Authorization':f"Bearer {os.environ['GITHUB_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+            method='POST')
+          urllib.request.urlopen(req).read()
+          PY
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Install document runtime
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-pictures texlive-science fonts-noto-cjk fonts-arphic-ukai fonts-arphic-uming fonts-wqy-zenhei poppler-utils fontconfig
+
+      - name: Wait for encrypted payload
+        run: |
+          for _ in $(seq 1 180); do
+            git fetch --quiet origin main
+            ref=refs/remotes/origin/main
+            current="$(git show "$ref:$REQUEST_DIR/request.json" | sha256sum | awk '{print $1}')"
+            test "$current" = "$REQUEST_SHA256" || exit 2
+            if git cat-file -e "$ref:$REQUEST_DIR/input.sealed.b64" 2>/dev/null &&
+               git cat-file -e "$ref:$REQUEST_DIR/input.sha256" 2>/dev/null; then
+              git show "$ref:$REQUEST_DIR/input.sealed.b64" | tr -d '\r\n ' | base64 -d > /tmp/input.sealed
+              git show "$ref:$REQUEST_DIR/input.sha256" | tr -d '\r\n ' > /tmp/input.sha256
+              echo "$(cat /tmp/input.sha256)  /tmp/input.sealed" | sha256sum -c -
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 2
+
+      - name: Decrypt and validate package
+        run: |
+          pdf-session unseal --private-key "$(cat /tmp/session-private.key)" --request-id "$REQUEST_ID" --input /tmp/input.sealed --output /tmp/job.zip
+          rm -rf /tmp/job /tmp/out && mkdir -p /tmp/job /tmp/out
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root=Path('/tmp/job').resolve()
+          with zipfile.ZipFile('/tmp/job.zip') as z:
+              for m in z.infolist():
+                  t=(root/m.filename).resolve()
+                  if root!=t and root not in t.parents:
+                      raise SystemExit('zip path escape')
+              z.extractall(root)
+          PY
+          python - <<'PY' >> "$GITHUB_ENV"
+          from pathlib import Path
+          import re,yaml
+          d=yaml.safe_load(Path('/tmp/job/engine-run.yaml').read_text(encoding='utf-8')) or {}
+          if d.get('version')!=1: raise SystemExit('bad engine-run version')
+          job=d.get('job_file'); block=d.get('block_id'); dpi=int(d.get('dpi',144))
+          if not isinstance(job,str) or not re.fullmatch(r'[A-Za-z0-9._-]+',job): raise SystemExit('bad job file')
+          if not isinstance(block,str) or not re.fullmatch(r'[A-Za-z0-9._-]+',block): raise SystemExit('bad block id')
+          if not 72<=dpi<=300: raise SystemExit('bad dpi')
+          print(f'ENGINE_JOB_FILE={job}'); print(f'ENGINE_BLOCK_ID={block}'); print(f'ENGINE_DPI={dpi}')
+          PY
+          python - <<'PY'
+          from pathlib import Path
+          import os,yaml
+          d=yaml.safe_load((Path('/tmp/job')/os.environ['ENGINE_JOB_FILE']).read_text(encoding='utf-8')) or {}
+          if d.get('privacy')!='session': raise SystemExit('privacy must be session')
+          blocks={b.get('block_id'):b for b in d.get('blocks',[]) if isinstance(b,dict)}
+          b=blocks.get(os.environ['ENGINE_BLOCK_ID'])
+          if not b: raise SystemExit('missing block')
+          if b.get('kind') not in {'figure','chart','source-page','asset','composition','final-pdf'}:
+              raise SystemExit('block kind outside engine mechanical boundary')
+          PY
+          pdf-resource-job "/tmp/job/$ENGINE_JOB_FILE"
+
+      - name: Execute resource block
+        run: |
+          pdf-resource-run --root /tmp/job --job "$ENGINE_JOB_FILE" --block "$ENGINE_BLOCK_ID" --out /tmp/out --dpi "$ENGINE_DPI"
+
+      - name: Encrypt result
+        run: |
+          python - <<'PY'
+          import json,os,shutil
+          from pathlib import Path
+          Path('/tmp/out/session-execution.json').write_text(json.dumps({'version':1,'request_id':os.environ['REQUEST_ID'],'engine_code_commit':os.environ['ENGINE_CODE_COMMIT'],'opening_commit':os.environ['GITHUB_SHA'],'execution_surface':'github-hosted-public-engine-ephemeral-session','plaintext_persisted':False},indent=2)+'\n',encoding='utf-8')
+          shutil.make_archive('/tmp/result','zip','/tmp/out')
+          PY
+          pdf-session seal --public-key "$RETURN_PUBLIC_KEY" --request-id "$REQUEST_ID" --input /tmp/result.zip --output /tmp/result.sealed
+          sha256sum /tmp/result.sealed > /tmp/result.sealed.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: session-sealed-result
+          path: |
+            /tmp/result.sealed
+            /tmp/result.sealed.sha256
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf /tmp/session-private.key /tmp/session-public.txt /tmp/input.sealed /tmp/input.sha256 /tmp/job /tmp/job.zip /tmp/out /tmp/result.zip
