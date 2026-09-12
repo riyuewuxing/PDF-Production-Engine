@@ -129,6 +129,9 @@ jobs:
           if not 72<=dpi<=300: raise SystemExit('bad dpi')
           print(f'ENGINE_JOB_FILE={job}'); print(f'ENGINE_BLOCK_ID={block}'); print(f'ENGINE_DPI={dpi}')
           PY
+          export ENGINE_JOB_FILE="$(python -c "import yaml; print((yaml.safe_load(open('/tmp/job/engine-run.yaml', encoding='utf-8')) or {})['job_file'])")"
+          export ENGINE_BLOCK_ID="$(python -c "import yaml; print((yaml.safe_load(open('/tmp/job/engine-run.yaml', encoding='utf-8')) or {})['block_id'])")"
+          export ENGINE_DPI="$(python -c "import yaml; print(int((yaml.safe_load(open('/tmp/job/engine-run.yaml', encoding='utf-8')) or {}).get('dpi', 144)))")"
           python - <<'PY'
           from pathlib import Path
           import os,yaml
