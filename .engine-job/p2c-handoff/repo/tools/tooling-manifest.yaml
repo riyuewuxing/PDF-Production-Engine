@@ -1,0 +1,393 @@
+version: 57
+policy: explicit-routing
+architecture: architecture/README.md
+module_registry: production/contracts/module-registry-v1.yaml
+
+canonical:
+  - artifact_foundation.py
+  - provenance_snapshot.py
+  - init_artifact_job.py
+  - manage_artifact_job.py
+  - lock_artifact_input_plan.py
+  - check_artifact_job.py
+  - check_artifact_provenance.py
+  - check_execution_ledger.py
+  - derive_state.py
+  - gen_handoff.py
+  - check_state_derivation.py
+  - check_engine_handoff.py
+  - build_packager.py
+  - handoff.py
+  - check_delivery_qualification_decoupling.py
+  - check_private_actions_boundary.py
+  - check_project_state.py
+  - check_tooling_routes.py
+  - check_generalization_architecture.py
+  - run_acceptance.py
+
+  # Teaching Demo active Golden Path / adapter set
+  - init_teaching_demo_case.py
+  - plan_teaching_demo_artifact_job.py
+  - teaching_demo_artifact_plan_primitives.py
+  - verify_teaching_demo_artifact_plan.py
+  - check_teaching_demo_case.py
+  - check_teaching_demo_content.py
+  - teaching_demo_content_architecture.py
+  - _teaching_demo_content_architecture_impl.py
+  - teaching_demo_content_enforcement.py
+  - verify_teaching_demo_semantic_provenance.py
+  - check_teaching_demo_phase_b_eval.py
+  - check_teaching_demo_inputs.py
+  - process_telemetry.py
+  - pdf_text_occupancy.py
+  - publisher_core.py
+  - publisher_core_legacy.py
+  - build_current_run.py
+  - check_current_run.py
+  - render_current_run.py
+  - latex_inline.py
+  - physics_notation.py
+  - physics_figures.py
+  - board_contract.py
+  - skeleton_density.py
+  - check_skeleton_density.py
+  - locate_locked_textbook_pages.py
+  - regression_case.py
+  - check_regression_case.py
+  - build_regression_case.py
+  - run_regression_suite.py
+  - render_regression_suite.py
+  - check_publisher_core.py
+  - check_figure_toolchain.py
+  - build_figure_review_block.py
+
+  # Preserved non-content Teaching Demo process-evaluation / textbook-atlas tools.
+  - check_teaching_demo_process_evaluation.py
+  - teaching_demo_process_eval_common.py
+  - teaching_demo_process_eval_policy.py
+  - teaching_demo_process_eval_execution.py
+  - teaching_demo_process_eval_regression.py
+  - check_textbook_store.py
+  - build_physics_textbook_topic_atlas.py
+  - search_physics_topic_atlas.py
+  - curate_physics_topic_atlas_retrieval.py
+  - check_textbook_topic_atlas_round2.py
+
+  # Structured Interview adapter set (FROZEN)
+  - import_structured_references.py
+  - normalize_structured_references.py
+  - validate_structured_reference_bank.py
+  - check_structured_interview.py
+  - check_structured_pagination.py
+  - check_structured_training_cases.py
+  - check_structured_training_state.py
+  - run_structured_acceptance.py
+  - publish_yunnan_structured.py
+
+  # Defense adapter set (FROZEN)
+  - build_defense_final_bank.py
+  - check_defense_final_bank.py
+  - check_defense_finalization_seed.py
+  - check_teacher_defense.py
+  - publish_yunnan_defense.py
+
+  # Self-introduction adapter set (FROZEN)
+  - check_teacher_self_introduction.py
+  - publish_yunnan_self_introduction.py
+
+compatibility_only:
+  - check_teaching_demo_delivery.py
+  - check_teaching_demo_score.py
+  - check_teaching_demo_efficiency.py
+  - import_written_exam_references.py
+  - normalize_written_exam_references.py
+  - validate_written_exam_reference_bank.py
+  - validate_written_exam_knowledge_links.py
+  - check_teacher_written_exam.py
+  - publish_teacher_written_exam_phase7.py
+  - validate_teacher_resume_materials.py
+  - publish_teacher_resume_materials_phase8.py
+
+retired:
+  - validate_teacher_position_sources.py
+  - plan_teacher_position_acquisition.py
+  - validate_teacher_position_phase9.py
+  - fetch_teacher_recruitment_attachments.py
+  - fetch_teacher_recruitment_attachments_browser.py
+  - sanitize_teacher_recruitment_attachment_artifacts.py
+  - run_teacher_recruitment_attachment_capture.py
+  - validate_teacher_position_attachments.py
+
+forbidden_current_paths:
+  - plan_teaching_demo_artifact_job_legacy.py
+  - teaching_demo_process_eval_core.py
+
+execution_roles:
+  library:
+    - artifact_foundation.py
+    - publisher_core.py
+    - publisher_core_legacy.py
+    - teaching_demo_artifact_plan_primitives.py
+    - verify_teaching_demo_artifact_plan.py
+    - teaching_demo_content_architecture.py
+    - _teaching_demo_content_architecture_impl.py
+    - teaching_demo_content_enforcement.py
+    - verify_teaching_demo_semantic_provenance.py
+    - teaching_demo_process_eval_common.py
+    - teaching_demo_process_eval_policy.py
+    - teaching_demo_process_eval_execution.py
+    - teaching_demo_process_eval_regression.py
+  entry:
+    - init_artifact_job.py
+    - manage_artifact_job.py
+    - lock_artifact_input_plan.py
+    - check_artifact_job.py
+    - check_artifact_provenance.py
+    - check_execution_ledger.py
+    - derive_state.py
+    - gen_handoff.py
+    - check_state_derivation.py
+    - check_engine_handoff.py
+    - build_packager.py
+    - handoff.py
+    - check_delivery_qualification_decoupling.py
+    - check_private_actions_boundary.py
+    - check_project_state.py
+    - check_tooling_routes.py
+    - check_generalization_architecture.py
+    - run_acceptance.py
+    - init_teaching_demo_case.py
+    - plan_teaching_demo_artifact_job.py
+    - check_teaching_demo_case.py
+    - check_teaching_demo_content.py
+    - check_teaching_demo_phase_b_eval.py
+    - check_teaching_demo_inputs.py
+    - build_current_run.py
+    - check_current_run.py
+    - render_current_run.py
+    - check_skeleton_density.py
+    - locate_locked_textbook_pages.py
+    - check_regression_case.py
+    - build_regression_case.py
+    - run_regression_suite.py
+    - render_regression_suite.py
+    - check_publisher_core.py
+    - check_figure_toolchain.py
+    - build_figure_review_block.py
+    - check_teaching_demo_process_evaluation.py
+    - check_textbook_store.py
+    - build_physics_textbook_topic_atlas.py
+    - search_physics_topic_atlas.py
+    - curate_physics_topic_atlas_retrieval.py
+    - check_textbook_topic_atlas_round2.py
+    - import_structured_references.py
+    - normalize_structured_references.py
+    - validate_structured_reference_bank.py
+    - check_structured_interview.py
+    - check_structured_pagination.py
+    - check_structured_training_cases.py
+    - check_structured_training_state.py
+    - run_structured_acceptance.py
+    - publish_yunnan_structured.py
+    - build_defense_final_bank.py
+    - check_defense_final_bank.py
+    - check_defense_finalization_seed.py
+    - check_teacher_defense.py
+    - publish_yunnan_defense.py
+    - check_teacher_self_introduction.py
+    - publish_yunnan_self_introduction.py
+  entry_and_library:
+    - provenance_snapshot.py
+    - process_telemetry.py
+    - pdf_text_occupancy.py
+    - latex_inline.py
+    - physics_notation.py
+    - physics_figures.py
+    - board_contract.py
+    - skeleton_density.py
+    - regression_case.py
+  compatibility_entry:
+    - check_teaching_demo_delivery.py
+    - check_teaching_demo_score.py
+    - check_teaching_demo_efficiency.py
+    - import_written_exam_references.py
+    - normalize_written_exam_references.py
+    - validate_written_exam_reference_bank.py
+    - validate_written_exam_knowledge_links.py
+    - check_teacher_written_exam.py
+    - publish_teacher_written_exam_phase7.py
+    - validate_teacher_resume_materials.py
+    - publish_teacher_resume_materials_phase8.py
+
+protected_operations:
+  architecture_decision: architecture/adr/ADR-016-teaching-demo-protected-capability-consumer-closure.md
+  contract: production/contracts/teacher-trial-two-pdf-v1.yaml
+  operations:
+    TEACHING_DEMO_CONTENT_ACCEPT:
+      contract_key: content_accept
+      canonical_entry: check_teaching_demo_content.py
+      implementation_libraries:
+        - _teaching_demo_content_core.inc
+        - teaching_demo_content_architecture.py
+        - _teaching_demo_content_architecture_impl.py
+        - teaching_demo_content_enforcement.py
+      forbidden_library_complete_symbols: [validate, validate_case, main]
+      forbid_library_cli: true
+      forbidden_paths: []
+    TEACHING_DEMO_ARTIFACT_PLAN_WRITE:
+      contract_key: artifact_plan_write
+      canonical_entry: plan_teaching_demo_artifact_job.py
+      implementation_libraries:
+        - teaching_demo_artifact_plan_primitives.py
+      forbidden_library_complete_symbols: [build_plan, write_content_addressed_plan, main]
+      forbid_library_cli: true
+      forbidden_paths: [plan_teaching_demo_artifact_job_legacy.py]
+      required_call_order:
+        - function: build_plan
+          before: validate_case
+          requires_before: [_require_accepted_content]
+        - function: write_content_addressed_plan
+          before: write_snapshot
+          requires_before: [build_plan]
+    TEACHING_DEMO_ARTIFACT_INPUT_LOCK_CONSUME:
+      contract_key: artifact_input_lock_consume
+      canonical_entry: check_artifact_job.py
+      implementation_libraries: [verify_teaching_demo_artifact_plan.py]
+      forbidden_library_complete_symbols: [main]
+      forbid_library_cli: true
+      forbidden_paths: []
+      required_call_order:
+        - function: _validate_live
+          before: _require_ledger_evidence
+          requires_before: [_module_input_lock_verification_errors]
+    TEACHING_DEMO_PRODUCT_PDF_COMPOSE:
+      contract_key: product_pdf_compose
+      canonical_entry: build_current_run.py
+      implementation_libraries: [publisher_core.py, publisher_core_legacy.py]
+      forbidden_library_complete_symbols: [main, build, build_product]
+      forbid_library_cli: true
+      forbidden_paths: []
+      required_call_order:
+        - function: build_product
+          before: clean_outputs
+          requires_before: [validate_teaching_demo_inputs]
+    TEACHING_DEMO_FORMAL_RENDER:
+      contract_key: formal_render
+      canonical_entry: render_current_run.py
+      implementation_libraries: []
+      forbidden_library_complete_symbols: [main, render_product]
+      forbid_library_cli: true
+      forbidden_paths: []
+      required_call_order:
+        - function: render_product
+          before: rmtree
+          requires_before: [validate_teaching_demo_inputs]
+        - function: render_product
+          before: mkdir
+          requires_before: [validate_teaching_demo_inputs]
+        - function: render_product
+          before: render_pdf
+          requires_before: [validate_teaching_demo_inputs]
+        - function: render_product
+          before: write_text
+          requires_before: [validate_teaching_demo_inputs]
+
+phase_b_evaluation:
+  architecture_decision: architecture/adr/ADR-017-teaching-demo-phase-b-semantic-controller-provenance.md
+  semantic_provenance_verifier: verify_teaching_demo_semantic_provenance.py
+  eval_entry: check_teaching_demo_phase_b_eval.py
+  verifier_execution_role: library
+  production_signing_capability_in_repository: forbidden
+  accepted_mode_opened_by_eval_harness: false
+
+lifecycle_groups:
+  ACTIVE:
+    - artifact_foundation.py
+    - provenance_snapshot.py
+    - init_artifact_job.py
+    - manage_artifact_job.py
+    - lock_artifact_input_plan.py
+    - check_artifact_job.py
+    - check_artifact_provenance.py
+    - check_execution_ledger.py
+    - derive_state.py
+    - gen_handoff.py
+    - check_state_derivation.py
+    - check_engine_handoff.py
+    - build_packager.py
+    - handoff.py
+    - check_delivery_qualification_decoupling.py
+    - check_private_actions_boundary.py
+    - check_project_state.py
+    - check_tooling_routes.py
+    - check_generalization_architecture.py
+    - run_acceptance.py
+    - teaching-demo-adapters
+  FROZEN:
+    - structured-interview-adapters
+    - defense-adapters
+    - self-introduction-adapters
+  DEFERRED:
+    - written-exam-tools
+    - resume-materials-tools
+  RETIRED:
+    - position-research-tools
+  EXTERNAL:
+    - recruitment-intelligence
+    - pdf-production-engine
+
+declarative_assets:
+  architecture:
+    - architecture/README.md
+    - architecture/MIGRATION.md
+    - architecture/adr/ADR-001-modular-monolith.md
+    - architecture/adr/ADR-002-external-boundaries.md
+    - architecture/adr/ADR-003-unified-artifact-pipeline.md
+    - architecture/adr/ADR-004-execution-ledger.md
+    - architecture/adr/ADR-005-content-addressed-provenance.md
+    - architecture/adr/ADR-006-delivery-vs-qualification.md
+    - architecture/adr/ADR-007-single-authority-and-lifecycle.md
+    - architecture/adr/ADR-008-git-authority.md
+    - architecture/adr/ADR-009-process-as-product-and-agent-portability.md
+    - architecture/adr/ADR-010-durable-repository-provenance.md
+    - architecture/adr/ADR-011-reuse-fingerprint-vs-audit-snapshot.md
+    - architecture/adr/ADR-012-evidence-carrying-teaching-script-compiler.md
+    - architecture/adr/ADR-013-teaching-demo-authority-provenance-and-phase-b-lock.md
+    - architecture/adr/ADR-014-teaching-demo-capability-removal-and-first-full-exposure.md
+    - architecture/adr/ADR-015-teaching-demo-protected-operation-capability-graph.md
+    - architecture/adr/ADR-016-teaching-demo-protected-capability-consumer-closure.md
+    - architecture/adr/ADR-017-teaching-demo-phase-b-semantic-controller-provenance.md
+    - architecture/adr/ADR-018-teaching-demo-delivery-acceptance-vs-phase-b-qualification.md
+  current-state:
+    - CURRENT_STATE.yaml
+  artifact-foundation-contracts:
+    - production/contracts/module-registry-v1.yaml
+    - production/contracts/artifact-job-v1.yaml
+    - production/contracts/artifact-job-template-v1.yaml
+    - production/contracts/execution-ledger-v1.yaml
+    - production/contracts/execution-ledger-template-v1.yaml
+    - production/contracts/repository-provenance-snapshot-v1.yaml
+    - production/contracts/system-qualification-v1.yaml
+  production-policies:
+    - production/resource-build-efficiency-policy-v1.yaml
+    - production/resource-build-operation-checklist-v1.yaml
+  migration-record:
+    - production/architecture-foundation-v1-migration.yaml
+  teaching-demo-product-contracts:
+    - production/contracts/teacher-trial-two-pdf-v1.yaml
+    - production/contracts/teaching-demo-content.yaml
+  figure-components:
+    - production/components/figures/registry.yaml
+
+legacy_declarative_assets:
+  teaching_demo_governance_v1:
+    lifecycle: compatibility-only
+    paths:
+      - production/contracts/teaching-demo-delivery-state-machine-v1.yaml
+      - production/contracts/teaching-demo-delivery-job-template-v1.yaml
+      - production/contracts/teaching-demo-final-score-v1.yaml
+      - production/contracts/teaching-demo-final-scorecard-template-v1.yaml
+      - production/contracts/teaching-demo-final-score-evidence-template-v1.yaml
+      - production/contracts/teaching-demo-three-pass-series-template-v1.yaml
+      - production/contracts/teaching-demo-efficiency-experiment-v1.yaml
+      - production/contracts/teaching-demo-efficiency-record-template-v1.yaml
