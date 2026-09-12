@@ -201,8 +201,36 @@ def _validate_entry_contract(contract: dict[str, Any]) -> list[str]:
         errors.append("CONTENT_SOURCE_REVIEW_ARTIFACT_CONTRACT_MISSING")
     if (contract.get("content_addressed_gate_evidence") or {}).get("machine_and_judge_binding_closure_is_allowlist_complete") is not True:
         errors.append("CONTENT_GATE_BINDING_CLOSURE_POLICY_MISSING")
-    if (contract.get("semantic_judges") or {}).get("work_packet_is_not_bound_until_freeze_because_single_packet_state_trace_advances_after_machine_gate") is not True:
+    semantic_judges = contract.get("semantic_judges") or {}
+    if semantic_judges.get("work_packet_is_not_bound_until_freeze_because_single_packet_state_trace_advances_after_machine_gate") is not True:
         errors.append("CONTENT_WORK_PACKET_BINDING_LIFECYCLE_POLICY_MISSING")
+    producer = semantic_judges.get("producer_provenance") or {}
+    if producer.get("calibrated_claim_requires_phase_b_controller_execution_receipt") is not True:
+        errors.append("CONTENT_ENTRY_CALIBRATED_CLAIM_CONTROLLER_POLICY_MISSING")
+    if producer.get("controller_receipt_must_bind_exact_input_runtime_and_output_before_calibrated_claim_can_exist") is not True:
+        errors.append("CONTENT_ENTRY_CALIBRATED_CLAIM_RECEIPT_POLICY_MISSING")
+    if "accepted_mode_requires_phase_b_controller_execution_receipt" in producer:
+        errors.append("CONTENT_ENTRY_STALE_DELIVERY_PHASE_B_PROVENANCE_POLICY")
+    if "controller_receipt_must_bind_exact_input_runtime_and_output_before_accepted_mode_can_exist" in producer:
+        errors.append("CONTENT_ENTRY_STALE_DELIVERY_CONTROLLER_POLICY")
+
+    unlock = contract.get("review_and_unlock") or {}
+    if unlock.get("delivery_accepted_mode_globally_locked") is not False:
+        errors.append("CONTENT_ENTRY_DELIVERY_GLOBAL_LOCK_DRIFT")
+    if unlock.get("calibrated_claim_requires_phase_b_controller_and_independent_gate_b") is not True:
+        errors.append("CONTENT_ENTRY_CALIBRATED_CLAIM_GATE_B_POLICY_MISSING")
+    if unlock.get("repository_local_gate_b_activation_can_unlock") is not False:
+        errors.append("CONTENT_ENTRY_REPOSITORY_GATE_B_SELF_UNLOCK_DRIFT")
+    if "phase_a_accepted_mode_globally_locked" in unlock:
+        errors.append("CONTENT_ENTRY_STALE_PHASE_A_DELIVERY_LOCK_POLICY")
+    if "phase_b_controller_and_independent_gate_b_required_before_accepted_mode_can_exist" in unlock:
+        errors.append("CONTENT_ENTRY_STALE_DELIVERY_GATE_B_POLICY")
+
+    hard_fail = set(contract.get("hard_fail") or [])
+    if "semantic_judge_producer_provenance_missing_before_calibrated_claim" not in hard_fail:
+        errors.append("CONTENT_ENTRY_CALIBRATED_CLAIM_HARD_FAIL_MISSING")
+    if "semantic_judge_producer_provenance_missing_before_accepted_mode" in hard_fail:
+        errors.append("CONTENT_ENTRY_STALE_DELIVERY_PROVENANCE_HARD_FAIL")
     registry = contract.get("executable_enforcement_registry") or {}
     if registry.get("canonical_machine_gate_receipt_generator") != "tools/teaching_demo_content_enforcement.py#make_machine_gate_receipt":
         errors.append("CONTENT_MACHINE_GATE_RECEIPT_GENERATOR_CONTRACT_DRIFT")
@@ -479,7 +507,7 @@ def validate(manifest_raw: str, *, root: Path = ROOT, require_independent: bool 
     errors.extend(_validate_machine_gate_state_trace_link(workspace))
     errors.extend(enforcement.validate_registry(contract))
     errors.extend(enforcement.validate_source_mode(manifest))
-    errors.extend(enforcement.validate_reference_candidates(workspace))
+    errors.extend(enforcement.validate_reference_candidates(workspace, root=root))
     errors.extend(enforcement.validate_release_claim_structure(workspace))
     errors.extend(enforcement.validate_resource_visibility(workspace))
     errors.extend(enforcement.validate_practice_occurrences(workspace))
