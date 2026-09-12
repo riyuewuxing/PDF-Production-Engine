@@ -701,9 +701,9 @@ semantic_judges:
   producer_provenance:
     role_and_separation_fields_are_declarations_not_identity_proof: true
     phase_a_readiness_may_validate_payload_integrity_without_claiming_producer_identity: true
-    accepted_mode_requires_phase_b_controller_execution_receipt: true
+    calibrated_claim_requires_phase_b_controller_execution_receipt: true
     repository_authored_role_or_runner_strings_may_not_unlock_accepted: true
-    controller_receipt_must_bind_exact_input_runtime_and_output_before_accepted_mode_can_exist: true
+    controller_receipt_must_bind_exact_input_runtime_and_output_before_calibrated_claim_can_exist: true
   judge_binding_closure_must_include:
   - canonical PROCESS/contract/checker/internal-core/architecture-helper/architecture-impl/enforcement-helper bytes
   - manifest and normalized source-lock digest
@@ -1002,7 +1002,7 @@ hard_fail:
 - executable_machine_requirement_mapping_missing
 - machine_gate_receipt_generator_validator_contract_drift
 - semantic_judge_evidence_missing
-- semantic_judge_producer_provenance_missing_before_accepted_mode
+- semantic_judge_producer_provenance_missing_before_calibrated_claim
 - blocking_semantic_unknown
 - gate_evidence_stale
 - submission_freeze_binding_stale
@@ -1024,9 +1024,9 @@ review_and_unlock:
   independent_review_must_bind_exact_frozen_bytes: true
   HUMAN_ACCEPTANCE_RECEIPT_required_after_independent_PASS: true
   only_current_HUMAN_ACCEPTANCE_RECEIPT_may_release_content_to_downstream: true
-  phase_a_accepted_mode_globally_locked: true
+  delivery_accepted_mode_globally_locked: false
   repository_local_gate_b_activation_can_unlock: false
-  phase_b_controller_and_independent_gate_b_required_before_accepted_mode_can_exist: true
+  calibrated_claim_requires_phase_b_controller_and_independent_gate_b: true
 
 two_topic_process_validation:
   required_before_process_declared_calibrated: true
