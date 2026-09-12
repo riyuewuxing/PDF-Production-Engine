@@ -1,0 +1,244 @@
+name: P3 Delivery Acceptance Runtime
+
+on:
+  push:
+    branches:
+      - 'job-architecture/p3-delivery-acceptance-*'
+    paths:
+      - '.engine-job/p3-delivery/**'
+      - '.github/workflows/p3-delivery-acceptance-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-delivery-path:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install public Engine runtime dependencies
+        run: python -m pip install -e .
+
+      - name: Verify exact source and execute canonical P3 path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+          import time
+
+          checkout = Path.cwd().resolve()
+          base = checkout / '.engine-job/p3-delivery'
+          source_root = base / 'repo'
+          output = base / 'output'
+          output.mkdir(parents=True, exist_ok=True)
+          manifest = json.loads((base / 'manifest.json').read_text(encoding='utf-8'))
+
+          def git_blob_sha1(data: bytes) -> str:
+              header = f'blob {len(data)}\0'.encode('ascii')
+              return hashlib.sha1(header + data).hexdigest()
+
+          verified = []
+          for item in manifest['files']:
+              path = (source_root / item['path']).resolve()
+              if source_root.resolve() != path and source_root.resolve() not in path.parents:
+                  raise SystemExit(f'path escape: {item["path"]}')
+              if not path.is_file():
+                  raise SystemExit(f'exact source missing: {item["path"]}')
+              data = path.read_bytes()
+              actual = git_blob_sha1(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(
+                      f'exact source mismatch: {item["path"]}: '
+                      f'expected={item["git_blob_sha1"]} actual={actual}'
+                  )
+              verified.append({
+                  'path': item['path'],
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+          if len(verified) != manifest['expected_file_count']:
+              raise SystemExit(
+                  f'verified source count drift: '
+                  f'{len(verified)} != {manifest["expected_file_count"]}'
+              )
+
+          commands = []
+          def run(command, cwd):
+              started = time.monotonic()
+              proc = subprocess.run(
+                  command,
+                  cwd=cwd,
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+              )
+              stdout = proc.stdout or ''
+              print('>>>', ' '.join(str(x) for x in command))
+              print(stdout, end='')
+              commands.append({
+                  'command': [str(x) for x in command],
+                  'exit_code': proc.returncode,
+                  'duration_seconds': round(time.monotonic() - started, 6),
+                  'output': stdout[-20000:],
+              })
+              if proc.returncode != 0:
+                  raise SystemExit(
+                      f'command failed: {command}: exit={proc.returncode}'
+                  )
+              return stdout
+
+          py = sys.executable
+          py_files = [
+              item['path']
+              for item in manifest['files']
+              if item['path'].endswith('.py')
+          ]
+          run([py, '-m', 'py_compile', *py_files], source_root)
+
+          checker_out = run(
+              [py, 'tools/check_teaching_demo_content.py', '--selftest'],
+              source_root,
+          )
+          accepted_workspace = base / 'runtime/canonical'
+          accepted_out = run(
+              [
+                  py,
+                  'examples/p3_canonical_accepted_fixture.py',
+                  '--workspace',
+                  str(accepted_workspace),
+              ],
+              source_root,
+          )
+          consumer_workspace = base / 'runtime/consumers'
+          consumer_out = run(
+              [
+                  py,
+                  'examples/p3_consumer_reachability_fixture.py',
+                  '--workspace',
+                  str(consumer_workspace),
+              ],
+              source_root,
+          )
+          prebuild_selftest_out = run(
+              [py, 'tools/check_teaching_demo_inputs.py', '--selftest'],
+              source_root,
+          )
+
+          required_markers = {
+              'checker_selftest': (
+                  checker_out,
+                  'PASS: canonical Teaching Demo content gate selftest',
+              ),
+              'canonical_fixture': (
+                  accepted_out,
+                  'P3_CANONICAL_ACCEPTED_FIXTURE_PASS',
+              ),
+              'delivery_positive': (
+                  accepted_out,
+                  'delivery_acceptance: PASS',
+              ),
+              'qualification_still_blocked': (
+                  accepted_out,
+                  'qualification: BLOCKED_REPOSITORY_SELF_ACTIVATION_FORBIDDEN',
+              ),
+              'negative_human_receipt': (
+                  accepted_out,
+                  'missing_human_receipt: REJECTED',
+              ),
+              'negative_review': (
+                  accepted_out,
+                  'independent_human_reject: REJECTED',
+              ),
+              'negative_source': (
+                  accepted_out,
+                  'source_drift: REJECTED',
+              ),
+              'negative_semantic': (
+                  accepted_out,
+                  'semantic_fail: REJECTED',
+              ),
+              'consumer_fixture': (
+                  consumer_out,
+                  'P3_CONSUMER_REACHABILITY_PASS',
+              ),
+              'planner_positive': (
+                  consumer_out,
+                  'planner_accepted_post_gate: REACHED',
+              ),
+              'planner_negative': (
+                  consumer_out,
+                  'planner_rejected_post_gate: NOT_REACHED',
+              ),
+              'prebuild_positive': (
+                  consumer_out,
+                  'prebuild_accepted_post_gate: REACHED',
+              ),
+              'prebuild_negative': (
+                  consumer_out,
+                  'prebuild_rejected_post_gate: NOT_REACHED',
+              ),
+              'no_product_pdf': (
+                  consumer_out,
+                  'product_pdf_generated: false',
+              ),
+              'prebuild_selftest': (
+                  prebuild_selftest_out,
+                  'PASS: canonical Teaching Demo prebuild input gate selftest',
+              ),
+          }
+          marker_results = {}
+          for name, (payload, marker) in required_markers.items():
+              ok = marker in payload
+              marker_results[name] = ok
+              if not ok:
+                  raise SystemExit(f'missing required runtime marker: {name}: {marker}')
+
+          evidence = {
+              'version': 1,
+              'kind': 'qiuzhidaren-p3-delivery-acceptance-runtime-evidence-v1',
+              'status': 'MACHINE_PASS',
+              'review_status': 'ENGINEERING_REVIEW_REQUIRED',
+              'source_repository': manifest['source_repository'],
+              'source_commit': manifest['source_commit'],
+              'engine_base_commit': manifest['engine_base_commit'],
+              'engine_execution_repository': os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
+              'engine_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'execution_surface': 'public-engine-github-hosted-runner',
+              'private_repository_access_used': False,
+              'private_repository_credentials_used': False,
+              'fixture_privacy': 'public-synthetic',
+              'product_pdf_generated': False,
+              'real_product_human_acceptance_claimed': False,
+              'calibrated_claim': 'NOT_CLAIMED',
+              'verified_source': verified,
+              'runtime_markers': marker_results,
+              'commands': commands,
+          }
+          (output / 'evidence.json').write_text(
+              json.dumps(evidence, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(evidence, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload public-safe P3 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-delivery-acceptance-runtime-evidence
+          path: .engine-job/p3-delivery/output/evidence.json
+          if-no-files-found: error
