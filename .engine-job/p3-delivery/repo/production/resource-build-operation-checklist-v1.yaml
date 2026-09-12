@@ -1,0 +1,72 @@
+version: 4
+id: qiuzhidaren-resource-build-operation-checklist-v1
+authority: artifact-operation-checklist
+architecture: architecture/README.md
+artifact_job_contract: production/contracts/artifact-job-v1.yaml
+module_registry: production/contracts/module-registry-v1.yaml
+execution_ledger_contract: production/contracts/execution-ledger-v1.yaml
+orchestrator: ChatGPT
+
+engine:
+  repository: riyuewuxing/PDF-Production-Engine
+  direct_repository_link: false
+  stores_consumer_business_state: false
+  may_emit_human_review_pass: false
+
+transport:
+  private_plaintext_in_public_repo: forbidden
+  preferred: chatgpt-session-mediated
+  private_github_hosted_actions_dependency: forbidden
+
+job_preflight:
+  - resolve module_id in module registry
+  - require lifecycle ACTIVE or FROZEN
+  - lock module contract and declared inputs by repository-relative path plus SHA-256
+  - create Artifact Job and execution ledger before mechanical execution
+
+artifact_lifecycle: [JOB_CREATED, INPUTS_LOCKED, BLOCKS_ACCEPTED, BUILT, MACHINE_VERIFIED, HUMAN_ACCEPTED, PUBLISHED]
+
+default_blocks:
+  content:
+    resource_execution_required: false
+    acceptance: HUMAN_REVIEW_PASS
+  figures:
+    resource_execution_required: conditional
+    acceptance: MACHINE_EVIDENCE_THEN_HUMAN_REVIEW_PASS
+  source_pages:
+    resource_execution_required: conditional
+    acceptance: MACHINE_EVIDENCE_THEN_HUMAN_REVIEW_PASS
+  composition:
+    resource_execution_required: true
+    prerequisite: all_required_upstream_blocks_accepted
+    acceptance: MACHINE_PASS
+  final_artifact:
+    resource_execution_required: true
+    machine_outputs: [preflight, every-page-render, sha256, page-or-media-evidence, review-index]
+    acceptance: HUMAN_REVIEW_PASS
+
+reuse:
+  unchanged_hash_bound_review_pass: required
+  downstream_failure_scope: minimum-causal-block-and-downstream
+  final_hash_unchanged_reuse: allowed
+
+path_and_hash:
+  path_policy: repository-relative-only
+  absolute_path: forbidden
+  traversal: forbidden
+  hash_algorithm: SHA-256
+  shared_primitive: tools/artifact_foundation.py
+
+execution_facts:
+  append_only_ledger: required_for_new_jobs
+  derive_metrics_from_events: true
+  trusted_manual_cycle_summary: false
+
+publication:
+  requires_exact_human_accepted_output_set: true
+  system_qualification_required: false
+
+legacy:
+  teaching_demo_15_stage_delivery: compatibility-only
+  teaching_demo_score_series: compatibility-only
+  teaching_demo_efficiency_round1: frozen-failed-experiment
