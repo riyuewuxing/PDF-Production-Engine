@@ -146,10 +146,13 @@ jobs:
           pdf-resource-job "/tmp/job/$ENGINE_JOB_FILE"
 
       - name: Execute resource block
+        id: execute_resource
+        continue-on-error: true
         run: |
           pdf-resource-run --root /tmp/job --job "$ENGINE_JOB_FILE" --block "$ENGINE_BLOCK_ID" --out /tmp/out --dpi "$ENGINE_DPI"
 
       - name: Encrypt result
+        if: always()
         run: |
           python - <<'PY'
           import json,os,shutil
@@ -161,6 +164,7 @@ jobs:
           sha256sum /tmp/result.sealed > /tmp/result.sealed.sha256
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: session-sealed-result
           path: |
@@ -168,6 +172,10 @@ jobs:
             /tmp/result.sealed.sha256
           retention-days: 1
           if-no-files-found: error
+
+      - name: Fail job after preserving encrypted failure evidence
+        if: steps.execute_resource.outcome == 'failure'
+        run: python -c "raise SystemExit(2)"
 
       - name: Cleanup
         if: always()
