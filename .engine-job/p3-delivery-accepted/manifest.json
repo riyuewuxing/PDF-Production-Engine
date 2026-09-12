@@ -3,7 +3,7 @@
   "kind": "qiuzhidaren-p3-canonical-delivery-accepted-runtime-input-v1",
   "privacy": "public-nonsecret-synthetic-fixture-only",
   "source_repository": "riyuewuxing/qiuzhidaren",
-  "source_commit": "7978aa26814b20f68dfe689799fe3d7d996ad654",
+  "source_commit": "e3f64840c1cbb6f3d3a882779724b0bcde63f3e6",
   "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
   "files": [
     {
@@ -48,7 +48,7 @@
     },
     {
       "path": "examples/p3_canonical_accepted_fixture.py",
-      "git_blob_sha1": "7b366cc1626b08c6f5086a0c99c6cb602f86a2c7"
+      "git_blob_sha1": "4d9ae78a11997427b5383c48f07d3e90b8ce89ac"
     }
   ],
   "expected_file_count": 11,
