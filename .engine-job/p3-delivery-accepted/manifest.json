@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p3-canonical-delivery-accepted-runtime-input-v1",
+  "privacy": "public-nonsecret-synthetic-fixture-only",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "7978aa26814b20f68dfe689799fe3d7d996ad654",
+  "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
+  "files": [
+    {
+      "path": "production/contracts/teaching-demo-content.yaml",
+      "git_blob_sha1": "b1845831af30fce9f5a416c27325e09d48808847"
+    },
+    {
+      "path": "production/contracts/teacher-trial-two-pdf-v1.yaml",
+      "git_blob_sha1": "f5157019625782395ab5f10bdc81138fb2f78c17"
+    },
+    {
+      "path": "production/process/teaching-demo-content/PROCESS.md",
+      "git_blob_sha1": "6f648fc7d3a77577f1dacbfdb4d52c7a8b980946"
+    },
+    {
+      "path": "tools/artifact_foundation.py",
+      "git_blob_sha1": "bb55345664781a974fdcdc7039d457cab601622d"
+    },
+    {
+      "path": "tools/check_teaching_demo_content.py",
+      "git_blob_sha1": "8a406b1799fb8230c13c6d8bbfa8eb54178b366f"
+    },
+    {
+      "path": "tools/_teaching_demo_content_core.inc",
+      "git_blob_sha1": "f669821e656c4521d1bb9912053866baa57182ad"
+    },
+    {
+      "path": "tools/teaching_demo_content_architecture.py",
+      "git_blob_sha1": "1b45a9713327628570001dc4b94ee9ed37c6891a"
+    },
+    {
+      "path": "tools/_teaching_demo_content_architecture_impl.py",
+      "git_blob_sha1": "dfef93bd34ab8e2de92524cd501de82635aef723"
+    },
+    {
+      "path": "tools/teaching_demo_content_enforcement.py",
+      "git_blob_sha1": "06736dd975624d52b698ab138305f92b5e95a576"
+    },
+    {
+      "path": "tools/check_teaching_demo_case.py",
+      "git_blob_sha1": "4cc3fd5abe1e2f55e1b3fd9971cd58bec06c30fd"
+    },
+    {
+      "path": "examples/p3_canonical_accepted_fixture.py",
+      "git_blob_sha1": "7b366cc1626b08c6f5086a0c99c6cb602f86a2c7"
+    }
+  ],
+  "expected_file_count": 11,
+  "product_pdf_expected": false
+}
