@@ -5,6 +5,7 @@ urls:
 selected_pages: [16, 17, 18, 19, 20, 21, 22]
 retries_per_url: 2
 timeout_seconds: 120
+preserve_verified_source: true
 expected:
   size_bytes: 21556582
   git_blob_sha: cbff21638646e6ef0518c288faa59019cb27cef9
