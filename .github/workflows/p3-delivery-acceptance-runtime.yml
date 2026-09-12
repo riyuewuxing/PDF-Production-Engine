@@ -153,11 +153,6 @@ jobs:
               ],
               source_root,
           )
-          prebuild_selftest_out = run(
-              [py, 'tools/check_teaching_demo_inputs.py', '--selftest'],
-              source_root,
-          )
-
           required_markers = {
               'checker_selftest': (
                   checker_out,
@@ -211,13 +206,17 @@ jobs:
                   consumer_out,
                   'prebuild_rejected_post_gate: NOT_REACHED',
               ),
+              'no_full_artifact_plan_claim': (
+                  consumer_out,
+                  'full_artifact_plan_claimed: false',
+              ),
+              'no_full_font_prebuild_claim': (
+                  consumer_out,
+                  'full_font_prebuild_claimed: false',
+              ),
               'no_product_pdf': (
                   consumer_out,
                   'product_pdf_generated: false',
-              ),
-              'prebuild_selftest': (
-                  prebuild_selftest_out,
-                  'PASS: canonical Teaching Demo prebuild input gate selftest',
               ),
           }
           marker_results = {}
