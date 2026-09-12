@@ -1,0 +1,239 @@
+version: 1
+id: teaching-demo-delivery-state-machine-v1
+scope: teaching-demo-delivery-governance
+status: ACTIVE_MAINTENANCE
+default_fail_closed: true
+required_product_contract: production/contracts/teacher-trial-two-pdf-v1.yaml
+
+# This contract describes the delivery protocol, not the acceptance of any
+# existing teaching-demo product. Existing product receipts remain immutable.
+historical_product_migration: NOT_CLAIMED
+engine_repository: riyuewuxing/PDF-Production-Engine
+engine_may_emit_states:
+  - MACHINE_PASS
+  - REVIEW_REQUIRED
+engine_may_not_emit:
+  - REVIEW_PASS
+  - PUBLISHED
+  - MACHINE_FAIL
+human_review_authority:
+  reviewer: ChatGPT
+  reviewer_role: HUMAN
+  private_receipt_only: true
+project_reviewer:
+  reviewer: qiuzhidaren-checker
+  reviewer_role: PROJECT_MACHINE
+engine_reviewer:
+  reviewer: PDF-Production-Engine
+  reviewer_role: ENGINE
+
+canonicalization:
+  algorithm: SHA-256
+  serialization: UTF-8 canonical JSON
+  object_rules:
+    sort_keys: true
+    separators: [",", ":"]
+    ensure_ascii: false
+    exclude_from_receipt_hash:
+      - receipt_sha256
+    include_in_receipt_hash:
+      - stage_id
+      - state
+      - reviewer
+      - reviewer_role
+      - reviewed_at
+      - contract_sha256
+      - predecessor_receipt_sha256
+      - input_bindings
+      - output_bindings
+      - evidence_ref
+      - evidence_kind
+      - evidence_sha256
+      - notes
+  receipt_hash_field: receipt_sha256
+  file_binding_hash: raw_file_bytes
+
+predecessor_rule:
+  first_stage_predecessor_receipt_sha256: null
+  later_stage_predecessor_receipt_sha256: exact_sha256_of_immediately_previous_canonical_receipt
+  no_external_or_skipped_predecessor: true
+lineage_rule:
+  later_stage_inputs_must_include_all_immediate_predecessor_outputs: true
+  binding_identity_fields: [path, sha256, kind]
+  final_pdf_review_output_must_match_final_pdf_input: true
+  published_input_must_match_final_pdf_review_output: true
+
+job_rules:
+  allowed_job_states: [NOT_STARTED, PENDING, RUNNING, FAILED, PUBLISHED]
+  empty_receipts_allowed_only_when: [NOT_STARTED, PENDING]
+  receipts_must_be_an_ordered_prefix: true
+  one_receipt_per_stage: true
+  partial_success_status: RUNNING
+  partial_failed_status: FAILED
+  published_requires_full_successful_chain: true
+  no_topic_or_case_is_authoritatively_migrated_by_this_template: true
+
+stage_rules:
+  - id: JOB_INITIALIZED
+    order: 1
+    required_success_state: MACHINE_PASS
+    allowed_states: [MACHINE_PASS, BLOCKED]
+    success_actor: PROJECT
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [job_manifest, product_contract]
+    required_output_kinds: [job_manifest]
+    required_evidence_kinds: [job_initialization]
+    failure_lock: all_later_stages_locked
+  - id: SOURCE_IDENTITY_LOCKED
+    order: 2
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [job_manifest]
+    required_output_kinds: [source_identity]
+    required_evidence_kinds: [source_identity]
+    failure_lock: all_later_stages_locked
+  - id: SOURCE_PIXELS_REVIEW_PASS
+    order: 3
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [source_identity]
+    required_output_kinds: [source_pixels]
+    required_evidence_kinds: [source_pixels_review]
+    failure_lock: all_later_stages_locked
+  - id: TEACHING_BOUNDARY_REVIEW_PASS
+    order: 4
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [source_pixels]
+    required_output_kinds: [teaching_boundary]
+    required_evidence_kinds: [teaching_boundary_review]
+    failure_lock: all_later_stages_locked
+  - id: POINT_CHAIN_REVIEW_PASS
+    order: 5
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [teaching_boundary]
+    required_output_kinds: [point_chain]
+    required_evidence_kinds: [point_chain_review]
+    failure_lock: all_later_stages_locked
+  - id: BOARD_PLAN_REVIEW_PASS
+    order: 6
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [point_chain]
+    required_output_kinds: [board_plan]
+    required_evidence_kinds: [board_plan_review]
+    failure_lock: all_later_stages_locked
+  - id: EXAM_SKELETON_REVIEW_PASS
+    order: 7
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [board_plan]
+    required_output_kinds: [exam_skeleton]
+    required_evidence_kinds: [exam_skeleton_review]
+    failure_lock: all_later_stages_locked
+  - id: TRIAL_SCRIPT_REVIEW_PASS
+    order: 8
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [exam_skeleton]
+    required_output_kinds: [trial_script]
+    required_evidence_kinds: [trial_script_review]
+    failure_lock: all_later_stages_locked
+  - id: CONTENT_PACKAGE_REVIEW_PASS
+    order: 9
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [trial_script]
+    required_output_kinds: [content_package]
+    required_evidence_kinds: [content_package_review]
+    failure_lock: all_later_stages_locked
+  - id: FIGURE_BLOCKS_REVIEW_PASS
+    order: 10
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [content_package]
+    required_output_kinds: [figure_blocks]
+    required_evidence_kinds: [figure_blocks_review]
+    failure_lock: all_later_stages_locked
+  - id: SOURCE_PAGES_BLOCK_REVIEW_PASS
+    order: 11
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [figure_blocks]
+    required_output_kinds: [source_pages]
+    required_evidence_kinds: [source_pages_review]
+    failure_lock: all_later_stages_locked
+  - id: COMPOSITION_MACHINE_PASS
+    order: 12
+    required_success_state: MACHINE_PASS
+    allowed_states: [MACHINE_PASS, REVIEW_REQUIRED]
+    success_actor: ENGINE
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [source_pages]
+    required_output_kinds: [composition]
+    required_evidence_kinds: [composition_machine]
+    failure_lock: all_later_stages_locked
+  - id: FINAL_PDF_MACHINE_PASS
+    order: 13
+    required_success_state: MACHINE_PASS
+    allowed_states: [MACHINE_PASS, REVIEW_REQUIRED]
+    success_actor: ENGINE
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [composition]
+    required_output_kinds: [final_pdf]
+    required_evidence_kinds: [final_pdf_machine]
+    failure_lock: all_later_stages_locked
+  - id: FINAL_PDF_REVIEW_PASS
+    order: 14
+    required_success_state: REVIEW_PASS
+    allowed_states: [REVIEW_PASS, REVIEW_REQUIRED, REVIEW_FAIL, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [final_pdf]
+    required_output_kinds: [final_pdf]
+    required_evidence_kinds: [final_pdf_review]
+    failure_lock: all_later_stages_locked
+  - id: PUBLISHED
+    order: 15
+    required_success_state: PUBLISHED
+    allowed_states: [PUBLISHED, BLOCKED]
+    success_actor: HUMAN
+    required_bindings: [input_bindings, output_bindings, evidence_ref]
+    required_input_kinds: [final_pdf]
+    required_output_kinds: [final_pdf]
+    required_evidence_kinds: [publication]
+    terminal: true
+    failure_lock: publication_forbidden
+
+
+# Normal delivery never consumes a scorecard.
+final_closure_qualification:
+  lane: independent
+  status: NOT_STARTED_USER_APPROVAL_REQUIRED
+  score_contract: production/contracts/teaching-demo-final-score-v1.yaml
+  requires: [quality_pass, efficiency_pass]
+  required_consecutive_attempts: 3
+  distinct_topic_ids: true
+  most_recent_three_only: true
+  failure_resets: closure_counter_only
