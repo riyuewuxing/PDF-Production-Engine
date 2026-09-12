@@ -1,0 +1,291 @@
+name: P2c Limited Handoff Runtime
+
+on:
+  push:
+    branches:
+      - 'job-architecture/p2c-handoff-*'
+    paths:
+      - '.engine-job/p2c-handoff/**'
+      - '.github/workflows/p2c-handoff-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  limited-handoff-roundtrip:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned public Engine
+        run: python -m pip install -e .
+
+      - name: Verify exact source and run P2c roundtrip
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+          import time
+          import yaml
+
+          checkout = Path.cwd().resolve()
+          base = checkout / '.engine-job/p2c-handoff'
+          source_root = base / 'repo'
+          runtime = base / 'runtime'
+          output = base / 'output'
+          runtime.mkdir(parents=True, exist_ok=True)
+          output.mkdir(parents=True, exist_ok=True)
+          manifest = json.loads((base / 'manifest.json').read_text(encoding='utf-8'))
+
+          def git_blob_sha1(data: bytes) -> str:
+              return hashlib.sha1(
+                  b'blob ' + str(len(data)).encode('ascii') + bytes([0]) + data
+              ).hexdigest()
+
+          verified_source = []
+          for item in manifest['files']:
+              path = (source_root / item['path']).resolve()
+              if source_root.resolve() != path and source_root.resolve() not in path.parents:
+                  raise SystemExit(f'path escape: {item["path"]}')
+              if not path.is_file():
+                  raise SystemExit(f'exact source missing: {item["path"]}')
+              data = path.read_bytes()
+              actual = git_blob_sha1(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(
+                      f'exact source mismatch: {item["path"]}: '
+                      f'expected={item["git_blob_sha1"]} actual={actual}'
+                  )
+              verified_source.append({
+                  'path': item['path'],
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+          if len(verified_source) != manifest['expected_file_count']:
+              raise SystemExit('verified source count drift')
+
+          verified_engine = []
+          for raw, expected in manifest['engine_source_blobs'].items():
+              data = (checkout / raw).read_bytes()
+              actual = git_blob_sha1(data)
+              if actual != expected:
+                  raise SystemExit(
+                      f'Engine source drift from pinned base: {raw}: '
+                      f'expected={expected} actual={actual}'
+                  )
+              verified_engine.append({
+                  'path': raw,
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+
+          tooling = yaml.safe_load(
+              (source_root / 'tools/tooling-manifest.yaml').read_text(encoding='utf-8')
+          )
+          if 'handoff.py' not in (tooling.get('canonical') or []):
+              raise SystemExit('handoff.py missing canonical tooling route')
+          roles = tooling.get('execution_roles') or {}
+          if 'handoff.py' not in (roles.get('entry') or []):
+              raise SystemExit('handoff.py missing execution_roles.entry')
+          lifecycle = tooling.get('lifecycle_groups') or {}
+          if 'handoff.py' not in (lifecycle.get('ACTIVE') or []):
+              raise SystemExit('handoff.py missing lifecycle_groups.ACTIVE')
+
+          acceptance_text = (source_root / 'tools/run_acceptance.py').read_text(encoding='utf-8')
+          if '("handoff.py", ["self-test"])' not in acceptance_text:
+              raise SystemExit('run_acceptance FOUNDATION does not include handoff self-test')
+
+          contract = yaml.safe_load(
+              (source_root / 'contracts/engine-handoff.yaml').read_text(encoding='utf-8')
+          )
+          orchestration = contract.get('orchestration') or {}
+          if orchestration.get('implementation') != 'tools/handoff.py':
+              raise SystemExit('handoff orchestration implementation drift')
+          for key in (
+              'generic_binary_dispatch_assumed',
+              'automatic_review_pass',
+              'automatic_human_acceptance',
+              'automatic_publication',
+          ):
+              if orchestration.get(key) is not False:
+                  raise SystemExit(f'handoff orchestration policy drift: {key}')
+
+          commands = []
+          def run(command, cwd):
+              started = time.monotonic()
+              proc = subprocess.run(
+                  command,
+                  cwd=cwd,
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+              )
+              stdout = proc.stdout or ''
+              print('>>>', ' '.join(str(x) for x in command))
+              print(stdout, end='')
+              commands.append({
+                  'command': [str(x) for x in command],
+                  'exit_code': proc.returncode,
+                  'duration_seconds': round(time.monotonic() - started, 6),
+                  'output': stdout[-20000:],
+              })
+              if proc.returncode != 0:
+                  raise SystemExit(f'command failed: {command}: exit={proc.returncode}')
+              return stdout
+
+          py = sys.executable
+          run([
+              py, '-m', 'py_compile',
+              'tools/handoff.py',
+              'tools/build_packager.py',
+              'tools/artifact_foundation.py',
+              'tools/check_artifact_job.py',
+              'tools/check_execution_ledger.py',
+              'tools/provenance_snapshot.py',
+              'tools/check_engine_handoff.py',
+              'examples/p2b_build_package_fixture.py',
+              'examples/p2c_handoff_fixture.py',
+          ], source_root)
+
+          selftest_out = run([py, 'tools/handoff.py', 'self-test'], source_root)
+          roundtrip_out = run([
+              py,
+              'examples/p2c_handoff_fixture.py',
+              '--workspace',
+              str(runtime),
+          ], source_root)
+
+          private_side = runtime / 'private-side'
+          request_path = private_side / 'handoff-output/handoff-request.json'
+          package_path = private_side / 'handoff-output/p2b-public-fixture.zip'
+          receipt_path = private_side / 'returned/provenance-receipt.json'
+          verified_path = private_side / 'returned/verified/verified-result.json'
+          review_path = private_side / 'returned/verified/review-pack.json'
+          for path in (request_path, package_path, receipt_path, verified_path, review_path):
+              if not path.is_file():
+                  raise SystemExit(f'P2c roundtrip artifact missing: {path}')
+
+          request = json.loads(request_path.read_text(encoding='utf-8'))
+          receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+          verified = json.loads(verified_path.read_text(encoding='utf-8'))
+          review = json.loads(review_path.read_text(encoding='utf-8'))
+
+          if request.get('status') != 'PENDING_ENGINE_EXECUTION':
+              raise SystemExit('request status drift')
+          if (request.get('dispatch') or {}).get('performed') is not False:
+              raise SystemExit('request falsely claims dispatch')
+          if receipt.get('engine') != {
+              'repository': 'riyuewuxing/PDF-Production-Engine',
+              'commit': manifest['engine_base_commit'],
+          }:
+              raise SystemExit('receipt Engine anchor drift')
+          if receipt.get('package_sha256') != hashlib.sha256(package_path.read_bytes()).hexdigest():
+              raise SystemExit('receipt/package hash mismatch after return')
+          if receipt.get('human_acceptance') != 'NOT_CLAIMED':
+              raise SystemExit('receipt falsely claims HUMAN acceptance')
+          if receipt.get('publication') != 'NOT_CLAIMED':
+              raise SystemExit('receipt falsely claims publication')
+          if verified.get('status') != 'VERIFIED_MACHINE_RESULT':
+              raise SystemExit('returned result is not independently VERIFIED')
+          if review.get('status') != 'WAITING_FOR_BLOCK_REVIEW':
+              raise SystemExit('resource roundtrip did not pause for review')
+          if review.get('automatic_state_mutation') is not False:
+              raise SystemExit('review pack permits automatic state mutation')
+          if review.get('automatic_publication') is not False:
+              raise SystemExit('review pack permits automatic publication')
+
+          markers = {
+              'handoff_selftest': 'SELFTEST OK: limited Engine handoff orchestrator' in selftest_out,
+              'roundtrip': 'P2C_HANDOFF_ROUNDTRIP_PASS' in roundtrip_out,
+              'generic_dispatch_not_claimed': 'generic_binary_dispatch_claimed=false' in roundtrip_out,
+              'private_business_bytes_not_used': 'private_business_bytes_used=false' in roundtrip_out,
+              'automatic_state_mutation_false': 'automatic_state_mutation=false' in roundtrip_out,
+              'automatic_human_acceptance_false': 'automatic_human_acceptance=false' in roundtrip_out,
+              'automatic_publication_false': 'automatic_publication=false' in roundtrip_out,
+              'product_pdf_not_generated': 'product_pdf_generated=false' in roundtrip_out,
+          }
+          if not all(markers.values()):
+              raise SystemExit(f'P2c runtime marker failure: {markers}')
+
+          evidence = {
+              'version': 1,
+              'kind': 'qiuzhidaren-p2c-limited-handoff-runtime-evidence-v1',
+              'status': 'MACHINE_PASS',
+              'source_repository': manifest['source_repository'],
+              'source_commit': manifest['source_commit'],
+              'engine_base_commit': manifest['engine_base_commit'],
+              'engine_execution_repository': os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
+              'engine_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'execution_surface': 'public-engine-github-hosted-runner',
+              'fixture_privacy': 'public-synthetic',
+              'generic_binary_dispatch_claimed': False,
+              'private_repository_access_used': False,
+              'private_repository_credentials_used': False,
+              'private_business_bytes_used': False,
+              'product_pdf_generated': False,
+              'real_product_human_acceptance_claimed': False,
+              'publication_claimed': False,
+              'verified_source': verified_source,
+              'verified_engine_source': verified_engine,
+              'runtime_markers': markers,
+              'request': {
+                  'sha256': hashlib.sha256(request_path.read_bytes()).hexdigest(),
+                  'status': request.get('status'),
+                  'dispatch_performed': (request.get('dispatch') or {}).get('performed'),
+              },
+              'package': {
+                  'sha256': hashlib.sha256(package_path.read_bytes()).hexdigest(),
+                  'size_bytes': package_path.stat().st_size,
+              },
+              'receipt': {
+                  'sha256': hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+                  'engine': receipt.get('engine'),
+                  'machine_status': receipt.get('machine_status'),
+                  'review_status': receipt.get('review_status'),
+              },
+              'verified_result': {
+                  'sha256': hashlib.sha256(verified_path.read_bytes()).hexdigest(),
+                  'status': verified.get('status'),
+              },
+              'review_pack': {
+                  'sha256': hashlib.sha256(review_path.read_bytes()).hexdigest(),
+                  'status': review.get('status'),
+                  'review_required': review.get('review_required'),
+                  'automatic_state_mutation': review.get('automatic_state_mutation'),
+                  'automatic_publication': review.get('automatic_publication'),
+              },
+              'commands': commands,
+          }
+          (output / 'evidence.json').write_text(
+              json.dumps(evidence, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(evidence, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload public-safe P2c evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2c-limited-handoff-runtime-evidence
+          path: |
+            .engine-job/p2c-handoff/output/evidence.json
+            .engine-job/p2c-handoff/runtime/private-side/handoff-output/handoff-request.json
+            .engine-job/p2c-handoff/runtime/private-side/handoff-output/p2b-public-fixture.zip
+            .engine-job/p2c-handoff/runtime/private-side/returned/provenance-receipt.json
+            .engine-job/p2c-handoff/runtime/private-side/returned/verified/verified-result.json
+            .engine-job/p2c-handoff/runtime/private-side/returned/verified/review-pack.json
+          if-no-files-found: error
