@@ -1,0 +1,151 @@
+name: P3 Canonical Delivery Acceptance Runtime
+
+on:
+  push:
+    branches:
+      - 'job-architecture/p3-delivery-accepted-*'
+    paths:
+      - '.engine-job/p3-delivery-accepted/**'
+      - '.github/workflows/p3-delivery-accepted-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-delivery:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml
+
+      - name: Verify exact source and execute canonical Delivery Acceptance fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess, sys, time
+
+          checkout = Path.cwd().resolve()
+          base = checkout / '.engine-job/p3-delivery-accepted'
+          source_root = base / 'repo'
+          runtime = base / 'runtime'
+          out = base / 'output'
+          runtime.mkdir(parents=True, exist_ok=True)
+          out.mkdir(parents=True, exist_ok=True)
+          manifest = json.loads((base / 'manifest.json').read_text(encoding='utf-8'))
+
+          def blob_sha(data: bytes) -> str:
+              return hashlib.sha1(
+                  f'blob {len(data)}\0'.encode('ascii') + data
+              ).hexdigest()
+
+          verified = []
+          for item in manifest['files']:
+              path = (source_root / item['path']).resolve()
+              if (
+                  source_root.resolve() != path
+                  and source_root.resolve() not in path.parents
+              ):
+                  raise SystemExit(f'path escape: {item["path"]}')
+              data = path.read_bytes()
+              actual = blob_sha(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(
+                      f'exact source mismatch: {item["path"]}: '
+                      f'expected={item["git_blob_sha1"]} actual={actual}'
+                  )
+              verified.append({
+                  'path': item['path'],
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+          if len(verified) != manifest['expected_file_count']:
+              raise SystemExit('verified source count drift')
+
+          commands = []
+          status = 'MACHINE_PASS'
+
+          def run(command, cwd):
+              global status
+              started = time.monotonic()
+              proc = subprocess.run(
+                  command,
+                  cwd=cwd,
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+              )
+              output = proc.stdout or ''
+              print('>>>', ' '.join(str(x) for x in command))
+              print(output, end='')
+              commands.append({
+                  'command': [str(x) for x in command],
+                  'exit_code': proc.returncode,
+                  'duration_seconds': round(time.monotonic() - started, 6),
+                  'output': output[-20000:],
+              })
+              if proc.returncode != 0:
+                  status = 'MACHINE_FAIL'
+              return proc
+
+          py = sys.executable
+          compile_result = run([
+              py, '-m', 'py_compile',
+              'tools/artifact_foundation.py',
+              'tools/check_teaching_demo_content.py',
+              'tools/teaching_demo_content_architecture.py',
+              'tools/_teaching_demo_content_architecture_impl.py',
+              'tools/teaching_demo_content_enforcement.py',
+              'tools/check_teaching_demo_case.py',
+              'examples/p3_canonical_accepted_fixture.py',
+          ], source_root)
+
+          fixture_result = None
+          if compile_result.returncode == 0:
+              fixture_result = run([
+                  py,
+                  'examples/p3_canonical_accepted_fixture.py',
+                  '--workspace', str(runtime / 'workspace'),
+              ], source_root)
+
+          evidence = {
+              'version': 1,
+              'kind': 'qiuzhidaren-p3-canonical-delivery-accepted-runtime-evidence-v1',
+              'status': status,
+              'review_status': 'REVIEW_REQUIRED',
+              'source_repository': manifest['source_repository'],
+              'source_commit': manifest['source_commit'],
+              'engine_base_commit': manifest['engine_base_commit'],
+              'engine_execution_repository': os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
+              'engine_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'execution_surface': 'public-engine-github-hosted-runner',
+              'private_repository_access_used': False,
+              'private_repository_credentials_used': False,
+              'product_pdf_generated': False,
+              'fixture_privacy': 'public-synthetic-only',
+              'verified_source': verified,
+              'commands': commands,
+          }
+          (out / 'evidence.json').write_text(
+              json.dumps(evidence, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(evidence, ensure_ascii=False, indent=2))
+          if status != 'MACHINE_PASS':
+              raise SystemExit('P3 canonical Delivery Acceptance fixture failed')
+          PY
+
+      - name: Upload public-safe P3 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-canonical-delivery-accepted-runtime-evidence
+          path: .engine-job/p3-delivery-accepted/output/evidence.json
+          if-no-files-found: error
