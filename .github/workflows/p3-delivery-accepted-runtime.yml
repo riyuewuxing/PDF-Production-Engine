@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pyyaml
+      - run: python -m pip install pyyaml pypdf
 
       - name: Verify exact source and execute canonical Delivery Acceptance fixture
         shell: bash
@@ -103,15 +103,33 @@ jobs:
               'tools/_teaching_demo_content_architecture_impl.py',
               'tools/teaching_demo_content_enforcement.py',
               'tools/check_teaching_demo_case.py',
+              'tools/provenance_snapshot.py',
+              'tools/teaching_demo_artifact_plan_primitives.py',
+              'tools/plan_teaching_demo_artifact_job.py',
+              'tools/check_teaching_demo_inputs.py',
+              'tools/publisher_core.py',
+              'tools/publisher_core_legacy.py',
+              'tools/board_contract.py',
+              'tools/physics_notation.py',
+              'tools/latex_inline.py',
+              'tools/physics_figures.py',
               'examples/p3_canonical_accepted_fixture.py',
+              'examples/p3_consumer_reachability_fixture.py',
           ], source_root)
 
           fixture_result = None
+          consumer_result = None
           if compile_result.returncode == 0:
               fixture_result = run([
                   py,
                   'examples/p3_canonical_accepted_fixture.py',
                   '--workspace', str(runtime / 'workspace'),
+              ], source_root)
+          if fixture_result is not None and fixture_result.returncode == 0:
+              consumer_result = run([
+                  py,
+                  'examples/p3_consumer_reachability_fixture.py',
+                  '--workspace', str(runtime / 'consumer-workspace'),
               ], source_root)
 
           evidence = {
