@@ -185,6 +185,8 @@ def run_locked_pages(spec_path: Path, out_dir: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix="pdf-engine-locked-source-") as tmp:
         source = Path(tmp) / "source.bin"
         acquisition = fetch_locked_source(spec, source)
+        if spec.get("preserve_verified_source") is True:
+            shutil.copy2(source, out_dir / "verified-source.pdf")
         selected = out_dir / "selected-pages.pdf"
         extraction = extract_pdf_pages(source, spec["selected_pages"], selected)
 
