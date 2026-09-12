@@ -1,0 +1,1040 @@
+version: 9
+id: teaching-demo-content
+scope: teacher_teaching_demo_content_formation
+status: ACTIVE_CANONICAL
+architecture_decision: architecture/adr/ADR-012-evidence-carrying-teaching-script-compiler.md
+architecture_hardening_addendum: architecture/adr/ADR-013-teaching-demo-authority-provenance-and-phase-b-lock.md
+architecture_capability_isolation_addendum: architecture/adr/ADR-014-teaching-demo-capability-removal-and-first-full-exposure.md
+
+canonical_checker: tools/check_teaching_demo_content.py
+canonical_checker_internal_core: tools/_teaching_demo_content_core.inc
+canonical_checker_internal_core_role: PRIMITIVES_ONLY_NO_ACCEPTANCE_ORCHESTRATION_AUTHORITY
+canonical_checker_internal_core_direct_execution: ABSENT_NO_CLI
+canonical_checker_internal_core_aggregate_import_call: ABSENT_NO_AGGREGATE_SYMBOL
+canonical_checker_helper: tools/teaching_demo_content_architecture.py
+canonical_checker_helper_impl: tools/_teaching_demo_content_architecture_impl.py
+canonical_checker_helper_has_independent_cli: false
+canonical_enforcement_helper: tools/teaching_demo_content_enforcement.py
+canonical_enforcement_helper_has_independent_cli: false
+
+single_line_policy:
+  this_file_is_only_content_contract: true
+  canonical_branch: main
+  update_in_place_only: true
+  new_content_branch_forbidden: true
+  parallel_versioned_contracts_forbidden: true
+  legacy_content_route_forbidden: true
+  backup_content_route_forbidden: true
+  alternate_content_quality_checker_forbidden: true
+  retired_branch_tree_sha: 61e02317ecaf0db1104911855150b593327d24fe
+  retired_branch_tree_role: ONLY_MAIN_REDIRECT_NO_PROJECT_FILES
+  forbidden_current_tree_roots:
+  - content/job-search/teacher/interview/teaching-demo/high-school/physics/page-to-plan
+  - content/job-search/teacher/interview/teaching-demo/references
+  - production/teaching-demo-cases/capacitance-v1
+  - production/teaching-demo-cases/molecular-kinetic-theory-v1/revisions
+  forbidden_current_tree_exact:
+  - docs/research/page-to-plan-2026-08.md
+  - docs/round-3-page-to-plan.md
+  - production/process-development/teaching-demo-quality-v2/IMPLEMENTATION_BLOCKER.md
+  - production/process-development/teaching-demo-quality-v2/IMPLEMENTATION_BLOCKER_CORRECTION.md
+
+boundary:
+  starts_at: teaching_demo_topic_and_source_material
+  ends_at: independent_content_human_acceptance_receipt
+  downstream_artifact_pdf_structured_delivery_is_out_of_scope: true
+
+purpose: >-
+  Produce scientifically correct, evidence-grounded, classroom-executable Teaching Demo content before PDF composition.
+  Visible final content is the factual surface; typed metadata may propose release claims but may not self-authenticate
+  knowledge formation. Deterministic requirements are enforced by executable validators, semantic claims require
+  evidence-bound judges, and downstream unlock requires independent HUMAN review plus a post-freeze
+  HUMAN_ACCEPTANCE_RECEIPT.
+
+architecture_contract:
+  direction: EVIDENCE_CARRYING_TEACHING_SCRIPT_COMPILER
+  phase: PHASE_A_ARCHITECTURE_CONTRACT
+  runtime_authority_unchanged: true
+  effective_single_gate_capability_required: true
+  acceptance_composition_locality: CANONICAL_CHECKER_VALIDATE_ONLY
+  internal_core_aggregate_symbols_absent_required: true
+  checker_aggregate_stage_collectors_forbidden: true
+  metadata_based_capability_isolation_forbidden: true
+  self_attestation_only_hard_requirement_allowed: false
+  caller_metadata_may_grant_gate_authority: false
+  caller_metadata_may_be_used_only_as_deny_signal: false
+  actual_facts_source: FINAL_VISIBLE_CONTENT_PLUS_MACHINE_DERIVED_EVENTS_AND_VERIFIED_SEMANTIC_EVIDENCE
+  author_sidecar_may_override_actual_facts: false
+  bare_event_releases_may_not_create_hard_fact: true
+  release_claim_visible_span_binding_required: true
+  verified_first_release_required_for_hard_causality: true
+  answer_bearing_full_show_forbidden: true
+  first_full_exposure_must_be_resource_reveal: true
+  semantic_unknown_policy: BLOCKING_FAIL_CLOSED
+  durable_state_trace_required: true
+  source_identity_is_machine_verified: true
+  source_visual_review_is_independent_human_evidence_machine_bound: true
+  formal_source_must_be_repository_materialized_before_SOURCE_LOCKED: true
+  complete_machine_and_semantic_input_binding_required: true
+  executable_machine_requirement_registry_required: true
+  post_freeze_human_acceptance_receipt_required: true
+  phase_b_required_before_fresh_validation: true
+  phase_b_repository_local_activation_forbidden: true
+  phase_b_controller_required_for_calibrated_claim: true
+  semantic_judge_role_fields_are_not_producer_provenance: true
+  semantic_judge_producer_provenance_required_for_calibrated_claim: true
+  delivery_accepted_mode_requires_phase_b_qualification: false
+  delivery_accepted_mode_state: AVAILABLE_WITH_PRODUCT_SPECIFIC_EVIDENCE
+  pdf_downstream_blocked_before_independent_content_pass: true
+
+enforcement_classes:
+- MACHINE_DETERMINISTIC
+- SEMANTIC_JUDGE
+- HUMAN_ONLY
+- AUTHOR_SELF_CHECK
+
+enforcement_class_policy:
+  MACHINE_DETERMINISTIC: exact structure, event coverage, state transition, digest, path, set, arithmetic, order and identity
+  SEMANTIC_JUDGE: open semantic judgments requiring evidence-bound model or equivalent semantic review
+  HUMAN_ONLY: source visual inspection, overall teaching quality, naturalness, professional judgment and final score
+  AUTHOR_SELF_CHECK: non-authoritative risk signal only
+  author_self_check_can_unlock_gate: false
+  semantic_judge_can_return_unknown: true
+  blocking_unknown_can_unlock_gate: false
+
+executable_enforcement_registry:
+  implementation: tools/teaching_demo_content_enforcement.py
+  canonical_machine_gate_receipt_generator: tools/teaching_demo_content_enforcement.py#make_machine_gate_receipt
+  every_MACHINE_DETERMINISTIC_HARD_requirement_must_have_code_spec: true
+  code_spec_requires: [validator_id, failure_code, probe_id, stage, runner]
+  runner_kinds: [local, core, checker]
+  local_runner_must_resolve_to_callable: true
+  contract_failure_code_must_equal_code_spec_failure_code: true
+  missing_or_orphan_code_spec_is_architecture_failure: true
+  machine_gate_requirement_coverage: MACHINE_DETERMINISTIC_HARD_with_stage_at_or_before_MACHINE_GATED
+  machine_gate_requirement_item_requires: [requirement_id, verdict, validator_id, failure_code, probe_id, runner]
+  duplicate_machine_gate_requirement_id_forbidden: true
+  machine_gate_binds_enforcement_registry_digest: true
+  machine_gate_binds_state_trace_prefix_digest: true
+  author_may_not_invent_machine_requirement_PASS_without_current_code_spec: true
+
+requirement_registry:
+- requirement_id: REQ-SCI-001
+  severity: HARD
+  authority_source: PROCESS#Science-Reasoning-Audit; Round2-INDEPENDENT-REVIEW#R2-01
+  subject: lesson_evidence_ir_and_script_facts
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Science/Evidence Judge
+  evidence_required: [source evidence refs, actual pre-task release facts, formation claim]
+  failure_code: CONTENT_SEMANTIC_CONCLUSION_STRONGER_THAN_EVIDENCE
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: round2/electric-field-strength/proportion-not-enacted
+- requirement_id: REQ-SCI-002
+  severity: HARD
+  authority_source: PROCESS#Science-Reasoning-Audit
+  subject: observation_and_inference
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Science/Evidence Judge
+  evidence_required: [direct observation refs, inference refs, source boundary]
+  failure_code: CONTENT_SEMANTIC_OBSERVATION_INFERENCE_CONFLATION
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: round1/faraday-observation-inference
+- requirement_id: REQ-SCI-003
+  severity: HARD
+  authority_source: contract#source_and_evidence_rules
+  subject: scientific_conditions_and_domain
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Science/Evidence Judge
+  evidence_required: [claim span, source condition refs, stated boundary]
+  failure_code: CONTENT_SEMANTIC_CONDITION_OR_DOMAIN_DROPPED
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: round1-and-round2-boundary-review
+
+- requirement_id: REQ-REL-001
+  severity: HARD
+  authority_source: INDEPENDENT_GATE_A_REVIEW#GATEA-P1-02; PROCESS#Verified-Knowledge-Release
+  subject: release_claim_semantically_establishes_knowledge
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Science/Evidence Judge
+  evidence_required: [all machine-derived release claims, same-event visible spans, per-release release_verifications with event and exact-text refs]
+  failure_code: CONTENT_SEMANTIC_RELEASE_CLAIM_NOT_ESTABLISHED
+  gate_effect: blocks SEMANTIC_JUDGED and all hard causality depending on verified_first_release
+  historical_probe: GATEA-P1-02-false-early-release
+- requirement_id: REQ-REL-002
+  severity: HARD
+  authority_source: INDEPENDENT_GATE_A_REVIEW#GATEA-P1-02; PROCESS#Verified-Knowledge-Release
+  subject: visible_span_release_claim_structure
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: release-claim visible-span structure validator
+  evidence_required: [bare releases empty, release_claims knowledge_id and visible_span, visible_span exact same-event text binding, complete unique formed-knowledge coverage]
+  failure_code: CONTENT_RELEASE_VISIBLE_SPAN_BINDING_INVALID
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: GATEA-P1-bare-false-early-release-metadata
+
+- requirement_id: REQ-SRC-ID-001
+  severity: HARD
+  authority_source: PROCESS#Exact-Source-Lock
+  subject: exact_repository_source_identity
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: canonical checker source-lock byte validator
+  evidence_required: [repository-relative PDF path, size_bytes, Git blob SHA-1, SHA-256, selected PDF page mapping]
+  failure_code: CONTENT_SOURCE_EVIDENCE_UNVERIFIED
+  gate_effect: blocks SOURCE_LOCKED and EVIDENCE_READY
+  historical_probe: P0_SOURCE_IDENTITY_FORGERY
+- requirement_id: REQ-SRC-REV-001
+  severity: HARD
+  authority_source: PROCESS#SOURCE_REVIEW
+  subject: selected_source_pages_actually_visually_reviewed
+  enforcement_class: HUMAN_ONLY
+  enforcer: INDEPENDENT_SOURCE_REVIEWER plus canonical receipt-binding validator
+  evidence_required: [SOURCE_REVIEW.yaml bound to exact source identity and all selected pages]
+  failure_code: CONTENT_SOURCE_VISUAL_REVIEW_NOT_ESTABLISHED
+  gate_effect: blocks EVIDENCE_READY
+  historical_probe: source-review-role-separation
+
+- requirement_id: REQ-STU-001
+  severity: HARD
+  authority_source: PROCESS#Student-State-Ledger; Round2-INDEPENDENT-REVIEW#R2-01
+  subject: student_response_reachability
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Science/Evidence Judge
+  evidence_required: [actual information visible before task, student response span, prior knowledge]
+  failure_code: CONTENT_SEMANTIC_STUDENT_RESPONSE_REQUIRES_FUTURE_INFO
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: round2/electric-field-strength-sidecar-only-proportion
+- requirement_id: REQ-STU-002
+  severity: HARD
+  authority_source: PROCESS#Student-State-Ledger
+  subject: independent_transfer_scaffold_boundary
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Enactment/Student Judge
+  evidence_required: [mode, pre-response teacher events, resource state, board state]
+  failure_code: CONTENT_SEMANTIC_INDEPENDENT_TRANSFER_ANSWER_LEAK
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: round2/electric-field-strength-q-cancel-scaffold
+- requirement_id: REQ-STU-003
+  severity: HARD
+  authority_source: PROCESS#Student-State-Ledger
+  subject: teacher_explanation_vs_student_discovery
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Enactment/Student Judge
+  evidence_required: [instruction mode, teacher events, student events, formation event]
+  failure_code: CONTENT_SEMANTIC_TEACHER_EXPLANATION_DISGUISED_AS_DISCOVERY
+  gate_effect: blocks SEMANTIC_JUDGED
+  historical_probe: round1-interaction-failure
+
+- requirement_id: REQ-INT-001
+  severity: HARD
+  authority_source: PROCESS#No-Student-Trial-Interaction-Chain
+  subject: interactive_event_chain
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: actual interaction-chain validator
+  evidence_required: [ASK, INVITE, WAIT, STUDENT_RESPONSE, PARAPHRASE, FEEDBACK event sequence]
+  failure_code: CONTENT_ACTUAL_INTERACTION_CHAIN_INCOMPLETE
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: round1/F1-interaction-anchor
+- requirement_id: REQ-INT-002
+  severity: HARD
+  authority_source: PROCESS#No-Student-Trial-Interaction-Chain
+  subject: cognitive_feedback
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Enactment/Student Judge
+  evidence_required: [student response span, feedback span, next formation span]
+  failure_code: CONTENT_SEMANTIC_EMPTY_PRAISE_ONLY
+  gate_effect: blocks SEMANTIC_JUDGED
+  historical_probe: mutation/M17
+
+- requirement_id: REQ-RES-001
+  severity: HARD
+  authority_source: PROCESS#Resource-Action-Map
+  subject: resource_actual_classroom_use
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: actual resource event validator
+  evidence_required: [RESOURCE_SHOW event, resource_id, cycle_id]
+  failure_code: CONTENT_ACTUAL_RESOURCE_NOT_SHOWN
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: mutation/M05
+- requirement_id: REQ-RES-002
+  severity: HARD
+  authority_source: INDEPENDENT_GATE_A_REVIEW#GATEA-RRA3-P1-05; PROCESS#Answer-Bearing-Resources
+  subject: answer_bearing_resource_visibility_and_explicit_full_exposure_transition
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: answer-resource visibility/reveal structural validator
+  evidence_required: [safe RESOURCE_SHOW strictly before response, STUDENT_RESPONSE ordinal, no RESOURCE_SHOW visibility FULL, explicit RESOURCE_REVEAL strictly after response, answer-bearing ids]
+  failure_code: CONTENT_ACTUAL_ANSWER_RESOURCE_PREMATURE
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: GATEA-RRA3-P1-05-post-response-FULL-show
+- requirement_id: REQ-RES-003
+  severity: HARD
+  authority_source: PROCESS#Resource-Action-Map
+  subject: resource_observation_vs_inference
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Science/Evidence Judge
+  evidence_required: [resource event, observation span, inferred claim span]
+  failure_code: CONTENT_SEMANTIC_RESOURCE_OBSERVATION_INFERENCE_CONFLATION
+  gate_effect: blocks SEMANTIC_JUDGED
+  historical_probe: round1/faraday-resource-reasoning
+- requirement_id: REQ-RES-004
+  severity: HARD
+  authority_source: INDEPENDENT_GATE_A_REVIEW#GATEA-RRA3-P1-05; PROCESS#Answer-Bearing-Resources
+  subject: first_full_exposure_is_explicit_reveal_after_verified_knowledge_formation
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: first-full-exposure verified-release causality validator
+  evidence_required: [first full exposure derived across RESOURCE_SHOW FULL and RESOURCE_REVEAL, first exposure event type RESOURCE_REVEAL, answer-bearing knowledge ids, verified_first_release derived from PASS release verification, verified ordinal strictly before first full exposure ordinal]
+  failure_code: CONTENT_ANSWER_RESOURCE_REVEAL_BEFORE_VERIFIED_FORMATION
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: GATEA-RRA3-P1-05-first-full-exposure
+
+- requirement_id: REQ-BRD-001
+  severity: HARD
+  authority_source: PROCESS#Board-Timeline
+  subject: final_board_lineage
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: actual board accumulation validator
+  evidence_required: [BOARD_ADD events, ordered board deltas, final board]
+  failure_code: CONTENT_ACTUAL_FINAL_BOARD_NOT_EVENT_ACCUMULATION
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: mutation/M07
+- requirement_id: REQ-BRD-002
+  severity: HARD
+  authority_source: INDEPENDENT_GATE_A_REVIEW#GATEA-P1-02; PROCESS#Board-Timeline
+  subject: board_strictly_after_verified_knowledge_formation
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: verified-release board causality validator
+  evidence_required: [BOARD_ADD board_delta_id, prerequisite and newly formed knowledge ids, verified_first_release ordinals, BOARD_ADD ordinal]
+  failure_code: CONTENT_ACTUAL_BOARD_BEFORE_FORMATION
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: GATEA-P1-false-release-board-causality
+
+- requirement_id: REQ-PRC-001
+  severity: HARD
+  authority_source: PROCESS#Practice-Completeness
+  subject: practice_scope_order_occurrence_and_text_equivalence
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: practice scope/occurrence/text-binding validator
+  evidence_required: [execution_scope, ordered trial PRACTICE events, unique practice ids, declared inventory, prompt roles and anchors]
+  failure_code: CONTENT_ACTUAL_PRACTICE_INVENTORY_DRIFT
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: mutation/M11-M12
+
+- requirement_id: REQ-TIM-001
+  severity: HARD
+  authority_source: PROCESS#Enactment-Timeline; Round2-INDEPENDENT-REVIEW#R2-02
+  subject: final_spoken_text_coverage
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: final spoken event coverage validator
+  evidence_required: [ordered spoken event ids, rendered spoken spans, final trial]
+  failure_code: CONTENT_ACTUAL_SPOKEN_COVERAGE_NOT_COMPLETE
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: round2/both-topics-summary-as-spoken-equivalent
+- requirement_id: REQ-TIM-002
+  severity: HARD
+  authority_source: contract#spoken_execution_rules
+  subject: machine_detectable_formula_oralization
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: formula-like text typing validator plus FORMULA_ORALIZE validator
+  evidence_required: [formula-like event text, FORMULA_ORALIZE events, formula ids]
+  failure_code: CONTENT_ACTUAL_FORMULA_ORALIZATION_MISSING
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: mutation/M10
+- requirement_id: REQ-TIM-003
+  severity: HARD
+  authority_source: PROCESS#Enactment-Timeline
+  subject: timing_arithmetic_and_real_text_mapping
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: event timing and coverage validator
+  evidence_required: [event timing components, segment mapping, total recomputation]
+  failure_code: CONTENT_ACTUAL_TIMING_NOT_RECOMPUTABLE
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: round2/timing-executability
+- requirement_id: REQ-TIM-004
+  severity: HARD
+  authority_source: PROCESS#Enactment-Timeline
+  subject: measured_timing_evidence
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: rehearsal evidence validator
+  evidence_required: [timing status, rehearsal evidence when MEASURED]
+  failure_code: CONTENT_MEASURED_WITHOUT_REHEARSAL_EVIDENCE
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: F4-regression
+- requirement_id: REQ-TIM-005
+  severity: HARD
+  authority_source: PROCESS#Formula-Oralization
+  subject: residual_formula_oralization_semantic_completeness
+  enforcement_class: SEMANTIC_JUDGE
+  enforcer: Enactment/Student Judge
+  evidence_required: [final trial spans, typed events, oralized formula spans]
+  failure_code: CONTENT_SEMANTIC_FORMULA_ORALIZATION_INCOMPLETE
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: formula-not-machine-detectable-residual
+
+- requirement_id: REQ-REF-001
+  severity: HARD
+  authority_source: ADR-012#Reference-selection
+  subject: reference_structural_candidate_comparison
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: canonical candidate CASE identity/comparison validator
+  evidence_required: [at least two distinct canonical CASE receipts, exact candidate receipt SHA-256, candidate fingerprints, selected candidate, rationale, transfer mapping]
+  failure_code: CONTENT_REFERENCE_CANDIDATE_COMPARISON_INCOMPLETE
+  gate_effect: blocks EVIDENCE_READY
+  historical_probe: mutation/M15
+- requirement_id: REQ-REF-002
+  severity: HARD
+  authority_source: PROCESS#Purchased-Reference
+  subject: selected_reference_receipt_identity
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: canonical CASE receipt validator
+  evidence_required: [repo CASE.yaml path, verification PASS, mechanism summary]
+  failure_code: CONTENT_REFERENCE_RECEIPT_NOT_VERIFIED
+  gate_effect: blocks EVIDENCE_READY
+  historical_probe: F6-regression
+
+- requirement_id: REQ-FRZ-001
+  severity: HARD
+  authority_source: PROCESS#Submission-Freeze
+  subject: content_addressed_freeze
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: exact-byte freeze binding validator
+  evidence_required: [source commit, current canonical digests, final input digests]
+  failure_code: CONTENT_SUBMISSION_FREEZE_STALE
+  gate_effect: blocks SUBMISSION_FROZEN
+  historical_probe: F5-regression
+- requirement_id: REQ-FRZ-002
+  severity: HARD
+  authority_source: ADR-012#Actual-facts
+  subject: stale_machine_or_semantic_evidence
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: complete machine/judge binding closure validator
+  evidence_required: [current source bytes, source review, all user products, all deterministic sidecars, selected references, runtime bytes]
+  failure_code: CONTENT_GATE_EVIDENCE_STALE
+  gate_effect: invalidates MACHINE_GATED, SEMANTIC_JUDGED and SUBMISSION_FROZEN as applicable
+  historical_probe: mutation/M14
+
+- requirement_id: REQ-STA-001
+  severity: HARD
+  authority_source: ADR-012#State-machine
+  subject: state_transition_trace_and_resolved_transition_evidence
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: canonical state controller plus transition-evidence resolver
+  evidence_required: [complete Work Packet prefix through SUBMISSION_FROZEN, adjacent transitions, resolved evidence refs, transition digests]
+  failure_code: CONTENT_ARCH_STATE_TRACE_SEQUENCE_DRIFT
+  gate_effect: blocks undeclared, missing, reordered, unresolved-evidence or digest-stale transition
+  historical_probe: property/state-transition
+- requirement_id: REQ-STA-002
+  severity: HARD
+  authority_source: ADR-012#State-machine
+  subject: script_facts_precondition
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: state controller
+  evidence_required: [SCRIPT_FACTS v2 digest and release claims]
+  failure_code: CONTENT_MACHINE_GATE_WITHOUT_SCRIPT_FACTS
+  gate_effect: blocks MACHINE_GATED
+  historical_probe: property/no-facts-no-machine-gate
+- requirement_id: REQ-STA-003
+  severity: HARD
+  authority_source: ADR-012#Semantic-judges
+  subject: blocking_unknown
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: semantic verdict controller
+  evidence_required: [all blocking semantic verdicts including release verifications]
+  failure_code: CONTENT_BLOCKING_SEMANTIC_UNKNOWN
+  gate_effect: blocks SEMANTIC_JUDGED and SUBMISSION_FROZEN
+  historical_probe: mutation/M13
+
+- requirement_id: REQ-REV-001
+  severity: HARD
+  authority_source: contract#review_and_unlock
+  subject: semantic_judge_evidence_binding
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: judge verdict schema/evidence binding validator
+  evidence_required: [requirement id, PASS/FAIL/UNKNOWN, exact evidence refs, reason, confidence, complete judge input binding]
+  failure_code: CONTENT_SEMANTIC_JUDGE_EVIDENCE_INVALID
+  gate_effect: blocks SEMANTIC_JUDGED
+  historical_probe: phase-b-judge-calibration
+- requirement_id: REQ-REV-002
+  severity: HARD
+  authority_source: PROCESS#Independent-HUMAN-Review
+  subject: final_content_acceptance
+  enforcement_class: HUMAN_ONLY
+  enforcer: independent HUMAN reviewer plus exact review binding validator
+  evidence_required: [exact frozen bytes, seven-dimension scores, hard fail list, review binding]
+  failure_code: CONTENT_INDEPENDENT_REVIEW_NOT_PASS
+  gate_effect: blocks HUMAN_ACCEPTED and all protected downstream
+  historical_probe: round1-and-round2-independent-reject
+- requirement_id: REQ-ACC-001
+  severity: HARD
+  authority_source: PROCESS#Post-Freeze-HUMAN-Acceptance
+  subject: durable_post_freeze_HUMAN_ACCEPTED_transition
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: HUMAN_ACCEPTANCE_RECEIPT exact-binding validator
+  evidence_required: [SUBMISSION_FREEZE bytes, INDEPENDENT_CONTENT_REVIEW bytes, source commit, transition digest]
+  failure_code: CONTENT_HUMAN_ACCEPTANCE_RECEIPT_INVALID
+  gate_effect: blocks HUMAN_ACCEPTED and all protected downstream
+  historical_probe: post-freeze-state-loop
+
+- requirement_id: REQ-WPK-001
+  severity: HARD
+  authority_source: ADR-012#Work-packets
+  subject: phase_specific_work_packet
+  enforcement_class: MACHINE_DETERMINISTIC
+  enforcer: work packet validator
+  evidence_required: [main SHA, current state, durable state_trace, schema, REQ IDs, source refs, allowed/forbidden writes, expected evidence, next gate]
+  failure_code: CONTENT_ARCH_WORK_PACKET_INVALID
+  gate_effect: blocks state-specific generation action
+  historical_probe: long-context-rule-loss-root-cause
+
+source_review_receipt:
+  schema_id: teaching-demo-source-review-v1
+  path: SOURCE_REVIEW.yaml
+  created_before_content_implementation: true
+  reviewer_role_required: INDEPENDENT_SOURCE_REVIEWER
+  implementation_and_review_separate_required: true
+  machine_derives_source_binding_from_manifest: true
+  machine_checks_repository_pdf_size_git_blob_sha1_and_sha256: true
+  machine_checks_receipt_integrity_not_human_visual_truth: true
+  required_fields:
+  - schema_id
+  - case_id
+  - reviewer_role
+  - implementation_and_review_separate
+  - source_binding
+  - reviewed_printed_pages
+  - reviewed_pdf_pages
+  - visual_open_and_review
+  - review_notes
+  - receipt_digest
+  visual_open_and_review_required: PASS
+  reviewed_page_lists_must_exactly_equal_manifest_page_mapping: true
+  receipt_digest_is_sha256_of_record_without_receipt_digest: true
+  author_self_review_may_unlock_EVIDENCE_READY: false
+
+source_and_evidence_rules:
+  explicit_task_requirements_have_priority: true
+  exact_source_identity_required: true
+  formal_source_mode: repository-pdf
+  remote_pdf_may_enter_only_pre_ingest: true
+  remote_pdf_must_materialize_to_repository_before_SOURCE_LOCKED: true
+  remote_pdf_manifest_locator_alone_can_pass_content_gate: false
+  repository_pdf_machine_checks: [repository-relative path, size_bytes, Git blob SHA-1, SHA-256, selected PDF page mapping]
+  selected_source_pages_must_be_actually_reviewed: true
+  source_review_receipt: SOURCE_REVIEW.yaml
+  source_review_must_be_independent_from_content_implementation: true
+  evidence_units_required: true
+  observation_must_be_separate_from_inference: true
+  claim_strength_must_not_exceed_evidence: true
+  conditions_domains_and_scales_must_not_be_silently_dropped: true
+  fabricated_measurement_or_data_forbidden: true
+  reference_learning_location: evidence.yaml#reference_learning
+  reference_learning_requires: [lesson_family, selected_case_receipts, mechanisms, transfer_to_cycles, structural_candidate_comparison]
+  selected_reference_receipt_must_be_repo_verified_case_yaml: true
+  every_reference_candidate_must_be_repo_verified_case_yaml: true
+  every_reference_candidate_must_bind_exact_case_receipt_sha256: true
+
+lesson_evidence_ir:
+  schema_id: teaching-demo-lesson-evidence-ir-v1
+  each_knowledge_unit_requires:
+  - knowledge_id
+  - claim
+  - claim_strength
+  - source_evidence_ids
+  - prior_student_knowledge_ids
+  - visible_evidence_before_task
+  - resource_state_before_task
+  - student_task
+  - permissible_response
+  - forbidden_response_requires_future_info
+  - scaffold_level
+  - teacher_scaffold_boundary
+  - formation_claim
+  - formation_requires
+  - board_after_formation
+  - practice_links
+  invariants:
+    formation_claim_must_not_exceed_actual_visible_evidence_prior_knowledge_and_permitted_scaffold: true
+    independent_transfer_must_not_receive_key_answer_before_response: true
+    sidecar_only_evidence_does_not_count_as_visible: true
+
+typed_script_event_stream:
+  schema_id: teaching-demo-script-event-stream-v1
+  event_types:
+  - SPEAK
+  - FORMULA_ORALIZE
+  - ASK
+  - INVITE
+  - WAIT
+  - STUDENT_RESPONSE
+  - PARAPHRASE
+  - FEEDBACK
+  - SCAFFOLD
+  - RESOURCE_SHOW
+  - RESOURCE_HIDE_OR_MASK
+  - RESOURCE_REVEAL
+  - BOARD_ADD
+  - PRACTICE
+  - TRANSITION
+  - CLOSE
+  each_event_requires: [event_id, type, cycle_id]
+  event_may_carry: [text, resource_id, visibility, board_delta_id, practice_id, formula_id, timing, release_claims, knowledge_state_before, knowledge_state_after]
+  old_releases_field_may_exist_only_as_empty_list_during_migration: true
+  nonempty_bare_releases_forbidden: true
+  formation_release_claim_requires: [knowledge_id, visible_span]
+  release_visible_span_must_occur_exactly_once_in_same_event_text: true
+  all_formed_knowledge_ids_require_exactly_one_release_claim: true
+  release_claim_is_unverified_until_semantic_judge_PASS: true
+  RESOURCE_SHOW_visibility_values: [SAFE, MASKED, CROPPED, FULL]
+  answer_bearing_discovery_or_scaffold_resource_requires_STUDENT_RESPONSE: true
+  answer_bearing_discovery_or_scaffold_resource_requires_safe_show_strictly_before_response: true
+  safe_or_masked_show_before_response_must_not_claim_answer_bearing_release: true
+  answer_bearing_discovery_or_scaffold_RESOURCE_SHOW_FULL_forbidden_at_all_ordinals: true
+  answer_bearing_discovery_or_scaffold_resource_requires_RESOURCE_REVEAL_after_response: true
+  first_full_exposure_is_derived_across_RESOURCE_SHOW_FULL_and_RESOURCE_REVEAL: true
+  first_full_exposure_event_type_must_be_RESOURCE_REVEAL: true
+  RESOURCE_REVEAL_before_or_at_student_response_forbidden: true
+  first_full_exposure_must_be_strictly_after_verified_first_release: true
+  board_add_must_bind_board_delta_id: true
+  user_product_must_not_leak_event_ids: true
+
+script_facts:
+  schema_id: teaching-demo-script-facts-v2
+  derivation: MACHINE_DERIVED_FROM_FINAL_EVENT_STREAM_ONLY
+  author_editable: false
+  unverified_first_release_field_forbidden: true
+  minimum_facts:
+  - cycle_event_sequence
+  - release_claims
+  - resource_shows
+  - resource_masks
+  - board_adds
+  - practice_events
+  - formula_oralizations
+  - student_responses
+  - scaffolds
+  - spoken_event_ids
+  - spoken_text_sha256
+  - elapsed_seconds_from_events
+  - facts_sha256
+  release_claim_fields: [knowledge_id, event_id, event_type, cycle_id, ordinal, visible_span]
+  release_claims_are_not_hard_formation_facts: true
+  planned_ir_comparison_required: true
+
+verified_knowledge_release:
+  persisted_author_editable_artifact: false
+  derivation: SCRIPT_FACTS.release_claims_PLUS_SCIENCE_EVIDENCE_JUDGE.release_verifications
+  semantic_requirement: REQ-REL-001
+  each_release_verification_requires: [knowledge_id, event_id, visible_span, verdict, reason, confidence, evidence_refs]
+  required_evidence_refs_per_release: [event:<event_id>, exact-text:<visible_span>]
+  PASS_required: true
+  FAIL_or_UNKNOWN_blocks: true
+  output_runtime_view: verified_first_release
+  hard_causality_consumers: [board strict formation causality, answer-resource first-full-exposure causality]
+  author_bare_metadata_may_not_populate_verified_first_release: true
+
+content_state_machine:
+  states:
+  - SOURCE_LOCKED
+  - EVIDENCE_READY
+  - IR_READY
+  - SCRIPT_BUILT
+  - SCRIPT_FACTS_DERIVED
+  - MACHINE_GATED
+  - SEMANTIC_JUDGED
+  - SUBMISSION_FROZEN
+  - HUMAN_ACCEPTED
+  allowed_transitions:
+  - [SOURCE_LOCKED, EVIDENCE_READY]
+  - [EVIDENCE_READY, IR_READY]
+  - [IR_READY, SCRIPT_BUILT]
+  - [SCRIPT_BUILT, SCRIPT_FACTS_DERIVED]
+  - [SCRIPT_FACTS_DERIVED, MACHINE_GATED]
+  - [MACHINE_GATED, SEMANTIC_JUDGED]
+  - [SEMANTIC_JUDGED, SUBMISSION_FROZEN]
+  - [SUBMISSION_FROZEN, HUMAN_ACCEPTED]
+  forbidden_shortcuts:
+  - [SCRIPT_BUILT, SUBMISSION_FROZEN]
+  - [AUTHOR_SELF_CHECK_PASS, MACHINE_GATED]
+  - [MACHINE_GATED, HUMAN_ACCEPTED]
+  facts_required_before_machine_gate: true
+  source_review_required_before_evidence_ready: true
+  all_applicable_deterministic_hard_requirements_through_MACHINE_GATED_must_pass: true
+  later_stage_machine_requirements_must_not_be_predeclared_as_MACHINE_GATE_PASS: true
+  all_blocking_semantic_verdicts_pass_before_submission_frozen: true
+  verified_first_release_required_before_board_resource_semantic_stage_causality_pass: true
+  work_packet_terminal_state: SUBMISSION_FROZEN
+  HUMAN_ACCEPTED_transition_location: HUMAN_ACCEPTANCE_RECEIPT.yaml
+  work_packet_must_not_be_mutated_after_freeze_to_record_HUMAN_ACCEPTED: true
+  durable_transition_trace:
+    location: WORK_PACKET.yaml#state_trace
+    complete_prefix_from_SOURCE_LOCKED_required: true
+    exact_adjacent_sequence_required: true
+    terminal_transition_in_work_packet: [SEMANTIC_JUDGED, SUBMISSION_FROZEN]
+    each_transition_requires: [from_state, to_state, evidence_refs, transition_digest]
+    evidence_refs_must_resolve_to_expected_artifacts: true
+    transition_digest_is_sha256_of_record_without_transition_digest: true
+    author_claimed_final_state_without_complete_trace_may_unlock: false
+
+phase_specific_work_packet:
+  schema_id: teaching-demo-work-packet-v1
+  required_fields: [main_sha, current_state, task_schema, requirement_ids, source_refs, reference_mechanisms, allowed_writes, forbidden_writes, expected_evidence, next_gate, state_trace]
+  requirement_ids_should_be_minimal_relevant_subset: true
+  state_trace_is_durable_execution_evidence_not_second_state_machine: true
+  frozen_packet_current_state_required: SUBMISSION_FROZEN
+  frozen_packet_next_gate_required: HUMAN_ACCEPTED
+
+state_trace_evidence_refs:
+  allowed_schemes: [artifact, source-lock]
+  SOURCE_LOCKED_to_EVIDENCE_READY: [source-lock:<binding_digest>, artifact:SOURCE_REVIEW.yaml]
+  EVIDENCE_READY_to_IR_READY: [artifact:LESSON_EVIDENCE_IR.yaml]
+  IR_READY_to_SCRIPT_BUILT: [artifact:SCRIPT_EVENTS.yaml]
+  SCRIPT_BUILT_to_SCRIPT_FACTS_DERIVED: [artifact:SCRIPT_FACTS.yaml]
+  SCRIPT_FACTS_DERIVED_to_MACHINE_GATED: [artifact:MACHINE_GATE.yaml]
+  MACHINE_GATED_to_SEMANTIC_JUDGED: [artifact:SCIENCE_EVIDENCE_JUDGE.yaml, artifact:ENACTMENT_STUDENT_JUDGE.yaml]
+  SEMANTIC_JUDGED_to_SUBMISSION_FROZEN: [artifact:SUBMISSION_FREEZE.yaml]
+
+semantic_judges:
+  verdict_schema:
+    required_fields: [requirement_id, verdict, claim, evidence_refs, reason, confidence]
+    verdicts: [PASS, FAIL, UNKNOWN]
+    exact_evidence_refs_required: true
+    missing_evidence_ref_invalidates_verdict: true
+    blocking_unknown_is_pass: false
+    author_decision_pass_is_trusted_evidence: false
+  producer_provenance:
+    role_and_separation_fields_are_declarations_not_identity_proof: true
+    phase_a_readiness_may_validate_payload_integrity_without_claiming_producer_identity: true
+    accepted_mode_requires_phase_b_controller_execution_receipt: true
+    repository_authored_role_or_runner_strings_may_not_unlock_accepted: true
+    controller_receipt_must_bind_exact_input_runtime_and_output_before_accepted_mode_can_exist: true
+  judge_binding_closure_must_include:
+  - canonical PROCESS/contract/checker/internal-core/architecture-helper/architecture-impl/enforcement-helper bytes
+  - manifest and normalized source-lock digest
+  - repository source PDF exact bytes
+  - SOURCE_REVIEW receipt
+  - reference usage contract and selected CASE receipts
+  - structural candidate comparison with exact candidate CASE receipt SHA-256 values
+  - all deterministic semantic sidecars
+  - Lesson Evidence IR / SCRIPT_EVENTS / SCRIPT_FACTS
+  - all five final user content roles
+  - BOARD_PLAN
+  - MACHINE_GATE receipt
+  work_packet_is_not_bound_until_freeze_because_single_packet_state_trace_advances_after_machine_gate: true
+  science_evidence_judge:
+    owns_requirement_prefixes: [REQ-SCI, REQ-REL-001, REQ-STU-001, REQ-RES-003]
+    checks: [evidence_entered_classroom, observation_vs_inference, claim_strength, conditions_and_boundaries, response_reachability, release_claim_semantic_entailment]
+    release_verifications_required: true
+    release_verification_source: SCRIPT_FACTS.release_claims
+    release_verification_evidence_must_bind_same_event_and_exact_visible_span: true
+  enactment_student_judge:
+    owns_requirement_prefixes: [REQ-STU-002, REQ-STU-003, REQ-INT-002, REQ-TIM-005]
+    checks: [answer_leakage, scaffold_honesty, cognitive_interaction, enactment_semantics, residual_formula_oralization, timing_text_correspondence]
+
+reference_structural_fingerprint:
+  minimum_candidate_count: 2
+  recommended_candidate_count: 3
+  candidate_required_fields: [case_receipt, case_receipt_sha256, lesson_mechanism, evidence_type, knowledge_formation_pattern, student_task_type, resource_interaction, misconception_structure, reasoning_pattern, classroom_enactment_pattern]
+  each_candidate_receipt_must_exist_under_canonical_benchmark_root: true
+  each_candidate_receipt_must_be_CASE_yaml: true
+  each_candidate_receipt_sha256_must_equal_current_bytes: true
+  duplicate_candidate_receipt_forbidden: true
+  selection_requires: [selected_case_receipt, selection_rationale, transfer_mapping]
+  machine_checks_completeness_and_identity_not_semantic_match_quality: true
+
+repository_reference_benchmark:
+  required: true
+  github_is_project_authority: true
+  usage_contract: production/reference-materials/teacher_teaching_demo/purchased-transcript-selection-2026-08-27/REFERENCE_USE_CONTRACT.yaml
+  case_index: production/reference-materials/teacher_teaching_demo/purchased-transcript-selection-2026-08-27/CASE_INDEX.md
+  source_hashes: production/reference-materials/teacher_teaching_demo/purchased-transcript-selection-2026-08-27/original-photo-hashes.json
+  identified_case_count: 13
+  photo_count: 41
+  all_case_receipts_ready: true
+  all_source_photos_accounted_and_human_reviewed: true
+  raw_binary_migration_may_remain_pending: true
+  production_must_not_depend_on_raw_binary_migration: true
+  mechanism_transfer_required: true
+  structural_candidate_comparison_required: true
+  verbatim_commercial_script_copy_forbidden: true
+  current_real_textbook_and_task_override_reference_example: true
+
+science_reasoning_required_fields: [claim_id, claim, evidence_refs, direct_observation, inference, alternative_explanations, exclusion_or_limitation, max_justified_conclusion, boundary_not_claimed, misconception_risk]
+
+point_rules:
+  point_means_student_learning_gain: true
+  fake_split_points_forbidden: true
+  adjacent_points_need_cognitive_reason: true
+  each_point_requires: [point_id, learning_gain, prerequisite_knowledge_ids, evidence_or_resource_ids, formation_cycle_id, next_need, out_of_scope_guard]
+
+student_state_rules:
+  instruction_modes: [teacher_explanation, teacher_demonstration, scaffolded_formation, independent_transfer, evaluation]
+  interactive_modes: [scaffolded_formation, independent_transfer, evaluation]
+  each_major_cycle_requires: [cycle_id, point_id, instruction_mode, interaction_required, knows_before, visible_now, resource_ids, teacher_prompt, student_task, plausible_short_response, likely_wrong_response, scaffold_1, scaffold_2, formed_knowledge_ids, formation_evidence, enactment]
+  enactment_requires: [prompt_anchor, formation_anchor, board_delta_ids]
+  interactive_enactment_additionally_requires: [invite_anchor, listen_anchor, paraphrase_anchor, feedback_anchor]
+  expected_response_must_be_possible_from_current_information: true
+  student_must_not_voice_full_teacher_reasoning_without_scaffold: true
+  teacher_explanation_must_not_be_disguised_as_student_discovery: true
+  interaction_must_have_cognitive_function: true
+  fixed_address_phrase_required: false
+
+resource_rules:
+  use_modes: [discovery, scaffold, verification, illustration, teacher_demo]
+  every_reasoning_resource_must_enter_classroom: true
+  each_reasoning_resource_requires: [resource_id, asset_path_or_source_page, identity, reveal_before_cycle, teacher_action, student_observes, directly_observed, inferred_from_conditions, task, supports_claims, use_mode, visible_information_ids, answer_bearing_information_ids, mask_policy]
+  mask_policies: [none_needed, masked_until_formation, cropped_until_formation]
+  actual_visibility_states: [SAFE, MASKED, CROPPED, FULL]
+  answer_bearing_resource_cannot_support_discovery_unmasked: true
+  answer_bearing_discovery_or_scaffold_resource_requires_student_response_event: true
+  answer_bearing_resource_safe_show_must_be_strictly_before_student_response: true
+  masked_or_safe_show_cannot_claim_answer_bearing_knowledge_release: true
+  answer_bearing_discovery_or_scaffold_RESOURCE_SHOW_FULL_forbidden: true
+  answer_bearing_resource_full_reveal_must_be_explicit_RESOURCE_REVEAL: true
+  answer_bearing_resource_reveal_must_be_after_student_response: true
+  first_full_exposure_derived_across_all_resource_events: true
+  first_full_exposure_event_type_must_be_RESOURCE_REVEAL: true
+  answer_bearing_resource_first_full_exposure_must_be_strictly_after_answer_knowledge_verified_first_release: true
+  direct_observation_must_be_separate_from_inference: true
+
+board_rules:
+  board_is_knowledge_formation_timeline: true
+  final_board_equals_ordered_accumulation_of_actual_board_add_events: true
+  board_add_event_must_bind_canonical_board_delta_id: true
+  prerequisite_and_newly_formed_knowledge_verified_first_release_ordinals_must_be_strictly_before_BOARD_ADD_ordinal: true
+  unverified_event_release_metadata_may_not_unlock_board: true
+  answer_before_student_task_forbidden: true
+  conclusion_before_formation_forbidden: true
+  each_delta_requires: [delta_id, trigger_cycle, prerequisite_knowledge_ids, newly_formed_knowledge_ids, add_only, forbidden_before_trigger]
+
+content_block_rules:
+  trial_cycle_must_trace_to_typed_events: true
+  interactive_event_order: [ASK, INVITE, WAIT, STUDENT_RESPONSE, PARAPHRASE, FEEDBACK]
+  engineering_label_only_is_not_executable_dialogue: true
+  empty_praise_only_is_insufficient: true
+  user_facing_internal_metadata_forbidden: [case_id, slot_id, receipt_id, process_gate_id, internal_review_code, event_id, requirement_id]
+
+information_release_rules:
+  planned_claim_source: SCRIPT_FACTS.release_claims
+  hard_causality_source_of_truth: verified_first_release
+  verified_first_release_derivation: machine-bound release_claim plus blocking Science/Evidence semantic PASS
+  bare_event_releases_is_author_claim_only_and_forbidden_when_nonempty: true
+  planning_sidecar_location: semantic-preflight-review.yaml#information_release_audit
+  planning_sidecar_is_authoritative_actual_fact: false
+  interactive_new_knowledge_before_student_task_forbidden: true
+
+practice_rules:
+  source_of_truth_for_trial_execution: SCRIPT_FACTS.practice_events
+  declared_inventory_location: semantic-preflight-review.yaml#practice_inventory
+  execution_scope_required_for_new_canonical_packages: true
+  execution_scope_values: [trial_event, support_product]
+  trial_event_scope_requires_prompt_role_trial: true
+  support_product_scope_must_not_use_prompt_role_trial: true
+  only_trial_event_scope_must_have_PRACTICE_event: true
+  support_product_scope_remains_bound_by_prompt_and_answer_role_anchors: true
+  ordered_trial_event_ids_must_equal_ordered_trial_inventory_ids: true
+  each_trial_practice_id_exactly_once: true
+  PRACTICE_event_text_must_contain_declared_prompt_anchor: true
+  set_only_equivalence_is_not_sufficient: true
+  historical_v8_missing_execution_scope_may_be_inferred_for_reading_only_but_current_gate_reports_missing_scope: true
+
+spoken_execution_rules:
+  source_markup_character_count_is_not_sufficient_timing_proof: true
+  spoken_source_of_truth: final typed spoken events
+  oralized_text_required: true
+  formula_oralization_event_required: true
+  formula_like_text_in_non_FORMULA_ORALIZE_event_machine_fails: true
+  residual_formula_oralization_completeness_owned_by_semantic_judge: true
+  final_spoken_coverage_required: 1.0
+  summary_may_substitute_for_spoken_text: false
+  elapsed_seconds_range_must_be_recomputable: true
+  total_seconds_range_must_equal_sum_of_event_or_segment_elapsed_ranges: true
+  duration_constraint_must_come_from_task_or_declared_profile: true
+  no_rehearsal_means_timing_status_estimate_only: true
+  measured_requires_rehearsal_evidence: true
+
+semantic_preflight:
+  machine_schema_pass_is_not_semantic_pass: true
+  author_self_checks: [science_red_team, student_state_simulation, enactment_board_dry_run]
+  author_self_checks_have_gate_authority: false
+  legacy_author_pass_fields_may_remain_during_migration: true
+  hard_fail_list_must_be_empty_for_author_submission: true
+  independent_semantic_judges_required_before_freeze: true
+
+content_addressed_gate_evidence:
+  machine_and_judge_binding_closure_is_allowlist_complete: true
+  machine_gate_binds:
+  - canonical PROCESS/contract/checker/internal-core/architecture-helper/architecture-impl/enforcement-helper bytes
+  - executable enforcement registry digest
+  - manifest and normalized source-lock digest
+  - repository source PDF exact bytes
+  - SOURCE_REVIEW receipt
+  - reference usage contract and selected CASE receipts
+  - structural candidate CASE identities through evidence.yaml candidate receipt SHA-256 values, rechecked against current CASE bytes
+  - all deterministic semantic sidecars
+  - Lesson Evidence IR / SCRIPT_EVENTS / SCRIPT_FACTS
+  - all five final user content roles
+  - BOARD_PLAN
+  judge_additionally_binds: [MACHINE_GATE receipt]
+  freeze_additionally_binds: [WORK_PACKET with durable state_trace, both semantic judge files]
+  HUMAN_ACCEPTANCE_RECEIPT_is_post_freeze_and_not_freeze_bound: true
+  byte_change_policy:
+    prior_machine_gate: STALE
+    prior_semantic_judge: STALE
+    prior_freeze: STALE_WHEN_BOUND_INPUT_CHANGED
+    prior_human_acceptance_receipt: STALE_WHEN_FREEZE_OR_REVIEW_CHANGED
+  stale_evidence_may_unlock: false
+
+required_user_content_roles: [reference_plan, exam_skeleton, trial, defense, analysis]
+required_semantic_artifacts:
+  evidence: evidence.yaml
+  science_reasoning: SCIENCE_REASONING_AUDIT.yaml
+  teaching_boundary: teaching-boundary.yaml
+  point_chain: point-chain.yaml
+  student_state: STUDENT_STATE_LEDGER.yaml
+  resource_action: RESOURCE_ACTION_MAP.yaml
+  board_plan: BOARD_PLAN.yaml
+  board_timeline: BOARD_TIMELINE.yaml
+  enactment_timeline: ENACTMENT_TIMELINE.yaml
+  semantic_preflight: semantic-preflight-review.yaml
+  source_review: SOURCE_REVIEW.yaml
+  submission_freeze: SUBMISSION_FREEZE.yaml
+  canonical_migration_adds:
+  - LESSON_EVIDENCE_IR.yaml
+  - SCRIPT_EVENTS.yaml
+  - SCRIPT_FACTS.yaml
+  - WORK_PACKET.yaml
+  - MACHINE_GATE.yaml
+  - SCIENCE_EVIDENCE_JUDGE.yaml
+  - ENACTMENT_STUDENT_JUDGE.yaml
+  post_freeze_acceptance: HUMAN_ACCEPTANCE_RECEIPT.yaml
+
+formation_sequence:
+- exact_repository_source_lock
+- independent_source_page_review
+- evidence_ready
+- reference_structural_candidate_comparison
+- science_reasoning_audit
+- lesson_evidence_ir
+- typed_script_event_stream
+- content_blocks
+- script_facts_release_claim_derivation
+- deterministic_machine_gate
+- science_evidence_judge_release_verification
+- verified_first_release_derivation
+- enactment_student_judge
+- verified_board_and_resource_causality
+- submission_freeze
+- independent_content_human_review
+- human_acceptance_receipt
+
+submission_freeze:
+  schema_id: teaching-demo-content-submission-freeze
+  source_commit_required: true
+  source_commit_format: 40_lower_hex
+  exact_byte_bindings_required: true
+  binds_current_process_contract_checker: true
+  binds_canonical_internal_core: true
+  binds_canonical_architecture_helper_and_impl: true
+  binds_canonical_enforcement_helper: true
+  binds_source_review: true
+  binds_repository_source_pdf: true
+  binds_script_facts_and_semantic_judges: true
+  binds_work_packet_and_state_trace: true
+  binds_selected_reference_receipts: true
+  binds_manifest_semantic_artifacts_and_all_five_user_content_roles: true
+  freeze_file_does_not_self_bind: true
+  post_freeze_human_acceptance_receipt_not_bound_here: true
+  any_bound_byte_change_invalidates_readiness: true
+
+independent_review_artifact:
+  path: INDEPENDENT_CONTENT_REVIEW.yaml
+  created_only_after_content_freeze: true
+  reviewer_role_required: INDEPENDENT_HUMAN
+  decision_required: PASS
+  exact_byte_bindings_required: true
+  binds_submission_freeze: true
+
+human_acceptance_receipt:
+  path: HUMAN_ACCEPTANCE_RECEIPT.yaml
+  schema_id: teaching-demo-human-acceptance-v1
+  created_only_after_independent_review_PASS: true
+  transition: [SUBMISSION_FROZEN, HUMAN_ACCEPTED]
+  must_not_mutate_frozen_WORK_PACKET: true
+  required_fields: [schema_id, case_id, from_state, to_state, source_commit, bindings, transition_digest]
+  binds_exact: [SUBMISSION_FREEZE.yaml, INDEPENDENT_CONTENT_REVIEW.yaml]
+  transition_digest_is_sha256_of_record_without_transition_digest: true
+  required_for_accepted_mode_and_downstream_unlock: true
+
+score:
+  total_points: 100
+  submission_threshold: 92
+  excellent_target: 95
+  hard_fail_overrides_numeric_score: true
+  dimensions:
+    evidence_boundary_and_science: {points: 20, minimum: 17}
+    point_and_cognitive_chain: {points: 16, minimum: 14}
+    student_state_and_classroom_cycles: {points: 18, minimum: 16}
+    resource_and_inquiry_enactment: {points: 14, minimum: 12}
+    board_lineage_and_time_causality: {points: 14, minimum: 12}
+    spoken_executability_and_timing: {points: 10, minimum: 9}
+    candidate_product_usability: {points: 8, minimum: 7}
+
+hard_fail:
+- fabricated_or_unreviewed_source_evidence
+- source_identity_or_source_review_binding_stale
+- physics_or_subject_matter_error
+- observation_inference_conflation
+- condition_or_domain_dropped
+- conclusion_stronger_than_evidence
+- expected_response_requires_unrevealed_information
+- critical_student_question_missing_invite_listen_paraphrase_feedback
+- fake_duplicate_or_stale_reference_candidate_receipt
+- bare_or_unverified_release_used_as_hard_formation_fact
+- semantic_release_claim_not_established
+- answer_bearing_resource_missing_student_response
+- answer_bearing_resource_revealed_before_student_response
+- answer_bearing_RESOURCE_SHOW_FULL_used_for_discovery_or_scaffold
+- answer_resource_visibility_state_missing
+- answer_resource_first_full_exposure_not_explicit_reveal
+- answer_resource_revealed_before_verified_formation
+- actual_board_add_not_strictly_after_verified_formation
+- practice_scope_occurrence_or_text_binding_drift
+- formula_oralization_missing
+- timing_arithmetic_not_recomputable
+- state_transition_trace_missing_invalid_or_unresolved
+- executable_machine_requirement_mapping_missing
+- machine_gate_receipt_generator_validator_contract_drift
+- semantic_judge_evidence_missing
+- semantic_judge_producer_provenance_missing_before_accepted_mode
+- blocking_semantic_unknown
+- gate_evidence_stale
+- submission_freeze_binding_stale
+- human_acceptance_receipt_missing_or_stale
+- internal_aggregate_acceptance_capability_present
+- metadata_based_capability_isolation_attempt
+- repository_local_gate_b_self_activation_attempt
+
+review_and_unlock:
+  engineer_score_meaning: submission_readiness_estimate_only
+  engineer_score_can_unlock_downstream: false
+  author_pass_can_unlock_downstream: false
+  machine_pass_alone_can_unlock_downstream: false
+  semantic_pass_without_human_can_unlock_downstream: false
+  independent_content_human_review_required: true
+  independent_pass_threshold: 92
+  independent_every_dimension_minimum_required: true
+  independent_hard_fail_count_required: 0
+  independent_review_must_bind_exact_frozen_bytes: true
+  HUMAN_ACCEPTANCE_RECEIPT_required_after_independent_PASS: true
+  only_current_HUMAN_ACCEPTANCE_RECEIPT_may_release_content_to_downstream: true
+  phase_a_accepted_mode_globally_locked: true
+  repository_local_gate_b_activation_can_unlock: false
+  phase_b_controller_and_independent_gate_b_required_before_accepted_mode_can_exist: true
+
+two_topic_process_validation:
+  required_before_process_declared_calibrated: true
+  topics: 2
+  selection: random_from_frozen_eligible_pool
+  first_complete_submission_counts: true
+  difficulty_based_replacement_forbidden: true
+  both_must_independently_pass: true
+  automatic_third_topic_after_failure: false
+  content_only_no_pdf_composition: true
+  fresh_validation_requires_explicit_new_authorization_after_phase_b: true
