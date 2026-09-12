@@ -1,0 +1,77 @@
+####################################################################################
+# contracts/engine-handoff.yaml — 全仓唯一跨仓 Engine 锚点
+#
+# authority:
+# - 只在本文件声明可执行 Engine 版本。
+# - 当前 pin_mode=commit：完整 40 位 commit SHA 本身就是不可变版本标识。
+# - 不要求创建 Git tag；branch 名、短 SHA、占位值均不是合法生产锚点。
+# - tools/check_engine_handoff.py --strict 必须远端确认 commit 存在，并校验契约字节 hash。
+#
+# privacy:
+# - Engine 为公开无状态机械执行仓。
+# - 私有教材、求职材料、业务包、凭证不得进入公开仓或公开 artifact。
+####################################################################################
+
+version: 2
+
+engine:
+  repository: riyuewuxing/PDF-Production-Engine
+
+  # 唯一活动固定模式。后续若升级 Engine，必须用新证据显式更新这两个 SHA 字段；
+  # public main 的自然前进不会自动改变本项目使用的 Engine 版本。
+  pin_mode: commit
+  ref: f4229338d2c6fce3d248360402ee13f550a3f967
+  commit: f4229338d2c6fce3d248360402ee13f550a3f967
+
+  cli_contract: "schemas/resource-job-v1.yaml"
+  cli_contract_sha256: "e1c18ad73306aad7f2b926b921d482d014d1b41e4ce4e989f475a397323d8264"
+
+  transport: chatgpt-session-mediated
+  additional_contracts: []
+
+handoff:
+  package: "build-package/<job_id>.zip"
+  manifest: "manifest.json"
+  request: "handoff-request.json"
+  receipt: "provenance-receipt.json"
+  verified_result: "verified-result.json"
+  review_pack: "review-pack.json"
+
+orchestration:
+  implementation: tools/handoff.py
+  generic_binary_dispatch_assumed: false
+  request_status_before_execution: PENDING_ENGINE_EXECUTION
+  engine_machine_result_status: ENGINE_MACHINE_RESULT_RECORDED
+  verified_result_status: VERIFIED_MACHINE_RESULT
+  resource_or_composition_pause: WAITING_FOR_BLOCK_REVIEW
+  final_pause: WAITING_FOR_HUMAN
+  engine_receipt_must_bind:
+    - engine.repository
+    - engine.commit
+    - request_sha256
+    - package_sha256
+    - package_manifest_sha256
+    - engine_job_sha256
+    - block_evidence_sha256
+    - outputs
+  automatic_review_pass: false
+  automatic_human_acceptance: false
+  automatic_publication: false
+  artifact_lifecycle_operator: tools/manage_artifact_job.py
+  rule: >-
+    The orchestrator may prepare and verify a session-mediated handoff but may not
+    claim transport, REVIEW_PASS, HUMAN acceptance, or publication without the
+    corresponding actual evidence and existing Artifact lifecycle operator.
+
+unlock_policy:
+  formal_pdf: bounded_release
+  phase_b: independent_evidence_line
+
+single_declaration:
+  allow_only:
+    - "contracts/engine-handoff.yaml"
+  allowed_reference_files:
+    - "docs/ENGINE-HANDOFF.md"
+    - "docs/READING-PATH.md"
+    - "HANDOFF.md"
+    - "AGENTS.md"
