@@ -23,8 +23,29 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install public Engine runtime dependencies
-        run: python -m pip install -e .
+      - name: Install public Engine and project-declared probe dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -e .
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          path = Path('.engine-job/p3-delivery/repo/requirements-pdf.txt')
+          data = path.read_bytes()
+          actual = hashlib.sha1(
+              f'blob {len(data)}\\0'.encode('ascii') + data
+          ).hexdigest()
+          expected = '13bcb4692e48f9296f7a5b96ad290d2f8055b70d'
+          if actual != expected:
+              raise SystemExit(
+                  f'requirements-pdf.txt exact blob mismatch: '
+                  f'expected={expected} actual={actual}'
+              )
+          print(f'P3_RUNTIME_REQUIREMENTS_BLOB_PASS {actual}')
+          PY
+          python -m pip install -r .engine-job/p3-delivery/repo/requirements-pdf.txt
 
       - name: Verify exact source and execute canonical P3 path
         shell: bash
