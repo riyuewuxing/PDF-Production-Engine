@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p2c-handoff-runtime-input-v1",
+  "privacy": "public-nonsecret-synthetic-fixture-only",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "fa1321e0a26904e04f55123c3370ae179791dd20",
+  "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
+  "engine_source_blobs": {
+    "src/pdf_production_engine/job_protocol.py": "c80e3e0861e1d701288959429f24ea5a30bf2237",
+    "src/pdf_production_engine/resource_runner.py": "728862e4d20bf39ee721af91ceb9694ef8976d7a"
+  },
+  "files": [
+    {
+      "path": "tools/handoff.py",
+      "git_blob_sha1": "7859f580e04f25eb5882f87851b27a7465a02ca2"
+    },
+    {
+      "path": "tools/build_packager.py",
+      "git_blob_sha1": "126850f65adfb125616423f9790e7863af507d0b"
+    },
+    {
+      "path": "tools/artifact_foundation.py",
+      "git_blob_sha1": "bb55345664781a974fdcdc7039d457cab601622d"
+    },
+    {
+      "path": "tools/check_artifact_job.py",
+      "git_blob_sha1": "c55f46b34133f5273aa245ba0a19eb25b6020f5e"
+    },
+    {
+      "path": "tools/check_execution_ledger.py",
+      "git_blob_sha1": "7f25469306e15331d716cbcd7c9f57d2812ab99e"
+    },
+    {
+      "path": "tools/provenance_snapshot.py",
+      "git_blob_sha1": "738e9a38c34a540a09d4d77d4df91506301dc1cc"
+    },
+    {
+      "path": "tools/check_engine_handoff.py",
+      "git_blob_sha1": "43644970c2927ccfda826da9917f125b2d43cc3f"
+    },
+    {
+      "path": "examples/p2b_build_package_fixture.py",
+      "git_blob_sha1": "86df540c2dfa224a3ce1ed4e50b2d46b7c454cd1"
+    },
+    {
+      "path": "examples/p2c_handoff_fixture.py",
+      "git_blob_sha1": "764ce12340f499ddf139c9690cd0fec820259d92"
+    },
+    {
+      "path": "production/contracts/artifact-job-v1.yaml",
+      "git_blob_sha1": "6a7d8d1548443923e8a74fe9c681d43d7b913f33"
+    },
+    {
+      "path": "contracts/engine-handoff.yaml",
+      "git_blob_sha1": "44e1598f743caac9dd3961f4d3ee0a5a836698a2"
+    },
+    {
+      "path": "tools/tooling-manifest.yaml",
+      "git_blob_sha1": "abfd9eed12f02df67ec5a99e8e991471a2e9e5fb"
+    },
+    {
+      "path": "tools/run_acceptance.py",
+      "git_blob_sha1": "ba36b04dcd1304cdd4642473aa40d65963315b75"
+    }
+  ],
+  "expected_file_count": 13,
+  "assertions": {
+    "generic_binary_dispatch_claimed": false,
+    "private_business_bytes_used": false,
+    "automatic_state_mutation": false,
+    "automatic_human_acceptance": false,
+    "automatic_publication": false,
+    "product_pdf_generated": false
+  }
+}
