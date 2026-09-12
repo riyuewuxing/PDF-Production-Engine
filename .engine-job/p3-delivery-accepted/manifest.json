@@ -3,7 +3,7 @@
   "kind": "qiuzhidaren-p3-canonical-delivery-accepted-runtime-input-v1",
   "privacy": "public-nonsecret-synthetic-fixture-only",
   "source_repository": "riyuewuxing/qiuzhidaren",
-  "source_commit": "afa11e3b87da0ebb1c44da33e4496d5cd44b0269",
+  "source_commit": "81f6c0d32ef09f78935e90d2f04d140ed2a3e426",
   "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
   "files": [
     {
@@ -49,8 +49,52 @@
     {
       "path": "examples/p3_canonical_accepted_fixture.py",
       "git_blob_sha1": "0b469a892b543127daaeef732dcac8b45172f0b9"
+    },
+    {
+      "path": "tools/provenance_snapshot.py",
+      "git_blob_sha1": "738e9a38c34a540a09d4d77d4df91506301dc1cc"
+    },
+    {
+      "path": "tools/teaching_demo_artifact_plan_primitives.py",
+      "git_blob_sha1": "60c7e87347c7910cd964661e27f18a9f13f49711"
+    },
+    {
+      "path": "tools/plan_teaching_demo_artifact_job.py",
+      "git_blob_sha1": "2f1019a6fa5f2597ae5eedff9db5bb53d0a1717c"
+    },
+    {
+      "path": "tools/check_teaching_demo_inputs.py",
+      "git_blob_sha1": "7b3e429e0d4a7c8277b4474725395f621f4f9e4a"
+    },
+    {
+      "path": "tools/publisher_core.py",
+      "git_blob_sha1": "9ed2b3cb6a5c9f3bebf8d424a837cec450463f49"
+    },
+    {
+      "path": "tools/publisher_core_legacy.py",
+      "git_blob_sha1": "9f790c7ab15844249f79b55abe34623f3f058232"
+    },
+    {
+      "path": "tools/board_contract.py",
+      "git_blob_sha1": "2633da451b9ded53c9d23d58fb415d2a4e8c4558"
+    },
+    {
+      "path": "tools/physics_notation.py",
+      "git_blob_sha1": "b47c3f75999017a8a97d95a0e52e4ae7c1dd199c"
+    },
+    {
+      "path": "tools/latex_inline.py",
+      "git_blob_sha1": "337fac30a0079f2ee00c3185a34d70b8b7cac0b7"
+    },
+    {
+      "path": "tools/physics_figures.py",
+      "git_blob_sha1": "98c118d371298ef0e4f798c32c8f4d782765714b"
+    },
+    {
+      "path": "examples/p3_consumer_reachability_fixture.py",
+      "git_blob_sha1": "3838f74f42843719bcc29e04a678b5ff150c3d67"
     }
   ],
-  "expected_file_count": 11,
+  "expected_file_count": 22,
   "product_pdf_expected": false
 }
