@@ -1,0 +1,230 @@
+name: P2b Build Package Runtime
+
+on:
+  push:
+    branches:
+      - 'job-architecture/p2b-build-package-*'
+    paths:
+      - '.engine-job/p2b-build-package/**'
+      - '.github/workflows/p2b-build-package-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-to-engine:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned Engine runtime
+        run: python -m pip install -e .
+
+      - name: Verify exact source and run P2b roundtrip
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, shutil, subprocess, sys, time, zipfile
+
+          checkout = Path.cwd().resolve()
+          base = checkout / '.engine-job/p2b-build-package'
+          source_root = base / 'repo'
+          runtime = base / 'runtime'
+          out = base / 'output'
+          runtime.mkdir(parents=True, exist_ok=True)
+          out.mkdir(parents=True, exist_ok=True)
+          manifest = json.loads((base / 'manifest.json').read_text(encoding='utf-8'))
+
+          def blob_sha(data: bytes) -> str:
+              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
+
+          verified = []
+          for item in manifest['files']:
+              path = (source_root / item['path']).resolve()
+              if source_root.resolve() != path and source_root.resolve() not in path.parents:
+                  raise SystemExit(f'path escape: {item["path"]}')
+              data = path.read_bytes()
+              actual = blob_sha(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(
+                      f'exact source mismatch: {item["path"]}: '
+                      f'expected={item["git_blob_sha1"]} actual={actual}'
+                  )
+              verified.append({
+                  'path': item['path'],
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+          if len(verified) != manifest['expected_file_count']:
+              raise SystemExit('verified source count drift')
+
+          engine_verified = []
+          for raw, expected in manifest['engine_source_blobs'].items():
+              data = (checkout / raw).read_bytes()
+              actual = blob_sha(data)
+              if actual != expected:
+                  raise SystemExit(
+                      f'Engine source drift from pinned base: {raw}: '
+                      f'expected={expected} actual={actual}'
+                  )
+              engine_verified.append({
+                  'path': raw,
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+
+          commands = []
+          def run(command, cwd):
+              started = time.monotonic()
+              proc = subprocess.run(
+                  command,
+                  cwd=cwd,
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+              )
+              output = proc.stdout or ''
+              print('>>>', ' '.join(str(x) for x in command))
+              print(output, end='')
+              commands.append({
+                  'command': [str(x) for x in command],
+                  'exit_code': proc.returncode,
+                  'duration_seconds': round(time.monotonic() - started, 6),
+                  'output': output[-12000:],
+              })
+              if proc.returncode != 0:
+                  raise SystemExit(
+                      f'command failed: {command}: exit={proc.returncode}'
+                  )
+
+          py = sys.executable
+          run([
+              py, '-m', 'py_compile',
+              'tools/artifact_foundation.py',
+              'tools/check_execution_ledger.py',
+              'tools/provenance_snapshot.py',
+              'tools/check_artifact_job.py',
+              'tools/build_packager.py',
+              'examples/p2b_build_package_fixture.py',
+          ], source_root)
+          run([py, 'tools/build_packager.py', 'self-test'], source_root)
+
+          workspace = runtime / 'workspace'
+          packages = runtime / 'packages'
+          run([
+              py,
+              'examples/p2b_build_package_fixture.py',
+              '--workspace', str(workspace),
+              '--out-dir', str(packages),
+          ], source_root)
+
+          package = packages / 'a/p2b-public-fixture.zip'
+          package_bytes = package.read_bytes()
+          package_sha = hashlib.sha256(package_bytes).hexdigest()
+
+          unpacked = runtime / 'unpacked'
+          if unpacked.exists():
+              shutil.rmtree(unpacked)
+          unpacked.mkdir(parents=True)
+          with zipfile.ZipFile(package, 'r') as zf:
+              for info in zf.infolist():
+                  target = (unpacked / info.filename).resolve()
+                  if unpacked.resolve() != target and unpacked.resolve() not in target.parents:
+                      raise SystemExit(
+                          f'unsafe package member during consumption: {info.filename}'
+                      )
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(zf.read(info))
+
+          package_manifest = json.loads(
+              (unpacked / 'manifest.json').read_text(encoding='utf-8')
+          )
+
+          run([
+              py, '-m', 'pdf_production_engine.job_protocol',
+              str(unpacked / 'resource-job.yaml'),
+          ], checkout)
+
+          engine_out = runtime / 'engine-output'
+          run([
+              py, '-m', 'pdf_production_engine.resource_runner',
+              '--root', str(unpacked),
+              '--job', 'resource-job.yaml',
+              '--block', 'fixture-resource',
+              '--out', str(engine_out),
+          ], checkout)
+
+          block_dir = engine_out / 'p2b-public-fixture/fixture-resource'
+          block_evidence = json.loads(
+              (block_dir / 'block-evidence.json').read_text(encoding='utf-8')
+          )
+          result = (block_dir / 'result.txt').read_text(encoding='utf-8')
+          if block_evidence.get('status') != 'MACHINE_PASS':
+              raise SystemExit('Engine block evidence is not MACHINE_PASS')
+          if block_evidence.get('review_status') != 'REVIEW_REQUIRED':
+              raise SystemExit('Engine block review_status drift')
+          if result != 'DETERMINISTIC FIXTURE INPUT\n':
+              raise SystemExit(f'Engine output content drift: {result!r}')
+
+          evidence = {
+              'version': 1,
+              'kind': 'qiuzhidaren-p2b-build-package-runtime-evidence-v1',
+              'status': 'MACHINE_PASS',
+              'review_status': 'REVIEW_REQUIRED',
+              'source_repository': manifest['source_repository'],
+              'source_commit': manifest['source_commit'],
+              'engine_base_commit': manifest['engine_base_commit'],
+              'engine_execution_repository': os.environ.get('GITHUB_REPOSITORY'),
+              'engine_execution_commit': os.environ.get('GITHUB_SHA'),
+              'engine_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'execution_surface': 'public-engine-github-hosted-runner',
+              'private_repository_access_used': False,
+              'private_repository_credentials_used': False,
+              'product_pdf_generated': False,
+              'fixture_privacy': 'public',
+              'verified_source': verified,
+              'verified_engine_source': engine_verified,
+              'package': {
+                  'sha256': package_sha,
+                  'size_bytes': len(package_bytes),
+                  'manifest_sha256': hashlib.sha256(
+                      (unpacked / 'manifest.json').read_bytes()
+                  ).hexdigest(),
+                  'engine_job_sha256': hashlib.sha256(
+                      (unpacked / 'resource-job.yaml').read_bytes()
+                  ).hexdigest(),
+                  'stage': package_manifest.get('stage_scope'),
+                  'block_id': package_manifest.get('block_id'),
+              },
+              'engine_result': block_evidence,
+              'output_sha256': hashlib.sha256(
+                  (block_dir / 'result.txt').read_bytes()
+              ).hexdigest(),
+              'commands': commands,
+          }
+          (out / 'evidence.json').write_text(
+              json.dumps(evidence, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(evidence, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload public-safe P2b evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2b-build-package-runtime-evidence
+          path: |
+            .engine-job/p2b-build-package/output/evidence.json
+            .engine-job/p2b-build-package/runtime/packages/a/p2b-public-fixture.zip
+          if-no-files-found: error
