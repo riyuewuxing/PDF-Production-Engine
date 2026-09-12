@@ -1,0 +1,375 @@
+version: 1
+id: teacher-trial-two-pdf-v1
+
+case_manifest:
+  schema_id: teacher-trial-case-v1
+  schema_version: 1
+  formal_schema_required: true
+  ready_status:
+    source_role: evidence
+    field: scaffold_status
+    value: READY
+  scaffold:
+    source_files:
+      evidence: evidence.yaml
+      board: BOARD_PLAN.yaml
+      reference_plan: 01_训练参考教案.md
+      exam_skeleton: 02_考场骨架教案.md
+      trial: 03_逐字稿.md
+      defense: 04_课题专属答辩.md
+      analysis: 05_教材到骨架提炼解析.md
+    deliverable_templates:
+      training: '{title}｜面试训练稿.pdf'
+      extraction: '{title}｜教材到骨架提炼解析.pdf'
+    default_constraints:
+      board_sections_min: 3
+      figure_count_min: 0
+
+protected_operations:
+  architecture_decision: architecture/adr/ADR-016-teaching-demo-protected-capability-consumer-closure.md
+  extends_decision: architecture/adr/ADR-015-teaching-demo-protected-operation-capability-graph.md
+  content_accept:
+    canonical_entry: tools/check_teaching_demo_content.py
+    complete_symbol: validate
+    implementation_libraries:
+      - tools/_teaching_demo_content_core.inc
+      - tools/teaching_demo_content_architecture.py
+      - tools/_teaching_demo_content_architecture_impl.py
+      - tools/teaching_demo_content_enforcement.py
+    forbidden_library_complete_symbols: [validate, validate_case, main]
+    forbid_library_cli: true
+    forbidden_paths: []
+  artifact_plan_write:
+    canonical_entry: tools/plan_teaching_demo_artifact_job.py
+    complete_symbols: [build_plan, write_content_addressed_plan]
+    implementation_libraries:
+      - tools/teaching_demo_artifact_plan_primitives.py
+    accepted_content_precondition_required: true
+    forbidden_library_complete_symbols: [build_plan, write_content_addressed_plan, main]
+    forbid_library_cli: true
+    forbidden_paths:
+      - tools/plan_teaching_demo_artifact_job_legacy.py
+  artifact_input_lock_consume:
+    canonical_entry: tools/check_artifact_job.py
+    complete_symbol: validate
+    implementation_libraries:
+      - tools/verify_teaching_demo_artifact_plan.py
+    verifier_callback: verify_live_job_input_plan
+    canonical_plan_reconstruction_required: true
+    forbidden_library_complete_symbols: [main]
+    forbid_library_cli: true
+    forbidden_paths: []
+  product_pdf_compose:
+    canonical_entry: tools/build_current_run.py
+    complete_symbol: build_product
+    implementation_libraries:
+      - tools/publisher_core.py
+      - tools/publisher_core_legacy.py
+    accepted_content_precondition_required: true
+    forbidden_library_complete_symbols: [main, build, build_product]
+    forbid_library_cli: true
+    forbidden_paths: []
+  formal_render:
+    canonical_entry: tools/render_current_run.py
+    complete_symbol: render_product
+    implementation_libraries: []
+    accepted_content_precondition_required: true
+    forbidden_library_complete_symbols: [main, render_product]
+    forbid_library_cli: true
+    forbidden_paths: []
+  rule: >-
+    A protected operation has exactly one complete current orchestrator. Implementation
+    libraries may expose primitives but may not independently perform the complete
+    protected operation or expose a direct protected CLI. Consumer boundaries that
+    commit protected state must independently re-establish the canonical precondition.
+
+artifact_job_profile:
+  plan_schema_id: teaching-demo-artifact-input-plan-v1
+  module_id: teacher_teaching_demo
+  planner: tools/plan_teaching_demo_artifact_job.py
+  locker: tools/lock_artifact_input_plan.py
+  output_root: production/teaching-demo-artifact-plans
+  include_case_manifest: true
+  source_commit_required: true
+  content_acceptance_capsule:
+    required: true
+    bindings:
+      submission_freeze:
+        filename: SUBMISSION_FREEZE.yaml
+        kind: content_submission_freeze
+      independent_content_review:
+        filename: INDEPENDENT_CONTENT_REVIEW.yaml
+        kind: independent_content_review
+      human_acceptance_receipt:
+        filename: HUMAN_ACCEPTANCE_RECEIPT.yaml
+        kind: content_human_acceptance_receipt
+    human_receipt_case_id_must_equal_manifest_case_id: true
+    human_receipt_source_commit_must_equal_plan_source_commit: true
+    human_receipt_must_bind_current_freeze_and_review: true
+    rule: >-
+      The Artifact plan must freeze the complete post-freeze acceptance chain. The HUMAN
+      receipt is not authority by itself: its case/source_commit and exact freeze/review
+      bindings must agree with the plan and current repository bytes.
+  input_lock_verification:
+    mode: canonical-plan-reconstruction-v1
+    required_from_state: INPUTS_LOCKED
+    input_plan_binding_kind: input_plan
+    direct_generic_lock_without_verified_plan: forbidden
+    verifier:
+      path: tools/verify_teaching_demo_artifact_plan.py
+      function: verify_live_job_input_plan
+      binding_kind: input_plan_live_verifier
+      repository_bootstrap: self-contained-no-repository-imports-v1
+    canonical_reconstruction_execution:
+      mode: isolated-fresh-python-file-subprocess-v1
+      planner_path_from_profile: true
+      planner_binding_required: true
+      current_process_module_alias_is_authority: false
+      isolated_interpreter_required: true
+      canonical_tools_path_inserted_first: true
+    rule: >-
+      Every live INPUTS_LOCKED+ Teaching Demo Artifact Job must bind exactly one canonical
+      content-addressed input plan and the verifier bytes. The verifier bootstrap primitives
+      must be self-contained and may not execute repository-local helper code before the
+      decision. Canonical reconstruction must execute the exact bound profile-declared
+      planner file in an isolated fresh Python process. Current-process module aliases and
+      self-declared plan fields are not authority.
+  workspace_source_roles:
+    - evidence
+    - board
+    - reference_plan
+    - exam_skeleton
+    - trial
+    - defense
+    - analysis
+  repository_dependencies:
+    - {path: production/contracts/module-registry-v1.yaml, kind: module_registry}
+    - {path: production/contracts/artifact-job-v1.yaml, kind: artifact_contract}
+    - {path: production/contracts/execution-ledger-v1.yaml, kind: execution_ledger_contract}
+    - {path: production/contracts/repository-provenance-snapshot-v1.yaml, kind: provenance_snapshot_contract}
+    - {path: production/contracts/teaching-demo-content.yaml, kind: canonical_content_contract}
+    - {path: production/process/teaching-demo-content/PROCESS.md, kind: canonical_content_process}
+    - {path: tools/check_teaching_demo_content.py, kind: canonical_content_gate}
+    - {path: tools/_teaching_demo_content_core.inc, kind: canonical_content_internal_core}
+    - {path: tools/teaching_demo_content_architecture.py, kind: canonical_content_architecture_facade}
+    - {path: tools/_teaching_demo_content_architecture_impl.py, kind: canonical_content_architecture_impl}
+    - {path: tools/teaching_demo_content_enforcement.py, kind: canonical_content_enforcement}
+    - {path: tools/artifact_foundation.py, kind: artifact_foundation_dependency}
+    - {path: tools/run_acceptance.py, kind: golden_path_orchestrator}
+    - {path: tools/process_telemetry.py, kind: process_telemetry}
+    - {path: tools/provenance_snapshot.py, kind: provenance_snapshot_tool}
+    - {path: tools/init_artifact_job.py, kind: artifact_initializer}
+    - {path: tools/manage_artifact_job.py, kind: artifact_transaction_operator}
+    - {path: tools/check_execution_ledger.py, kind: execution_ledger_gate}
+    - {path: tools/lock_artifact_input_plan.py, kind: input_plan_locker}
+    - {path: tools/verify_teaching_demo_artifact_plan.py, kind: input_plan_live_verifier}
+    - {path: tools/check_artifact_job.py, kind: live_artifact_state_gate}
+    - {path: tools/check_teaching_demo_case.py, kind: case_gate}
+    - {path: tools/check_teaching_demo_inputs.py, kind: prebuild_gate}
+    - {path: tools/publisher_core.py, kind: publisher_primitive_facade}
+    - {path: tools/publisher_core_legacy.py, kind: publisher_primitive_library}
+    - {path: production/templates/teacher_teaching_demo/user-latex-baseline-v2.tex, kind: latex_visual_baseline}
+    - {path: production/templates/teacher_teaching_demo/user-latex-baseline-v2.yaml, kind: latex_visual_baseline_provenance}
+    - {path: tools/check_current_run.py, kind: module_checker}
+    - {path: tools/render_current_run.py, kind: render_adapter}
+    - {path: tools/pdf_text_occupancy.py, kind: render_qa_dependency}
+    - {path: tools/latex_inline.py, kind: publisher_dependency}
+    - {path: tools/physics_notation.py, kind: semantic_gate_dependency}
+    - {path: tools/physics_figures.py, kind: figure_loader_dependency}
+    - {path: tools/board_contract.py, kind: board_dependency}
+    - {path: tools/skeleton_density.py, kind: skeleton_dependency}
+    - {path: tools/plan_teaching_demo_artifact_job.py, kind: input_planner}
+    - {path: tools/teaching_demo_artifact_plan_primitives.py, kind: input_planner_primitive_library}
+  repository_python_import_closure:
+    enabled: true
+    include_builder: true
+    excluded_dependency_kinds:
+      - golden_path_orchestrator
+      - provenance_snapshot_tool
+      - artifact_initializer
+      - artifact_transaction_operator
+      - execution_ledger_gate
+      - input_plan_locker
+      - input_plan_live_verifier
+      - live_artifact_state_gate
+      - input_planner
+      - input_planner_primitive_library
+    rule: >-
+      Engine/formal runtime Python dependencies must close over repository-local tools
+      imports. Governance, planning, provenance, locking, transaction and live-state
+      controls are exact plan/snapshot bindings but are intentionally excluded from the
+      Engine runtime closure; their own imports are enforced by the separate control
+      closure below. Dynamic repository dependencies remain explicit contract bindings.
+  repository_control_import_closure:
+    enabled: true
+    all_declared_python_dependencies_must_close: true
+    dynamic_non_python_dependencies_must_be_explicit: true
+    dynamic_repository_dependencies_must_be_explicit: true
+    include_builder: true
+    rule: >-
+      Every repository-local Python module statically imported by a declared Python
+      dependency or by the separately bound canonical builder must itself be declared in
+      repository_dependencies. Dynamic repository-local dependencies used by authority
+      code must be separately declared and checked by that consumer. The builder remains
+      authoritative through builder_binding and is scanned as a closure root rather than
+      duplicated under a second binding kind.
+  figure_dependencies:
+    marker_regex: '\[\[FIGURE:([a-z0-9-]+)\]\]'
+    registry: production/components/figures/registry.yaml
+    component_root: production/components/figures
+    include_registry_when_any_figure_used: true
+    include_only_used_components: true
+    unknown_marker: fail
+  recommended_review_blocks:
+    - id: source-boundary
+      source_roles: [evidence]
+    - id: board-skeleton
+      source_roles: [board, exam_skeleton]
+    - id: trial-script
+      source_roles: [trial]
+    - id: support-materials
+      source_roles: [reference_plan, defense, analysis]
+  invariants:
+    hidden_chat_memory_required: false
+    planner_generates_content: false
+    planner_accepts_blocks: false
+    planner_starts_pdf_build: false
+    input_plan_is_content_addressed: true
+    artifact_plan_binds_complete_content_acceptance_capsule: true
+    plan_source_commit_matches_content_human_acceptance: true
+    lock_operator_rechecks_current_hashes: true
+    artifact_transaction_operator_is_plan_bound: true
+    execution_ledger_gate_is_plan_bound: true
+    repository_control_import_closure_required: true
+    canonical_builder_is_separately_bound_and_control_closure_scanned: true
+    governance_controls_are_not_engine_runtime_dependencies: true
+    plan_file_is_bound_by_locker: true
+    live_artifact_gate_reconstructs_canonical_plan: true
+    live_verifier_bootstrap_primitives_are_self_contained: true
+    live_verifier_has_no_repository_local_bootstrap_import: true
+    canonical_reconstruction_uses_isolated_fresh_bound_planner_file: true
+    current_process_module_alias_cannot_define_verifier_primitives: true
+    current_process_module_alias_cannot_define_canonical_reconstruction: true
+    direct_generic_lock_without_verified_plan_forbidden: true
+    repository_snapshot_is_content_addressed: true
+    repository_snapshot_carries_source_commit: true
+    historical_verification_does_not_require_current_path_bytes: true
+    engine_private_repository_access_required: false
+    canonical_artifact_plan_write_entry: tools/plan_teaching_demo_artifact_job.py
+    canonical_artifact_input_lock_consumer_gate: tools/check_artifact_job.py
+    canonical_artifact_transaction_operator: tools/manage_artifact_job.py
+    canonical_product_pdf_compose_entry: tools/build_current_run.py
+    canonical_formal_render_entry: tools/render_current_run.py
+    accepted_content_required_before_plan_write: true
+    accepted_content_required_before_product_pdf_compose: true
+    accepted_content_required_before_formal_render: true
+    implementation_libraries_must_not_expose_complete_protected_operations: true
+
+documents:
+  training:
+    deliverable_role: training
+    tex_filename: 01_面试训练稿.tex
+    header_kind: 面试训练稿
+    title_suffix: 面试训练稿
+    subtitle: 题面 → 训练参考教案 → 考场骨架 → 逐字稿 → 课题专属答辩
+    sections:
+      - role: source_pages
+        heading: 一、题面 / 教材证据
+        renderer: source_pages
+      - role: reference_plan
+        heading: 二、训练参考教案
+        renderer: markdown
+        source_role: reference_plan
+      - role: exam_skeleton
+        heading: 三、考场骨架教案
+        renderer: markdown
+        source_role: exam_skeleton
+        include_total_board: true
+      - role: trial
+        heading: 四、逐字稿
+        renderer: markdown
+        source_role: trial
+        consume_board_markers: true
+      - role: defense
+        heading: 五、本课题专属答辩
+        renderer: markdown
+        source_role: defense
+  extraction:
+    deliverable_role: extraction
+    tex_filename: 02_教材到骨架提炼解析.tex
+    header_kind: 教材到骨架提炼解析
+    title_suffix: 教材到骨架提炼解析
+    subtitle: 从题面证据到考场提示词：边界、找点、串点、压缩、板书
+    renderer: markdown
+    source_role: analysis
+
+render:
+  dpi: 200
+
+publication:
+  publisher: XeLaTeX
+  require_global_typography: true
+  require_symbol_notation_lint: true
+  forbid_case_id_leak: true
+  forbidden_engineering_regexes:
+    - '\bP\d+\b'
+    - '\bB\d+\b'
+    - '(?m)^>$'
+
+source_policy:
+  require_source_pages: true
+  require_locked_identity: true
+  require_resilient_transport: true
+
+manifest_constraints:
+  allowed:
+    - board_sections_min
+    - figure_count_min
+  required:
+    - board_sections_min
+    - figure_count_min
+
+qa:
+  training_deliverable_role: training
+  extraction_deliverable_role: extraction
+  require_training_section_new_page: true
+  skeleton_section_role: exam_skeleton
+  trial_section_role: trial
+  defense_section_role: defense
+  homework_solution_section_role: reference_plan
+
+  exam_skeleton_section_pages_max: 1
+
+  skeleton_density:
+    max_nonspace_chars: 800
+    min_content_lines: 7
+    max_content_lines: 28
+    max_avg_visible_chars_per_line: 46
+    max_single_line_visible_chars: 96
+    max_full_sentence_ratio: 0.30
+    min_cue_line_ratio: 0.60
+    max_long_prose_lines: 2
+
+  visual_occupancy:
+    enabled: true
+    min_words_for_check: 20
+    warn_below_text_bbox_height_fraction: 0.32
+    hard_fail_below_text_bbox_height_fraction: 0.26
+
+  defense_questions:
+    heading_regex: '^###\s+问题\d+'
+    min: 5
+    max: 8
+
+  homework_solution:
+    required: true
+    token: 作业参考解析
+
+  required_training_section_roles:
+    - source_pages
+    - defense
+  required_extraction_sections:
+    - 题面证据
+    - 教学边界
+    - 找点与串点
+    - 常见错误链
