@@ -107,6 +107,10 @@ def _load_stage_spec(
         raise ValueError("engine stage spec input_paths must be a string list")
     if len(paths) != len(set(paths)):
         raise ValueError("engine stage spec input_paths contains duplicates")
+    if expected_mode in {"all_locked", "outputs_only"} and paths:
+        raise ValueError(
+            f"engine stage spec input_paths must be empty when input_mode={expected_mode}"
+        )
     for item in paths:
         _safe_relative(item, "engine stage spec input path")
         _locked_binding(job, item)
@@ -369,16 +373,14 @@ def _binding_paths(
             raise ValueError("build_provenance must be a mapping")
         for key in ("module_contract_binding", "builder_binding"):
             add_binding(provenance.get(key), f"build_provenance.{key}")
-        for raw in input_paths:
-            add_locked_path(raw, f"composition.input_paths[{raw}]")
+        for index, binding in enumerate(job.get("input_bindings") or []):
+            add_binding(binding, f"composition.all_locked[{index}]")
     elif stage == "final":
         outputs = job.get("outputs")
         if not isinstance(outputs, list) or not outputs:
             raise ValueError("final stage requires non-empty job.outputs")
         for index, binding in enumerate(outputs):
             add_binding(binding, f"outputs[{index}]")
-        for raw in input_paths:
-            add_locked_path(raw, f"final.input_paths[{raw}]")
     else:
         raise ValueError(f"unsupported stage: {stage}")
 
