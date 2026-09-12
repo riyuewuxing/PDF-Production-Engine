@@ -1,0 +1,255 @@
+name: Session LaTeX Job
+
+on:
+  push:
+    branches:
+      - 'feat/session-latex-job-v1'
+      - 'job-public/**'
+    paths:
+      - '.engine-job/session-latex/**'
+      - '.github/workflows/session-latex-job.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  session-latex:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout engine and session payload
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XeLaTeX and engine runtime
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            texlive-xetex \
+            texlive-lang-chinese \
+            texlive-latex-extra \
+            texlive-pictures \
+            texlive-science \
+            fonts-noto-cjk \
+            fonts-arphic-ukai \
+            fonts-arphic-uming \
+            fonts-wqy-zenhei \
+            poppler-utils \
+            fontconfig
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Create synthetic validation payload on feature branch only
+        if: startsWith(github.ref_name, 'feat/')
+        run: |
+          if [ ! -f .engine-job/session-latex/job.yaml ]; then
+            mkdir -p .engine-job/session-latex
+            cat > .engine-job/session-latex/job.yaml <<'YAML'
+          version: 1
+          privacy: public-safe
+          dpi: 200
+          locked_sources: []
+          documents:
+            - source: hello.tex
+              output: hello-session-latex.pdf
+          YAML
+            cat > .engine-job/session-latex/hello.tex <<'TEX'
+          \documentclass[UTF8,10pt]{ctexart}
+          \usepackage[a4paper,margin=2.5cm]{geometry}
+          \usepackage{amsmath}
+          \begin{document}
+          \section*{Session LaTeX Job}
+          这是一个公开合成验证样本。\[
+          E=\frac{F}{q}
+          \]
+          \end{document}
+          TEX
+          fi
+
+      - name: Validate session job manifest
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          root = Path('.engine-job/session-latex').resolve()
+          job_path = root / 'job.yaml'
+          if not job_path.is_file():
+              raise SystemExit('missing .engine-job/session-latex/job.yaml')
+          data = yaml.safe_load(job_path.read_text(encoding='utf-8')) or {}
+          if data.get('version') != 1:
+              raise SystemExit('job version must be 1')
+          if data.get('privacy') != 'public-safe':
+              raise SystemExit('session-latex workflow accepts only privacy: public-safe')
+          dpi = int(data.get('dpi', 200))
+          if not 144 <= dpi <= 240:
+              raise SystemExit('dpi must be 144..240')
+          docs = data.get('documents')
+          if not isinstance(docs, list) or not docs:
+              raise SystemExit('documents must be a non-empty list')
+          if len(docs) > 4:
+              raise SystemExit('documents limit is 4')
+
+          def safe_rel(raw):
+              p = Path(str(raw))
+              if p.is_absolute() or '..' in p.parts:
+                  raise SystemExit(f'unsafe relative path: {raw}')
+              target = (root / p).resolve()
+              if root != target and root not in target.parents:
+                  raise SystemExit(f'path escapes payload root: {raw}')
+              return target
+
+          outputs = set()
+          for idx, doc in enumerate(docs):
+              if not isinstance(doc, dict):
+                  raise SystemExit(f'document #{idx} must be mapping')
+              src = safe_rel(doc.get('source'))
+              if src.suffix.lower() != '.tex' or not src.is_file():
+                  raise SystemExit(f'document source missing/not tex: {doc.get("source")}')
+              out = Path(str(doc.get('output') or ''))
+              if out.name != str(out) or out.suffix.lower() != '.pdf':
+                  raise SystemExit(f'output must be a simple PDF filename: {out}')
+              if out.name in outputs:
+                  raise SystemExit(f'duplicate output: {out.name}')
+              outputs.add(out.name)
+
+          locked = data.get('locked_sources') or []
+          if not isinstance(locked, list):
+              raise SystemExit('locked_sources must be list')
+          for idx, item in enumerate(locked):
+              if not isinstance(item, dict):
+                  raise SystemExit(f'locked source #{idx} must be mapping')
+              spec = safe_rel(item.get('spec'))
+              out = safe_rel(item.get('out'))
+              if spec.suffix.lower() not in {'.yaml', '.yml'} or not spec.is_file():
+                  raise SystemExit(f'locked source spec missing: {item.get("spec")}')
+              if out == root:
+                  raise SystemExit('locked source out must be a child directory')
+
+          print(f'SESSION_LATEX_MANIFEST_PASS documents={len(docs)} locked_sources={len(locked)} dpi={dpi}')
+          PY
+
+      - name: Fetch hash-locked public source pages
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, yaml
+
+          root = Path('.engine-job/session-latex').resolve()
+          data = yaml.safe_load((root / 'job.yaml').read_text(encoding='utf-8')) or {}
+          for item in data.get('locked_sources') or []:
+              spec = root / item['spec']
+              out = root / item['out']
+              subprocess.run(
+                  ['pdf-locked-pages', '--spec', str(spec), '--out', str(out)],
+                  check=True,
+              )
+          PY
+
+      - name: Build all declared XeLaTeX documents
+        run: |
+          rm -rf .session-output .session-review
+          mkdir -p .session-output
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, yaml
+
+          root = Path('.engine-job/session-latex').resolve()
+          data = yaml.safe_load((root / 'job.yaml').read_text(encoding='utf-8')) or {}
+          for doc in data['documents']:
+              src = root / doc['source']
+              out = Path('.session-output') / doc['output']
+              evidence = Path('.session-output') / (out.stem + '.latex-evidence.json')
+              subprocess.run(
+                  [
+                      'pdf-latex-build',
+                      '--root', str(root),
+                      '--source', str(src),
+                      '--output', str(out),
+                      '--passes', '3',
+                      '--evidence', str(evidence),
+                  ],
+                  check=True,
+              )
+          PY
+
+      - name: Build full-page 200dpi review pack
+        run: |
+          DPI="$(python - <<'PY'
+          import yaml
+          from pathlib import Path
+          data = yaml.safe_load(Path('.engine-job/session-latex/job.yaml').read_text(encoding='utf-8')) or {}
+          print(int(data.get('dpi', 200)))
+          PY
+          )"
+          pdf-review-pack --out .session-review --dpi "$DPI" .session-output/*.pdf
+
+      - name: Assert complete machine evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidences = sorted(Path('.session-output').glob('*.latex-evidence.json'))
+          pdfs = sorted(Path('.session-output').glob('*.pdf'))
+          if not evidences or len(evidences) != len(pdfs):
+              raise SystemExit('PDF/evidence count mismatch')
+          for p in evidences:
+              data = json.loads(p.read_text(encoding='utf-8'))
+              assert data['status'] == 'MACHINE_PASS'
+              assert data['review_status'] == 'REVIEW_REQUIRED'
+              assert data['output']['page_count'] >= 1
+              assert len(data['output']['sha256']) == 64
+              assert not data['quality']['strict_failures'], data['quality']
+
+          review = json.loads(Path('.session-review/review-pack.json').read_text(encoding='utf-8'))
+          assert review['status'] == 'MACHINE_PASS'
+          assert review['visual_status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert review['document_count'] == len(pdfs)
+          assert review['total_page_count'] == review['total_rendered_page_count']
+          print(f'SESSION_LATEX_MACHINE_PASS documents={len(pdfs)} pages={review["total_page_count"]}')
+          PY
+
+      - name: Upload session PDFs and review evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-latex-result
+          path: |
+            .session-output/
+            .session-review/
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Publish success status
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+              data=json.dumps({
+                  'state':'success',
+                  'context':'pdf-engine/session-latex',
+                  'description':'Session XeLaTeX build + full-page render passed',
+                  'target_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              }).encode(),
+              headers={
+                  'Authorization':f"Bearer {os.environ['GH_TOKEN']}",
+                  'Accept':'application/vnd.github+json',
+                  'X-GitHub-Api-Version':'2022-11-28',
+                  'Content-Type':'application/json',
+              },
+              method='POST',
+          )
+          with urllib.request.urlopen(req) as r:
+              assert r.status == 201
+          PY
