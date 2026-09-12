@@ -96,6 +96,34 @@ jobs:
                   f'{len(verified)} != {manifest["expected_file_count"]}'
               )
 
+          config_manifest = json.loads(
+              (base / 'config-manifest.json').read_text(encoding='utf-8')
+          )
+          verified_config = []
+          for item in config_manifest['files']:
+              path = (source_root / item['path']).resolve()
+              if source_root.resolve() != path and source_root.resolve() not in path.parents:
+                  raise SystemExit(f'config path escape: {item["path"]}')
+              if not path.is_file():
+                  raise SystemExit(f'exact config source missing: {item["path"]}')
+              data = path.read_bytes()
+              actual = git_blob_sha1(data)
+              if actual != item['git_blob_sha1']:
+                  raise SystemExit(
+                      f'exact config source mismatch: {item["path"]}: '
+                      f'expected={item["git_blob_sha1"]} actual={actual}'
+                  )
+              verified_config.append({
+                  'path': item['path'],
+                  'git_blob_sha1': actual,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              })
+          if len(verified_config) != config_manifest['expected_file_count']:
+              raise SystemExit(
+                  f'verified config count drift: '
+                  f'{len(verified_config)} != {config_manifest["expected_file_count"]}'
+              )
+
           commands = []
           def run(command, cwd):
               started = time.monotonic()
@@ -122,12 +150,23 @@ jobs:
               return stdout
 
           py = sys.executable
-          py_files = [
+          py_files = sorted({
               item['path']
-              for item in manifest['files']
+              for item in [*manifest['files'], *config_manifest['files']]
               if item['path'].endswith('.py')
-          ]
+          })
           run([py, '-m', 'py_compile', *py_files], source_root)
+
+          config_out = run(
+              [
+                  py,
+                  'tools/check_delivery_qualification_decoupling.py',
+                  '--root',
+                  str(source_root),
+                  '--self-test',
+              ],
+              source_root,
+          )
 
           checker_out = run(
               [py, 'tools/check_teaching_demo_content.py', '--selftest'],
@@ -154,6 +193,10 @@ jobs:
               source_root,
           )
           required_markers = {
+              'config_decoupling': (
+                  config_out,
+                  'PASS: delivery/qualification decoupling',
+              ),
               'checker_selftest': (
                   checker_out,
                   'PASS: canonical Teaching Demo content gate selftest',
@@ -245,6 +288,7 @@ jobs:
               'real_product_human_acceptance_claimed': False,
               'calibrated_claim': 'NOT_CLAIMED',
               'verified_source': verified,
+              'verified_config_authority': verified_config,
               'runtime_markers': marker_results,
               'commands': commands,
           }
