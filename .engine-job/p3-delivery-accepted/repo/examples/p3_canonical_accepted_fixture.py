@@ -205,6 +205,13 @@ def make_events() -> list[dict[str, Any]]:
             "timing": {"speech_seconds": 2},
         },
         {
+            "event_id": "E7F",
+            "type": "SPEAK",
+            "cycle_id": "C1",
+            "text": "因此我们只形成当前条件下的有限结论。",
+            "timing": {"speech_seconds": 1},
+        },
+        {
             "event_id": "E8",
             "type": "BOARD_ADD",
             "cycle_id": "C1",
@@ -418,7 +425,7 @@ def prepare_fixture(root: Path) -> Path:
                         "listen_anchor": events[3]["text"],
                         "paraphrase_anchor": events[5]["text"],
                         "feedback_anchor": events[6]["text"],
-                        "formation_anchor": events[4]["text"],
+                        "formation_anchor": events[7]["text"],
                         "board_delta_ids": ["B1"],
                     },
                 }
@@ -505,7 +512,7 @@ def prepare_fixture(root: Path) -> Path:
                     "item_id": "P1",
                     "execution_scope": "trial_event",
                     "prompt_role": "trial",
-                    "prompt_anchor": events[8]["text"],
+                    "prompt_anchor": events[9]["text"],
                     "answer_role": "reference_plan",
                     "answer_anchor": "答案：在新情境中应用已经形成的规律。",
                     "figure_or_data_status": "not_needed",
