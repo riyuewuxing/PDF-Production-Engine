@@ -1,15 +1,16 @@
 {
-  "version": 1,
-  "kind": "qiuzhidaren-p3-delivery-acceptance-runtime-input-v1",
-  "privacy": "public-nonsecret-synthetic-probe-only",
+  "version": 2,
+  "kind": "qiuzhidaren-p3-delivery-acceptance-runtime-input-v2",
+  "privacy": "public-nonsecret-synthetic-fixture-only",
   "source_repository": "riyuewuxing/qiuzhidaren",
-  "source_commit": "81ab12eac70290a80199206885fde5cb22fcf3b0",
+  "source_commit": "81f6c0d32ef09f78935e90d2f04d140ed2a3e426",
   "engine_base_commit": "f4229338d2c6fce3d248360402ee13f550a3f967",
   "product_pdf_expected": false,
+  "qualification_pass_expected": false,
   "files": [
     {
       "path": "tools/check_teaching_demo_content.py",
-      "git_blob_sha1": "4cb05d37ffdd3cdf5c13b3cb7ccc396ef2536efb"
+      "git_blob_sha1": "8a406b1799fb8230c13c6d8bbfa8eb54178b366f"
     },
     {
       "path": "tools/_teaching_demo_content_core.inc",
@@ -41,7 +42,7 @@
     },
     {
       "path": "tools/check_teaching_demo_inputs.py",
-      "git_blob_sha1": "e516a6a2050003591eb12aa9452393dd7d1b07e3"
+      "git_blob_sha1": "7b3e429e0d4a7c8277b4474725395f621f4f9e4a"
     },
     {
       "path": "tools/publisher_core.py",
@@ -76,13 +77,35 @@
       "git_blob_sha1": "738e9a38c34a540a09d4d77d4df91506301dc1cc"
     },
     {
-      "path": "examples/p3_delivery_acceptance_probe.py",
-      "git_blob_sha1": "0a10f310566a7dbd6326fc158e6174528f90a924"
+      "path": "examples/p3_canonical_accepted_fixture.py",
+      "git_blob_sha1": "0b469a892b543127daaeef732dcac8b45172f0b9"
+    },
+    {
+      "path": "examples/p3_consumer_reachability_fixture.py",
+      "git_blob_sha1": "3838f74f42843719bcc29e04a678b5ff150c3d67"
     },
     {
       "path": "production/contracts/teaching-demo-content.yaml",
-      "git_blob_sha1": "c7dc8425f0a2289468e65ee5dd27efdb62442088"
+      "git_blob_sha1": "b1845831af30fce9f5a416c27325e09d48808847"
+    },
+    {
+      "path": "production/contracts/teacher-trial-two-pdf-v1.yaml",
+      "git_blob_sha1": "f46fa902a0be9c5092f65ee4c846847aa37304cb"
+    },
+    {
+      "path": "production/process/teaching-demo-content/PROCESS.md",
+      "git_blob_sha1": "ba3a7d88962c96630e67a8c38b34cb1b3ad0438b"
     }
   ],
-  "expected_file_count": 19
+  "expected_file_count": 22,
+  "runtime_assertions": {
+    "canonical_accepted_fixture": "PASS",
+    "canonical_missing_human_receipt": "REJECT",
+    "planner_accepted_post_gate": "REACHED",
+    "planner_rejected_post_gate": "NOT_REACHED",
+    "prebuild_accepted_post_gate": "REACHED",
+    "prebuild_rejected_post_gate": "NOT_REACHED",
+    "repository_gate_b_self_activation": "FORBIDDEN",
+    "calibrated_claim": "NOT_CLAIMED"
+  }
 }
