@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "kind": "qiuzhidaren-p3-delivery-qualification-config-runtime-input-v1",
+  "source_repository": "riyuewuxing/qiuzhidaren",
+  "source_commit": "81f6c0d32ef09f78935e90d2f04d140ed2a3e426",
+  "files": [
+    {
+      "path": "tools/check_delivery_qualification_decoupling.py",
+      "git_blob_sha1": "920110f4614528986db5e071851d08a9fbe44d79"
+    },
+    {
+      "path": "production/process/teaching-demo-content/STATUS.yaml",
+      "git_blob_sha1": "7bc96778dc9be7d77f1dbdd1501bbcdc96de609f"
+    },
+    {
+      "path": "production/contracts/artifact-job-v1.yaml",
+      "git_blob_sha1": "6a7d8d1548443923e8a74fe9c681d43d7b913f33"
+    },
+    {
+      "path": "production/contracts/system-qualification-v1.yaml",
+      "git_blob_sha1": "20bb57f580d0a94b4ad00badc1be25c7bdea16b8"
+    },
+    {
+      "path": "production/contracts/teaching-demo-delivery-state-machine-v1.yaml",
+      "git_blob_sha1": "89721adc8966edc14b919ab27c2d4d9310cf6840"
+    },
+    {
+      "path": "contracts/engine-handoff.yaml",
+      "git_blob_sha1": "9af1b44a641db3bcde6bd61fe576ea83aeefee41"
+    },
+    {
+      "path": "production/resource-build-efficiency-policy-v1.yaml",
+      "git_blob_sha1": "9401f8d6a68e40769ab75354c7cf1a410e854df4"
+    },
+    {
+      "path": "production/resource-build-operation-checklist-v1.yaml",
+      "git_blob_sha1": "11af58781d0233d412cf3901552085bfb7284996"
+    }
+  ],
+  "expected_file_count": 8,
+  "expected_result": "PASS: delivery/qualification decoupling"
+}
