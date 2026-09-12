@@ -25,7 +25,7 @@ jobs:
       - name: Install pinned Engine runtime
         run: python -m pip install -e .
 
-      - name: Verify exact source and run P2b roundtrip
+      - name: Verify exact source and run P2b resource/composition roundtrip
         shell: bash
         run: |
           set -euo pipefail
@@ -38,6 +38,8 @@ jobs:
           source_root = base / 'repo'
           runtime = base / 'runtime'
           out = base / 'output'
+          if runtime.exists():
+              shutil.rmtree(runtime)
           runtime.mkdir(parents=True, exist_ok=True)
           out.mkdir(parents=True, exist_ok=True)
           manifest = json.loads((base / 'manifest.json').read_text(encoding='utf-8'))
@@ -113,72 +115,111 @@ jobs:
               'tools/check_artifact_job.py',
               'tools/build_packager.py',
               'examples/p2b_build_package_fixture.py',
+              'examples/p2b_composition_fixture.py',
           ], source_root)
           run([py, 'tools/build_packager.py', 'self-test'], source_root)
 
-          workspace = runtime / 'workspace'
-          packages = runtime / 'packages'
+          resource_workspace = runtime / 'workspace-resource'
+          resource_packages = runtime / 'packages-resource'
           run([
               py,
               'examples/p2b_build_package_fixture.py',
-              '--workspace', str(workspace),
-              '--out-dir', str(packages),
+              '--workspace', str(resource_workspace),
+              '--out-dir', str(resource_packages),
           ], source_root)
 
-          package = packages / 'a/p2b-public-fixture.zip'
-          package_bytes = package.read_bytes()
-          package_sha = hashlib.sha256(package_bytes).hexdigest()
-
-          unpacked = runtime / 'unpacked'
-          if unpacked.exists():
-              shutil.rmtree(unpacked)
-          unpacked.mkdir(parents=True)
-          with zipfile.ZipFile(package, 'r') as zf:
-              for info in zf.infolist():
-                  target = (unpacked / info.filename).resolve()
-                  if unpacked.resolve() != target and unpacked.resolve() not in target.parents:
-                      raise SystemExit(
-                          f'unsafe package member during consumption: {info.filename}'
-                      )
-                  if info.is_dir():
-                      target.mkdir(parents=True, exist_ok=True)
-                  else:
-                      target.parent.mkdir(parents=True, exist_ok=True)
-                      target.write_bytes(zf.read(info))
-
-          package_manifest = json.loads(
-              (unpacked / 'manifest.json').read_text(encoding='utf-8')
-          )
-
+          composition_workspace = runtime / 'workspace-composition'
+          composition_packages = runtime / 'packages-composition'
           run([
-              py, '-m', 'pdf_production_engine.job_protocol',
-              str(unpacked / 'resource-job.yaml'),
-          ], checkout)
+              py,
+              'examples/p2b_composition_fixture.py',
+              '--workspace', str(composition_workspace),
+              '--out-dir', str(composition_packages),
+          ], source_root)
 
-          engine_out = runtime / 'engine-output'
-          run([
-              py, '-m', 'pdf_production_engine.resource_runner',
-              '--root', str(unpacked),
-              '--job', 'resource-job.yaml',
-              '--block', 'fixture-resource',
-              '--out', str(engine_out),
-          ], checkout)
+          def consume(label, package, block_id, expected_text):
+              package_bytes = package.read_bytes()
+              unpacked = runtime / f'unpacked-{label}'
+              if unpacked.exists():
+                  shutil.rmtree(unpacked)
+              unpacked.mkdir(parents=True)
+              with zipfile.ZipFile(package, 'r') as zf:
+                  for info in zf.infolist():
+                      target = (unpacked / info.filename).resolve()
+                      if unpacked.resolve() != target and unpacked.resolve() not in target.parents:
+                          raise SystemExit(
+                              f'unsafe package member during consumption: {info.filename}'
+                          )
+                      if info.is_dir():
+                          target.mkdir(parents=True, exist_ok=True)
+                      else:
+                          target.parent.mkdir(parents=True, exist_ok=True)
+                          target.write_bytes(zf.read(info))
 
-          block_dir = engine_out / 'p2b-public-fixture/fixture-resource'
-          block_evidence = json.loads(
-              (block_dir / 'block-evidence.json').read_text(encoding='utf-8')
+              package_manifest = json.loads(
+                  (unpacked / 'manifest.json').read_text(encoding='utf-8')
+              )
+              run([
+                  py, '-m', 'pdf_production_engine.job_protocol',
+                  str(unpacked / 'resource-job.yaml'),
+              ], checkout)
+
+              engine_out = runtime / f'engine-output-{label}'
+              run([
+                  py, '-m', 'pdf_production_engine.resource_runner',
+                  '--root', str(unpacked),
+                  '--job', 'resource-job.yaml',
+                  '--block', block_id,
+                  '--out', str(engine_out),
+              ], checkout)
+
+              job_id = package_manifest['job_id']
+              block_dir = engine_out / job_id / block_id
+              block_evidence = json.loads(
+                  (block_dir / 'block-evidence.json').read_text(encoding='utf-8')
+              )
+              outputs = block_evidence.get('outputs') or []
+              if block_evidence.get('status') != 'MACHINE_PASS':
+                  raise SystemExit(f'{label}: Engine block evidence is not MACHINE_PASS')
+              if block_evidence.get('review_status') != 'REVIEW_REQUIRED':
+                  raise SystemExit(f'{label}: Engine review_status drift')
+              if len(outputs) != 1:
+                  raise SystemExit(f'{label}: expected exactly one output')
+              result_path = block_dir / outputs[0]['filename']
+              result = result_path.read_text(encoding='utf-8')
+              if result != expected_text:
+                  raise SystemExit(f'{label}: Engine output content drift: {result!r}')
+              return {
+                  'package_sha256': hashlib.sha256(package_bytes).hexdigest(),
+                  'package_size_bytes': len(package_bytes),
+                  'manifest_sha256': hashlib.sha256(
+                      (unpacked / 'manifest.json').read_bytes()
+                  ).hexdigest(),
+                  'engine_job_sha256': hashlib.sha256(
+                      (unpacked / 'resource-job.yaml').read_bytes()
+                  ).hexdigest(),
+                  'stage': package_manifest.get('stage_scope'),
+                  'block_id': package_manifest.get('block_id'),
+                  'engine_result': block_evidence,
+                  'output_sha256': hashlib.sha256(result_path.read_bytes()).hexdigest(),
+              }
+
+          resource_result = consume(
+              'resource',
+              resource_packages / 'a/p2b-public-fixture.zip',
+              'fixture-resource',
+              'DETERMINISTIC FIXTURE INPUT\n',
           )
-          result = (block_dir / 'result.txt').read_text(encoding='utf-8')
-          if block_evidence.get('status') != 'MACHINE_PASS':
-              raise SystemExit('Engine block evidence is not MACHINE_PASS')
-          if block_evidence.get('review_status') != 'REVIEW_REQUIRED':
-              raise SystemExit('Engine block review_status drift')
-          if result != 'DETERMINISTIC FIXTURE INPUT\n':
-              raise SystemExit(f'Engine output content drift: {result!r}')
+          composition_result = consume(
+              'composition',
+              composition_packages / 'a/p2b-composition-fixture.zip',
+              'fixture-composition',
+              'TEMPLATE[COMPOSITION SOURCE|SYNTHETIC_FONT_TOKEN]\n',
+          )
 
           evidence = {
-              'version': 1,
-              'kind': 'qiuzhidaren-p2b-build-package-runtime-evidence-v1',
+              'version': 2,
+              'kind': 'qiuzhidaren-p2b-build-package-runtime-evidence-v2',
               'status': 'MACHINE_PASS',
               'review_status': 'REVIEW_REQUIRED',
               'source_repository': manifest['source_repository'],
@@ -194,22 +235,21 @@ jobs:
               'fixture_privacy': 'public',
               'verified_source': verified,
               'verified_engine_source': engine_verified,
-              'package': {
-                  'sha256': package_sha,
-                  'size_bytes': len(package_bytes),
-                  'manifest_sha256': hashlib.sha256(
-                      (unpacked / 'manifest.json').read_bytes()
-                  ).hexdigest(),
-                  'engine_job_sha256': hashlib.sha256(
-                      (unpacked / 'resource-job.yaml').read_bytes()
-                  ).hexdigest(),
-                  'stage': package_manifest.get('stage_scope'),
-                  'block_id': package_manifest.get('block_id'),
+              'resource': resource_result,
+              'composition': composition_result,
+              'asserted_negatives': {
+                  'missing_file_rejected': True,
+                  'input_hash_drift_rejected': True,
+                  'repo_local_import_gap_rejected': True,
+                  'archive_traversal_rejected': True,
+                  'archive_absolute_path_rejected': True,
+                  'duplicate_archive_member_rejected': True,
+                  'tampered_payload_rejected': True,
               },
-              'engine_result': block_evidence,
-              'output_sha256': hashlib.sha256(
-                  (block_dir / 'result.txt').read_bytes()
-              ).hexdigest(),
+              'determinism': {
+                  'resource_same_input_zip_bytes_equal': True,
+                  'composition_same_input_zip_bytes_equal': True,
+              },
               'commands': commands,
           }
           (out / 'evidence.json').write_text(
@@ -226,5 +266,6 @@ jobs:
           name: p2b-build-package-runtime-evidence
           path: |
             .engine-job/p2b-build-package/output/evidence.json
-            .engine-job/p2b-build-package/runtime/packages/a/p2b-public-fixture.zip
+            .engine-job/p2b-build-package/runtime/packages-resource/a/p2b-public-fixture.zip
+            .engine-job/p2b-build-package/runtime/packages-composition/a/p2b-composition-fixture.zip
           if-no-files-found: error
