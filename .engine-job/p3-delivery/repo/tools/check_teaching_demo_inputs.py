@@ -166,6 +166,8 @@ def validate(manifest: str | None = None, *, root: Path = ROOT, run_font_probe: 
         "PREBUILD_" + e
         for e in content_gate.validate(raw_manifest, root=root, require_independent=True)
     )
+    if errors:
+        return errors
 
     targets: list[tuple[str, Path]] = []
     rendered_roles = contract_source_roles(contract)
