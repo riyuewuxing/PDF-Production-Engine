@@ -11,11 +11,20 @@ permissions:
 
 jobs:
   session-resource-job:
-    if: github.actor == github.repository_owner && startsWith(github.event.head_commit.message, 'session: open ')
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
     steps:
+      - name: Require repository owner session opener
+        run: |
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER" || { echo 'owner only'; exit 2; }
+          case "$GITHUB_HEAD_COMMIT_MESSAGE" in
+            'session: open '*) ;;
+            *) echo 'not a session opener commit'; exit 2 ;;
+          esac
+        env:
+          GITHUB_HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+
       - name: Checkout engine request branch
         uses: actions/checkout@v4
         with:
