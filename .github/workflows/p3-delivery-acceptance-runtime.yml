@@ -35,7 +35,7 @@ jobs:
           path = Path('.engine-job/p3-delivery/repo/requirements-pdf.txt')
           data = path.read_bytes()
           actual = hashlib.sha1(
-              f'blob {len(data)}\\0'.encode('ascii') + data
+              b'blob ' + str(len(data)).encode('ascii') + bytes([0]) + data
           ).hexdigest()
           expected = '13bcb4692e48f9296f7a5b96ad290d2f8055b70d'
           if actual != expected:
