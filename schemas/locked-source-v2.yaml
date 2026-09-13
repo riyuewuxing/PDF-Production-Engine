@@ -1,0 +1,56 @@
+version: 2
+id: pdf-production-locked-source-v2
+purpose: >-
+  Separate canonical source identity from transport. Private canonical bytes should be
+  carried inside the encrypted session package and verified by identity before page
+  extraction. Temporary signed/download URLs are transport hints only and must never
+  define source identity.
+
+required:
+  - version
+  - identity
+  - transport
+  - selected_pages
+
+fields:
+  version:
+    const: 2
+  source_id:
+    type: string
+  identity:
+    type: mapping
+    at_least_one_required:
+      - git_blob_sha
+      - sha256
+    optional:
+      repository: string
+      ref: string
+      path: string
+      size_bytes: integer
+      git_blob_sha: 40-lowercase-hex
+      sha256: 64-lowercase-hex
+      magic: string
+  transport:
+    kind_enum:
+      - package-file
+      - urls
+    package-file:
+      required:
+        - path
+      path_must_be_relative_and_within_package_root: true
+    urls:
+      required:
+        - urls
+      note: PUBLIC_OR_STABLE_TRANSPORT_ONLY
+  selected_pages:
+    type: array
+    positive_unique_1_based_integers: true
+
+rules:
+  - source identity is independent from transport
+  - package-file is the preferred transport for private canonical source bytes
+  - private repository credentials are forbidden in the public engine
+  - temporary GitHub signed/download URLs must not be persisted as canonical identity
+  - every acquired byte stream is revalidated against identity before page extraction
+  - package-file paths may not be absolute and may not escape the encrypted job package
+  - low-resolution review derivatives are not substitutes for canonical final source pixels
