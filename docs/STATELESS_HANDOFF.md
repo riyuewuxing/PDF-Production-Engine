@@ -38,6 +38,16 @@ Do not send an entire private repository when a figure, page range, or document 
 
 Plain private build packages must never be committed to this public repository. For private material, use a sealed/encrypted transport or a session-mediated transfer that leaves no plaintext public repository history. Public fixtures may use plain packages.
 
+### Private canonical source bytes
+
+Private canonical source identity and source transport are separate concerns.
+
+For a private textbook/document, the consumer/session should first obtain the actual source bytes in an authorized private context, verify the canonical identity, and place the required original file inside the encrypted session package. Use `locked-source-v2` with `transport.kind: package-file`. The Engine recomputes size / Git blob SHA / SHA-256 before extracting pages.
+
+Temporary GitHub `download_url` / signed URLs are not source identity and must not be persisted as the canonical private-source mechanism. URL transport remains suitable for public or otherwise stable sources only.
+
+Unicode and spaces in package filenames are supported. Low-resolution review derivatives are for inspection only and must not replace original source pixels in final products.
+
 ## Block-first acceptance
 
 Every composite deliverable declares blocks. Example:
@@ -81,9 +91,13 @@ If the block changes, the hash changes and the previous receipt is invalid.
 
 Preferred order:
 
-1. ChatGPT/session retrieves the engine result and writes it to the target private repository;
-2. if a private binary cannot safely transit as plaintext through a public artifact, use sealed/encrypted result transport;
-3. direct engine-to-private-repository PAT checkout/write-back is forbidden by repository rules.
+1. ChatGPT/session retrieves the encrypted engine result into the current session;
+2. decrypt and deliver the final binary to the user from the current session;
+3. persist only hashes/receipts/source state when the consumer policy forbids long-term generated binaries;
+4. any GitHub Artifact used as a transfer envelope is ephemeral only and must not be treated as storage;
+5. direct engine-to-private-repository PAT checkout/write-back is forbidden by repository rules.
+
+If Artifact/egress quota prevents result retrieval, report an infrastructure failure. Consumers may use an explicitly approved session-native formal fallback, but that fallback must preserve the consumer's full quality/acceptance gates.
 
 ## Engine job states
 
