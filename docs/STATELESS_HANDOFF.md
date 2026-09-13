@@ -97,6 +97,8 @@ Preferred order:
 4. any GitHub Artifact used as a transfer envelope is ephemeral only and must not be treated as storage;
 5. direct engine-to-private-repository PAT checkout/write-back is forbidden by repository rules.
 
+After the session has successfully downloaded and verified a `session-sealed-result`, it should write exactly one small marker at `.engine-session/<request_id>/retrieved.json` with schema `pdf-engine-session-retrieved-v1` and the workflow run id. The `Session Result Cleanup` workflow deletes that run's result artifact. This marker is a cleanup signal only; it is not product state.
+
 If Artifact/egress quota prevents result retrieval, report an infrastructure failure. Consumers may use an explicitly approved session-native formal fallback, but that fallback must preserve the consumer's full quality/acceptance gates.
 
 ## Engine job states
