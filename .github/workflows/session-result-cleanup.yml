@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Validate retrieval marker and delete temporary result branch
+      - name: Validate retrieval marker and export result identity
         env:
           HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
@@ -62,6 +62,10 @@ jobs:
               print(f'RESULT_COMMIT={result_commit}')
           PY
 
+      - name: Delete temporary result branch
+        run: |
+          test -n "$REQUEST_ID"
+          test -n "$RESULT_BRANCH"
           if git ls-remote --exit-code --heads origin "$RESULT_BRANCH" >/dev/null 2>&1; then
             if [ -n "${RESULT_COMMIT:-}" ]; then
               remote_commit="$(git ls-remote --heads origin "$RESULT_BRANCH" | awk '{print $1}')"
