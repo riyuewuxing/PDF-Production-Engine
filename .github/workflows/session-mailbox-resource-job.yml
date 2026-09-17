@@ -208,8 +208,7 @@ jobs:
           git add ".engine-session/$REQUEST_ID/result.sealed.b64" ".engine-session/$REQUEST_ID/result.sha256" ".engine-session/$REQUEST_ID/result.json"
           git commit -m "session: result $REQUEST_ID"
           git push --force origin "HEAD:refs/heads/$RESULT_BRANCH"
-          RESULT_COMMIT="$(git rev-parse HEAD)"
-          echo "RESULT_COMMIT=$RESULT_COMMIT" >> "$GITHUB_ENV"
+          echo "RESULT_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           cd "$GITHUB_WORKSPACE"
           git worktree remove --force /tmp/result-repo
 
@@ -217,6 +216,7 @@ jobs:
         if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          EXECUTION_OUTCOME_FOR_STATUS: ${{ steps.execute_resource.outcome }}
         run: |
           python - <<'PY'
           import json, os, urllib.request
@@ -229,9 +229,6 @@ jobs:
             method='POST')
           urllib.request.urlopen(req).read()
           PY
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          EXECUTION_OUTCOME_FOR_STATUS: ${{ steps.execute_resource.outcome }}
 
       - name: Fail job after preserving encrypted failure evidence
         if: steps.execute_resource.outcome == 'failure'
