@@ -3,5 +3,6 @@
   "schema": "pdf-engine-session-retrieved-v1",
   "request_id": "transport-smoke-20260917-0228",
   "result_branch": "session-result/transport-smoke-20260917-0228",
-  "result_commit": "b3d119694f8de7549574b23c5870e44bcd3fca7c"
+  "result_commit": "b3d119694f8de7549574b23c5870e44bcd3fca7c",
+  "cleanup_retry": 1
 }
