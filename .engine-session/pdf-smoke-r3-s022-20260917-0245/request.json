@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-request-v1",
+  "request_id": "pdf-smoke-r3-s022-20260917-0245",
+  "engine_commit": "61b2439aca0b598bdb1061bc54c1bc8dee85a2c2",
+  "return_public_key": "1KGkE3LpRS4BSMGCniPD9K8jIGI_pTGsxsIAXhx8PGA"
+}
