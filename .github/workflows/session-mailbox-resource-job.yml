@@ -8,7 +8,7 @@ on:
       - '.engine-session/**/request.json'
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
@@ -53,6 +53,7 @@ jobs:
           print(f'RETURN_PUBLIC_KEY={key}')
           print(f'ENGINE_CODE_COMMIT={pin}')
           print(f'REQUEST_SHA256={hashlib.sha256(raw).hexdigest()}')
+          print(f'RESULT_BRANCH=session-result/{rid}')
           PY
         env:
           HEAD_MESSAGE: ${{ github.event.head_commit.message }}
@@ -157,21 +158,80 @@ jobs:
           python - <<'PY'
           import json,os,shutil
           from pathlib import Path
-          Path('/tmp/out/session-execution.json').write_text(json.dumps({'version':1,'request_id':os.environ['REQUEST_ID'],'engine_code_commit':os.environ['ENGINE_CODE_COMMIT'],'opening_commit':os.environ['GITHUB_SHA'],'execution_surface':'github-hosted-public-engine-ephemeral-session','plaintext_persisted':False},indent=2)+'\n',encoding='utf-8')
+          Path('/tmp/out/session-execution.json').write_text(json.dumps({
+            'version':1,
+            'request_id':os.environ['REQUEST_ID'],
+            'engine_code_commit':os.environ['ENGINE_CODE_COMMIT'],
+            'opening_commit':os.environ['GITHUB_SHA'],
+            'workflow_run_id':int(os.environ['GITHUB_RUN_ID']),
+            'execution_surface':'github-hosted-public-engine-ephemeral-session',
+            'result_transport':'encrypted-git-result-branch',
+            'plaintext_persisted':False
+          },indent=2)+'\n',encoding='utf-8')
           shutil.make_archive('/tmp/result','zip','/tmp/out')
           PY
           pdf-session seal --public-key "$RETURN_PUBLIC_KEY" --request-id "$REQUEST_ID" --input /tmp/result.zip --output /tmp/result.sealed
-          sha256sum /tmp/result.sealed > /tmp/result.sealed.sha256
+          sha256sum /tmp/result.sealed | awk '{print $1}' > /tmp/result.sealed.sha256
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish encrypted result to temporary Git result branch
         if: always()
-        with:
-          name: session-sealed-result
-          path: |
-            /tmp/result.sealed
-            /tmp/result.sealed.sha256
-          retention-days: 1
-          if-no-files-found: error
+        env:
+          EXECUTION_OUTCOME: ${{ steps.execute_resource.outcome }}
+        run: |
+          rm -rf /tmp/result-repo
+          git worktree add --detach /tmp/result-repo "$GITHUB_SHA"
+          cd /tmp/result-repo
+          git switch -C "$RESULT_BRANCH"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          mkdir -p ".engine-session/$REQUEST_ID"
+          base64 -w0 /tmp/result.sealed > ".engine-session/$REQUEST_ID/result.sealed.b64"
+          cp /tmp/result.sealed.sha256 ".engine-session/$REQUEST_ID/result.sha256"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path('.engine-session')/os.environ['REQUEST_ID']/'result.json'
+          p.write_text(json.dumps({
+            'version':1,
+            'schema':'pdf-engine-session-result-v1',
+            'request_id':os.environ['REQUEST_ID'],
+            'result_branch':os.environ['RESULT_BRANCH'],
+            'opening_commit':os.environ['GITHUB_SHA'],
+            'engine_commit':os.environ['ENGINE_CODE_COMMIT'],
+            'workflow_run_id':int(os.environ['GITHUB_RUN_ID']),
+            'execution_outcome':os.environ['EXECUTION_OUTCOME'],
+            'ciphertext_sha256':Path(f".engine-session/{os.environ['REQUEST_ID']}/result.sha256").read_text().strip(),
+            'transport':'encrypted-git-result-branch',
+            'plaintext_persisted':False
+          },ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+          git add ".engine-session/$REQUEST_ID/result.sealed.b64" ".engine-session/$REQUEST_ID/result.sha256" ".engine-session/$REQUEST_ID/result.json"
+          git commit -m "session: result $REQUEST_ID"
+          git push --force origin "HEAD:refs/heads/$RESULT_BRANCH"
+          RESULT_COMMIT="$(git rev-parse HEAD)"
+          echo "RESULT_COMMIT=$RESULT_COMMIT" >> "$GITHUB_ENV"
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force /tmp/result-repo
+
+      - name: Publish result branch status
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          state='success' if os.environ.get('EXECUTION_OUTCOME_FOR_STATUS','')=='success' else 'failure'
+          desc=f"branch={os.environ['RESULT_BRANCH']} request={os.environ['REQUEST_ID']}"
+          req=urllib.request.Request(
+            f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/statuses/{os.environ['GITHUB_SHA']}",
+            data=json.dumps({'state':state,'context':'pdf-engine/session-result','description':desc[:140]}).encode(),
+            headers={'Authorization':f"Bearer {os.environ['GITHUB_TOKEN']}",'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
+            method='POST')
+          urllib.request.urlopen(req).read()
+          PY
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXECUTION_OUTCOME_FOR_STATUS: ${{ steps.execute_resource.outcome }}
 
       - name: Fail job after preserving encrypted failure evidence
         if: steps.execute_resource.outcome == 'failure'
@@ -179,4 +239,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -rf /tmp/session-private.key /tmp/session-public.txt /tmp/input.sealed /tmp/input.sha256 /tmp/job /tmp/job.zip /tmp/out /tmp/result.zip
+        run: rm -rf /tmp/session-private.key /tmp/session-public.txt /tmp/input.sealed /tmp/input.sha256 /tmp/job /tmp/job.zip /tmp/out /tmp/result.zip /tmp/result.sealed /tmp/result.sealed.sha256 /tmp/result-repo
