@@ -1,0 +1,23 @@
+name: One-shot encrypted Round 11 relay
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  relay:
+    if: contains(github.event.head_commit.message, '[round11-chat-relay]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload encrypted relay package
+        uses: actions/upload-artifact@v4
+        with:
+          name: round11-encrypted-chat-relay
+          path: .tmp/round11-chat-relay-20260918-1550.enc.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
