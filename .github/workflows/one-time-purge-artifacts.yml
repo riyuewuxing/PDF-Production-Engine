@@ -5,7 +5,7 @@ on:
     paths: ['.github/workflows/one-time-purge-artifacts.yml']
 permissions:
   actions: write
-  contents: read
+  contents: write
 jobs:
   purge:
     runs-on: ubuntu-latest
@@ -26,4 +26,16 @@ jobs:
                 deleted++;
               }
             }
-            core.notice(`Deleted ${deleted} artifacts`);
+            let deletedRefs = 0;
+            for (const prefix of ['heads/session-job/', 'heads/session-result/']) {
+              const refs = await github.paginate('GET /repos/{owner}/{repo}/git/matching-refs/{ref}', {
+                owner, repo, ref: prefix, per_page: 100
+              });
+              for (const item of refs) {
+                await github.request('DELETE /repos/{owner}/{repo}/git/refs/{ref}', {
+                  owner, repo, ref: item.ref.replace('refs/', '')
+                });
+                deletedRefs++;
+              }
+            }
+            core.notice(`Deleted ${deleted} artifacts and ${deletedRefs} temporary refs`);
