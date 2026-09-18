@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-retrieved-v1",
+  "request_id": "round11-finalbuild-20260918-01",
+  "result_branch": "session-result/round11-finalbuild-20260918-01",
+  "result_commit": "5f3b7592f771473a9df5099c93538adc7d0edf73"
+}
