@@ -1,8 +1,0 @@
-{
-  "version": 1,
-  "schema": "pdf-engine-session-retrieved-v1",
-  "request_id": "round11-relay-20260918-1540",
-  "result_branch": "session-result/round11-relay-20260918-1540",
-  "result_commit": "008859c3609af40547f6bc9ef1d4595809fe904a",
-  "workflow_run_id": 35364217733
-}

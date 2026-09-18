@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "schema": "pdf-engine-session-request-v1",
-  "request_id": "shm-two-pdf-20260913-1200",
-  "return_public_key": "ThBQCAznDEClfiAOMg8JkS8GYSN_KWLsPzPj2_smlQE",
-  "engine_commit": "add56dca6e277b15663abbd535e4a617cf83a6c8"
-}

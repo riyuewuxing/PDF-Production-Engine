@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "schema": "pdf-engine-session-retrieved-v1",
-  "request_id": "round11-rebuild-17a8956b0335-mb",
-  "result_branch": "session-result/round11-rebuild-17a8956b0335-mb",
-  "result_commit": "e3711d9294b3d734d1c4a645fe5050195e18ca48"
-}

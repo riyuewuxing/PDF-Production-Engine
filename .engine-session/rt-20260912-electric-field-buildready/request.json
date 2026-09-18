@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "schema": "pdf-engine-session-request-v1",
-  "request_id": "rt-20260912-electric-field-buildready",
-  "return_public_key": "wm4npHXGNuHeh4cSMXjSgr7865cV8cvgPtaYEFctMQA",
-  "engine_commit": "d2c6b1c18def081ada5c3d19bb3f0bf8b2e7c4d0"
-}
