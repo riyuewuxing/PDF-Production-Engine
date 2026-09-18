@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-retrieved-v1",
+  "request_id": "pdf-smoke-r3-s022-20260917-0245",
+  "result_branch": "session-result/pdf-smoke-r3-s022-20260917-0245",
+  "result_commit": "b347a866aeca7c28b26348765a93530f980bce92"
+}
