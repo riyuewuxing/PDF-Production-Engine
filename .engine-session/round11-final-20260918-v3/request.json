@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-request-v1",
+  "request_id": "round11-final-20260918-v3",
+  "return_public_key": "NCQGniQTZ-yWK2rEh1ys6OS0blLProTVDip6CTXzmGY",
+  "engine_commit": "60da9c87a7afbb123ff7b78a924b7311a681a538"
+}
