@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-request-v1",
+  "request_id": "qz-plan-b01-20260920",
+  "return_public_key": "4RCTRzw6qgBzEOKJs5skywjeahIPCBNzBk4xn7DxkhU",
+  "engine_commit": "a9da652809bcee3d8784ab774a0dfa034177d7a0"
+}
