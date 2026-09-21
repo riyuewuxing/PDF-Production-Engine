@@ -11,8 +11,6 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/resource-runtime-ci.yml'
       - 'AGENTS.md'
-      - 'docs/STATELESS_HANDOFF.md'
-      - 'docs/SEALED_PRIVATE_JOBS.md'
   workflow_dispatch:
 
 permissions:
