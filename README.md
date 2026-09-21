@@ -2,7 +2,7 @@
 
 Public, deterministic, stateless build runtime for PDF production and related resource artifacts.
 
-This repository stores no consumer-project business content, private documents, candidate data, source repositories, or long-lived private build inputs. ChatGPT/session is the orchestrator between a consumer project and this public mechanical build engine.
+This repository stores and executes only public or synthetic build inputs. It does not accept consumer-project private documents, private source repositories, private build packages, credentials, or private outputs.
 
 ## Canonical authored-PDF backend
 
@@ -37,7 +37,7 @@ The engine never decides what a project should say. Consumer projects own conten
 
 ## Repository boundary
 
-The engine must not require a PAT that can read/write a consumer repository, must not checkout a private consumer repository, and must not commit back into one. Normal execution is session-mediated and ephemeral. Consumer plaintext must not be committed to this public repository.
+The engine has no private-consumer transport role. It must not require consumer-repository credentials, checkout a private consumer repository, receive private build packages, or write results back to a private repository. Private consumer jobs belong in the consumer's authorized runtime, not here.
 
 ## Acceptance
 
@@ -72,8 +72,6 @@ pdf-resource-run --root . --job resource-job.yaml --block figures --out dist --d
 # Full-page review bundle
 pdf-review-pack --out dist/review --dpi 200 output.pdf
 
-# Locked source-page extraction
-pdf-locked-pages --spec locked-source.yaml --out dist/source-pages
 
 # Full TeX/CJK/figure runtime smoke
 pdf-runtime-smoke --out .runtime-smoke
