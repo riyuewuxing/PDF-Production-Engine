@@ -139,7 +139,7 @@ def test_composition_passes_with_hash_bound_review_receipts(tmp_path: Path) -> N
         "version": 1,
         "job_id": "compose-r2",
         "stage": "composition",
-        "privacy": "sealed",
+        "privacy": "public",
         "blocks": [
             _reviewed_block("content", "content"),
             _reviewed_block("figure-1", "figure"),
