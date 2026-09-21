@@ -62,6 +62,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install document runtime
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-pictures texlive-science fonts-noto-cjk fonts-arphic-ukai fonts-arphic-uming fonts-wqy-zenhei poppler-utils fontconfig
+
+
       - name: Install engine and publish one-time receive key
         run: |
           python -m pip install --upgrade pip
@@ -80,11 +86,6 @@ jobs:
           PY
         env:
           GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Install document runtime
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends texlive-xetex texlive-lang-chinese texlive-latex-extra texlive-pictures texlive-science fonts-noto-cjk fonts-arphic-ukai fonts-arphic-uming fonts-wqy-zenhei poppler-utils fontconfig
 
       - name: Wait for encrypted payload
         run: |
