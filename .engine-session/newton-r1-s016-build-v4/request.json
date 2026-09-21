@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-request-v1",
+  "request_id": "newton-r1-s016-build-v4",
+  "return_public_key": "7WVV0_LkMX45QBL2DXAkBdKzZFecqg76N0uzQ_RNnAo",
+  "engine_commit": "54043e0972738952d760ac3210072095f9a02c09"
+}
