@@ -82,7 +82,15 @@ def run_block(root: Path, job_relative: str, block_id: str, out_root: Path, dpi:
     proc = subprocess.run(argv, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     (block_out / "backend.log").write_text(proc.stdout or "", encoding="utf-8")
     if proc.returncode:
-        raise JobProtocolError(f"block command failed: {block_id}: exit={proc.returncode}")
+        # Diagnostics stay in workflow logs / internal backend.log and are never
+        # part of the authorized result allowlist. Emit a bounded tail so a
+        # failed private session can be diagnosed without returning extra files.
+        tail_lines = (proc.stdout or "").splitlines()[-80:]
+        tail = "\n".join(tail_lines)
+        raise JobProtocolError(
+            f"block command failed: {block_id}: exit={proc.returncode}\n"
+            f"--- backend tail (diagnostic only) ---\n{tail}"
+        )
 
     outputs = []
     for rel in expected:
