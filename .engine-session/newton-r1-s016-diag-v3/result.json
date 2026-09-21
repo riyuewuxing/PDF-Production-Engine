@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "schema": "pdf-engine-session-result-v1",
+  "request_id": "newton-r1-s016-diag-v3",
+  "result_branch": "session-result/newton-r1-s016-diag-v3",
+  "opening_commit": "ea3d71882eaec42eb4de21712fd5c00b14d81439",
+  "engine_commit": "54043e0972738952d760ac3210072095f9a02c09",
+  "workflow_run_id": 35560941137,
+  "execution_outcome": "failure",
+  "ciphertext_sha256": "6aeeeb972741efd3940f0d6e6a61eccd5093198546379a2f9b5b140e55ff6990",
+  "transport": "encrypted-git-result-branch",
+  "plaintext_persisted": false
+}
