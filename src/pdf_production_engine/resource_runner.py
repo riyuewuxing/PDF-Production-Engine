@@ -84,7 +84,6 @@ def run_block(root: Path, job_relative: str, block_id: str, out_root: Path, dpi:
     if proc.returncode:
         # Diagnostics stay in workflow logs / internal backend.log and are never
         # part of the authorized result allowlist. Emit a bounded tail so a
-        # failed private session can be diagnosed without returning extra files.
         tail_lines = (proc.stdout or "").splitlines()[-80:]
         tail = "\n".join(tail_lines)
         raise JobProtocolError(

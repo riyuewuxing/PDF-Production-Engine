@@ -11,16 +11,16 @@ This public repository is a **generic, stateless resource-build engine**. It own
 3. Never checkout a private consumer repository from a public workflow.
 4. Never treat this repository as a free-compute shell for unrelated work. Every workflow must exercise a real generic build capability owned by this engine.
 5. Public fixtures must be synthetic or intentionally public.
-6. Private job inputs/outputs may enter runtime only through an approved privacy-preserving handoff. Plain private material must never be committed or uploaded as a public artifact.
+6. Private consumer job inputs/outputs must not enter this repository or its workflows at all. There is no approved private handoff, sealed transport, mailbox, or session relay.
 7. Consumer-project rules/content remain authoritative in the consumer repository. This engine must not invent, rewrite, or interpret business content.
 
 ## Orchestration model
 
 ChatGPT is the orchestrator and final reviewer:
 
-`consumer project -> resource-operation checklist -> ChatGPT -> Engine job -> machine evidence/output -> ChatGPT review -> accepted output written back to consumer project`
+`public/synthetic input -> Engine job -> machine evidence/output -> caller review`
 
-The Engine does not discover what to build and does not make project-level decisions. The two repositories have no direct repository credential relationship.
+The Engine does not discover what to build, does not make project-level decisions, and has no private-consumer repository or transport relationship.
 
 ## Block-first acceptance
 

@@ -10,7 +10,6 @@ import yaml
 from pdf_production_engine.cli import ManifestError, build, load_manifest
 from pdf_production_engine.job_protocol import load_job, validate_job
 from pdf_production_engine.resource_runner import run_block
-from pdf_production_engine.sealed_handoff import generate_keypair, seal_file, unseal_file
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -124,7 +123,7 @@ def test_composition_is_blocked_until_every_required_block_is_reviewed() -> None
         "version": 1,
         "job_id": "compose-r1",
         "stage": "composition",
-        "privacy": "sealed",
+        "privacy": "public",
         "blocks": [
             _reviewed_block("content", "content"),
             {"block_id": "figure-1", "kind": "figure", "required": True, "state": "MACHINE_PASS"},
@@ -140,7 +139,7 @@ def test_composition_passes_with_hash_bound_review_receipts(tmp_path: Path) -> N
         "version": 1,
         "job_id": "compose-r2",
         "stage": "composition",
-        "privacy": "sealed",
+        "privacy": "public",
         "blocks": [
             _reviewed_block("content", "content"),
             _reviewed_block("figure-1", "figure"),
@@ -206,16 +205,3 @@ def test_resource_runner_executes_one_image_block_and_emits_evidence(tmp_path: P
     assert evidence["outputs"][0]["width_px"] == 320
     assert evidence["outputs"][0]["height_px"] == 180
     assert len(evidence["outputs"][0]["sha256"]) == 64
-
-
-def test_sealed_handoff_roundtrip_keeps_plaintext_out_of_transport(tmp_path: Path) -> None:
-    public_key, private_key = generate_keypair()
-    source = tmp_path / "private-input.zip"
-    source.write_bytes(b"private consumer bytes\x00\x01")
-    sealed = tmp_path / "input.sealed"
-    restored = tmp_path / "restored.zip"
-    seal_file(public_key, source, sealed)
-    assert sealed.read_bytes() != source.read_bytes()
-    assert b"private consumer bytes" not in sealed.read_bytes()
-    unseal_file(private_key, sealed, restored)
-    assert restored.read_bytes() == source.read_bytes()
