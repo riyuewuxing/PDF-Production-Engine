@@ -152,12 +152,17 @@ jobs:
         run: |
           pdf-resource-run --root /tmp/job --job "$ENGINE_JOB_FILE" --block "$ENGINE_BLOCK_ID" --out /tmp/out --dpi "$ENGINE_DPI"
 
-      - name: Encrypt result
+      - name: Encrypt authorized result files only
         if: always()
+        env:
+          EXECUTION_OUTCOME_FOR_RETURN: ${{ steps.execute_resource.outcome }}
         run: |
           python - <<'PY'
-          import json,os,shutil
+          import json, os, shutil
           from pathlib import Path
+          import yaml
+
+          out_root = Path('/tmp/out').resolve()
           Path('/tmp/out/session-execution.json').write_text(json.dumps({
             'version':1,
             'request_id':os.environ['REQUEST_ID'],
@@ -166,9 +171,63 @@ jobs:
             'workflow_run_id':int(os.environ['GITHUB_RUN_ID']),
             'execution_surface':'github-hosted-public-engine-ephemeral-session',
             'result_transport':'encrypted-git-result-branch',
-            'plaintext_persisted':False
+            'plaintext_persisted':False,
+            'return_policy':'EXPECTED_OUTPUTS_ONLY'
           },indent=2)+'\n',encoding='utf-8')
-          shutil.make_archive('/tmp/result','zip','/tmp/out')
+
+          return_root = Path('/tmp/authorized-return')
+          shutil.rmtree(return_root, ignore_errors=True)
+          return_root.mkdir(parents=True)
+
+          if os.environ.get('EXECUTION_OUTCOME_FOR_RETURN') == 'success':
+              job = yaml.safe_load((Path('/tmp/job') / os.environ['ENGINE_JOB_FILE']).read_text(encoding='utf-8')) or {}
+              blocks = {
+                  b.get('block_id'): b
+                  for b in (job.get('blocks') or [])
+                  if isinstance(b, dict)
+              }
+              block = blocks.get(os.environ['ENGINE_BLOCK_ID'])
+              if not block:
+                  raise SystemExit('return allowlist cannot resolve executed block')
+              expected = block.get('expected_outputs')
+              if not isinstance(expected, list) or not expected or not all(isinstance(x, str) and x for x in expected):
+                  raise SystemExit('return allowlist requires non-empty expected_outputs')
+              if len(set(expected)) != len(expected):
+                  raise SystemExit('return allowlist contains duplicate expected_outputs')
+
+              block_out = (out_root / str(job.get('job_id')) / os.environ['ENGINE_BLOCK_ID']).resolve()
+              if out_root != block_out and out_root not in block_out.parents:
+                  raise SystemExit('resolved block output escaped /tmp/out')
+
+              copied = []
+              for rel_raw in expected:
+                  rel = Path(rel_raw)
+                  if rel.is_absolute() or '..' in rel.parts:
+                      raise SystemExit(f'unsafe expected output path: {rel_raw}')
+                  src = (block_out / rel).resolve()
+                  if block_out != src and block_out not in src.parents:
+                      raise SystemExit(f'expected output escaped block output: {rel_raw}')
+                  if not src.is_file() or src.stat().st_size <= 0:
+                      raise SystemExit(f'authorized expected output missing/empty: {rel_raw}')
+                  dst = (return_root / rel).resolve()
+                  if return_root.resolve() != dst and return_root.resolve() not in dst.parents:
+                      raise SystemExit(f'return target escaped allowlist root: {rel_raw}')
+                  dst.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, dst)
+                  copied.append(rel.as_posix())
+
+              actual = sorted(
+                  p.relative_to(return_root).as_posix()
+                  for p in return_root.rglob('*')
+                  if p.is_file()
+              )
+              if actual != sorted(expected):
+                  raise SystemExit(f'authorized return mismatch: expected={sorted(expected)} actual={actual}')
+              print(f'PASS: encrypted return allowlist exact files={actual}')
+          else:
+              print('Execution failed: encrypted return payload intentionally contains no product files; use workflow logs for diagnosis.')
+
+          shutil.make_archive('/tmp/result','zip',return_root)
           PY
           pdf-session seal --public-key "$RETURN_PUBLIC_KEY" --request-id "$REQUEST_ID" --input /tmp/result.zip --output /tmp/result.sealed
           sha256sum /tmp/result.sealed | awk '{print $1}' > /tmp/result.sealed.sha256
