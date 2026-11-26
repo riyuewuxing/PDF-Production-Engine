@@ -51,3 +51,48 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+
+  natural-pagination-matrix:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        locale: ['zh-CN', 'en-US']
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        run: pnpm desktop:build
+      - name: Render natural pagination stress matrix
+        env:
+          RESUME_MATRIX_LOCALE: ${{ matrix.locale }}
+          RESUME_MATRIX_MODES: natural
+          RESUME_MATRIX_SOURCE_SHA: '2297a02c576262494e2fdb52e7c0134e8337c916'
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_MATRIX_OUT = Join-Path $env:GITHUB_WORKSPACE 'natural-matrix'
+          & .\node_modules\.bin\electron.cmd .\scripts\qa-template-matrix.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload natural pagination evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: natural-pagination-${{ matrix.locale }}
+          path: natural-matrix/
+          if-no-files-found: error
+          retention-days: 3

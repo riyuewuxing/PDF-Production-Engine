@@ -132,6 +132,9 @@ async function run() {
         else if(user.mode==='co-create'){
           const b=user.toolResults.list_visible_blocks[0],f=user.toolResults.inspect_block_facts[0].sources[0];
           content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 整理实验记录。',reason:'合成改写',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改'}]);
+        }else if(Array.isArray(user.blocks)){
+          const b=user.blocks[0];
+          content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 复核合成实验数据。',reason:'整卷合成候选',factIds:[b.sources[0].id]}]);
         }else if(user.currentSettings&&typeof user.goal==='string'){
           content=JSON.stringify({reason:'合成版式微调',changes:{baseFontSize:14,pagePadding:24,lineHeight:1.2}});
         }else content='OK';
@@ -439,6 +442,36 @@ async function run() {
   if(JSON.stringify(omitStyle(afterLayout))!==JSON.stringify(omitStyle(beforeLayout))||afterLayout.globalSettings.pagePadding!==24)throw Error('layout altered content');
   checks.layoutPrivacy=true;checks.layoutNativePdfReview=true;checks.layoutApproved=true;
   await capture('27-layout-applied');
+  // The original full-JD entry uses the same native PDF gate; changing selected proposals invalidates approval.
+  await click('整卷 JD 改写');
+  await setValue('textarea[placeholder^="请在此或"]','示例岗位需要实验记录和科学教育');
+  await click('生成整卷 JD 定向提案');
+  await until('tailor preview',()=>bodyHas('发送前确认（尚未调用模型）'));
+  await click('确认发送给模型');
+  await until('tailor candidate',()=>bodyHas('整卷合成候选'));
+  const beforeTailor=await main.store.getResume('master');
+  await click('已核对后全选无机器预警项');
+  const isTailorDisabled=()=>js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("应用已勾选的"))?.disabled===true');
+  if(!await isTailorDisabled())throw Error('whole apply not gated');
+  await click('试渲染整卷提案');
+  await until('tailor native PDF comparison',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  const approveWhole=()=>js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("我已检查真实 PDF 前后页面，批准当前正文候选"));const box=l?.querySelector("input");if(!box||box.disabled)return false;box.click();return true})()');
+  if(!await approveWhole())throw Error('whole PDF blocked');
+  await click('清空');
+  if(!await isTailorDisabled())throw Error('clearing selection did not revoke approval');
+  await click('已核对后全选无机器预警项');
+  if(!await isTailorDisabled())throw Error('old review revived after selection change');
+  checks.wholeReviewInvalidated=true;
+  await click('试渲染整卷提案');
+  await until('tailor rerender',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(beforeTailor))throw Error('whole preview modified disk');
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('28-whole-pdf-review');
+  if(!await approveWhole())throw Error('whole rerender blocked');
+  await click('应用已勾选的 1 条修改');
+  await until('whole applied',async()=>(await main.store.getResume('master')).education[0].description.includes('复核合成实验数据'));
+  checks.wholePdfReview=true;
+  await capture('29-whole-applied');
   // Actual career text UI with exact preview and reversible local placeholders.
   await click('求职面试');await click('自荐信 / 话术');
   await until('career AI visible',()=>bodyHas('预览文案精修请求'));
