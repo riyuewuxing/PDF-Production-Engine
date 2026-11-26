@@ -5,7 +5,8 @@ export type Checkpoint=Promise<DraftReceipt|null>;
 export function checkpointRecovery(input:DraftInput,onError:(message:string|null)=>void):Checkpoint{
   const api=typeof window==='undefined'?undefined:window.resumeDesktop?.recoveryDrafts;
   if(!api)return Promise.resolve(null);
-  return api.checkpoint(input).then(receipt=>{onError(null);return receipt;},()=>{onError('自动恢复草稿写入失败；请立即保存或另存草稿。');return null;});
+  try{return api.checkpoint(input).then(receipt=>{onError(null);return receipt;},()=>{onError('自动恢复草稿写入失败；请立即保存或另存草稿。');return null;});}
+  catch{onError('自动恢复草稿写入失败；请立即保存或另存草稿。');return Promise.resolve(null);}
 }
 export async function clearRecovery(checkpoint:Checkpoint|undefined,onError:(message:string|null)=>void){
   const api=typeof window==='undefined'?undefined:window.resumeDesktop?.recoveryDrafts;

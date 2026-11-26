@@ -8,6 +8,7 @@ import type {LocalResumeStore} from './localFsApi';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_BYTES=8*1024*1024,MAX_RECORDS=64;
 const missing=(e:unknown)=>(e as NodeJS.ErrnoException)?.code==='ENOENT';
+function ownerAlive(pid:number){try{process.kill(pid,0);return true;}catch(e){return (e as NodeJS.ErrnoException).code!=='ESRCH';}}
 function comparable(data:object,kind:'resume'|'ledger'){
   const copy={...data} as Record<string,unknown>;
   delete copy[kind==='resume'?'updatedAt':'revision'];
@@ -18,10 +19,13 @@ export class RecoveryDraftStore{
   private readonly session=randomUUID();
   private readonly ids=new Map<string,string>();
   private tail:Promise<unknown>=Promise.resolve();
+  private queued=0;
   private readonly dir:string;
-  constructor(private root:string,private store:LocalResumeStore){this.dir=path.join(root,DRAFT_DIR);}
+  constructor(private root:string,private store:LocalResumeStore,private isOwnerAlive=ownerAlive){this.dir=path.join(path.resolve(root),DRAFT_DIR);}
   private serial<T>(work:()=>Promise<T>):Promise<T>{
-    const next=this.tail.then(work,work);this.tail=next.catch(()=>{});return next;
+    if(this.queued>=128)return Promise.reject(Error('恢复草稿操作队列已满，请立即保存。'));
+    this.queued++;
+    const next=this.tail.then(work,work).finally(()=>{this.queued--;});this.tail=next.catch(()=>{});return next;
   }
   private async directory(create:boolean){
     const real=await fs.realpath(this.root);
@@ -50,7 +54,7 @@ export class RecoveryDraftStore{
       const names=await fs.readdir(this.dir);
       if(names.filter(n=>n.endsWith('.json')).length>=MAX_RECORDS)throw Error('恢复草稿数量已达上限，请先检查旧草稿。');
     }
-    const record:DraftRecord={version:1,id,token:randomUUID(),session:this.session,createdAt:new Date().toISOString(),input};
+    const record:DraftRecord={version:1,id,token:randomUUID(),session:this.session,ownerPid:process.pid,createdAt:new Date().toISOString(),input};
     const bytes=Buffer.from(JSON.stringify(record));
     if(bytes.length>MAX_BYTES)throw Error('恢复草稿超过8 MB上限。');
     const temp=target+'.'+randomUUID()+'.tmp';
@@ -75,7 +79,7 @@ export class RecoveryDraftStore{
     let row:DraftRecord;try{row=await this.read(receipt.id);}catch(e){if(missing(e))return false;throw e;}
     if(row.token!==receipt.token)return false;
     if(confirmation==='SAVED_OR_DISCARDED'&&row.session!==this.session)return false;
-    if(confirmation==='DISCARD_RECOVERY'&&row.session===this.session)return false;
+    if(confirmation==='DISCARD_RECOVERY'&&(row.session===this.session||this.isOwnerAlive(row.ownerPid)))return false;
     await fs.unlink(this.file(row.id));return true;
   });}
   private async summarize(row:DraftRecord):Promise<DraftSummary>{
@@ -90,11 +94,12 @@ export class RecoveryDraftStore{
         state=comparable(current,'ledger')===comparable(input.data,'ledger')?'already-saved':current.revision===input.baseRevision?'same-base':'changed';
       }
     }catch(e){if((e as {code?:string})?.code==='NOT_FOUND'||missing(e))state='missing';}
+    if(this.isOwnerAlive(row.ownerPid))state='active';
     return {id:row.id,token:row.token,kind:input.kind,title:input.kind==='resume'?input.data.title:'投递台账与面试记录',...(input.kind==='resume'?{slug:input.slug}:{}),createdAt:row.createdAt,state};
   }
   list():Promise<DraftList>{return this.serial(async()=>{
     if(!await this.directory(false))return {drafts:[],unreadable:0};
-    const names=await fs.readdir(this.dir);const drafts:DraftSummary[]=[];let unreadable=0;
+    const names=await fs.readdir(this.dir);const drafts:DraftSummary[]=[];let unreadable=names.filter(n=>n.endsWith('.tmp')).length;
     const files=names.filter(n=>n.endsWith('.json'));
     if(files.length>MAX_RECORDS)throw Error('草稿目录文件数量超限，未自动清理。');
     for(const n of files){
@@ -106,7 +111,7 @@ export class RecoveryDraftStore{
   get(id:string,token:string):Promise<DraftRecord>{return this.serial(async()=>{
     if(!await this.directory(false))throw Error('恢复草稿不存在。');
     const row=await this.read(id);
-    if(row.session===this.session||row.token!==token)throw Error('恢复草稿已变化，请重新检查。');
+    if(row.session===this.session||row.token!==token||this.isOwnerAlive(row.ownerPid))throw Error('恢复草稿已变化，请重新检查。');
     return row;
   });}
 }

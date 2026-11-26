@@ -236,8 +236,9 @@ export function useResumePersistence(options?: {
       setSummaries(prev=>prev.map(item=>item.slug===activeSlug?{...item,id:raw.id,title:raw.title,templateId:raw.templateId,updatedAt:raw.updatedAt}:item));
       if(activeSlug==='master')setMasterSummary(prev=>prev?{...prev,id:raw.id,title:raw.title,templateId:raw.templateId,updatedAt:raw.updatedAt}:prev);
       // Caller has explicitly confirmed discard. Only discard after successful read.
-      await clearRecovery(pendingSaveRef.current?.checkpoint,setRecoveryError);
+      const discarded=pendingSaveRef.current;
       pendingSaveRef.current=null;
+      await clearRecovery(discarded?.checkpoint,setRecoveryError);
       activeDocRef.current=doc;
       resetHistory(doc);
       setSaveState('saved');

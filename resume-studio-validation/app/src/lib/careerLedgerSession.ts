@@ -73,9 +73,12 @@ export class CareerLedgerSession {
   restoreRecovery=async(data:ApplicationsStoreData,baseRevision:string):Promise<void>=>{
     if(this.state.dirty||this.state.saving||this.state.loading||this.logTask||this.inFlight||this.loadingTask)throw Error('当前台账有未保存或进行中的操作，请先处理。');
     this.change({loading:true,error:null});
-    try{const current=await this.api.getApplications();if(validRevision(current)!==baseRevision)throw Error('正式台账已变化，未覆盖。');const saved=await this.api.saveApplications(data,baseRevision);this.adopt(saved);}
-    catch(err){this.change({error:localErrorMessage(err,'台账恢复失败')});throw err;}
-    finally{this.change({loading:false});}
+    const work=(async()=>{
+      try{const current=await this.api.getApplications();if(validRevision(current)!==baseRevision)throw Error('正式台账已变化，未覆盖。');const saved=await this.api.saveApplications(data,baseRevision);this.adopt(saved);const read=await this.api.getApplications();this.adopt(read);if(validRevision(read)!==validRevision(saved))throw Error('草稿已写入，但随后台账发生变化，已读取最新磁盘版本，请核对。');}
+      catch(err){this.change({error:localErrorMessage(err,'台账恢复失败')});throw err;}
+      finally{this.change({loading:false});}
+    })();
+    this.loadingTask=work;try{await work;}finally{if(this.loadingTask===work)this.loadingTask=null;}
   };
   log=async(input:ApplicationLogInput):Promise<JobApplication>=>{
     if(this.logTask)throw new Error('已有投递归档正在进行。');

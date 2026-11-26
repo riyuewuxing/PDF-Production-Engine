@@ -1,0 +1,95 @@
+const {app}=require('electron');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_CRASH_OUT,stage=process.env.RESUME_STUDIO_CRASH_STAGE;
+if(!root||!out||!['prepare','recover'].includes(stage)||!path.basename(root).startsWith('synthetic-crash-'))throw Error('isolated crash fixture required');
+fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile-'+stage));app.disableHardwareAcceleration();
+const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json'),manifest=require('./runner-manifest.json');
+const dir=path.join(root,'.resume-studio-drafts-v1');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),checks={};
+const deadline=setTimeout(()=>{console.error('crash fixture watchdog expired: '+stage);app.exit(2)},45000);
+const records=()=>fs.existsSync(dir)?fs.readdirSync(dir).filter(n=>n.endsWith('.json')).map(n=>JSON.parse(fs.readFileSync(path.join(dir,n),'utf8'))):[];
+async function until(label,fn,ms=15000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label);}
+async function run(){
+  if(stage==='prepare'){
+    await main.store.saveResume('master',{...fixture,id:'synthetic-crash-doc',title:'合成正式简历'});
+    const base=await main.store.getApplications();
+    await main.store.saveApplications({...base,applications:[{id:'synthetic-crash-application',company:'虚构恢复单位',role:'合成岗位',notes:'正式备注'}]},base.revision);
+    const before=await main.store.getResume('master'),ledger=await main.store.getApplications();
+    fs.writeFileSync(path.join(out,'original.json'),JSON.stringify({before,ledger}));
+    main.store.saveResume=async()=>{throw Error('受控正式简历写入失败');};
+    main.store.saveApplications=async()=>{throw Error('受控正式台账写入失败');};
+  }else{
+    const original=JSON.parse(fs.readFileSync(path.join(out,'original.json'),'utf8'));
+    if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(original.before)||JSON.stringify(await main.store.getApplications())!==JSON.stringify(original.ledger))throw Error('official files changed before recovery');
+    checks.officialUnchangedAfterKill=true;
+    await main.store.saveResume('master',{...original.before,basic:{...original.before.basic,name:'外部正式修改'}});
+  }
+  await main.registerAssetProtocol();main.registerIpcHandlers();
+  const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
+  const js=code=>win.webContents.executeJavaScript(code);
+  const has=t=>js('document.body.innerText.includes('+JSON.stringify(t)+')');
+  const click=async(label,scope='body')=>{if(!await js('(()=>{const root=document.querySelector('+JSON.stringify(scope)+');const b=[...(root?.querySelectorAll("button")??[])].find(e=>e.innerText.trim()==='+JSON.stringify(label)+');if(!b||b.disabled)return false;b.click();return true})()'))throw Error('missing/enabled button '+label)};
+  const input=async(selector,value)=>{if(!await js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const proto=e.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,"value").set.call(e,'+JSON.stringify(value)+');e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()'))throw Error('missing input '+selector)};
+  const capture=async name=>{await js('document.fonts.ready.then(()=>true)');await sleep(350);const image=await win.webContents.capturePage();if(image.isEmpty())throw Error('empty screenshot');fs.writeFileSync(path.join(out,name+'.png'),image.toPNG());};
+  await until('editor ready',()=>js('!!document.querySelector("#basic-field-name")'));
+  if(stage==='prepare'){
+    await input('#basic-field-name','异常退出前最新名字');
+    await until('resume checkpoint durable',()=>records().some(x=>x.input.kind==='resume'&&x.input.data.basic.name==='异常退出前最新名字'));
+    await until('resume save failure',()=>has('受控正式简历写入失败'));
+    await click('求职面试');await until('ledger loaded',()=>has('已读取本地台账'));
+    const notes='textarea[placeholder="记录笔试真题、试讲课题或面试复盘..."]';
+    await input(notes,'异常退出前最新台账备注');
+    await until('ledger checkpoint durable',()=>records().some(x=>x.input.kind==='ledger'&&x.input.data.applications[0]?.notes==='异常退出前最新台账备注'));
+    await until('ledger save failure',()=>has('受控正式台账写入失败'));
+    const original=JSON.parse(fs.readFileSync(path.join(out,'original.json'),'utf8'));
+    if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(original.before)||JSON.stringify(await main.store.getApplications())!==JSON.stringify(original.ledger))throw Error('official data overwritten by draft');
+    const rows=records();if(rows.length!==2||rows.some(x=>x.ownerPid!==process.pid))throw Error('unexpected journal records');
+    fs.writeFileSync(path.join(out,'ready-to-kill.json'),JSON.stringify({pid:process.pid,records:rows.map(({id,token,input})=>({id,token,kind:input.kind}))}));
+    return new Promise(()=>{});
+  }
+  await until('startup recovery banner',()=>has('本地自动恢复草稿 2 份'));await click('检查恢复草稿');
+  await until('conflict and matching basis',()=>has('原版本已变化').then(a=>a?has('原版本未变化'):false));
+  const panel='[aria-label="异常退出草稿恢复"]';
+  checks.crashDraftsFound=true;
+  await capture('01-recovery-on-restart');
+  const rows=await js('window.resumeDesktop.recoveryDrafts.list()');
+  const resume=rows.drafts.find(x=>x.kind==='resume'),ledger=rows.drafts.find(x=>x.kind==='ledger');
+  if(resume?.state!=='changed'||ledger?.state!=='same-base')throw Error('wrong recovery basis classification');
+  const master=await main.store.getResume('master');
+  await js('window.confirm=()=>true');
+  await click('恢复为新简历',panel);
+  await until('recovered resume exists',async()=>(await main.store.listResumes()).resumes.some(x=>x.title.includes('恢复草稿')));
+  const list=await main.store.listResumes(),copy=list.resumes.find(x=>x.title.includes('恢复草稿')),doc=await main.store.getResume(copy.slug);
+  if(doc.basic.name!=='异常退出前最新名字'||doc.id===master.id||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(master))throw Error('recovery replaced original or lost latest name');
+  checks.conflictingResumeRestoredAsNewCopy=true;
+  await until('copy loaded',()=>js('document.querySelector("#basic-field-name")?.value==="异常退出前最新名字"'));
+  await capture('02-resume-restored-copy');
+  const ledgerRow=panel+' article';
+  const ledgerIndex=await js('[...document.querySelectorAll('+JSON.stringify(ledgerRow)+')].findIndex(e=>e.innerText.includes("投递台账与面试记录"))');
+  if(ledgerIndex<0)throw Error('ledger recovery row missing');
+  const ledgerScope=ledgerRow+':nth-of-type('+(ledgerIndex+1)+')';
+  if(!await js('(()=>{const row=document.querySelector('+JSON.stringify(ledgerScope)+');return [...row.querySelectorAll("button")].find(e=>e.innerText==="恢复未变化台账")?.disabled===true})()'))throw Error('ledger restore allowed without review');
+  await click('查看草稿内容',ledgerScope);
+  await until('ledger draft preview',()=>has('异常退出前最新台账备注'));
+  await capture('03-ledger-draft-review');
+  await click('恢复未变化台账',ledgerScope);
+  await until('ledger restored on disk',async()=>(await main.store.getApplications()).applications[0]?.notes==='异常退出前最新台账备注');
+  await until('ledger readback confirmed',()=>has('台账草稿已恢复并重新读取'));
+  checks.ledgerRestoredWithCas=true;
+  await capture('04-ledger-restored');
+  await click('内容编辑');
+  await input('#basic-field-name','恢复副本正常保存');
+  await until('normal save persisted',async()=>(await main.store.getResume(copy.slug)).basic.name==='恢复副本正常保存');
+  await until('normal save cleared own checkpoint',()=>records().length===2&&records().every(x=>x.ownerPid!==process.pid));
+  checks.normalSaveClearsOnlyOwnDraft=true;
+  await click('清除这份草稿',panel);
+  await until('one draft explicitly discarded',()=>has('本地自动恢复草稿 1 份'));
+  await click('清除这份草稿',panel);
+  await until('both explicitly discarded',()=>records().length===0);
+  checks.explicitDiscardOnly=true;
+  checks.originalStillUnchanged=JSON.stringify(await main.store.getResume('master'))===JSON.stringify(master);
+  if(!checks.originalStillUnchanged)throw Error('original changed');
+  fs.writeFileSync(path.join(out,'crash-recovery-evidence.json'),JSON.stringify({sourceSha:manifest.sourceSha,runnerSha:process.env.GITHUB_SHA,checks},null,2));
+}
+app.whenReady().then(run).then(()=>{clearTimeout(deadline);app.exit(0)}).catch(e=>{console.error(e.message);fs.writeFileSync(path.join(out,'failure-'+stage+'.json'),JSON.stringify({checks,error:e.message},null,2));clearTimeout(deadline);app.exit(1)});
