@@ -10,6 +10,7 @@ import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {scanScopedProposalWarnings,type TailorBlockProposal} from '../../lib/aiTailor';
 import {PRIVACY_PLACEHOLDER,isShareableFact} from '../../lib/aiContext';
 import type {FactBank,FactRecord} from '../../schema/factBankSchema';
+import {assertFreshFactSelection,loadLocalFactBank,prepareFactSelection} from '../../lib/factSelection';
 import {FactBankPane} from './FactBankPane';
 import {renderAiComparison,type AiPdfComparison} from '../../lib/aiPdfComparison';
 import {AiPdfComparisonView} from './AiPdfComparisonView';
@@ -50,10 +51,7 @@ export function ResumeAiAssistantPane(props:Props){
   };
   const assertFactsFresh=async(b:Basis)=>{
     if(!b.records.length)return;
-    const bridge=window.resumeDesktop?.facts;
-    if(!bridge)throw new Error('本地事实库不可用，旧审批作废。');
-    const latest=await bridge.get();
-    if(latest.revision!==b.bankRevision||!b.records.every(r=>latest.records.some(s=>s.id===r.id&&JSON.stringify(s)===JSON.stringify(r)&&isShareableFact(b.document,s))))throw new Error('本地事实库已变化，请刷新并重新预览；旧审批作废。');
+    await assertFreshFactSelection(b.document,{records:b.records,binding:b.bankRevision?{slug:b.slug,docId:b.document.id,bankRevision:b.bankRevision,ids:b.records.map(r=>r.id),selectedKeys:b.keys}:undefined},loadLocalFactBank);
     if(!isCurrent(b))throw new Error('事实选择或简历已变化。');
   };
   const reset=()=>{setPending(null);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice(null);setError(null);};
@@ -61,11 +59,11 @@ export function ResumeAiAssistantPane(props:Props){
     if(busy||applying||factsBusy)return;reset();
     try{
       props.assertSettings(props.settings);
-      const records=factIds.map(id=>bank?.records.find(r=>r.id===id));
-      if(records.some(r=>!r))throw new Error('事实选择已变化，请刷新。');
-      const basis:Basis={document:props.document,slug:props.slug,settings:props.settings,mode,goal,keys:[...keys],jdText:includeJd?props.jdText:undefined,overflowPx:props.overflowPx,requestId:crypto.randomUUID(),records:records as FactRecord[],bankRevision:bank?.revision??null};
+      const selection=prepareFactSelection(props.document,props.slug,keys,bank,factIds);
+      const records=selection.records;
+      const basis:Basis={document:props.document,slug:props.slug,settings:props.settings,mode,goal,keys:[...keys],jdText:includeJd?props.jdText:undefined,overflowPx:props.overflowPx,requestId:crypto.randomUUID(),records,bankRevision:bank?.revision??null};
       const prepared=prepareAssistantTask(basis);
-      if(basis.records.length&&basis.bankRevision)prepared.options.factBinding={slug:basis.slug,docId:basis.document.id,bankRevision:basis.bankRevision,ids:basis.records.map(r=>r.id),selectedKeys:[...basis.keys]};
+      if(selection.binding)prepared.options.factBinding=selection.binding;
       assertAiPreviewSettings(props.settings,prepared.options);setPending({basis,prepared});
     }catch(err){setError(localErrorMessage(err,'无法准备 AI 任务'));}
   };

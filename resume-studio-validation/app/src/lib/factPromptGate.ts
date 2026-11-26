@@ -8,8 +8,14 @@ function readPrompt(prompt:string):unknown{
   try{return JSON.parse(prompt);}catch{return null;}
 }
 function readRecords(value:unknown):{blockKey:unknown;source:unknown}[]{
-  if(!obj(value)||!obj(value.toolResults)||!Array.isArray(value.toolResults.inspect_block_facts))return [];
-  return value.toolResults.inspect_block_facts.flatMap((row:unknown)=>{
+  if(!obj(value))return [];
+  // Single polish and assistant use toolResults; whole-resume tailoring uses blocks.
+  // Inspect both, so duplicating or moving records into a second supported container cannot bypass the gate.
+  const rows:unknown[]=[
+    ...(obj(value.toolResults)&&Array.isArray(value.toolResults.inspect_block_facts)?value.toolResults.inspect_block_facts:[]),
+    ...(Array.isArray(value.blocks)?value.blocks:[]),
+  ];
+  return rows.flatMap((row:unknown)=>{
     if(!obj(row)||!Array.isArray(row.sources))return [];
     return row.sources.filter((source:unknown)=>obj(source)&&(source.scope==='record'||(typeof source.id==='string'&&source.id.startsWith('record-')))).map((source:unknown)=>({blockKey:row.blockKey,source}));
   });

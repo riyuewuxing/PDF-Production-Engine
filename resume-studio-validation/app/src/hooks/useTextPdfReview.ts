@@ -3,7 +3,7 @@ import type {ResumeDocument} from '../schema/resumeSchema';
 import {buildTextPatchEnvelope,previewTextPatch,type TextPatchCandidate} from '../lib/aiTextPatch';
 import {renderAiComparison,type AiPdfComparison} from '../lib/aiPdfComparison';
 import {localErrorMessage} from '../lib/apiClient';
-type Input={document:ResumeDocument;slug:string;requestId:string;enabled:boolean;candidates:readonly TextPatchCandidate[]};
+type Input={document:ResumeDocument;slug:string;requestId:string;enabled:boolean;candidates:readonly TextPatchCandidate[];validate?:()=>Promise<void>};
 export function useTextPdfReview(input:Input){
   const {document,slug,requestId,enabled,candidates}=input;
   const fingerprint=JSON.stringify([slug,requestId,candidates]);
@@ -22,11 +22,13 @@ export function useTextPdfReview(input:Input){
     const ctrl=new AbortController();controller.current=ctrl;setBusy(true);setError(null);setReview(null);setConfirmed(false);
     const stillCurrent=()=>mounted.current&&latest.current.enabled&&latest.current.document===document&&latest.current.fingerprint===fingerprint&&!ctrl.signal.aborted;
     try{
+      await input.validate?.();if(!stillCurrent())return;
       const envelope=await buildTextPatchEnvelope({document,slug,baseRevision:'local-preview-only',sourceRequestId:requestId,candidates});
       const next=await previewTextPatch({document,slug,revision:'local-preview-only',envelope});
       if(!stillCurrent())return;
       const comparison=await renderAiComparison(document,next,false,ctrl.signal);
       if(!stillCurrent())return;
+      await input.validate?.();if(!stillCurrent())return;
       setReview({document,fingerprint,next,comparison});
     }catch(err){if(stillCurrent())setError(localErrorMessage(err,'正文 PDF 对照失败'));}
     finally{if(controller.current===ctrl){controller.current=null;if(mounted.current)setBusy(false);}}

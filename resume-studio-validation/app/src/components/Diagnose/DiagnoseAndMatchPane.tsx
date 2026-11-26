@@ -19,6 +19,7 @@ import {
   type TailorBlockProposal,
   generateTailorProposals,
   prepareTailorRequest,
+  prepareScopedPolishRequest,
   scanFactGuardWarnings,
   scanScopedProposalWarnings,
   type PreparedTailorRequest,
@@ -34,18 +35,20 @@ import {
   DEFAULT_BYOK_SETTINGS,
   type PolishMode,
   computeLineDiff,
-  preparePolishRequest,
   requestByokCompletion,
   validateByokBaseUrl,
   type ByokCompletionOptions,
 } from '../../lib/byokAiClient';
 import { matchResumeWithJd } from '../../lib/jdMatcher';
-import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, visibleBasicValue, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from '../../lib/aiContext';
+import { buildAiFactSources, currentSourceCorpus, isShareableFact, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from '../../lib/aiContext';
 import { collectEditableBlocks } from '../../lib/resumeBlocks';
 import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
 import {AiLayoutPane} from './AiLayoutPane';
+import {FactBankPane} from './FactBankPane';
+import type {FactBank} from '../../schema/factBankSchema';
+import {prepareFactSelection,assertFreshFactSelection,loadLocalFactBank,type FactSelection} from '../../lib/factSelection';
 import {TextPdfReviewGate} from './TextPdfReviewGate';
 import {useTextPdfReview} from '../../hooks/useTextPdfReview';
 import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
@@ -53,8 +56,9 @@ import type { ResumeDocument } from '../../schema/resumeSchema';
 
 type DiagnoseSubTab = 'hr' | 'jd' | 'ats' | 'ai';
 type AiSubMode = 'single' | 'tailor' | 'assistant' | 'layout';
-type PolishBasis = { document: ResumeDocument; slug: string; blockKey: string; text: string;requestId:string };
-type TailorBasis = { document: ResumeDocument; slug: string; jdText: string;requestId:string };
+type CommonBasis={document:ResumeDocument;slug:string;requestId:string;settings:ByokAiSettings;selection:FactSelection};
+type PolishBasis = CommonBasis & { blockKey: string; text: string;polishMode:PolishMode;sourceMap:AiFactSourceMap;kind:'single' };
+type TailorBasis = CommonBasis & { jdText: string;masterRef:boolean;kind:'tailor' };
 type PendingAiRequest =
   | { mode: 'single'; basis: PolishBasis; settings: ByokAiSettings; options: ByokCompletionOptions; polishMode: PolishMode }
   | { mode: 'tailor'; basis: TailorBasis; settings: ByokAiSettings; prepared: PreparedTailorRequest; masterRef: boolean };
@@ -105,6 +109,9 @@ export function DiagnoseAndMatchPane({
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<PendingAiRequest | null>(null);
+  const [factBank,setFactBank]=useState<FactBank|null>(null);
+  const [factIds,setFactIds]=useState<string[]>([]);
+  const [factsBusy,setFactsBusy]=useState(false);
 
   const editableBlocks = useMemo(() => collectEditableBlocks(document), [document]);
   const [selectedBlockKey, setSelectedBlockKey] = useState<string>(() => editableBlocks[0]?.key ?? 'skills');
@@ -163,26 +170,38 @@ export function DiagnoseAndMatchPane({
   const jdResult = useMemo(() => matchResumeWithJd(document, jdText), [document, jdText]);
 
   const selectedBlock = editableBlocks.find((b) => b.key === selectedBlockKey) ?? editableBlocks[0];
-  const contextRef = useRef({ document, slug: activeSlug, jdText, blockKey: selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab });
-  contextRef.current = { document, slug: activeSlug, jdText, blockKey: selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab };
+  const factKeys=aiSubMode==='single'?(selectedBlock?[selectedBlock.key]:[]):editableBlocks.map(b=>b.key);
+  const contextRef = useRef({ document, slug: activeSlug, jdText, blockKey: selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab,factBank,factIds });
+  contextRef.current = { document, slug: activeSlug, jdText, blockKey: selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab,factBank,factIds };
   const currentSources = useMemo(() => buildAiFactSources(document), [document]);
   const polishWarnings = useMemo(
     () => suggestedText === null || !selectedBlock ? [] :
       scanFactGuardWarnings(suggestedText, currentSourceCorpus(currentSources[selectedBlock.key] ?? [])),
     [suggestedText, selectedBlock, currentSources],
   );
-  const isCurrent = (basis: { document: ResumeDocument; slug: string; jdText?: string; blockKey?: string }) =>
-    mountedRef.current && contextRef.current.document === basis.document &&
-    contextRef.current.slug === basis.slug &&
-    (basis.jdText === undefined || contextRef.current.jdText === basis.jdText) &&
-    (basis.blockKey === undefined || contextRef.current.blockKey === basis.blockKey);
+  const isCurrent = (basis: PolishBasis|TailorBasis) => {
+    const c=contextRef.current;
+    return mountedRef.current&&c.document===basis.document&&c.slug===basis.slug&&c.aiSettings===basis.settings&&c.subTab==='ai'&&c.aiSubMode===basis.kind&&
+      JSON.stringify(c.factIds)===JSON.stringify(basis.selection.records.map(r=>r.id))&&
+      (!basis.selection.binding||c.factBank?.revision===basis.selection.binding.bankRevision)&&
+      (basis.kind==='single'?c.blockKey===basis.blockKey&&c.polishMode===basis.polishMode:c.jdText===basis.jdText&&c.tailorUseMasterRef===basis.masterRef);
+  };
+  const assertFactsFresh=async(basis:PolishBasis|TailorBasis)=>{
+    await assertFreshFactSelection(basis.document,basis.selection,loadLocalFactBank);
+    if(!isCurrent(basis))throw new Error('任务范围、模型或事实选择已变化，请重新预览。');
+  };
+  const clearTextApprovals=()=>{
+    setPendingRequest(null);setSuggestedText(null);setPolishRiskConfirmed(false);
+    setTailorProposals([]);setTailorSources({});setTailorNotice(null);setTailorEditingKey(null);
+    polishAbortRef.current?.abort();tailorAbortRef.current?.abort();
+  };
 
   const singleBasis=polishBasisRef.current;
   const singleCandidates=singleBasis&&suggestedText!==null&&selectedBlock&&selectedBlock.key===singleBasis.blockKey?[{blockKey:singleBasis.blockKey,originalText:singleBasis.text,suggestedText,reason:'单段精修（人工核对）',factIds:(currentSources[singleBasis.blockKey]??[]).map(s=>s.id)}]:[];
-  const singleReview=useTextPdfReview({document,slug:activeSlug,requestId:singleBasis?.requestId??'',enabled:subTab==='ai'&&aiSubMode==='single'&&polishRiskConfirmed&&!!singleBasis&&isCurrent(singleBasis)&&!polishing,candidates:singleCandidates});
+  const singleReview=useTextPdfReview({document,slug:activeSlug,requestId:singleBasis?.requestId??'',enabled:subTab==='ai'&&aiSubMode==='single'&&polishRiskConfirmed&&!!singleBasis&&isCurrent(singleBasis)&&!polishing&&!factsBusy,candidates:singleCandidates,validate:singleBasis?()=>assertFactsFresh(singleBasis):undefined});
   const wholeBasis=tailorBasisRef.current;
   const wholeCandidates=tailorProposals.filter(p=>p.accepted);
-  const wholeReview=useTextPdfReview({document,slug:activeSlug,requestId:wholeBasis?.requestId??'',enabled:subTab==='ai'&&aiSubMode==='tailor'&&!!wholeBasis&&isCurrent(wholeBasis)&&!tailoring,candidates:wholeCandidates});
+  const wholeReview=useTextPdfReview({document,slug:activeSlug,requestId:wholeBasis?.requestId??'',enabled:subTab==='ai'&&aiSubMode==='tailor'&&!!wholeBasis&&isCurrent(wholeBasis)&&!tailoring&&!factsBusy,candidates:wholeCandidates,validate:wholeBasis?()=>assertFactsFresh(wholeBasis):undefined});
   useEffect(() => {
     setSuggestedText(null);
     setPolishRiskConfirmed(false);
@@ -198,6 +217,7 @@ export function DiagnoseAndMatchPane({
   useEffect(() => {
     setPendingRequest(null);
   }, [document, activeSlug, jdText, selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab]);
+  useEffect(()=>{setFactIds([]);clearTextApprovals();},[document,activeSlug,selectedBlock?.key,aiSettings,aiSubMode,polishMode,tailorUseMasterRef,subTab,jdText]);
   const diffSegments = useMemo(
     () =>
       selectedBlock && suggestedText !== null
@@ -284,17 +304,16 @@ export function DiagnoseAndMatchPane({
     finally{if(testAbort.current===ctrl){testAbort.current=null;if(mountedRef.current)setTestingConnection(false);}}
   };
   const handlePreparePolish = () => {
-    if (!selectedBlock || applyingRef.current || polishing) return;
+    if (!selectedBlock || applyingRef.current || polishing || factsBusy) return;
     setPolishError(null);
     setPendingRequest(null);
     try {
       assertPreviewSettings(aiSettings);
-      const sanitize = createAiTextSanitizer([document]);
-      const basis: PolishBasis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text,requestId:crypto.randomUUID() };
-      const options = preparePolishRequest({
-        mode: polishMode, targetTitle: sanitize(selectedBlock.label),
-        content: sanitize(selectedBlock.text), jobTitle: sanitize(visibleBasicValue(document,'title')),
-      });
+      const selection=prepareFactSelection(document,activeSlug,[selectedBlock.key],factBank,factIds);
+      const prepared=prepareScopedPolishRequest({document,blockKey:selectedBlock.key,mode:polishMode,records:selection.records});
+      const basis:PolishBasis={kind:'single',document,slug:activeSlug,blockKey:selectedBlock.key,text:selectedBlock.text,requestId:crypto.randomUUID(),settings:aiSettings,polishMode,selection,sourceMap:prepared.sourceMap};
+      const options=prepared.options;
+      if(selection.binding)options.factBinding=selection.binding;
       assertPreviewSettings(aiSettings,options);
       setPendingRequest({ mode:'single', basis, settings:aiSettings, options, polishMode });
     } catch(err) {
@@ -314,7 +333,10 @@ export function DiagnoseAndMatchPane({
     setSuggestedText(null);
     setPolishRiskConfirmed(false);
     try {
+      await assertFactsFresh(basis);
+      if(controller.signal.aborted)return;
       const output = await requestByokCompletion({...request.options,settings:request.settings,signal:controller.signal});
+      await assertFactsFresh(basis);
       if (controller.signal.aborted || polishAbortRef.current !== controller || !isCurrent(basis)) return;
       const block = editableBlocks.find(b=>b.key===basis.blockKey);
       if (!block || output.length > block.maxCharsHint) throw new Error('润色结果超出段落字数预算，请缩短后重试。');
@@ -354,11 +376,13 @@ export function DiagnoseAndMatchPane({
       const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
       if(!singleReview.matches(next))throw new Error('单段候选与已审核 PDF 不一致。');
       if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
+      await assertFactsFresh(basis);
       await apiClient.createSnapshot(activeSlug,'AI 单段润色前快照',revision);
+      await assertFactsFresh(basis);
       if (!isCurrent(basis)||getCurrentRevision()!==revision||!singleReview.matches(next)) throw new Error('简历或审批已变化，请重新生成润色建议。');
       onImmediateChange(next);
       setPolishError(null);
-      setSuggestedText(null);
+      setSuggestedText(null);setFactIds([]);
     } catch (err) {
       if (mountedRef.current) setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
     } finally {
@@ -368,28 +392,31 @@ export function DiagnoseAndMatchPane({
   };
 
   const handlePrepareTailor = async () => {
-    if (applyingRef.current || tailoring) return;
+    if (applyingRef.current || tailoring || factsBusy) return;
     tailorAbortRef.current?.abort();
     const controller = new AbortController();
     tailorAbortRef.current = controller;
-    const basis: TailorBasis = { document, slug: activeSlug, jdText,requestId:crypto.randomUUID() };
     const settings = aiSettings;
     const masterRef = tailorUseMasterRef;
+    let basis:TailorBasis|undefined;
     setTailoring(true);
     setTailorError(null);
     setPendingRequest(null);
     try {
       assertPreviewSettings(settings);
+      const selection=prepareFactSelection(document,activeSlug,editableBlocks.map(b=>b.key),factBank,factIds);
+      basis={kind:'tailor',document,slug:activeSlug,jdText,requestId:crypto.randomUUID(),settings,masterRef,selection};
       let masterDoc: ResumeDocument | null = null;
       if (masterRef && activeSlug !== 'master') masterDoc = await apiClient.getResume('master');
       if (controller.signal.aborted || !isCurrent(basis) || contextRef.current.aiSettings !== settings ||
           contextRef.current.tailorUseMasterRef !== masterRef || contextRef.current.aiSubMode !== 'tailor' ||
           contextRef.current.subTab !== 'ai') return;
-      const prepared = prepareTailorRequest({document,masterDocument:masterDoc,jdText});
+      const prepared = prepareTailorRequest({document,masterDocument:masterDoc,jdText,records:selection.records});
+      if(selection.binding)prepared.options.factBinding=selection.binding;
       assertPreviewSettings(settings,prepared.options);
       setPendingRequest({mode:'tailor',basis,settings,prepared,masterRef});
     } catch(err) {
-      if (isCurrent(basis)) setTailorError(err instanceof Error?err.message:'无法准备整卷请求。');
+      if (!basis||isCurrent(basis)) setTailorError(err instanceof Error?err.message:'无法准备整卷请求。');
     } finally {
       if(tailorAbortRef.current===controller&&mountedRef.current)setTailoring(false);
     }
@@ -407,7 +434,10 @@ export function DiagnoseAndMatchPane({
     setTailorNotice(null);
     setTailorProposals([]);
     try {
+      await assertFactsFresh(basis);
+      if(controller.signal.aborted)return;
       const res = await generateTailorProposals({settings:request.settings,prepared:request.prepared,signal:controller.signal});
+      await assertFactsFresh(basis);
       if (controller.signal.aborted || tailorAbortRef.current !== controller || !isCurrent(basis)) return;
       setTailorProposals(res.proposals);
       setTailorSources(res.sourceMap);
@@ -423,7 +453,7 @@ export function DiagnoseAndMatchPane({
 
   const confirmPendingRequest = () => {
     const request = pendingRequest;
-    if (!request) return;
+    if (!request||factsBusy||polishing||tailoring||applyingRef.current) return;
     setPendingRequest(null);
     const current = contextRef.current;
     if (!isCurrent(request.basis) || current.aiSettings !== request.settings ||
@@ -465,11 +495,13 @@ export function DiagnoseAndMatchPane({
       const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
       if(!wholeReview.matches(next))throw new Error('整卷候选与已审核 PDF 不一致。');
       if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
+      await assertFactsFresh(basis);
       await apiClient.createSnapshot(activeSlug,'AI 整卷定向改写前快照',revision);
+      await assertFactsFresh(basis);
       if (!isCurrent(basis)||getCurrentRevision()!==revision||!wholeReview.matches(next)) throw new Error('简历或审批已变化，未应用修改。');
       onImmediateChange(next);
       setTailorError(null);
-      setTailorProposals([]);
+      setTailorProposals([]);setFactIds([]);
       setTailorNotice(`已一次性应用 ${selected.length} 条整卷改写（按 Ctrl+Z 可 1 步完整撤回）。`);
     } catch (err) {
       if (mountedRef.current) setTailorError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
@@ -959,6 +991,7 @@ export function DiagnoseAndMatchPane({
             {aiSubMode==='layout'&&<AiLayoutPane document={document} slug={activeSlug} settings={aiSettings} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>} 
 
             {aiSubMode==='assistant'&&<ResumeAiAssistantPane document={document} slug={activeSlug} settings={aiSettings} jdText={jdText} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>}
+            {(aiSubMode==='single'||aiSubMode==='tailor')&&<FactBankPane key={activeSlug+':'+document.id+':'+aiSubMode} document={document} slug={activeSlug} blocks={editableBlocks} keys={factKeys} bank={factBank} selected={factIds} locked={polishing||tailoring||applying||factsBusy||singleReview.busy||wholeReview.busy} onBank={bank=>{setFactBank(bank);setFactIds([]);clearTextApprovals();}} onSelected={ids=>{setFactIds(ids.filter(id=>factBank?.records.some(r=>r.id===id&&isShareableFact(document,r)&&factKeys.includes(r.blockKey))));clearTextApprovals();}} onBusy={setFactsBusy} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision}/>}
             {pendingRequest && (
               <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800">
                 <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>
@@ -966,6 +999,7 @@ export function DiagnoseAndMatchPane({
                 <p>模型：{pendingRequest.settings.model} · 档案：{pendingRequest.settings.providerLabel}</p>
                  <p>本地上限：{resolveAiLimits(pendingRequest.settings).maxOutputTokens} 输出 tokens；{resolveAiLimits(pendingRequest.settings).timeoutMs/1000} 秒</p>
                 <p>下方是本次实际发送的消息内容。基本联系方式、照片和已识别的隐私内容已尽量省略；仍请检查可见经历或 JD 中是否有其他敏感信息。密钥不在预览中。</p>
+                {pendingRequest.basis.selection.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 bg-white p-2 space-y-1"><div className="font-semibold">本次明确外发 {pendingRequest.basis.selection.records.length} 条本人确认事实（证据位置不外发）</div>{Object.values(pendingRequest.mode==='single'?pendingRequest.basis.sourceMap:pendingRequest.prepared.sourceMap).flat().filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1"><span className="text-teal-800">{s.id} · 本人确认</span><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}
                 <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-amber-200 bg-white p-2">
                   <div className="font-semibold">系统消息</div>
                   <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).systemPrompt}</pre>
@@ -973,7 +1007,7 @@ export function DiagnoseAndMatchPane({
                   <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).userPrompt}</pre>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white">确认发送给模型</button>
+                  <button type="button" disabled={factsBusy||polishing||tailoring||applying} onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white">确认发送给模型</button>
                   <button type="button" onClick={()=>setPendingRequest(null)} className="rounded border border-slate-300 bg-white px-3 py-1.5">取消发送</button>
                 </div>
               </section>
@@ -1006,7 +1040,7 @@ export function DiagnoseAndMatchPane({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={tailoring || applying}
+                    disabled={tailoring || applying || factsBusy}
                     onClick={() => void handlePrepareTailor()}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
                   >
@@ -1065,7 +1099,7 @@ export function DiagnoseAndMatchPane({
 
                       <button
                         type="button"
-                        disabled={applying || !tailorProposals.some((p) => p.accepted) || !wholeReview.canApply}
+                        disabled={applying || factsBusy || !tailorProposals.some((p) => p.accepted) || !wholeReview.canApply}
                         onClick={() => void handleApplyTailorProposals()}
                         className="inline-flex items-center gap-1 rounded bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
                       >
@@ -1121,7 +1155,7 @@ export function DiagnoseAndMatchPane({
                           <div className="rounded border border-slate-200 bg-slate-50 p-2 text-[10px] text-slate-600">
                             事实来源（候选人自述，不是独立证明）：
                             {(tailorSources[proposal.blockKey] ?? []).map(source=>(
-                              <div key={source.id}>{source.scope==='current'?'当前段落':'同源母库'} · {source.label} · {source.id}{proposal.factIds.includes(source.id)?'（模型引用）':''}</div>
+                              <div key={source.id}>{source.scope==='current'?'当前段落':source.scope==='record'?'本人确认事实':'同源母库'} · {source.label} · {source.id}{proposal.factIds.includes(source.id)?'（模型引用）':''}{source.scope==='record'&&<div className="whitespace-pre-wrap break-words">{source.facts}<div>本地证据：{wholeBasis?.selection.records[Number(source.id.slice(7))-1]?.evidenceRef}</div></div>}</div>
                             ))}
                             <div>请人工核对主体、日期、限定词及因果关系；机器预警无法证明语义真实性。</div>
                           </div>
@@ -1246,7 +1280,7 @@ export function DiagnoseAndMatchPane({
 
               <button
                 type="button"
-                disabled={polishing || applying || !selectedBlock}
+                disabled={polishing || applying || factsBusy || !selectedBlock}
                 onClick={handlePreparePolish}
                 className="flex w-full items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
               >
@@ -1275,7 +1309,7 @@ export function DiagnoseAndMatchPane({
                     </button>
                     <button
                       type="button"
-                      disabled={applying || !polishRiskConfirmed || !singleReview.canApply}
+                      disabled={applying || factsBusy || !polishRiskConfirmed || !singleReview.canApply}
                       onClick={() => void handleAdoptDiff()}
                       className="inline-flex items-center gap-1 rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-500"
                     >
@@ -1286,6 +1320,7 @@ export function DiagnoseAndMatchPane({
 
                 <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
                   <div>来源：当前所选段落（候选人自述）。数字检查不等于事实或语义验证，请核对主体、角色、时间及否定限定。</div>
+                  {singleBasis?.selection.records.map((r,i)=><div key={r.id} className="rounded border border-amber-200 p-1 break-words">提供给模型的事实 record-{i+1}：{r.assertion}<div>本地证据：{r.evidenceRef}（纯正文输出不代表模型逐条引用）</div></div>)}
                   {polishWarnings.map((warning, i) => <div key={i}>{warning.message}</div>)}
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={polishRiskConfirmed} disabled={applying}

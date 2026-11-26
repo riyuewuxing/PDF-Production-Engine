@@ -17,7 +17,7 @@ const fixture = require('./runner-fixture.json');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const checks = {};
 let server;
-const deadline = setTimeout(() => { console.error('application smoke deadline exceeded'); app.exit(2); }, 210000);
+const deadline = setTimeout(() => { console.error('application smoke deadline exceeded'); app.exit(2); }, 270000);
 async function until(label, fn, timeout = 20000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) { if (await fn()) return; await sleep(150); }
@@ -127,6 +127,7 @@ async function run() {
       if(second){
         const user=JSON.parse(body.messages[1].content);
         if(typeof user.draftText==='string')content='感谢审阅。\n'+user.draftText+'\n我获得了30%的提升。';
+        else if(typeof user.originalText==='string')content=user.originalText+'\n- 核对合成资料。';
         else if(user.mode==='ask')content='仅供参考：当前可见正文可以更简洁。';
         else if(user.mode==='plan')content='建议先核对经历，再精简表达，不增加事实。';
         else if(user.mode==='co-create'){
@@ -572,6 +573,74 @@ async function run() {
   await until('whole applied',async()=>(await main.store.getResume('master')).education[0].description.includes('复核合成实验数据'));
   checks.wholePdfReview=true;
   await capture('29-whole-applied');
+  // Same persisted fact, distinct explicit authorizations per text workflow.
+  const unifiedBefore=await main.store.getResume('master');
+  let unifiedBank=await js('window.resumeDesktop.facts.get()');
+  const newFact={slug:'master',docRevision:JSON.stringify([unifiedBefore.id,unifiedBefore.updatedAt]),blockKey:'edu:'+unifiedBefore.education[0].id,bankRevision:unifiedBank.revision,fact:{kind:'achievement',assertion:'核对 12 份合成资料',value:'12',unit:'份',timeframe:'2025',evidenceRef:'UNIFIED_LOCAL_ONLY_SOURCE',sensitivity:'shareable'},confirmation:'CONFIRM_SELF_REPORTED_FACT'};
+  unifiedBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(newFact)+')');
+  const unified=unifiedBank.records.find(r=>r.assertion===newFact.fact.assertion);
+  const loadFacts=async()=>{
+    await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.textContent.includes("本地事实资料库"));if(e&&!e.parentElement.open)e.click();return !!e})()');
+    await click('加载 / 刷新事实库');
+    await until('shared fact bank loaded',()=>bodyHas('核对 12 份合成资料'));
+  };
+  const chooseUnified=()=>js('(()=>{const b=[...document.querySelectorAll("input[type=checkbox]")].find(e=>e.getAttribute("aria-label")==="选择事实 核对 12 份合成资料");if(!b||b.disabled)return false;if(!b.checked)b.click();return true})()');
+  const textPreview=()=>js('Array.from(document.querySelectorAll("section[aria-label=\\"AI 数据发送预览\\"] pre")).map(e=>e.textContent)');
+  const beforeUnifiedCalls=providerCalls;
+  await click('单段精修');
+  await loadFacts();
+  await click('生成润色对比 Diff');await until('single default preview',()=>bodyHas('发送前确认（尚未调用模型）'));
+  if(JSON.stringify(await textPreview()).includes(newFact.fact.assertion))throw Error('single default leaked fact');
+  await click('取消发送');
+  if(!await chooseUnified())throw Error('single fact choice missing');
+  await click('生成润色对比 Diff');await until('single scoped preview',()=>bodyHas('本次明确外发 1 条本人确认事实'));
+  const singleMessages=await textPreview();
+  if(!JSON.stringify(singleMessages).includes(newFact.fact.assertion)||JSON.stringify(singleMessages).includes(newFact.fact.evidenceRef))throw Error('single fact preview privacy mismatch');
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\"AI 数据发送预览\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('35-single-fact-preview');
+  await click('确认发送给模型');
+  await until('single scoped result',()=>bodyHas('原文 vs 建议 Diff 审阅'));
+  if(providerCalls!==beforeUnifiedCalls+1||JSON.stringify(lastAiRequest.body.messages.map(m=>m.content))!==JSON.stringify(singleMessages)||JSON.stringify(lastAiRequest.body).includes(unified.id)||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('single exact outbound scope failed');
+  if(!await checkLabel('我已核对以上事实，确认属实'))throw Error('single fact approval unavailable');
+  await click('试渲染单段提案');
+  await until('single scoped PDF',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(!await approveWhole())throw Error('single fact PDF approval failed');
+  await capture('36-single-fact-review');
+  await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:unified.id,bankRevision:unifiedBank.revision,confirmation:'REVOKE_FACT'})+')');
+  await click('采纳替换（可 Ctrl+Z）');
+  await until('single fact apply blocked',()=>bodyHas('本地事实库已变化'));
+  if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(unifiedBefore))throw Error('revoked single evidence modified resume');
+  checks.singleFactScoped=true;checks.singleFactRevokedAfterPdf=true;
+  await capture('37-single-fact-revoked');
+  unifiedBank=await js('window.resumeDesktop.facts.get()');
+  const tailorFact={...newFact,bankRevision:unifiedBank.revision,fact:{...newFact.fact,assertion:'核对 13 份合成资料'}};
+  unifiedBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(tailorFact)+')');
+  const tailorRecord=unifiedBank.records.find(r=>r.assertion===tailorFact.fact.assertion);
+  await click('整卷 JD 改写');await loadFacts();
+  await click('生成整卷 JD 定向提案');await until('whole default preview',()=>bodyHas('发送前确认（尚未调用模型）'));
+  if(JSON.stringify(await textPreview()).includes(tailorFact.fact.assertion))throw Error('whole default leaked fact');
+  await click('取消发送');
+  const chooseTailor=await js('(()=>{const b=[...document.querySelectorAll("input[type=checkbox]")].find(e=>e.getAttribute("aria-label")==="选择事实 核对 13 份合成资料");if(!b||b.disabled)return false;b.click();return true})()');
+  if(!chooseTailor)throw Error('whole fact selection unavailable');
+  await click('生成整卷 JD 定向提案');await until('whole scoped preview',()=>bodyHas('本次明确外发 1 条本人确认事实'));
+  const wholeMessages=await textPreview();
+  if(!JSON.stringify(wholeMessages).includes(tailorFact.fact.assertion)||JSON.stringify(wholeMessages).includes(tailorFact.fact.evidenceRef))throw Error('whole fact preview privacy mismatch');
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\"AI 数据发送预览\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('38-whole-fact-preview');
+  await click('确认发送给模型');
+  await until('whole fact proposal',()=>bodyHas('整卷合成候选'));
+  if(providerCalls!==beforeUnifiedCalls+2||JSON.stringify(lastAiRequest.body.messages.map(m=>m.content))!==JSON.stringify(wholeMessages)||JSON.stringify(lastAiRequest.body).includes(tailorRecord.id)||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('whole exact outbound scope failed');
+  const wholeFacts=JSON.parse(lastAiRequest.body.messages[1].content).blocks.flatMap(b=>b.sources.filter(s=>s.scope==='record').map(s=>({block:b.blockKey,id:s.id})));
+  if(wholeFacts.length!==1||wholeFacts[0].block!=='B1'||wholeFacts[0].id!=='record-1')throw Error('whole fact scope drift');
+  await js('(()=>{const l=[...document.querySelectorAll("div.rounded-xl.border.p-3")].find(e=>e.innerText.includes("整卷合成候选"));const b=l?.querySelector("input[type=checkbox]");if(b&&!b.checked)b.click();return !!b})()');
+  await click('试渲染整卷提案');await until('whole scoped PDF',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(!await approveWhole())throw Error('whole scoped PDF approval missing');
+  await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:tailorRecord.id,bankRevision:unifiedBank.revision,confirmation:'REVOKE_FACT'})+')');
+  await click('应用已勾选的 1 条修改');await until('whole fact apply blocked',()=>bodyHas('本地事实库已变化'));
+  if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(unifiedBefore))throw Error('revoked whole evidence modified resume');
+  checks.wholeFactScoped=true;checks.wholeFactRevokedAfterPdf=true;
+  await capture('39-whole-fact-revoked');
+
   // Actual career text UI with exact preview and reversible local placeholders.
   await click('求职面试');await click('自荐信 / 话术');
   await until('career AI visible',()=>bodyHas('预览文案精修请求'));
