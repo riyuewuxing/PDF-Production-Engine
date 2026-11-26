@@ -10,7 +10,7 @@ concurrency:
 jobs:
   windows-context-safety:
     runs-on: windows-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     defaults:
       run:
         working-directory: resume-studio-validation/app
@@ -37,6 +37,12 @@ jobs:
         run: |
           $env:RESUME_STUDIO_CONTEXT_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-context-evidence'
           node validation-context-scale.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Baseline integrity regression and recovery
+        timeout-minutes: 3
+        run: |
+          $env:RESUME_STUDIO_CONTEXT_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-context-evidence'
+          node validation-context-integrity.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload context evidence
         if: always()

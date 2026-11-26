@@ -179,6 +179,23 @@ function hashText(text) {
   return crypto.createHash('sha256').update(text).digest('hex').slice(0, 12);
 }
 
+function verifyBaselineFile(manifest) {
+  const digest = manifest.baseSha256;
+  if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) {
+    throw Error('Baseline has no integrity digest. Run pnpm context:pack to regenerate the baseline.');
+  }
+  const basePath = path.join(outDir, manifest.baseFileName);
+  let stat;
+  try { stat = fs.lstatSync(basePath); }
+  catch (e) {
+    if (e?.code === 'ENOENT') throw Error('Baseline file missing. Run pnpm context:pack to regenerate the baseline.');
+    throw e;
+  }
+  if (!stat.isFile() || stat.isSymbolicLink()) throw Error('Baseline is not a regular file. Use a safe output directory or regenerate the baseline.');
+  const actual = crypto.createHash('sha256').update(fs.readFileSync(basePath)).digest('hex');
+  if (actual !== digest) throw Error('Baseline integrity mismatch. Run pnpm context:pack to regenerate the baseline.');
+}
+
 function prepareValidatedPack(fileName, content) {
   assertSafeOutput(fileName, content);
   const outPath = path.join(outDir, fileName);
@@ -250,6 +267,7 @@ function buildBasePack(safeFiles, headSha, branch, baseSeq) {
     policyVersion: CONTEXT_POLICY_VERSION,
     baseCommit: headSha,
     baseFileName,
+    baseSha256: crypto.createHash('sha256').update(content, 'utf8').digest('hex'),
     baseSeq,
     lastSeq: baseSeq,
     branch,
@@ -376,6 +394,7 @@ function main() {
       process.exit(1);
     }
     if(prevManifest.policyVersion!==CONTEXT_POLICY_VERSION)throw Error('Context privacy policy changed. Run pnpm context:pack to regenerate the baseline before delta export.');
+    verifyBaselineFile(prevManifest);
     manifest = {...prevManifest};
     const nextDeltaSeq = nextSequence(prevManifest);
     const deltaRes = buildDeltaPack(safeFiles, headSha, branch, manifest, nextDeltaSeq);
