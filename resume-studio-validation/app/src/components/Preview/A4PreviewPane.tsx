@@ -31,7 +31,7 @@ interface A4PreviewPaneProps {
   measureRef: React.MutableRefObject<(() => number) | null>;
   onOverflowChange?: (px: number) => void;
   fitFeedback: { type: 'ok' | 'warn'; text: string } | null;
-  exportStatus: { type: 'ok' | 'error'; text: string; filePath?: string } | null;
+  exportStatus: { type: 'ok' | 'warn' | 'error'; text: string; filePath?: string } | null;
   canLogApplication?: boolean;
   onOpenQuickLog?: () => void;
   isRedacted?: boolean;
@@ -323,14 +323,16 @@ export function A4PreviewPane({
               className={`flex flex-wrap items-center justify-between gap-2 rounded px-3 py-1.5 text-xs ${
                 exportStatus.type === 'ok'
                   ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-200'
-                  : 'border border-red-500/40 bg-red-500/15 text-red-200'
+                  : exportStatus.type==='warn'
+                    ? 'border border-amber-500/40 bg-amber-500/15 text-amber-200'
+                    : 'border border-red-500/40 bg-red-500/15 text-red-200'
               }`}
             >
               <span className="inline-flex items-center gap-1.5 break-all">
                 {exportStatus.type === 'ok' && <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />}
                 {exportStatus.text}
               </span>
-              {exportStatus.type === 'ok' && (canLogApplication || (exportStatus.filePath && desktop)) && (
+              {exportStatus.type !== 'error' && (canLogApplication || (exportStatus.filePath && desktop)) && (
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                   {canLogApplication && onOpenQuickLog && (
                     <button

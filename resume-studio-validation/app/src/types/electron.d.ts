@@ -35,6 +35,8 @@ export interface PdfExportResult {
   canceled: boolean;
   filePath?: string;
   fileName?: string;
+  /** Artifact exists; its automatic history operation did not complete. */
+  snapshotWarning?: string;
 }
 
 export interface SaveTextFileOptions {

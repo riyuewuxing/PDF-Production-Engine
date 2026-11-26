@@ -147,8 +147,7 @@ async function writeFileSafely(targetPath: string, data: Buffer | string): Promi
       const ext = path.extname(targetPath);
       const base = targetPath.slice(0, -ext.length);
       const fallbackPath = `${base}-${formatLocalTime()}${ext}`;
-      await fs.writeFile(fallbackPath, data);
-      return fallbackPath;
+      return writeUniqueExportFile(fallbackPath,data);
     }
     throw err;
   }
@@ -689,20 +688,29 @@ function registerIpcHandlers(): void {
     const writtenPath = explicitPath ? await writeFileSafely(targetPath, content) : await writeUniqueExportFile(targetPath, content);
     await rememberOutput(writtenPath);
 
+    let snapshotWarning:string|undefined;
     if ((spec.ext === 'pdf' || spec.ext === 'docx') && options.slug) {
-      await store.createSnapshot(
-        options.slug,
-        options.skipSave
-          ? `导出${spec.ext.toUpperCase()}脱敏版前原稿快照`
-          : `导出 ${spec.ext.toUpperCase()} 自动快照`,
-        options.skipSave ? undefined : targetDoc,
-      );
+      try{
+        await store.createExportSnapshot(
+          options.slug,
+          options.skipSave
+            ? `导出${spec.ext.toUpperCase()}脱敏版时原稿快照`
+            : `导出 ${spec.ext.toUpperCase()} 自动快照`,
+          targetDoc,
+          options.skipSave===true,
+        );
+      }catch(err){
+        // The artifact is already written. Report that fact, separately from
+        // the incomplete history operation; never make the user guess.
+        snapshotWarning=err instanceof LocalFsApiError?err.message:'自动历史快照未能确认完成，请检查本地历史记录。';
+      }
     }
 
     return {
       canceled: false,
       filePath: writtenPath,
       fileName: path.basename(writtenPath),
+      ...(snapshotWarning?{snapshotWarning}:{}),
     };
   }
 
@@ -737,7 +745,8 @@ function registerIpcHandlers(): void {
       const companyPart = sanitizeFilePart(options.payload.company, '自荐信');
       const defaultName = `${namePart}-自荐信-${companyPart}-${formatLocalDate()}.pdf`;
       await fs.mkdir(exportsDir, { recursive: true });
-      let targetPath = resolveUniqueExportPath(path.join(exportsDir, defaultName));
+      let targetPath = path.join(exportsDir, defaultName);
+      let explicitPath=false;
       if (options.saveAs && mainWindow) {
         const result = await dialog.showSaveDialog(mainWindow, {
           title: '导出求职自荐信 A4 PDF',
@@ -748,9 +757,10 @@ function registerIpcHandlers(): void {
           return { canceled: true };
         }
         targetPath = result.filePath;
+        explicitPath=true;
       }
       const pdfBytes = await renderCoverLetterToPdf(options.payload);
-      const writtenPath = await writeFileSafely(targetPath, pdfBytes);
+      const writtenPath = explicitPath?await writeFileSafely(targetPath,pdfBytes):await writeUniqueExportFile(targetPath,pdfBytes);
       await rememberOutput(writtenPath);
       return {
         canceled: false,

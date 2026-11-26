@@ -142,6 +142,7 @@ export default function App() {
     setExportStatus,
     lastExportedPdfSnapshot,
     setLastExportedPdfSnapshot,
+    invalidateExportFeedback,
     handleExportFormat,
   } = useResumeExport({
     activeSlug,
@@ -152,8 +153,8 @@ export default function App() {
   });
 
   clearExportFeedbackRef.current = () => {
-    setExportStatus(null);
-    setLastExportedPdfSnapshot(null);
+    invalidateExportFeedback();
+    setIsQuickLogOpen(false);
   };
 
   const handleDocumentChange = useCallback(

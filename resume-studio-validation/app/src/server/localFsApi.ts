@@ -749,6 +749,18 @@ export class LocalResumeStore {
       return this.createSnapshotUnlocked(rawSlug,reason,docOverride);
     });
   }
+  /** Bind a finished export to the original version identity under the write
+   * lock. Later edits of that same document are allowed; a deleted or reused
+   * slug must never receive another document's exported history. */
+  async createExportSnapshot(rawSlug:string,reason:string,exported:ResumeDocument,redacted:boolean):Promise<ResumeSnapshotMeta>{
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.getResume(rawSlug);
+      const frozen=ResumeDocumentSchema.parse(exported);
+      if(current.id!==frozen.id)throw new LocalFsApiError(409,'DOCUMENT_ID_CONFLICT','导出所属版本已变化，未向另一份简历写入历史快照。');
+      return this.createSnapshotUnlocked(rawSlug,reason,redacted?current:frozen);
+    });
+  }
+
   private async createSnapshotUnlocked(rawSlug:string,reason:string,docOverride?:ResumeDocument):Promise<ResumeSnapshotMeta>{
     const sourceDoc = docOverride
       ? ResumeDocumentSchema.parse(docOverride)
