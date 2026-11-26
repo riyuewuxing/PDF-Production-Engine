@@ -15,8 +15,8 @@ async function setup(available = true) {
   // Reversible fixture codec only; real OS encryption is separately tested in Electron.
   const codec: CredentialCodec = {
     available: () => available,
-    encrypt: value => Buffer.from(value).map(b => b ^ 0xa5),
-    decrypt: bytes => bytes.map(b => b ^ 0xa5).toString(),
+    encrypt: value => Buffer.from(Buffer.from(value).map(b => b ^ 0xa5)),
+    decrypt: bytes => Buffer.from(bytes.map(b => b ^ 0xa5)).toString(),
   };
   return { file, store: new AiSettingsStore(file, codec) };
 }

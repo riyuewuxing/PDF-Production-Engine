@@ -1,5 +1,5 @@
 {
-  "sourceSha": "f51bf9dbae2219de3c75dfba6c35b537f174eed9",
+  "sourceSha": "2eb3822f6f3b0587f609a003f5193a36907bee6d",
   "scope": "runtime/build dependency closure only; one actual persistence test; synthetic guard test and fixtures; no private history or data",
   "publicOverlays": [
     "src/lib/sampleResumeData.ts entirely synthetic",

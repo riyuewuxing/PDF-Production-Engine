@@ -6,7 +6,10 @@ const dataDirEnv = process.env.RESUME_STUDIO_DATA_DIR?.trim();
 const dataDir = dataDirEnv ? path.resolve(dataDirEnv) : path.resolve(process.cwd(), 'data');
 
 const store = new LocalResumeStore(dataDir);
-const dispatcher = createMcpDispatcher(store);
+const dispatcher = createMcpDispatcher(store, {
+  allowVersionWrite: process.env.RESUME_STUDIO_MCP_ALLOW_WRITE === '1',
+  allowMasterWrite: process.env.RESUME_STUDIO_MCP_ALLOW_MASTER_WRITE === '1',
+});
 
 type FramingMode = 'content-length' | 'ndjson';
 

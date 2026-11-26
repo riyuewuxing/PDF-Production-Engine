@@ -69,7 +69,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'get_resume',
-    description: '读取并校验指定 slug（如 master 或 physics-teacher-yunnan）的完整 ResumeDocument JSON',
+    description: '读取并校验指定 slug（如 master 或 synthetic-job）的完整 ResumeDocument JSON',
     inputSchema: {
       type: 'object',
       properties: {
@@ -120,7 +120,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
   {
     name: 'upsert_resume_version',
     description:
-      '安全新建或覆盖岗位子版本简历：校验 slug、默认保护 master（需显式 allowMasterWrite: true）、Zod Schema 严格校验并在覆写已有版本前自动创建备份快照',
+      '受本地启动权限控制的新建或覆盖岗位子版本简历；默认禁用直接写入，母库还需独立本地授权及显式参数',
     inputSchema: {
       type: 'object',
       properties: {
@@ -128,7 +128,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         document: { type: 'object', description: '完整的 ResumeDocument 对象' },
         allowMasterWrite: {
           type: 'boolean',
-          description: '是否显式授权覆写 master 母库（默认 false，强烈建议保持 false）',
+          description: '是否请求覆写母库；此参数本身不授予权限',
         },
         reason: { type: 'string', description: '覆盖已有版本时写入快照的说明原因' },
       },
@@ -175,7 +175,15 @@ function formatError(err: unknown): { code: string; message: string } {
   return { code: 'UNKNOWN_ERROR', message: String(err) };
 }
 
-export function createMcpDispatcher(store: LocalResumeStore) {
+export interface McpWritePolicy {
+  /** Trusted local launch configuration, never supplied by an MCP tool caller. */
+  allowVersionWrite?: boolean;
+  allowMasterWrite?: boolean;
+}
+
+export function createMcpDispatcher(store: LocalResumeStore, policy: Readonly<McpWritePolicy> = {}) {
+  const allowVersionWrite = policy.allowVersionWrite === true;
+  const allowMasterWrite = allowVersionWrite && policy.allowMasterWrite === true;
   async function executeTool(name: string, rawArgs: unknown) {
     try {
       switch (name) {
@@ -225,10 +233,11 @@ export function createMcpDispatcher(store: LocalResumeStore) {
           // Guard 1: safe slug check (blocks traversal, illegal chars)
           const safeSlug = assertSafeSlug(parsedArgs.slug);
 
-          // Guard 2: block writes to master unless explicitly allowed
-          if (safeSlug === 'master' && parsedArgs.allowMasterWrite !== true) {
+          // A tool argument is a request, not authorization.
+          if (!allowVersionWrite) return toolError('MCP 默认只读；直接写入必须由本地启动配置授权。', 'MCP_WRITE_DISABLED');
+          if (safeSlug === 'master' && (!allowMasterWrite || parsedArgs.allowMasterWrite !== true)) {
             return toolError(
-              '母库 master.json 默认只读受保护；如需写入请新建岗位子版本或显式传 allowMasterWrite: true。',
+              '母库受保护；只有本地独立授权且显式请求时才允许修改。',
               'MASTER_WRITE_PROTECTED',
             );
           }
