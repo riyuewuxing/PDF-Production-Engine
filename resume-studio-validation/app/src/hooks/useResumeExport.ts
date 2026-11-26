@@ -16,7 +16,7 @@ export type ExportFormat =
   | 'jsonResume';
 
 export interface ExportStatusState {
-  type: 'ok' | 'warn' | 'error';
+  type: 'ok' | 'error';
   text: string;
   filePath?: string;
 }
@@ -39,32 +39,21 @@ export function useResumeExport({
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const exportInFlight = useRef(false);
-  const versionGeneration=useRef(0);
   const [exportStatus, setExportStatus] = useState<ExportStatusState | null>(null);
   const [lastExportedPdfSnapshot, setLastExportedPdfSnapshot] =
     useState<FrozenPdfExportSnapshot | null>(null);
-
-  const invalidateExportFeedback=useCallback(()=>{
-    versionGeneration.current++;
-    setExportStatus(null);
-    setLastExportedPdfSnapshot(null);
-  },[]);
 
   const handleExportFormat = useCallback(
     async (format: ExportFormat, saveAs = false) => {
       const latest = activeDocRef.current;
       if (!latest || exportInFlight.current) return;
       exportInFlight.current = true;
-      const generation=versionGeneration.current;
-      const sameVersion=()=>versionGeneration.current===generation&&activeDocRef.current?.id===latest.id;
-      setLastExportedPdfSnapshot(null);
       setIsExportMenuOpen(false);
       setIsExporting(true);
       setExportStatus(null);
       try {
         await flushPendingSave();
-        if(!sameVersion())return;
-        const savedRealDoc = structuredClone(activeDocRef.current ?? latest);
+        const savedRealDoc = activeDocRef.current ?? latest;
         const customTerms = parseCustomRedactionTerms(redactionTermsInput);
         const docToExport = isRedacted
           ? redactResumeDocument(savedRealDoc, {
@@ -105,8 +94,8 @@ export function useResumeExport({
           setLastExportedPdfSnapshot(null);
           if (!jrRes.canceled) {
             setExportStatus({
-              type: sameVersion()?'ok':'warn',
-              text: `已导出标准 JSON Resume（仅可见内容；非完整备份）${suffix}：${jrRes.filePath ?? jrRes.fileName}${sameVersion()?'':'。文件属于此前版本。'}`,
+              type: 'ok',
+              text: `已导出标准 JSON Resume（仅可见内容；非完整备份）${suffix}：${jrRes.filePath ?? jrRes.fileName}`,
               filePath: jrRes.filePath,
             });
           }
@@ -155,14 +144,6 @@ export function useResumeExport({
                     : 'Markdown 文档 (.md)';
 
         if (result.filePath) {
-          if(!sameVersion()||result.snapshotWarning){
-            setLastExportedPdfSnapshot(null);
-            setExportStatus({
-              type:'warn',filePath:result.filePath,
-              text:`已导出${formatLabel}：${result.filePath}。${!sameVersion()?'文件属于此前版本，未关联当前简历。':''}${result.snapshotWarning?'自动历史快照未确认完成：'+result.snapshotWarning:''}`,
-            });
-            return;
-          }
           if (format === 'pdf') {
             setLastExportedPdfSnapshot({
               slug: activeSlug,
@@ -181,12 +162,11 @@ export function useResumeExport({
         } else if (result.fileName) {
           setLastExportedPdfSnapshot(null);
           setExportStatus({
-            type: sameVersion()?'ok':'warn',
-            text: `已生成${formatLabel}：${result.fileName}${sameVersion()?'':'。文件属于此前版本。'}`,
+            type: 'ok',
+            text: `已生成${formatLabel}：${result.fileName}`,
           });
         }
       } catch (err) {
-        if(!sameVersion())return;
         setExportStatus({
           type: 'error',
           text: err instanceof Error ? err.message : '导出文件失败',
@@ -207,7 +187,6 @@ export function useResumeExport({
     setExportStatus,
     lastExportedPdfSnapshot,
     setLastExportedPdfSnapshot,
-    invalidateExportFeedback,
     handleExportFormat,
   };
 }

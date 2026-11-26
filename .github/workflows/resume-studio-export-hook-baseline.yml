@@ -1,0 +1,48 @@
+name: Resume Studio V6 prior export hook regression
+on:
+  push:
+    branches: ['resume-studio/v6-export-hook-baseline']
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify prior hook blob and reproduce behavioral regressions
+        timeout-minutes: 2
+        run: |
+          $sha = git hash-object src/hooks/useResumeExport.ts
+          if ($sha -ne '86b39b5fbea93e020e2a880963c7e0cb1f64ba72') { throw 'Incorrect baseline hook' }
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-export-hook-baseline'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          pnpm exec vitest run src/hooks/useResumeExportReceipts.test.tsx --reporter=json --outputFile="$out/baseline-vitest.json"
+          $code=$LASTEXITCODE
+          $j=Get-Content "$out/baseline-vitest.json" -Raw | ConvertFrom-Json
+          if($code -eq 0 -or $j.numFailedTests -ne 5 -or $j.numTotalTests -ne 5){throw "Unexpected baseline count $($j.numFailedTests)/$($j.numTotalTests)"}
+          $LASTEXITCODE=0
+      - name: Upload prior hook evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-export-hook-baseline
+          path: resume-studio-export-hook-baseline/
+          if-no-files-found: error
+          retention-days: 3
