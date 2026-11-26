@@ -224,7 +224,7 @@ export function prepareTailorRequest(input: {
   const blocks=collectEditableBlocks(input.document);
   if (!blocks.length) throw new Error('当前简历暂无可改写的可见段落。');
   const sanitize=createAiTextSanitizer(input.masterDocument?[input.document,input.masterDocument]:[input.document]);
-  const sourceMap=appendSelectedFactSources(input.document,buildAiFactSources(input.document,input.masterDocument),input.records??[],blocks.map(b=>b.key));
+  const sourceMap=appendSelectedFactSources(input.document,buildAiFactSources(input.document,input.masterDocument),input.records??[],blocks.map(b=>b.key),input.masterDocument?[input.masterDocument]:[]);
   const jdText=sanitize(input.jdText.trim());
   const currentCorpus=Object.values(sourceMap).map(currentSourceCorpus).join('\n').toLowerCase();
   const jdMissingKeywords=extractJdKeywords(jdText).filter(kw=>!currentCorpus.includes(kw.toLowerCase())).slice(0,20);

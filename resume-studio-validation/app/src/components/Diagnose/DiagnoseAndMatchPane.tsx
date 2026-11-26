@@ -52,13 +52,13 @@ import {prepareFactSelection,assertFreshFactSelection,loadLocalFactBank,type Fac
 import {TextPdfReviewGate} from './TextPdfReviewGate';
 import {useTextPdfReview} from '../../hooks/useTextPdfReview';
 import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
-import type { ResumeDocument } from '../../schema/resumeSchema';
+import {resumeRevision,type ResumeDocument} from '../../schema/resumeSchema';
 
 type DiagnoseSubTab = 'hr' | 'jd' | 'ats' | 'ai';
 type AiSubMode = 'single' | 'tailor' | 'assistant' | 'layout';
 type CommonBasis={document:ResumeDocument;slug:string;requestId:string;settings:ByokAiSettings;selection:FactSelection};
 type PolishBasis = CommonBasis & { blockKey: string; text: string;polishMode:PolishMode;sourceMap:AiFactSourceMap;kind:'single' };
-type TailorBasis = CommonBasis & { jdText: string;masterRef:boolean;kind:'tailor' };
+type TailorBasis = CommonBasis & { jdText: string;masterRef:boolean;masterRevision?:string;kind:'tailor' };
 type PendingAiRequest =
   | { mode: 'single'; basis: PolishBasis; settings: ByokAiSettings; options: ByokCompletionOptions; polishMode: PolishMode }
   | { mode: 'tailor'; basis: TailorBasis; settings: ByokAiSettings; prepared: PreparedTailorRequest; masterRef: boolean };
@@ -192,6 +192,7 @@ export function DiagnoseAndMatchPane({
   };
   const assertFactsFresh=async(basis:PolishBasis|TailorBasis)=>{
     await assertFreshFactSelection(basis.document,basis.selection,loadLocalFactBank);
+    if(basis.kind==='tailor'&&basis.masterRevision&&resumeRevision(await apiClient.getResume('master'))!==basis.masterRevision)throw new Error('参考母库已变化，请重新预览；旧审批作废。');
     if(!isCurrent(basis))throw new Error('任务范围、模型或事实选择已变化，请重新预览。');
   };
   const clearTextApprovals=()=>{
@@ -380,15 +381,15 @@ export function DiagnoseAndMatchPane({
       const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
       if(!singleReview.matches(next))throw new Error('单段候选与已审核 PDF 不一致。');
       if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
-      await assertFactsFresh(basis);
+      await assertFactsFresh(basis).catch(err=>{singleReview.invalidate();throw err;});
       await apiClient.createSnapshot(activeSlug,'AI 单段润色前快照',revision);
-      await assertFactsFresh(basis);
+      await assertFactsFresh(basis).catch(err=>{singleReview.invalidate();throw err;});
       if (!isCurrent(basis)||getCurrentRevision()!==revision||!singleReview.matches(next)) throw new Error('简历或审批已变化，请重新生成润色建议。');
       onImmediateChange(next);
       setPolishError(null);
       setSuggestedText(null);setFactIds([]);
     } catch (err) {
-      if (mountedRef.current){singleReview.invalidate();setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');}
+      if (mountedRef.current)setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
     } finally {
       applyingRef.current = false;
       if (mountedRef.current) setApplying(false);
@@ -415,6 +416,7 @@ export function DiagnoseAndMatchPane({
       if (controller.signal.aborted || !isCurrent(basis) || contextRef.current.aiSettings !== settings ||
           contextRef.current.tailorUseMasterRef !== masterRef || contextRef.current.aiSubMode !== 'tailor' ||
           contextRef.current.subTab !== 'ai') return;
+      if(masterDoc){basis.masterRevision=resumeRevision(masterDoc);if(selection.binding)selection.binding={...selection.binding,masterRevision:basis.masterRevision};}
       const prepared = prepareTailorRequest({document,masterDocument:masterDoc,jdText,records:selection.records});
       if(selection.binding)prepared.options.factBinding=selection.binding;
       assertPreviewSettings(settings,prepared.options);
@@ -499,16 +501,16 @@ export function DiagnoseAndMatchPane({
       const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
       if(!wholeReview.matches(next))throw new Error('整卷候选与已审核 PDF 不一致。');
       if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
-      await assertFactsFresh(basis);
+      await assertFactsFresh(basis).catch(err=>{wholeReview.invalidate();throw err;});
       await apiClient.createSnapshot(activeSlug,'AI 整卷定向改写前快照',revision);
-      await assertFactsFresh(basis);
+      await assertFactsFresh(basis).catch(err=>{wholeReview.invalidate();throw err;});
       if (!isCurrent(basis)||getCurrentRevision()!==revision||!wholeReview.matches(next)) throw new Error('简历或审批已变化，未应用修改。');
       onImmediateChange(next);
       setTailorError(null);
       setTailorProposals([]);setFactIds([]);
       setTailorNotice(`已一次性应用 ${selected.length} 条整卷改写（按 Ctrl+Z 可 1 步完整撤回）。`);
     } catch (err) {
-      if (mountedRef.current){wholeReview.invalidate();setTailorError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');}
+      if (mountedRef.current)setTailorError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
     } finally {
       applyingRef.current = false;
       if (mountedRef.current) setApplying(false);

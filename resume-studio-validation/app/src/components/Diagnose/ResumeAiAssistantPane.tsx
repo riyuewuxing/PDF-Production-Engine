@@ -152,7 +152,7 @@ export function ResumeAiAssistantPane(props:Props){
     if(session&&(!isWorkflowCurrent(session,props.document,props.slug,props.settings,props.jdText)||session.stage!=='active')){setError('分步计划已过期。');return;}
     applyRef.current=true;setApplying(true);setError(null);
     try{
-      await assertFactsFresh(request.basis);
+      await assertFactsFresh(request.basis).catch(err=>{setReview(null);setPdfConfirmed(false);throw err;});
       for(const p of selected){
         const warnings=scanScopedProposalWarnings(p.suggestedText,p.blockKey,request.prepared.sourceMap,p.factIds);
         if(JSON.stringify(warnings)!==JSON.stringify(p.factWarnings))throw new Error('提案事实警告变化，请重新审核。');
@@ -165,12 +165,12 @@ export function ResumeAiAssistantPane(props:Props){
       if(JSON.stringify(next)!==JSON.stringify(review.next))throw new Error('候选已变化，请重新试渲染。');
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
       await apiClient.createSnapshot(props.slug,'AI 协作任务前快照',revision);
-      await assertFactsFresh(request.basis);
+      await assertFactsFresh(request.basis).catch(err=>{setReview(null);setPdfConfirmed(false);throw err;});
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
       props.onImmediateChange(next);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setFactIds([]);
       if(session)setWorkflow(finishWorkflowStep(session,next,'applied'));
       setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');
-    }catch(err){if(mounted.current){setReview(null);setPdfConfirmed(false);setError(localErrorMessage(err,'提案应用失败'));}}
+    }catch(err){if(mounted.current)setError(localErrorMessage(err,'提案应用失败'));}
     finally{applyRef.current=false;if(mounted.current)setApplying(false);}
   };
   const locked=busy||applying||rendering||factsBusy||workflowBusy;

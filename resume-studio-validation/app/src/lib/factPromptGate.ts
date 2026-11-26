@@ -27,8 +27,8 @@ export function hasRecordFactSources(prompt:string):boolean{
 /** Bind each request alias to the same persisted fact, selected block and sanitized content.
  * The local binding is stripped before transport; user-facing preview remains exact.
  */
-export function assertBoundFactPrompt(doc:ResumeDocument,binding:FactRequestBinding,records:readonly FactRecord[],prompt:string):void{
-  const expected=readRecords({toolResults:collectAiToolContext(doc,binding.selectedKeys,0,records).toolResults});
+export function assertBoundFactPrompt(doc:ResumeDocument,binding:FactRequestBinding,records:readonly FactRecord[],prompt:string,master?:ResumeDocument|null):void{
+  const expected=readRecords({toolResults:collectAiToolContext(doc,binding.selectedKeys,0,records,master?[master]:[]).toolResults});
   const actual=readRecords(readPrompt(prompt));
   if(expected.length!==records.length||JSON.stringify(actual)!==JSON.stringify(expected))
     throw new Error('事实外发清单与本地授权记录不一致，拒绝发送。');

@@ -9,6 +9,7 @@ import {ResumeDocumentSchema,resumeRevision,type ResumeDocument} from '../schema
 import {type AddFactInput} from '../schema/factBankSchema';
 import {isShareableFact} from '../lib/aiContext';
 import {prepareAssistantTask} from '../lib/aiAssistant';
+import {prepareTailorRequest} from '../lib/aiTailor';
 
 const fixture=()=>ResumeDocumentSchema.parse({
   id:'synthetic-doc',title:'合成测试',createdAt:'2026-01-01',updatedAt:'2026-01-01',
@@ -78,6 +79,16 @@ describe('independent local fact bank',()=>{
     const revoked=await bank.revoke({id:r.id,bankRevision:saved.revision,confirmation:'REVOKE_FACT'});
     await expect(bank.assertCurrentBinding(binding,prompt)).rejects.toThrow('事实库已被其他操作更新');
     await expect(bank.assertCurrentBinding({...binding,bankRevision:revoked.revision},prompt)).rejects.toThrow('事实主体');
+  });
+  it('checks the persisted master revision for explicitly referenced master and facts together',async()=>{
+    const master=await store.saveResume('master',{...fixture(),id:'synthetic-master',basic:{...doc.basic,name:'MASTER_PRIVATE_MARKER'}});
+    const saved=await bank.add({...input,fact:{...input.fact,assertion:'整理合成记录 12 份。 MASTER_PRIVATE_MARKER'}}),r=saved.records[0]!;
+    const binding={slug:'synthetic',docId:doc.id,bankRevision:saved.revision,ids:[r.id],selectedKeys:[r.blockKey],masterRevision:resumeRevision(master)};
+    const prompt=prepareTailorRequest({document:doc,masterDocument:master,jdText:'示例岗位',records:[r]}).options.userPrompt;
+    expect(prompt).not.toContain('MASTER_PRIVATE_MARKER');
+    await expect(bank.assertCurrentBinding(binding,prompt)).resolves.toBeUndefined();
+    await store.saveResume('master',{...master,experience:master.experience.map(e=>({...e,description:'updated master'}))});
+    await expect(bank.assertCurrentBinding(binding,prompt)).rejects.toThrow('参考母库已变化');
   });
   it('corrects a fact atomically, retains its original evidence and invalidates prior approvals',async()=>{
     const saved=await bank.add(input),old=saved.records[0]!;

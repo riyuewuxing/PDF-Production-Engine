@@ -74,9 +74,9 @@ export function isShareableFact(doc:ResumeDocument,record:FactRecord):boolean{
   return record.docId===doc.id&&record.verifiedStatus==='user-confirmed'&&record.sensitivity==='shareable'&&factEntityId(doc,record.blockKey)===record.entityId;
 }
 /** Only explicitly selected, matching records are sent; source references and persistent IDs never leave the app. */
-export function appendSelectedFactSources(doc:ResumeDocument,map:AiFactSourceMap,records:readonly FactRecord[],selectedKeys:readonly string[]):AiFactSourceMap{
+export function appendSelectedFactSources(doc:ResumeDocument,map:AiFactSourceMap,records:readonly FactRecord[],selectedKeys:readonly string[],additionalPrivateDocs:readonly ResumeDocument[]=[]):AiFactSourceMap{
   if(records.length>20||new Set(records.map(r=>r.id)).size!==records.length)throw new Error('事实选择重复或超过20条。');
-  const keys=new Set(selectedKeys),sanitize=createAiTextSanitizer([doc]);
+  const keys=new Set(selectedKeys),sanitize=createAiTextSanitizer([doc,...additionalPrivateDocs]);
   const next={...map};
   records.forEach((r,i)=>{
     const sources=next[r.blockKey];

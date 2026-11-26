@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {describe,it,expect,vi} from 'vitest';
-import {ResumeDocumentSchema} from '../schema/resumeSchema';
+import {ResumeDocumentSchema,resumeRevision} from '../schema/resumeSchema';
 import type {FactBank,FactRecord} from '../schema/factBankSchema';
 import {factEntityId} from './aiContext';
 import {prepareFactSelection,assertFreshFactSelection} from './factSelection';
@@ -41,6 +41,17 @@ describe('unified fact selection and text modes',()=>{
     const single=JSON.parse(prompts[0][0]);expect(single.toolResults.inspect_block_facts[0].sources.filter((s:any)=>s.scope==='record')).toHaveLength(1);
     expect(prompts[0][0]).not.toContain('整理 6 份合成记录');
     const full=JSON.parse(prompts[2][0]);expect(full.blocks[0].sources.find((s:any)=>s.scope==='record').id).toBe('record-2');expect(full.blocks[1].sources.find((s:any)=>s.scope==='record').id).toBe('record-1');
+  });
+  it('sanitizes selected records against both current and explicitly referenced master identities',()=>{
+    const {d,a,bank}=fixture();
+    const master={...d,id:'synthetic-master',basic:{...d.basic,name:'母库隐私标记'}};
+    const changed={...a,assertion:a.assertion+' 母库隐私标记'};
+    const s=prepareFactSelection(d,'demo',[a.blockKey,'skills'],{...bank,records:[changed]},[a.id]);
+    const binding={...s.binding!,masterRevision:resumeRevision(master)};
+    const req=prepareTailorRequest({document:d,masterDocument:master,jdText:'示例',records:s.records});
+    expect(req.options.userPrompt).not.toContain('母库隐私标记');
+    expect(()=>assertBoundFactPrompt(d,binding,s.records,req.options.userPrompt,master)).not.toThrow();
+    expect(()=>assertBoundFactPrompt(d,binding,s.records,req.options.userPrompt)).toThrow('事实外发清单');
   });
   it('rejects copied records under a different block alias and duplicate supported containers',()=>{
     const {d,a,b,bank}=fixture(),s=prepareFactSelection(d,'demo',[a.blockKey,b.blockKey],bank,[a.id]);

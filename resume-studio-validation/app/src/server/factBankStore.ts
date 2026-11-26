@@ -51,7 +51,9 @@ export class FactBankStore {
       const records=binding.ids.map(id=>bank.records.find(r=>r.id===id));
       if(doc.id!==binding.docId||!records.every(r=>r!==undefined&&isShareableFact(doc,r)))
         throw new LocalFsApiError(409,'FACT_BINDING_CONFLICT','事实主体、敏感级别或授权状态已变化，拒绝发送。');
-      assertBoundFactPrompt(doc,binding,records as FactRecord[],userPrompt);
+      const master=binding.masterRevision?await this.resumes.getResume('master'):null;
+      if(master&&resumeRevision(master)!==binding.masterRevision)throw new LocalFsApiError(409,'FACT_MASTER_CONFLICT','参考母库已变化，请重新预览。');
+      assertBoundFactPrompt(doc,binding,records as FactRecord[],userPrompt,master);
     });
   }
   async add(raw:unknown):Promise<FactBank>{

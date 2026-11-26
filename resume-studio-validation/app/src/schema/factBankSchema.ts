@@ -52,5 +52,6 @@ export const FactRequestBindingSchema=z.object({
   slug:z.string().min(1).max(80),docId:z.string().min(1).max(500),
   bankRevision:z.string().min(1).max(64),ids:z.array(z.string().uuid()).min(1).max(20),
   selectedKeys:z.array(z.string().min(1).max(500)).min(1).max(200),
+  masterRevision:z.string().min(1).max(1000).optional(),
 }).strict().refine(b=>new Set(b.ids).size===b.ids.length&&new Set(b.selectedKeys).size===b.selectedKeys.length,'事实或段落绑定重复');
 export type FactRequestBinding=z.infer<typeof FactRequestBindingSchema>;
