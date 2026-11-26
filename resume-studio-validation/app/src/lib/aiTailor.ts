@@ -153,6 +153,9 @@ export function scanScopedProposalWarnings(
   } else if (factIds.some(id => sources.some(source => source.id === id && source.scope === 'master'))) {
     warnings.push({ type:'source-reference', token:'master', message:'引用了同源母库自述，请确认本段主体、时间与事实关系；母库不是独立证明。' });
   }
+  if (factIds.some(id=>sources.some(s=>s.id===id&&s.scope==='record'))) {
+    warnings.push({type:'source-reference',token:'record',message:'引用本人确认的本地事实记录；请核对主体、时间和证据，仍非独立验证。'});
+  }
   if (suggestedText.includes(PRIVACY_PLACEHOLDER)) {
     warnings.push({ type:'privacy-placeholder', token:'privacy', message:'改写中保留隐私省略标记，请先手工整理，禁止直接应用。' });
   }

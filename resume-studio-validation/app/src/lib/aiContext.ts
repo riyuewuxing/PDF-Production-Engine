@@ -1,3 +1,4 @@
+import type {FactRecord} from '../schema/factBankSchema';
 import { collectEditableBlocks, type EditableBlockOption } from './resumeBlocks';
 import type { ResumeDocument } from '../schema/resumeSchema';
 
@@ -29,11 +30,11 @@ export function createAiTextSanitizer(docs:readonly ResumeDocument[]):(text:stri
 export interface AiFactSource {
   id: string;
   blockKey: string;
-  scope: 'current' | 'master';
+  scope: 'current' | 'master' | 'record';
   label: string;
   entity: string;
   facts: string;
-  status: 'self-reported';
+  status: 'self-reported' | 'user-confirmed';
 }
 
 export type AiFactSourceMap = Record<string, AiFactSource[]>;
@@ -59,6 +60,33 @@ function blockDetails(doc: ResumeDocument, block: EditableBlockOption): {entity:
     }
   }
   return {entity:'', facts:[]};
+}
+
+/** Local identity includes the version's document ID and the stable block/entity.
+ * It intentionally does not include wording, so an approved rewrite preserves the link.
+ * Changing the subject or timeframe (or hiding the block) invalidates the link. */
+export function factEntityId(doc:ResumeDocument,blockKey:string):string|null{
+  const matches=collectEditableBlocks(doc).filter(b=>b.key===blockKey);
+  if(matches.length!==1)return null;
+  return JSON.stringify([doc.id,blockKey,blockDetails(doc,matches[0]!).entity]);
+}
+export function isShareableFact(doc:ResumeDocument,record:FactRecord):boolean{
+  return record.docId===doc.id&&record.verifiedStatus==='user-confirmed'&&record.sensitivity==='shareable'&&factEntityId(doc,record.blockKey)===record.entityId;
+}
+/** Only explicitly selected, matching records are sent; source references and persistent IDs never leave the app. */
+export function appendSelectedFactSources(doc:ResumeDocument,map:AiFactSourceMap,records:readonly FactRecord[],selectedKeys:readonly string[]):AiFactSourceMap{
+  if(records.length>20||new Set(records.map(r=>r.id)).size!==records.length)throw new Error('事实选择重复或超过20条。');
+  const keys=new Set(selectedKeys),sanitize=createAiTextSanitizer([doc]);
+  const next={...map};
+  records.forEach((r,i)=>{
+    if(!keys.has(r.blockKey)||!isShareableFact(doc,r)||!next[r.blockKey])throw new Error('所选事实已撤销、不可外发或与当前主体不匹配。');
+    next[r.blockKey]=[...next[r.blockKey],{
+      id:'record-'+(i+1),blockKey:r.blockKey,scope:'record',entity:r.entityId,label:'本人确认的事实',
+      facts:sanitize([r.assertion,r.value,r.unit,r.timeframe].filter(Boolean).join('\n')),
+      status:'user-confirmed',
+    }];
+  });
+  return next;
 }
 
 function makeSources(doc: ResumeDocument, scope: AiFactSource['scope'], sanitize: (text:string)=>string): AiFactSource[] {

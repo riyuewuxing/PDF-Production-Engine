@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
 import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
+import {FactBankStore} from '../src/server/factBankStore';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
@@ -48,6 +49,7 @@ const rootDir = resolvedPaths.dataRootDir;
 const dataDir = resolvedPaths.dataDir;
 const exportsDir = resolvedPaths.exportsDir;
 const store = new LocalResumeStore(dataDir);
+const facts=new FactBankStore(store);
 
 let mainWindow: BrowserWindow | null = null;
 let isClosingConfirmed = false;
@@ -460,6 +462,9 @@ async function authorizeShellFile(filePath:string):Promise<string> {
 }
 
 function registerIpcHandlers(): void {
+  trustedEditorHandle('facts:get',()=>facts.get());
+  trustedEditorHandle('facts:add',(_event,input:unknown)=>facts.add(input));
+  trustedEditorHandle('facts:revoke',(_event,input:unknown)=>facts.revoke(input));
   trustedEditorHandle('resumes:list', () => store.listResumes());
   trustedEditorHandle('resumes:get', (_event, slug: string) => store.getResume(slug));
   trustedEditorHandle('resumes:save', (_event, slug: string, doc: unknown) => store.saveResume(slug, doc, { requireExisting: true }));

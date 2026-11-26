@@ -1,6 +1,7 @@
+import type {FactRecord} from '../schema/factBankSchema';
 import {TEMPLATE_IDS,ResumeDocumentSchema,type ResumeDocument} from '../schema/resumeSchema';
 import {collectEditableBlocks} from './resumeBlocks';
-import {buildAiFactSources,createAiTextSanitizer,outboundFactSources} from './aiContext';
+import {appendSelectedFactSources,buildAiFactSources,createAiTextSanitizer,outboundFactSources} from './aiContext';
 
 export const AI_SKILL_VERSION='resume-text-v1' as const;
 export const AI_TOOL_CATALOG=[
@@ -26,11 +27,11 @@ export function buildAiSkillGuide(){
 }
 export type AiReadToolName='list_visible_blocks'|'inspect_block_facts'|'inspect_layout';
 /** Read operations run locally; only the explicit sanitized output can enter a model request. */
-export function collectAiToolContext(doc:ResumeDocument,selectedKeys:readonly string[],overflowPx:number){
+export function collectAiToolContext(doc:ResumeDocument,selectedKeys:readonly string[],overflowPx:number,records:readonly FactRecord[]=[]){
   const all=collectEditableBlocks(doc),selected=new Set(selectedKeys);
   const blocks=all.filter(b=>selected.has(b.key));
   if(blocks.length!==selected.size||new Set(blocks.map(b=>b.key)).size!==blocks.length)throw new Error('选择的段落已经变化或标识重复。');
-  const sanitize=createAiTextSanitizer([doc]),sourceMap=buildAiFactSources(doc);
+  const sanitize=createAiTextSanitizer([doc]),sourceMap=appendSelectedFactSources(doc,buildAiFactSources(doc),records,selectedKeys);
   const aliases=Object.fromEntries(blocks.map((b,i)=>['B'+(i+1),b.key]));
   const toolResults={
     list_visible_blocks:blocks.map((b,i)=>({blockKey:'B'+(i+1),label:sanitize(b.label),field:fieldForBlock(b.key),text:sanitize(b.text),maxCharsHint:b.maxCharsHint})),

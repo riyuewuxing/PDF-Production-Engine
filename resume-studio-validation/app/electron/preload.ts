@@ -60,6 +60,7 @@ const bridge: ResumeDesktopBridge = {
       ipcRenderer.invoke('pdf:getCoverLetterPayload', jobId),
     notifyReady: (jobId: string) => ipcRenderer.invoke('pdf:notifyReady', jobId),
   },
+  facts: {get:()=>ipcRenderer.invoke('facts:get'),add:input=>ipcRenderer.invoke('facts:add',input),revoke:input=>ipcRenderer.invoke('facts:revoke',input)},
   ai: {
     getSettings: () => ipcRenderer.invoke('ai:getSettings'),
     listProfiles:()=>ipcRenderer.invoke('ai:listProfiles'),
