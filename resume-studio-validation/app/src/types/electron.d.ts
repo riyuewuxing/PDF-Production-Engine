@@ -1,0 +1,120 @@
+import type { ByokAiSettings } from '../lib/byokAiClient';
+import type {
+  ApplicationSnapshotMeta,
+  ApplicationSnapshotRecord,
+  ApplicationsStoreData,
+  CoverLetterPdfPayload,
+} from '../schema/applicationSchema';
+import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
+import type { ResumeSnapshotMeta } from '../server/localFsApi';
+
+export interface SystemFontResult {
+  fonts: string[];
+  source: 'windows-gdi' | 'browser-local' | 'fallback';
+  note?: string;
+}
+
+export interface PdfExportOptions {
+  slug: string;
+  document: ResumeDocument;
+  saveAs?: boolean;
+  skipSave?: boolean;
+  fileNameSuffix?: string;
+}
+
+export interface CoverLetterExportOptions {
+  payload: CoverLetterPdfPayload;
+  saveAs?: boolean;
+}
+
+export interface PdfExportResult {
+  canceled: boolean;
+  filePath?: string;
+  fileName?: string;
+}
+
+export interface SaveTextFileOptions {
+  defaultFileName: string;
+  content: string;
+  saveAs?: boolean;
+  dialogTitle?: string;
+  filterName?: string;
+  extension?: string;
+  mimeType?: string;
+}
+
+export interface SaveApplicationSnapshotInput {
+  snapshotId?: string;
+  applicationId?: string;
+  resumeSlug: string;
+  exportedFilePath?: string;
+  atsScore?: number | null;
+  document: ResumeDocument;
+}
+
+export interface ResumeDesktopBridge {
+  readonly isDesktop: true;
+  resumes: {
+    list: () => Promise<{ master: ResumeSummary | null; resumes: ResumeSummary[] }>;
+    get: (slug: string) => Promise<ResumeDocument>;
+    save: (slug: string, doc: ResumeDocument) => Promise<ResumeDocument>;
+    create: (input: {
+      slug?: string;
+      title?: string;
+      cloneFromSlug?: string;
+      document?: unknown;
+    }) => Promise<{ slug: string; document: ResumeDocument }>;
+    delete: (slug: string) => Promise<{ deleted: boolean }>;
+  };
+  snapshots: {
+    list: (slug: string) => Promise<ResumeSnapshotMeta[]>;
+    create: (slug: string, reason?: string) => Promise<ResumeSnapshotMeta>;
+    restore: (slug: string, snapshotId: string) => Promise<ResumeDocument>;
+  };
+  applications: {
+    get: () => Promise<ApplicationsStoreData>;
+    save: (data: ApplicationsStoreData) => Promise<ApplicationsStoreData>;
+    saveSnapshot: (input: SaveApplicationSnapshotInput) => Promise<ApplicationSnapshotMeta>;
+    getSnapshot: (snapshotId: string) => Promise<ApplicationSnapshotRecord>;
+    deleteSnapshot: (snapshotId: string) => Promise<{ deleted: boolean }>;
+  };
+  assets: {
+    upload: (filename: string, dataUrl: string) => Promise<{ filename: string; url: string }>;
+  };
+  fonts: {
+    listSystem: () => Promise<SystemFontResult>;
+  };
+  pdf: {
+    export: (options: PdfExportOptions) => Promise<PdfExportResult>;
+    exportPng: (options: PdfExportOptions) => Promise<PdfExportResult>;
+    exportDocx: (options: PdfExportOptions) => Promise<PdfExportResult>;
+    exportMarkdown: (options: PdfExportOptions) => Promise<PdfExportResult>;
+    exportHtml: (options: PdfExportOptions) => Promise<PdfExportResult>;
+    exportCoverLetter: (options: CoverLetterExportOptions) => Promise<PdfExportResult>;
+    /** 真 ATS 逆向体检专用：纯内存渲染 PDF 并返回字节，绝不落盘 */
+    renderBuffer: (doc: ResumeDocument) => Promise<Uint8Array>;
+    getPrintPayload: (jobId: string) => Promise<ResumeDocument>;
+    getCoverLetterPayload: (jobId: string) => Promise<CoverLetterPdfPayload>;
+    notifyReady: (jobId: string) => Promise<void>;
+  };
+  ai: {
+    getSettings: () => Promise<ByokAiSettings>;
+    saveSettings: (settings: ByokAiSettings) => Promise<ByokAiSettings>;
+  };
+  shell: {
+    openPath: (filePath: string) => Promise<string>;
+    showItemInFolder: (filePath: string) => Promise<void>;
+    openExportsDir: () => Promise<string>;
+    saveTextFile: (options: SaveTextFileOptions) => Promise<PdfExportResult>;
+  };
+  lifecycle: {
+    onBeforeClose: (callback: (requestId: number) => void) => () => void;
+    confirmCloseReady: (requestId: number, saved: boolean) => void;
+  };
+}
+
+declare global {
+  interface Window {
+    resumeDesktop?: ResumeDesktopBridge;
+  }
+}

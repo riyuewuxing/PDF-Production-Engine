@@ -1,0 +1,361 @@
+import { type ByokAiSettings, DEFAULT_BYOK_SETTINGS } from './byokAiClient';
+import { exportResumeToDocxBlob } from './docxExporter';
+import { buildStandaloneResumeHtml } from './htmlExporter';
+import { resumeToMarkdown } from './markdownExporter';
+import type {
+  ApplicationSnapshotMeta,
+  ApplicationSnapshotRecord,
+  ApplicationsStoreData,
+} from '../schema/applicationSchema';
+import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
+import type { ResumeSnapshotMeta } from '../server/localFsApi';
+import type {
+  CoverLetterExportOptions,
+  PdfExportOptions,
+  PdfExportResult,
+  SaveApplicationSnapshotInput,
+  SaveTextFileOptions,
+  SystemFontResult,
+} from '../types/electron';
+
+export interface ResumeListResponse {
+  master: ResumeSummary | null;
+  resumes: ResumeSummary[];
+}
+
+async function handleJsonResponse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let message = `请求失败 (${res.status})`;
+    try {
+      const errBody = (await res.json()) as { message?: string };
+      if (errBody.message) {
+        message = errBody.message;
+      }
+    } catch {
+      // Ignore non-JSON error body
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as T;
+}
+
+export function isDesktopMode(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.resumeDesktop?.isDesktop);
+}
+
+export function resolveAssetUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/api/assets/') && isDesktopMode()) {
+    const filename = trimmed.slice('/api/assets/'.length);
+    return `resume-asset://local/${encodeURIComponent(filename)}`;
+  }
+  return trimmed;
+}
+
+export const apiClient = {
+  async listResumes(): Promise<ResumeListResponse> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.resumes.list();
+    }
+    const res = await fetch('/api/resumes');
+    return handleJsonResponse<ResumeListResponse>(res);
+  },
+
+  async getResume(slug: string): Promise<ResumeDocument> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.resumes.get(slug);
+    }
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`);
+    return handleJsonResponse<ResumeDocument>(res);
+  },
+
+  async saveResume(slug: string, doc: ResumeDocument): Promise<ResumeDocument> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.resumes.save(slug, doc);
+    }
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc),
+    });
+    return handleJsonResponse<ResumeDocument>(res);
+  },
+
+  async createResume(input: {
+    slug?: string;
+    title?: string;
+    cloneFromSlug?: string;
+    document?: unknown;
+  }): Promise<{ slug: string; document: ResumeDocument }> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.resumes.create(input);
+    }
+    const res = await fetch('/api/resumes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    return handleJsonResponse<{ slug: string; document: ResumeDocument }>(res);
+  },
+
+  async deleteResume(slug: string): Promise<{ deleted: boolean }> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.resumes.delete(slug);
+    }
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+    });
+    return handleJsonResponse<{ deleted: boolean }>(res);
+  },
+
+  async listSnapshots(slug: string): Promise<ResumeSnapshotMeta[]> {
+    if (window.resumeDesktop?.snapshots) {
+      return window.resumeDesktop.snapshots.list(slug);
+    }
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshots`);
+    return handleJsonResponse<ResumeSnapshotMeta[]>(res);
+  },
+
+  async createSnapshot(slug: string, reason = '手动创建快照'): Promise<ResumeSnapshotMeta> {
+    if (window.resumeDesktop?.snapshots) {
+      return window.resumeDesktop.snapshots.create(slug, reason);
+    }
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    return handleJsonResponse<ResumeSnapshotMeta>(res);
+  },
+
+  async restoreSnapshot(slug: string, snapshotId: string): Promise<ResumeDocument> {
+    if (window.resumeDesktop?.snapshots) {
+      return window.resumeDesktop.snapshots.restore(slug, snapshotId);
+    }
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshots/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snapshotId }),
+    });
+    return handleJsonResponse<ResumeDocument>(res);
+  },
+
+  async getApplications(): Promise<ApplicationsStoreData> {
+    if (window.resumeDesktop?.applications) {
+      return window.resumeDesktop.applications.get();
+    }
+    const res = await fetch('/api/applications');
+    return handleJsonResponse<ApplicationsStoreData>(res);
+  },
+
+  async saveApplications(data: ApplicationsStoreData): Promise<ApplicationsStoreData> {
+    if (window.resumeDesktop?.applications) {
+      return window.resumeDesktop.applications.save(data);
+    }
+    const res = await fetch('/api/applications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleJsonResponse<ApplicationsStoreData>(res);
+  },
+
+  async saveApplicationSnapshot(
+    input: SaveApplicationSnapshotInput,
+  ): Promise<ApplicationSnapshotMeta> {
+    if (window.resumeDesktop?.applications?.saveSnapshot) {
+      return window.resumeDesktop.applications.saveSnapshot(input);
+    }
+    const res = await fetch('/api/application-snapshots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    return handleJsonResponse<ApplicationSnapshotMeta>(res);
+  },
+
+  async getApplicationSnapshot(snapshotId: string): Promise<ApplicationSnapshotRecord> {
+    if (window.resumeDesktop?.applications?.getSnapshot) {
+      return window.resumeDesktop.applications.getSnapshot(snapshotId);
+    }
+    const res = await fetch(`/api/application-snapshots/${encodeURIComponent(snapshotId)}`);
+    return handleJsonResponse<ApplicationSnapshotRecord>(res);
+  },
+
+  async deleteApplicationSnapshot(snapshotId: string): Promise<{ deleted: boolean }> {
+    if (window.resumeDesktop?.applications?.deleteSnapshot) {
+      return window.resumeDesktop.applications.deleteSnapshot(snapshotId);
+    }
+    const res = await fetch(`/api/application-snapshots/${encodeURIComponent(snapshotId)}`, {
+      method: 'DELETE',
+    });
+    return handleJsonResponse<{ deleted: boolean }>(res);
+  },
+
+  async uploadAsset(filename: string, dataUrl: string): Promise<{ filename: string; url: string }> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.assets.upload(filename, dataUrl);
+    }
+    const res = await fetch('/api/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, dataUrl }),
+    });
+    return handleJsonResponse<{ filename: string; url: string }>(res);
+  },
+
+  async exportPdf(options: PdfExportOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.pdf.export(options);
+    }
+    window.print();
+    return { canceled: false };
+  },
+
+  async exportPng(options: PdfExportOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.pdf.exportPng(options);
+    }
+    throw new Error('高清 PNG 长图导出需在 Resume Studio 桌面客户端中使用');
+  },
+
+  async exportDocx(options: PdfExportOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.pdf.exportDocx(options);
+    }
+    const blob = await exportResumeToDocxBlob(options.document);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${options.slug || 'resume'}${options.fileNameSuffix ?? ''}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { canceled: false, fileName: a.download };
+  },
+
+  async exportMarkdown(options: PdfExportOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.pdf.exportMarkdown(options);
+    }
+    const md = resumeToMarkdown(options.document);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${options.slug || 'resume'}${options.fileNameSuffix ?? ''}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { canceled: false, fileName: a.download };
+  },
+
+  async exportHtml(options: PdfExportOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop?.pdf?.exportHtml) {
+      return window.resumeDesktop.pdf.exportHtml(options);
+    }
+    const html = buildStandaloneResumeHtml(options.document);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${options.slug || 'resume'}${options.fileNameSuffix ?? ''}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { canceled: false, fileName: a.download };
+  },
+
+  /**
+   * 真 ATS 逆向体检：请求主进程把当前文档纯内存渲染成 PDF 字节。
+   * 不落盘、不产生快照；非桌面环境明确报错。
+   */
+  async renderPdfBuffer(doc: ResumeDocument): Promise<Uint8Array> {
+    if (window.resumeDesktop?.pdf?.renderBuffer) {
+      return window.resumeDesktop.pdf.renderBuffer(doc);
+    }
+    throw new Error('真 ATS 逆向解析需在 Resume Studio 桌面端运行');
+  },
+
+  async exportCoverLetterPdf(options: CoverLetterExportOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop?.pdf?.exportCoverLetter) {
+      return window.resumeDesktop.pdf.exportCoverLetter(options);
+    }
+    const blob = new Blob([options.payload.bodyText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${options.payload.candidateName || '求职者'}-自荐信.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { canceled: false, fileName: a.download };
+  },
+
+  async getAiSettings(): Promise<ByokAiSettings> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.ai.getSettings();
+    }
+    return { ...DEFAULT_BYOK_SETTINGS };
+  },
+
+  async saveAiSettings(settings: ByokAiSettings): Promise<ByokAiSettings> {
+    if (window.resumeDesktop) {
+      return window.resumeDesktop.ai.saveSettings(settings);
+    }
+    return settings;
+  },
+
+  async listSystemFonts(): Promise<SystemFontResult> {
+    if (window.resumeDesktop?.fonts) {
+      return window.resumeDesktop.fonts.listSystem();
+    }
+    return {
+      fonts: [
+        'Noto Sans SC',
+        'Noto Serif SC',
+        'MiSans',
+        'Microsoft YaHei',
+        'KaiTi',
+        'FangSong',
+        'SimHei',
+        'DengXian',
+        'Segoe UI',
+        'Consolas',
+      ],
+      source: 'fallback',
+      note: '浏览器预览模式使用内置推荐字体集；桌面端可枚举本机全部已装字体。',
+    };
+  },
+
+  async openFile(filePath: string): Promise<void> {
+    if (window.resumeDesktop) {
+      await window.resumeDesktop.shell.openPath(filePath);
+    }
+  },
+
+  async showInFolder(filePath: string): Promise<void> {
+    if (window.resumeDesktop) {
+      await window.resumeDesktop.shell.showItemInFolder(filePath);
+    }
+  },
+
+  async openExportsDir(): Promise<void> {
+    if (window.resumeDesktop) {
+      await window.resumeDesktop.shell.openExportsDir();
+    }
+  },
+
+  async saveTextFile(options: SaveTextFileOptions): Promise<PdfExportResult> {
+    if (window.resumeDesktop?.shell?.saveTextFile) {
+      return window.resumeDesktop.shell.saveTextFile(options);
+    }
+    const blob = new Blob([options.content], {
+      type: options.mimeType ?? 'text/plain;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = options.defaultFileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { canceled: false, fileName: options.defaultFileName };
+  },
+};

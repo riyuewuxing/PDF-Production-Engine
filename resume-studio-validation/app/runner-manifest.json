@@ -1,0 +1,15 @@
+{
+  "sourceSha": "c26b796b6ee4631a3c9e3e408f658ee63b7ba668",
+  "scope": "runtime/build dependency closure only; one actual persistence test; synthetic guard test and fixtures; no private history or data",
+  "publicOverlays": [
+    "src/lib/sampleResumeData.ts entirely synthetic",
+    "src/components/Career/JobCareerPane.tsx placeholder",
+    "src/components/Common/StudioHeader.tsx placeholder",
+    "src/lib/atsInspector.ts example string",
+    "src/lib/privacyRedactor.ts example comments",
+    "src/templates/shared.tsx example comment",
+    "omitted binary icons and all pre-existing personal-data-dependent tests"
+  ],
+  "fixture": "synthetic, no actual personal data",
+  "sourceValidation": "fixed-SHA file fetch; per-file candidate scan for credentials, personal-like content, email/phone, embedded photos; not a guarantee of exhaustive legal/license review"
+}

@@ -1,0 +1,1112 @@
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  FileText,
+  KeyRound,
+  Radar,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  Wand2,
+  XCircle,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type TailorBlockProposal,
+  generateTailorProposals,
+  scanFactGuardWarnings,
+  buildTrustedFactCorpus,
+} from '../../lib/aiTailor';
+import { apiClient } from '../../lib/apiClient';
+import { type AtsInspectionResult, runLiveAtsInspection } from '../../lib/atsInspector';
+import {
+  BYOK_PROVIDER_PRESETS,
+  type ByokAiSettings,
+  DEFAULT_BYOK_SETTINGS,
+  type PolishMode,
+  computeLineDiff,
+  polishResumeBlockWithByok,
+} from '../../lib/byokAiClient';
+import { matchResumeWithJd } from '../../lib/jdMatcher';
+import { applyBlockUpdates, collectEditableBlocks } from '../../lib/resumeBlocks';
+import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
+import type { ResumeDocument } from '../../schema/resumeSchema';
+
+type DiagnoseSubTab = 'hr' | 'jd' | 'ats' | 'ai';
+type AiSubMode = 'single' | 'tailor';
+
+export function DiagnoseAndMatchPane({
+  document,
+  activeSlug = '',
+  overflowPx,
+  jdText: controlledJdText,
+  onJdTextChange,
+  onAtsScoreChange,
+  onJumpToSection,
+  onImmediateChange,
+  onFlushBeforeApply,
+}: {
+  document: ResumeDocument;
+  activeSlug?: string;
+  overflowPx: number;
+  jdText?: string;
+  onJdTextChange?: (next: string) => void;
+  onAtsScoreChange?: (score: number) => void;
+  onJumpToSection: (sectionId: string) => void;
+  onImmediateChange: (next: ResumeDocument) => void;
+  onFlushBeforeApply: () => Promise<void>;
+}) {
+  const [subTab, setSubTab] = useState<DiagnoseSubTab>('hr');
+  const [internalJdText, setInternalJdText] = useState('');
+  const jdText = controlledJdText ?? internalJdText;
+  const setJdText = onJdTextChange ?? setInternalJdText;
+
+  // 真 ATS 逆向体检 state
+  const [atsResult, setAtsResult] = useState<AtsInspectionResult | null>(null);
+  const [atsRunning, setAtsRunning] = useState(false);
+  const [atsError, setAtsError] = useState<string | null>(null);
+  const [showAtsRawText, setShowAtsRawText] = useState(false);
+
+  // BYOK state
+  const [aiSubMode, setAiSubMode] = useState<AiSubMode>('single');
+  const [aiSettings, setAiSettings] = useState<ByokAiSettings>(DEFAULT_BYOK_SETTINGS);
+  const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
+  const [showAiConfig, setShowAiConfig] = useState(false);
+
+  const editableBlocks = useMemo(() => collectEditableBlocks(document), [document]);
+  const [selectedBlockKey, setSelectedBlockKey] = useState<string>(() => editableBlocks[0]?.key ?? 'skills');
+  const [polishMode, setPolishMode] = useState<PolishMode>('star');
+  const [polishing, setPolishing] = useState(false);
+  const [polishError, setPolishError] = useState<string | null>(null);
+  const [suggestedText, setSuggestedText] = useState<string | null>(null);
+  const [polishRiskConfirmed, setPolishRiskConfirmed] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const applyingRef = useRef(false);
+  const polishAbortRef = useRef<AbortController | null>(null);
+  const polishBasisRef = useRef<{ document: ResumeDocument; slug: string; blockKey: string; text: string } | null>(null);
+  const tailorBasisRef = useRef<{ document: ResumeDocument; slug: string; jdText: string } | null>(null);
+  const mountedRef = useRef(false);
+
+  // Tailor whole-resume state
+  const [tailorUseMasterRef, setTailorUseMasterRef] = useState(false);
+  const [tailoring, setTailoring] = useState(false);
+  const [tailorError, setTailorError] = useState<string | null>(null);
+  const [tailorProposals, setTailorProposals] = useState<TailorBlockProposal[]>([]);
+  const [tailorCorpus, setTailorCorpus] = useState('');
+  const [tailorEditingKey, setTailorEditingKey] = useState<string | null>(null);
+  const [tailorNotice, setTailorNotice] = useState<string | null>(null);
+  const tailorAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void apiClient.getAiSettings().then((settings) => {
+      if (mountedRef.current) setAiSettings(settings);
+    }).catch(() => {});
+    return () => {
+      mountedRef.current = false;
+      polishAbortRef.current?.abort();
+      tailorAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!editableBlocks.some((b) => b.key === selectedBlockKey) && editableBlocks[0]) {
+      setSelectedBlockKey(editableBlocks[0].key);
+    }
+  }, [editableBlocks, selectedBlockKey]);
+
+  const diagnostic = useMemo(
+    () => analyzeResumeDiagnostics(document, { overflowPx }),
+    [document, overflowPx],
+  );
+
+  const jdResult = useMemo(() => matchResumeWithJd(document, jdText), [document, jdText]);
+
+  const selectedBlock = editableBlocks.find((b) => b.key === selectedBlockKey) ?? editableBlocks[0];
+  const contextRef = useRef({ document, slug: activeSlug, jdText, blockKey: selectedBlock?.key });
+  contextRef.current = { document, slug: activeSlug, jdText, blockKey: selectedBlock?.key };
+  const polishWarnings = useMemo(
+    () => suggestedText === null ? [] : scanFactGuardWarnings(suggestedText, buildTrustedFactCorpus(document)),
+    [suggestedText, document],
+  );
+  const isCurrent = (basis: { document: ResumeDocument; slug: string; jdText?: string; blockKey?: string }) =>
+    mountedRef.current && contextRef.current.document === basis.document &&
+    contextRef.current.slug === basis.slug &&
+    (basis.jdText === undefined || contextRef.current.jdText === basis.jdText) &&
+    (basis.blockKey === undefined || contextRef.current.blockKey === basis.blockKey);
+
+  useEffect(() => {
+    setSuggestedText(null);
+    setPolishRiskConfirmed(false);
+    polishAbortRef.current?.abort();
+  }, [document, activeSlug, selectedBlock?.key]);
+
+  useEffect(() => {
+    setTailorProposals([]);
+    setTailorCorpus('');
+    setTailorNotice(null);
+    tailorAbortRef.current?.abort();
+  }, [document, activeSlug, jdText]);
+  const diffSegments = useMemo(
+    () =>
+      selectedBlock && suggestedText !== null
+        ? computeLineDiff(selectedBlock.text, suggestedText)
+        : [],
+    [selectedBlock, suggestedText],
+  );
+
+  const scoreColor =
+    diagnostic.score >= 85
+      ? 'text-emerald-600 border-emerald-500 bg-emerald-50'
+      : diagnostic.score >= 65
+        ? 'text-amber-600 border-amber-500 bg-amber-50'
+        : 'text-red-600 border-red-500 bg-red-50';
+
+  const atsScoreColor = atsResult
+    ? atsResult.score >= 85
+      ? 'text-emerald-600 border-emerald-500 bg-emerald-50'
+      : atsResult.score >= 65
+        ? 'text-amber-600 border-amber-500 bg-amber-50'
+        : 'text-red-600 border-red-500 bg-red-50'
+    : '';
+
+  const handleRunAtsInspection = async () => {
+    setAtsRunning(true);
+    setAtsError(null);
+    try {
+      const result = await runLiveAtsInspection(document, jdText);
+      setAtsResult(result);
+      onAtsScoreChange?.(result.score);
+    } catch (err) {
+      setAtsError(err instanceof Error ? err.message : 'ATS 逆向体检失败');
+    } finally {
+      setAtsRunning(false);
+    }
+  };
+
+  const handleSaveAiSettings = async () => {
+    const saved = await apiClient.saveAiSettings(aiSettings);
+    setAiSettings(saved);
+    setSettingsSavedMsg('已安全保存到本地 data/.ai-settings.json（不入 Git）');
+    setTimeout(() => setSettingsSavedMsg(null), 3000);
+  };
+
+  const handleRunPolish = async () => {
+    if (!selectedBlock || applyingRef.current) return;
+    polishAbortRef.current?.abort();
+    const controller = new AbortController();
+    polishAbortRef.current = controller;
+    const basis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text };
+    polishBasisRef.current = basis;
+    setPolishing(true);
+    setPolishError(null);
+    setSuggestedText(null);
+    setPolishRiskConfirmed(false);
+    try {
+      const output = await polishResumeBlockWithByok({
+        settings: aiSettings, mode: polishMode, targetTitle: selectedBlock.label,
+        content: selectedBlock.text, jobTitle: document.basic.title, signal: controller.signal,
+      });
+      if (controller.signal.aborted || polishAbortRef.current !== controller || !isCurrent(basis)) return;
+      if (output.length > selectedBlock.maxCharsHint) throw new Error('润色结果超出段落字数预算，请缩短后重试。');
+      setSuggestedText(output);
+    } catch (err) {
+      if (polishAbortRef.current === controller && isCurrent(basis)) {
+        setPolishError(err instanceof Error ? err.message : '润色请求失败');
+      }
+    } finally {
+      if (polishAbortRef.current === controller && mountedRef.current) setPolishing(false);
+    }
+  };
+
+  const handleAdoptDiff = async () => {
+    const basis = polishBasisRef.current;
+    if (!basis || !selectedBlock || suggestedText === null || applyingRef.current ||
+        !isCurrent(basis) || selectedBlock.key !== basis.blockKey || selectedBlock.text !== basis.text) {
+      setPolishError('原简历或段落已变化，请重新生成润色建议。');
+      setSuggestedText(null);
+      return;
+    }
+    if (polishWarnings.length && !polishRiskConfirmed) {
+      setPolishError('请逐项核对新事实风险后再确认采纳。');
+      return;
+    }
+    if (!activeSlug) { setPolishError('未找到当前简历版本，无法安全应用。'); return; }
+    applyingRef.current = true;
+    setApplying(true);
+    try {
+      await onFlushBeforeApply();
+      if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
+      await apiClient.createSnapshot(activeSlug, 'AI 单段润色前快照');
+      if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
+      onImmediateChange(applyBlockUpdates(document, { [basis.blockKey]: suggestedText }));
+      setSuggestedText(null);
+    } catch (err) {
+      if (mountedRef.current) setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
+    } finally {
+      applyingRef.current = false;
+      if (mountedRef.current) setApplying(false);
+    }
+  };
+
+  const handleRunTailor = async () => {
+    if (applyingRef.current) return;
+    tailorAbortRef.current?.abort();
+    const controller = new AbortController();
+    tailorAbortRef.current = controller;
+    const basis = { document, slug: activeSlug, jdText };
+    tailorBasisRef.current = basis;
+    setTailoring(true);
+    setTailorError(null);
+    setTailorNotice(null);
+    setTailorProposals([]);
+    try {
+      let masterDoc: ResumeDocument | null = null;
+      if (tailorUseMasterRef && activeSlug !== 'master') {
+        masterDoc = await apiClient.getResume('master');
+      }
+      if (controller.signal.aborted || !isCurrent(basis)) return;
+      const res = await generateTailorProposals({
+        settings: aiSettings, document, masterDocument: masterDoc, jdText, signal: controller.signal,
+      });
+      if (controller.signal.aborted || tailorAbortRef.current !== controller || !isCurrent(basis)) return;
+      setTailorProposals(res.proposals);
+      setTailorCorpus(res.trustedCorpus);
+      if (res.proposals.length === 0) {
+        setTailorNotice('模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。');
+      }
+    } catch (err) {
+      if (tailorAbortRef.current !== controller || !isCurrent(basis)) return;
+      setTailorError(controller.signal.aborted ? '已取消整卷改写请求。' :
+        err instanceof Error ? err.message : '整卷定向改写失败');
+    } finally {
+      if (tailorAbortRef.current === controller && mountedRef.current) setTailoring(false);
+    }
+  };
+
+  const handleApplyTailorProposals = async () => {
+    const selected = tailorProposals.filter((p) => p.accepted);
+    if (selected.length === 0 || applyingRef.current) return;
+    const basis = tailorBasisRef.current;
+    if (!basis || !isCurrent(basis) || !activeSlug) {
+      setTailorError('简历版本或岗位要求已变化，请重新生成提案。');
+      return;
+    }
+    const updates: Record<string, string> = {};
+    for (const item of selected) {
+      const block = editableBlocks.find((b) => b.key === item.blockKey);
+      const warnings = scanFactGuardWarnings(item.suggestedText, tailorCorpus);
+      if (!block || block.text !== item.originalText || !item.suggestedText.trim() ||
+          item.suggestedText.length > block.maxCharsHint ||
+          JSON.stringify(warnings) !== JSON.stringify(item.factWarnings)) {
+        setTailorError('提案已变化、超出字数上限或事实风险未重新确认，未应用修改。');
+        return;
+      }
+      updates[item.blockKey] = item.suggestedText;
+    }
+    applyingRef.current = true;
+    setApplying(true);
+    try {
+      await onFlushBeforeApply();
+      if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
+      await apiClient.createSnapshot(activeSlug, 'AI 整卷定向改写前快照');
+      if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
+      onImmediateChange(applyBlockUpdates(document, updates));
+      setTailorProposals([]);
+      setTailorNotice(`已一次性应用 ${selected.length} 条整卷改写（按 Ctrl+Z 可 1 步完整撤回）。`);
+    } catch (err) {
+      if (mountedRef.current) setTailorError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
+    } finally {
+      applyingRef.current = false;
+      if (mountedRef.current) setApplying(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full flex-col bg-white">
+      <div className="border-b border-slate-200 px-4 py-2.5">
+        <div className="text-xs font-bold text-slate-900">诊断优化中心</div>
+        <div className="text-[11px] text-slate-500">0 成本离线 HR 体检 · JD 关键词雷达 · 可选本地/BYOK 润色</div>
+
+        <div className="mt-2.5 grid grid-cols-4 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium">
+          <button
+            type="button"
+            onClick={() => setSubTab('hr')}
+            className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
+              subTab === 'hr' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Stethoscope size={12} /> HR 体检
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('jd')}
+            className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
+              subTab === 'jd' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Radar size={12} /> JD 雷达
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('ats')}
+            className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
+              subTab === 'ats' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FileText size={12} /> 真 ATS 机读
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('ai')}
+            className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
+              subTab === 'ai' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Sparkles size={12} /> AI 润色 Diff
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 text-xs">
+        {subTab === 'hr' && (
+          <div className="space-y-4">
+            {/* Overall Score Card */}
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <div
+                aria-label="HR体检综合分"
+                className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border-4 font-bold ${scoreColor}`}
+              >
+                <span className="text-xl leading-none">{diagnostic.score}</span>
+                <span className="text-[9px] font-normal">分</span>
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="font-bold text-slate-900">离线确定性简历体检评分</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
+                  <span>有效字数：{diagnostic.metrics.totalChars} 字</span>
+                  <span>经历量化率：{diagnostic.metrics.quantifiedRate}%</span>
+                  <span>
+                    含指标经历：{diagnostic.metrics.quantifiedEntries}/{diagnostic.metrics.totalEntries}
+                  </span>
+                  <span>未留空混排：{diagnostic.metrics.unspacedCjkHits} 处</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Findings List */}
+            <div className="space-y-2.5">
+              {diagnostic.findings.map((finding) => {
+                const badgeStyle =
+                  finding.severity === 'error'
+                    ? 'border-red-200 bg-red-50/80 text-red-900'
+                    : finding.severity === 'warn'
+                      ? 'border-amber-200 bg-amber-50/80 text-amber-900'
+                      : 'border-emerald-200 bg-emerald-50/70 text-emerald-900';
+
+                return (
+                  <div key={finding.id} className={`rounded-lg border p-3 ${badgeStyle}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        {finding.severity === 'error' ? (
+                          <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600" />
+                        ) : finding.severity === 'warn' ? (
+                          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                        ) : (
+                          <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />
+                        )}
+                        <div>
+                          <span className="mr-1.5 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold">
+                            {finding.category}
+                          </span>
+                          <span className="font-semibold">{finding.title}</span>
+                          <p className="mt-1 text-[11px] leading-relaxed opacity-85">{finding.detail}</p>
+                        </div>
+                      </div>
+                      {finding.sectionId && (
+                        <button
+                          type="button"
+                          onClick={() => onJumpToSection(finding.sectionId!)}
+                          className="inline-flex shrink-0 items-center gap-0.5 rounded border border-current/25 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-slate-50"
+                        >
+                          定位修复 <ArrowUpRight size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {subTab === 'jd' && (
+          <div className="space-y-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="font-semibold text-slate-800">粘贴目标岗位招聘 JD / 考编公告条件</span>
+              <textarea
+                rows={6}
+                data-native-undo="true"
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+                placeholder="例如：招聘高中物理教师，要求硕士及以上学历，持有高中物理教师资格证，熟悉新高考课程标准与实验教学，具备班级管理、班主任经验或 AI 智慧课堂/可视化课件开发能力者优先..."
+                className="w-full rounded-lg border border-slate-200 p-2.5 text-xs leading-relaxed text-slate-900 focus:border-teal-500 focus:outline-none"
+              />
+            </label>
+
+            {jdResult.totalKeywords > 0 ? (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900">JD 关键词覆盖度雷达</span>
+                  <span className="rounded-full bg-teal-600 px-2.5 py-0.5 font-mono text-xs font-bold text-white">
+                    {jdResult.coveragePercent}%（{jdResult.matchedCount}/{jdResult.totalKeywords}）
+                  </span>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 font-semibold text-emerald-700">
+                    简历已命中（{jdResult.matchedKeywords.length}）
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {jdResult.matchedKeywords.length === 0 ? (
+                      <span className="text-[11px] text-slate-400">暂无直接命中关键词</span>
+                    ) : (
+                      jdResult.matchedKeywords.map((kw) => (
+                        <span
+                          key={kw}
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
+                        >
+                          ✓ {kw}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 font-semibold text-amber-700">
+                    JD 高频但简历缺失（建议自然融入，{jdResult.missingKeywords.length}）
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {jdResult.missingKeywords.length === 0 ? (
+                      <span className="text-[11px] text-emerald-600">所有提取关键词均已覆盖！</span>
+                    ) : (
+                      jdResult.missingKeywords.map((kw) => (
+                        <span
+                          key={kw}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                        >
+                          + {kw}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-[11px] text-slate-400">
+                在上方粘贴任意招聘 JD 文本，离线引擎将即刻分析关键词命中率。
+              </div>
+            )}
+          </div>
+        )}
+
+        {subTab === 'ats' && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <div className="font-bold text-slate-900">把导出的 PDF 再读回来</div>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                在内存中把当前简历渲染成与正式导出完全一致的矢量 A4 PDF，再解析出招聘系统真正读到的文本流。
+                全程不落盘、不产生快照、不改动原稿。
+              </p>
+              <button
+                type="button"
+                disabled={atsRunning}
+                onClick={() => void handleRunAtsInspection()}
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-slate-900 py-2 font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                <FileText size={13} />
+                {atsRunning ? '渲染并解析中…' : atsResult ? '重新体检' : '运行真 ATS 逆向体检'}
+              </button>
+              {jdText.trim() ? (
+                <p className="mt-1.5 text-[10px] text-emerald-700">
+                  已自动带入「JD 雷达」中的 JD，将额外核验关键词机读命中。
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[10px] text-slate-400">
+                  提示：先到「JD 雷达」粘贴 JD，可额外核验关键词是否真被机读。
+                </p>
+              )}
+              {atsError && (
+                <div className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                  {atsError}
+                </div>
+              )}
+            </div>
+
+            {atsResult && (
+              <>
+                <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                  <div
+                    aria-label="ATS 机读得分"
+                    className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border-4 font-bold ${atsScoreColor}`}
+                  >
+                    <span className="text-xl leading-none">{atsResult.score}</span>
+                    <span className="text-[9px] font-normal">分</span>
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="font-bold text-slate-900">ATS 机读还原评分</div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
+                      <span>页数：{atsResult.pageCount}</span>
+                      <span>有效字符：{atsResult.charCount}</span>
+                      <span>
+                        栏结构：
+                        {atsResult.columnsDetected
+                          ? `双栏（${atsResult.columnPageCount} 页）`
+                          : '单栏线性'}
+                      </span>
+                      <span>跨栏拼接行：{atsResult.interleavedLineCount}</span>
+                      <span>乱码字符：{atsResult.garbledCharCount}</span>
+                      <span>部首替换：{atsResult.compatCharCount}</span>
+                      <span>实体覆盖率：{Math.round(atsResult.coverageRatio * 100)}%</span>
+                      {atsResult.jdPdfHitRate !== null && (
+                        <span>JD 机读命中：{atsResult.jdPdfHitRate}%</span>
+                      )}
+                      {atsResult.jdMissedInPdfOnly.length > 0 && (
+                        <span className="text-amber-700">
+                          正文有但读不出：{atsResult.jdMissedInPdfOnly.length} 个词
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {atsResult.checks.map((check) => {
+                    const style =
+                      check.severity === 'error'
+                        ? 'border-red-200 bg-red-50/80 text-red-900'
+                        : check.severity === 'warn'
+                          ? 'border-amber-200 bg-amber-50/80 text-amber-900'
+                          : 'border-emerald-200 bg-emerald-50/70 text-emerald-900';
+                    return (
+                      <div key={check.id} className={`rounded-lg border p-3 ${style}`}>
+                        <div className="flex items-start gap-2">
+                          {check.severity === 'error' ? (
+                            <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600" />
+                          ) : check.severity === 'warn' ? (
+                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                          ) : (
+                            <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />
+                          )}
+                          <div>
+                            <span className="font-semibold">{check.label}</span>
+                            {check.penalty > 0 && (
+                              <span className="ml-1.5 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold">
+                                -{check.penalty}
+                              </span>
+                            )}
+                            <p className="mt-1 text-[11px] leading-relaxed opacity-85">{check.detail}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowAtsRawText((v) => !v)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <span>{showAtsRawText ? '收起' : '查看'}原始 ATS 机读纯文本流</span>
+                    <span className="text-[10px] font-normal text-slate-400">只读</span>
+                  </button>
+                  {showAtsRawText && (
+                    <div className="space-y-2 border-t border-slate-200 p-2.5">
+                      <div>
+                        <div className="mb-1 text-[10px] font-bold text-slate-500">
+                          ATS 原始流（朴素自上而下）
+                        </div>
+                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700">
+                          {atsResult.rawExtractedText || '（无文本）'}
+                        </pre>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-[10px] font-bold text-slate-500">
+                          双栏感知顺序（人类阅读顺序）
+                        </div>
+                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-white p-2 font-mono text-[10px] leading-relaxed text-slate-700">
+                          {atsResult.columnAwareText || '（无文本）'}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {subTab === 'ai' && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                  <ShieldCheck size={14} className="text-teal-600" />
+                  BYOK 自带密钥 / 本地 Ollama 配置
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAiConfig((v) => !v)}
+                  className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
+                >
+                  <KeyRound size={11} /> {showAiConfig ? '收起设置' : aiSettings.enabled ? '已启用 · 修改' : '去配置'}
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">
+                默认关闭且不内置任何第三方密钥。密钥仅明文保存在本地 <code className="font-mono">data/.ai-settings.json</code>（已被 Git 忽略）。
+              </p>
+
+              {showAiConfig && (
+                <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                  <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={aiSettings.enabled}
+                      onChange={(e) =>
+                        setAiSettings((prev) => ({ ...prev, enabled: e.target.checked }))
+                      }
+                    />
+                    启用 AI 原地润色接口
+                  </label>
+
+                  <div className="flex flex-wrap gap-1">
+                    {BYOK_PROVIDER_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() =>
+                          setAiSettings((prev) => ({
+                            ...prev,
+                            providerLabel: p.label,
+                            baseUrl: p.baseUrl,
+                            model: p.defaultModel,
+                          }))
+                        }
+                        className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <input
+                    type="text"
+                    data-native-undo="true"
+                    value={aiSettings.baseUrl}
+                    onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                    placeholder="OpenAI 兼容 Base URL"
+                    className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="password"
+                      data-native-undo="true"
+                      value={aiSettings.apiKey}
+                      onChange={(e) => setAiSettings((prev) => ({ ...prev, apiKey: e.target.value }))}
+                      placeholder="API Key（Ollama 可留空）"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                    />
+                    <input
+                      type="text"
+                      data-native-undo="true"
+                      value={aiSettings.model}
+                      onChange={(e) => setAiSettings((prev) => ({ ...prev, model: e.target.value }))}
+                      placeholder="模型名（如 deepseek-chat）"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-emerald-700">{settingsSavedMsg}</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveAiSettings()}
+                      className="rounded bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-800"
+                    >
+                      保存本地配置
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Mode Switch: Single-Block vs Whole-Resume JD Tailor */}
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium">
+              <button
+                type="button"
+                onClick={() => setAiSubMode('single')}
+                className={`rounded py-1.5 transition ${
+                  aiSubMode === 'single' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                单段精修
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiSubMode('tailor')}
+                className={`rounded py-1.5 transition ${
+                  aiSubMode === 'tailor' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                整卷 JD 定向改写（Tailor）
+              </button>
+            </div>
+
+            {aiSubMode === 'tailor' && (
+              <div className="space-y-3">
+                <label className="flex flex-col gap-1">
+                  <span className="font-semibold text-slate-800">目标岗位招聘 JD（与「JD 雷达」同步）</span>
+                  <textarea
+                    rows={4}
+                    data-native-undo="true"
+                    value={jdText}
+                    onChange={(e) => setJdText(e.target.value)}
+                    placeholder="请在此或「JD 雷达」粘贴目标岗位要求，AI 将针对性微调最多 8 个段落并通过 Fact Guard 核查数字/资质边界..."
+                    className="w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none"
+                  />
+                </label>
+
+                <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={tailorUseMasterRef}
+                    onChange={(e) => setTailorUseMasterRef(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  <span>参考母库（master.json）作为可信事实与未展示经历补充边界</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={tailoring || applying}
+                    onClick={() => void handleRunTailor()}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+                  >
+                    <Wand2 size={13} />
+                    {tailoring ? '正在分析整卷匹配与防编造检查...' : '生成整卷 JD 定向提案'}
+                  </button>
+                  {tailoring && (
+                    <button
+                      type="button"
+                      onClick={() => tailorAbortRef.current?.abort()}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <XCircle size={13} /> 取消
+                    </button>
+                  )}
+                </div>
+
+                {tailorError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                    {tailorError}
+                  </div>
+                )}
+                {tailorNotice && (
+                  <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
+                    {tailorNotice}
+                  </div>
+                )}
+
+                {tailorProposals.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTailorProposals((prev) =>
+                              prev.map((p) => ({ ...p, accepted: p.factWarnings.length === 0 })),
+                            )
+                          }
+                          className="rounded border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50"
+                        >
+                          全选无预警提案
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTailorProposals((prev) => prev.map((p) => ({ ...p, accepted: false })))
+                          }
+                          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100"
+                        >
+                          清空
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={applying || !tailorProposals.some((p) => p.accepted)}
+                        onClick={() => void handleApplyTailorProposals()}
+                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+                      >
+                        <Check size={12} /> 应用已勾选的 {tailorProposals.filter((p) => p.accepted).length} 条修改
+                      </button>
+                    </div>
+
+                    {tailorProposals.map((proposal) => {
+                      const linesDiff = computeLineDiff(proposal.originalText, proposal.suggestedText);
+                      const isEditing = tailorEditingKey === proposal.blockKey;
+                      return (
+                        <div
+                          key={proposal.id}
+                          className={`rounded-xl border p-3 space-y-2 ${
+                            proposal.factWarnings.length > 0
+                              ? 'border-amber-300 bg-amber-50/40'
+                              : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <label className="flex cursor-pointer items-center gap-2 font-bold text-slate-900">
+                              <input
+                                type="checkbox"
+                                checked={proposal.accepted}
+                                disabled={applying}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setTailorProposals((prev) =>
+                                    prev.map((item) =>
+                                      item.blockKey === proposal.blockKey
+                                        ? { ...item, accepted: checked }
+                                        : item,
+                                    ),
+                                  );
+                                }}
+                                className="rounded border-slate-300"
+                              />
+                              <span>{proposal.label}</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTailorEditingKey(isEditing ? null : proposal.blockKey)
+                              }
+                              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
+                            >
+                              {isEditing ? '收起微调' : '手工微调'}
+                            </button>
+                          </div>
+
+                          <div className="text-[11px] text-slate-600">{proposal.reason}</div>
+
+                          {proposal.matchedJdKeywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {proposal.matchedJdKeywords.map((kw) => (
+                                <span
+                                  key={kw}
+                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
+                                >
+                                  + 命中 {kw}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {proposal.factWarnings.length > 0 && (
+                            <div className="rounded-lg border border-amber-300 bg-amber-100/80 p-2 text-[11px] text-amber-900 space-y-1">
+                              <div className="flex items-center gap-1 font-bold">
+                                <ShieldAlert size={13} className="text-amber-700" />
+                                Fact Guard 防编造预警（确认事实后逐项勾选）
+                              </div>
+                              {proposal.factWarnings.map((w, idx) => (
+                                <div key={idx} className="text-[10px] leading-relaxed">
+                                  • {w.message}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {isEditing ? (
+                            <textarea
+                              rows={4}
+                              data-native-undo="true"
+                              value={proposal.suggestedText}
+                              disabled={applying}
+                              onChange={(e) => {
+                                const nextText = e.target.value;
+                                const nextWarnings = scanFactGuardWarnings(nextText, tailorCorpus);
+                                setTailorProposals((prev) =>
+                                  prev.map((item) =>
+                                    item.blockKey === proposal.blockKey
+                                      ? { ...item, suggestedText: nextText, factWarnings: nextWarnings, accepted: false }
+                                      : item,
+                                  ),
+                                );
+                              }}
+                              className="w-full rounded border border-teal-300 bg-white p-2 text-[11px] text-slate-900 focus:outline-none"
+                            />
+                          ) : (
+                            <div className="space-y-0.5 rounded border border-slate-200 bg-white p-2 font-mono text-[10px]">
+                              {linesDiff.map((seg, i) => (
+                                <div
+                                  key={i}
+                                  className={
+                                    seg.type === 'removed'
+                                      ? 'bg-red-50 text-red-700 line-through'
+                                      : seg.type === 'added'
+                                        ? 'bg-emerald-50 text-emerald-800'
+                                        : 'text-slate-500'
+                                  }
+                                >
+                                  {seg.type === 'removed' ? '- ' : seg.type === 'added' ? '+ ' : '  '}
+                                  {seg.text}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {aiSubMode === 'single' && (
+              <>
+            {/* Polish Execution */}
+            <div className="space-y-2.5">
+              <label className="flex flex-col gap-1">
+                <span className="font-semibold text-slate-800">选择要润色的简历段落</span>
+                <select
+                  value={selectedBlock?.key ?? ''}
+                  onChange={(e) => {
+                    setSelectedBlockKey(e.target.value);
+                    setSuggestedText(null);
+                  }}
+                  className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                >
+                  {editableBlocks.map((b) => (
+                    <option key={b.key} value={b.key}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    ['star', 'STAR 量化润色'],
+                    ['pedagogy', '教研专业化'],
+                    ['concise', '精简控字'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPolishMode(id)}
+                    className={`rounded border py-1.5 font-medium ${
+                      polishMode === id
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={polishing || applying || !selectedBlock}
+                onClick={() => void handleRunPolish()}
+                className="flex w-full items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+              >
+                <Wand2 size={13} /> {polishing ? '请求模型生成中...' : '生成润色对比 Diff'}
+              </button>
+
+              {polishError && (
+                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                  {polishError}
+                </div>
+              )}
+            </div>
+
+            {/* Side-by-side / Line-by-line Diff Review */}
+            {suggestedText !== null && selectedBlock && (
+              <div className="space-y-2.5 rounded-xl border border-teal-300 bg-teal-50/40 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-teal-900">原文 vs 建议 Diff 审阅</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSuggestedText(null)}
+                      className="rounded border border-slate-300 bg-white px-2.5 py-1 text-[11px] text-slate-600 hover:bg-slate-50"
+                    >
+                      放弃
+                    </button>
+                    <button
+                      type="button"
+                      disabled={applying || (polishWarnings.length > 0 && !polishRiskConfirmed)}
+                      onClick={() => void handleAdoptDiff()}
+                      className="inline-flex items-center gap-1 rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-500"
+                    >
+                      <Check size={12} /> 采纳替换（可 Ctrl+Z）
+                    </button>
+                  </div>
+                </div>
+
+                {polishWarnings.length > 0 && (
+                  <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
+                    {polishWarnings.map((warning, i) => <div key={i}>{warning.message}</div>)}
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={polishRiskConfirmed} disabled={applying}
+                        onChange={(e) => setPolishRiskConfirmed(e.target.checked)} />
+                      我已核对以上事实，确认属实
+                    </label>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="rounded border border-slate-200 bg-white p-2">
+                    <div className="mb-1 text-[10px] font-bold text-slate-500">当前原文</div>
+                    <div className="whitespace-pre-wrap text-[11px] text-slate-700">{selectedBlock.text}</div>
+                  </div>
+                  <div className="rounded border border-emerald-200 bg-emerald-50/60 p-2">
+                    <div className="mb-1 text-[10px] font-bold text-emerald-700">AI 建议版</div>
+                    <div className="whitespace-pre-wrap text-[11px] text-slate-900">{suggestedText}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-0.5 rounded border border-slate-200 bg-white p-2 font-mono text-[10px]">
+                  {diffSegments.map((seg, i) => (
+                    <div
+                      key={i}
+                      className={
+                        seg.type === 'removed'
+                          ? 'bg-red-50 text-red-700 line-through'
+                          : seg.type === 'added'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : 'text-slate-500'
+                      }
+                    >
+                      {seg.type === 'removed' ? '- ' : seg.type === 'added' ? '+ ' : '  '}
+                      {seg.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

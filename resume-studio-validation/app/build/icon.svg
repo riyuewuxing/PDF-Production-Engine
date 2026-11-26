@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <!-- Deep obsidian-to-emerald-teal commercial studio backdrop -->
+    <linearGradient id="bgGrad" x1="48" y1="32" x2="468" y2="484" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0b1628" />
+      <stop offset="52%" stop-color="#10364c" />
+      <stop offset="100%" stop-color="#0d7a72" />
+    </linearGradient>
+    <radialGradient id="topGlow" cx="0.22" cy="0.16" r="0.72">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.34" />
+      <stop offset="100%" stop-color="#2dd4bf" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="headerBar" x1="126" y1="92" x2="364" y2="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="100%" stop-color="#1d63b8" />
+    </linearGradient>
+    <linearGradient id="goldBadge" x1="316" y1="312" x2="434" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+    <linearGradient id="sheetGrad" x1="120" y1="84" x2="380" y2="428" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f1f5f9" />
+    </linearGradient>
+    <filter id="cardShadow" x="86" y="68" width="336" height="398" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#020617" flood-opacity="0.42" />
+    </filter>
+    <filter id="badgeShadow" x="292" y="294" width="166" height="166" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#020617" flood-opacity="0.42" />
+    </filter>
+  </defs>
+
+  <!-- Outer rounded squircle container -->
+  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#bgGrad)" />
+  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#topGlow)" />
+  <rect x="22" y="22" width="468" height="468" rx="110" stroke="#ffffff" stroke-opacity="0.16" stroke-width="4" />
+
+  <!-- Subtle back page layer for studio depth -->
+  <rect x="138" y="72" width="248" height="332" rx="26" fill="#2dd4bf" fill-opacity="0.18" transform="rotate(4.5 262 238)" />
+
+  <!-- Primary A4 resume sheet with folded top-right dog-ear -->
+  <g filter="url(#cardShadow)">
+    <path
+      d="M144 88 H314 L382 156 V398 C382 414.569 368.569 428 352 428 H144 C127.431 428 114 414.569 114 398 V118 C114 101.431 127.431 88 144 88 Z"
+      fill="url(#sheetGrad)"
+    />
+
+    <!-- Top commercial gradient header inside sheet -->
+    <path
+      d="M144 88 H314 L382 156 V186 H114 V118 C114 101.431 127.431 88 144 88 Z"
+      fill="url(#headerBar)"
+    />
+
+    <!-- Folded dog-ear corner -->
+    <path
+      d="M314 88 V136 C314 147.046 322.954 156 334 156 H382 L314 88 Z"
+      fill="#bae6fd"
+      fill-opacity="0.92"
+    />
+
+    <!-- Circular avatar emblem + crisp header bars -->
+    <circle cx="164" cy="138" r="24" fill="#ffffff" fill-opacity="0.96" />
+    <circle cx="164" cy="131" r="8.5" fill="#0f766e" />
+    <path d="M148 154 C150.5 144.5 156.5 141 164 141 C171.5 141 177.5 144.5 180 154 Z" fill="#0f766e" />
+
+    <rect x="202" y="122" width="96" height="14" rx="7" fill="#ffffff" />
+    <rect x="202" y="146" width="72" height="9" rx="4.5" fill="#ccfbf1" fill-opacity="0.88" />
+
+    <!-- Section 1: Teal accent bar + clean structured resume lines -->
+    <rect x="142" y="216" width="10" height="24" rx="5" fill="#0f766e" />
+    <rect x="164" y="220" width="92" height="16" rx="8" fill="#0f172a" />
+
+    <rect x="142" y="256" width="208" height="12" rx="6" fill="#64748b" />
+    <rect x="142" y="280" width="174" height="12" rx="6" fill="#94a3b8" />
+
+    <!-- Section 2: Cobalt accent bar + clean structured lines -->
+    <rect x="142" y="318" width="10" height="24" rx="5" fill="#1d63b8" />
+    <rect x="164" y="322" width="78" height="16" rx="8" fill="#0f172a" />
+
+    <rect x="142" y="358" width="154" height="12" rx="6" fill="#64748b" />
+    <rect x="142" y="382" width="128" height="12" rx="6" fill="#94a3b8" />
+  </g>
+
+  <!-- Floating luxury studio gold/amber nib-sparkle seal -->
+  <g filter="url(#badgeShadow)">
+    <circle cx="375" cy="374" r="64" fill="url(#goldBadge)" stroke="#ffffff" stroke-width="8" />
+    <!-- Crisp minimalist four-point studio star / polish mark -->
+    <path
+      d="M375 332 L384.5 364.5 L417 374 L384.5 383.5 L375 416 L365.5 383.5 L333 374 L365.5 364.5 Z"
+      fill="#ffffff"
+    />
+  </g>
+</svg>

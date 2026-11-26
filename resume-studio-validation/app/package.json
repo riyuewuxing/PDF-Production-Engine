@@ -1,0 +1,84 @@
+{
+  "name": "resume-studio",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local-first desktop A4 resume studio with native vector PDF export",
+  "author": "riyuewuxing",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/build-electron.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate:legacy": "tsx scripts/migrate-legacy.ts",
+    "desktop:build": "vite build && node scripts/build-electron.mjs",
+    "desktop:start": "pnpm desktop:build && node scripts/start-desktop.mjs",
+    "desktop:dev": "node scripts/dev-desktop.mjs",
+    "desktop:pack": "pnpm desktop:build && electron-builder --win && node scripts/postpack-win.mjs",
+    "mcp:start": "tsx scripts/mcp-server.ts",
+    "context:pack": "node scripts/pack-context.mjs",
+    "context:delta": "node scripts/pack-context.mjs --delta-only"
+  },
+  "build": {
+    "appId": "com.riyuewuxing.resume-studio",
+    "productName": "Resume Studio",
+    "compression": "store",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*.cjs",
+      "package.json",
+      "!node_modules/**"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "Resume Studio.exe",
+      "unpackDirName": true
+    }
+  },
+  "dependencies": {
+    "docx": "^9.15.4",
+    "lucide-react": "^0.511.0",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.7",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.15.21",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.0",
+    "electron": "^45.3.4",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^26.1.0",
+    "tailwindcss": "^4.1.7",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.8",
+    "vitest": "^3.1.4"
+  }
+}
