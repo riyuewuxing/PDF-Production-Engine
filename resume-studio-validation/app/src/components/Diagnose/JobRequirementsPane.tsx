@@ -9,6 +9,7 @@ import {splitJobRequirements,collectLocalJobEvidence,evidenceKeywordHints,blankR
 
 const priorityLabel:Record<RequirementPriority,string>={unknown:'待判定',mandatory:'硬条件',preferred:'优先条件','not-requirement':'非招聘条件'};
 const outcomeLabel:Record<RequirementOutcome,string>={unchecked:'待核对',supported:'本人核对：已有自述依据',gap:'本人标记：存在缺口'};
+function historicalClauses(a:JobReviewArchive){try{return new Map(splitJobRequirements(a.source).map(c=>[c.id,c]));}catch{return new Map<string,RequirementClause>();}}
 type Props={document:ResumeDocument;slug:string;jdText:string;onJdTextChange:(next:string)=>void;onFlush:()=>Promise<void>;getRevision:()=>string};
 type Session={source:string;doc:ResumeDocument;slug:string;clauses:RequirementClause[]};
 export function JobRequirementsPane({document,slug,jdText,onJdTextChange,onFlush,getRevision}:Props){
@@ -141,6 +142,8 @@ export function JobRequirementsPane({document,slug,jdText,onJdTextChange,onFlush
       // Clear the active session before trying to restore, never leave a failed historical review displayed as current.
       setSession(null);setBank(null);setReviews({});setDraft(blankRequirementReview());setActive('');setCheckedAt('');
       const {doc,revision,fresh}=await readDiskBasis(s,archive.factRevision!==null);
+      const disk=await apiClient.getApplications();
+      if(!disk.jobReviews?.some(a=>a.id===archive.id&&JSON.stringify(a)===JSON.stringify(archive)))throw new Error('磁盘档案已经变化或被删除，请刷新档案。');
       const restored=await restoreArchivedJobReview(archive,doc,fresh,revision);
       if(!stillCurrent(s)||getRevision()!==revision)return;
       const clauses=splitJobRequirements(s.source),first=clauses.find(c=>restored[c.id])?.id??'';
@@ -174,16 +177,23 @@ export function JobRequirementsPane({document,slug,jdText,onJdTextChange,onFlush
       {!canUseLedger&&<p className="text-amber-800">{ledger.error||'台账尚未就绪或存在未保存草稿。'} 请在投递台账处理保存、重试或重载。</p>}
       <button type="button" disabled={busy||ledger.loading||ledger.saving||ledger.dirty} onClick={()=>void task(async()=>{await careerLedger.load();setNotice('已读取本地核对档案。');})} className="rounded border px-2 py-1">刷新本地核对档案</button>
       <label className="flex items-center gap-1"><input type="checkbox" checked={showAllArchives} disabled={busy} onChange={e=>setShowAllArchives(e.target.checked)}/>显示全部简历版本的历史档案</label>
-      {visibleArchives.map(a=><div key={a.id} className="space-y-1 rounded border p-2">
+      {visibleArchives.map(a=>{const clauses=historicalClauses(a);return <div key={a.id} className="space-y-1 rounded border p-2">
         <div className="font-medium">{new Date(a.createdAt).toLocaleString()} · {a.rows.length} 条人工核对 · {a.slug===slug&&a.docId===document.id?'当前简历':a.slug+'（其他版本）'}</div>
         <p className="whitespace-pre-wrap">{a.source.slice(0,180)}{a.source.length>180?'…':''}</p>
         <p className="text-slate-600">{a.applicationId?'历史关联投递及永久快照':'未关联投递'} · {a.factRevision?'绑定独立事实库':'仅简历自述'}</p>
+        <details className="rounded bg-slate-50 p-2" aria-label="历史岗位核对内容">
+          <summary className="cursor-pointer font-medium">查看历史核对内容（非当前结论）</summary>
+          <div className="max-h-60 space-y-2 overflow-auto pt-2">
+            <p className="whitespace-pre-wrap">{a.source}</p>
+            {a.rows.map(({clauseId,review})=><div key={clauseId} className="rounded border bg-white p-2"><div className="font-semibold">{priorityLabel[review.priority]} · {outcomeLabel[review.outcome]}</div><p className="whitespace-pre-wrap">{clauses.get(clauseId)?.quote??'历史条款位置无法核实'}</p><p className="whitespace-pre-wrap text-slate-600">历史选择 {review.evidenceIds.length} 条依据（不代表当前有效） · {review.note}</p></div>)}
+          </div>
+        </details>
         <div className="flex flex-wrap gap-1">
           <button type="button" disabled={busy||!canUseLedger||a.slug!==slug||a.docId!==document.id} onClick={()=>onJdTextChange(a.source)} className="rounded border px-2 py-1">载入档案原文</button>
           <button type="button" disabled={busy||!canUseLedger||a.source!==jdText||a.slug!==slug||a.docId!==document.id} onClick={()=>restoreArchive(a)} className="rounded border px-2 py-1">恢复档案核对</button>
           <button type="button" disabled={busy||!canUseLedger} onClick={()=>deleteArchive(a)} className="rounded border px-2 py-1 text-red-700">删除核对档案</button>
         </div>
-      </div>)}
+      </div>})}
     </div>}
     {current&&<>
       <div className="flex flex-wrap gap-2 text-slate-700"><span>候选 {session.clauses.length} 条</span><span>已记录 {totals.length} 条</span><span>本人标记硬条件 {totals.filter(r=>r.priority==='mandatory').length}</span><span>自述支持 {totals.filter(r=>r.outcome==='supported').length}</span><span>缺口 {totals.filter(r=>r.outcome==='gap').length}</span></div>

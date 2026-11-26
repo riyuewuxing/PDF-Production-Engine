@@ -910,7 +910,7 @@ export class LocalResumeStore {
       for(const a of validated.applications){
         if(ids.has(a.id))throw new LocalFsApiError(422,'DUPLICATE_APPLICATION','投递标识重复。');ids.add(a.id);
         const old=current.applications.find(x=>x.id===a.id);
-        if(old&&(a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联及原导出信息不能通过整表保存修改。');
+        if(old&&(a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore||a.jdText!==old.jdText))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联、原岗位原文及导出信息不能通过整表保存修改。');
         if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
       }
       // Older clients omitting the optional field cannot silently erase local review archives.
@@ -929,7 +929,8 @@ export class LocalResumeStore {
         catch(err){throw new LocalFsApiError(409,'JOB_REVIEW_STALE',err instanceof Error?err.message:'岗位核对依据无效。');}
         if(archive.applicationId!==null){
           const linked=validated.applications.find(a=>a.id===archive.applicationId);
-          if(!linked||linked.snapshotId!==archive.snapshotId||linked.resumeSlug!==archive.slug||linked.jdText!==archive.source)
+          const persisted=current.applications.find(a=>a.id===archive.applicationId);
+          if(!persisted||persisted.snapshotId!==archive.snapshotId||persisted.jdText!==archive.source||!linked||linked.snapshotId!==archive.snapshotId||linked.resumeSlug!==archive.slug||linked.jdText!==archive.source)
             throw new LocalFsApiError(409,'JOB_REVIEW_LINK','投递关联与原文或版本不一致。');
           const snap=await this.getApplicationSnapshot(linked.snapshotId);
           if(snap.meta.applicationId!==linked.id||snap.meta.resumeSlug!==archive.slug||!sameJobReviewDocument(snap.document,doc))

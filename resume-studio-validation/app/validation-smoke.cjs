@@ -1091,6 +1091,9 @@ async function run() {
   await until('stale historical review rejected',async()=>await bodyHas('事实库版本已变化，历史核对档案不能恢复为当前结果')&&await js('!document.querySelector("select[aria-label=\\\"岗位候选条款\\\"]")'));
   if((await main.store.getApplications()).jobReviews[0].id!==savedReview.id)throw Error('stale history was silently deleted');
   await capture('72-job-review-archive-stale');checks.jobReviewArchiveStaleRejected=true;
+  await js('(()=>{const d=document.querySelector("details[aria-label=\\"历史岗位核对内容\\"]");if(!d)return false;d.open=true;d.scrollIntoView({block:"center"});return true})()');
+  await until('stale historical details still readable',()=>js('(()=>{const d=document.querySelector("details[aria-label=\\"历史岗位核对内容\\"]");return !!d?.open&&d.innerText.includes("合成示例：已本人核对，非资格结论")&&d.innerText.includes("不代表当前有效")})()'));
+  await capture('73-job-review-historical-readonly');checks.jobReviewHistoricalReadable=true;
   await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',jobSource+'\n合成附加条件');
   await until('job source change clears session',()=>js('!document.querySelector("select[aria-label=\\"岗位候选条款\\"]")'));
   if(providerCalls!==reviewCalls||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(reviewDoc))throw Error('job review wrote resume or contacted model');
