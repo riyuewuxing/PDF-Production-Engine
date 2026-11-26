@@ -1374,6 +1374,12 @@ async function run() {
       if(!fs.existsSync(path.join(restoreFolder,'.electron-userdata'))||!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster)||providerCalls!==backupCalls)throw Error('independent launch changed source or shared user profile');
       await until('success text actually visible without test scroll',()=>feedbackVisible(feedbackStatus));
       await until('launch result actually visible without test scroll',()=>feedbackVisible('[aria-label="独立工作区启动结果"]'));
+      // The independently launched window may occlude the source window and leave its last composited frame stale.
+      // Return to the original window as a user would, without touching its scroll position.
+      win.show();win.focus();
+      await until('source window foreground for final screenshot',()=>win.isFocused(),5000);
+      await Promise.race([js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))'),sleep(4000).then(()=>{throw Error('source window paint watchdog expired')})]);
+      await until('success still visible in foreground short window',()=>feedbackVisible(feedbackStatus));
       await capture('87-workspace-launch-ready');checks.workspaceLaunchReadyVisible=true;
       win.setContentSize(1440,860);await sleep(350);
       await until('success remains visible wide',()=>feedbackVisible(feedbackStatus));await capture('88-workspace-launch-ready-wide');checks.workspaceLaunchWideVisible=true;
