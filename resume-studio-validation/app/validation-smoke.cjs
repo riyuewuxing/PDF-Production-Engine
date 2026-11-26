@@ -171,6 +171,14 @@ async function run() {
   const origSnapshot = main.store.createSnapshot.bind(main.store);
   main.store.createSnapshot = async () => { throw Error('受控快照失败'); };
   await js('(()=>{const l=[...document.querySelectorAll("label")].find(x=>x.innerText.includes("我已核对以上事实"));l?.querySelector("input")?.click();return !!l})()');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("采纳替换"))?.disabled===true'))throw Error('single without PDF review was enabled');
+  await click('试渲染单段提案');
+  await until('single actual PDF review',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('04b-single-pdf-review');
+  const singleConfirm=await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("我已检查真实 PDF 前后页面，批准当前正文候选"));const box=l?.querySelector("input");if(!box||box.disabled)return false;box.click();return true})()');
+  if(!singleConfirm)throw Error('single candidate PDF blocked: '+await js('document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]")?.innerText'));
+  checks.singlePdfReview=true;
   await click('采纳替换（可 Ctrl+Z）');
   await until('snapshot error surfaced', () => bodyHas('受控快照失败'));
   if ((await main.store.getResume('runner-fixture')).education[0].description.includes('30%')) throw Error('failed snapshot mutated saved content');
@@ -415,6 +423,12 @@ async function run() {
   if(images.length!==2||images.some(e=>e.width<400||!e.complete||!e.src.startsWith("data:image/png")))throw Error('missing actual PDF page images '+JSON.stringify(images));
   await js('(()=>{const e=document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]");e?.scrollIntoView({block:"start"});return true})()');
   await capture('26-layout-pdf-comparison');
+  await click('展开全屏 PDF 对照');
+  await until('full screen side by side',()=>js('document.querySelector("[role=dialog][aria-label=\\\"全屏 PDF 对照\\\"]")?.querySelectorAll("img").length===2'));
+  await capture('26b-layout-fullscreen');
+  await click('关闭全屏对照');
+  if(await js('!!document.querySelector("[role=dialog][aria-label=\\\"全屏 PDF 对照\\\"]")'))throw Error('fullscreen did not close');
+  checks.fullscreenPdfReview=true;
   if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="应用已核对版式")?.disabled===true'))throw Error('layout not gated before PDF approval');
   const layoutConfirm=await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("我已检查真实 PDF 前后页面"));const box=l?.querySelector("input");if(!box||box.disabled)return false;box.click();return true})()');
   if(!layoutConfirm)throw Error('layout native comparison blocked: '+await js('document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]")?.innerText'));

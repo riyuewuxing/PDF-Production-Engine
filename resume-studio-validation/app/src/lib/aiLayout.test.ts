@@ -4,6 +4,8 @@ import {ResumeDocumentSchema} from '../schema/resumeSchema';
 import {parseLayoutProposal,prepareLayoutRequest,previewLayoutProposal} from './aiLayout';
 import {auditPdfCandidate,comparePdfAudits} from './aiPdfAudit';
 import type {ExtractedPdfPageTokens} from './pdfTextLayout';
+import {collectExpectedEntities,inspectAtsFromExtractedPages} from './atsInspector';
+import {collectResumePlainText,matchResumeWithJd} from './jdMatcher';
 function doc(){return ResumeDocumentSchema.parse({id:'synthetic-id',title:'合成简历',createdAt:'2026-01-01',updatedAt:'2026-01-01',templateId:'minimal-ats',basic:{name:'演示甲',email:'fixture@example.invalid',phone:'synthetic-contact'},menuSections:[{id:'basic',title:'基本',order:0},{id:'education',title:'教育',order:1},{id:'skills',title:'技能',order:2},{id:'experience',title:'经历',order:3,enabled:false}],education:[{id:'edu',school:'示例大学',description:'参与实验设计。'}],experience:[{id:'exp',company:'隐藏标记',description:'HIDDEN_BODY'}],skillContent:'Python 实验记录',globalSettings:{}})}
 function page(lines:string[]):ExtractedPdfPageTokens{return {pageIndex:0,pageWidth:595.28,pageHeight:841.89,tokens:lines.map((str,i)=>({str,x:30,y:790-i*20,width:str.length*8,height:10}))};}
 const lines=['演示甲','fixture@example.invalid','synthetic-contact','教育','示例大学','参与实验设计。','技能','Python 实验记录'];
@@ -53,4 +55,19 @@ describe('AI layout proposal and native PDF audits',()=>{
     expect(comparePdfAudits(before,garbled,false).blockers.join()).toContain('乱码');
     expect(()=>auditPdfCandidate(d,Array.from({length:13},()=>page(lines)))).toThrow();
   });
+  it('does not reward JD matches from hidden sections or penalize undisplayed identity fields',()=>{
+    const d=doc();
+    d.basic.fieldOrder=d.basic.fieldOrder.map(f=>f.key==='email'?{...f,visible:false}:f);
+    d.experience[0]!.description='React 隐藏技能';
+    d.title='INTERNAL_TITLE React';
+    const visible=collectResumePlainText(d);
+    expect(visible).not.toContain('internal_title');
+    expect(visible).not.toContain('react');
+    expect(matchResumeWithJd(d,'React Python').matchedKeywords).toEqual(['Python']);
+    expect(collectExpectedEntities(d)).not.toContain('隐藏标记');
+    const result=inspectAtsFromExtractedPages(d,[page(lines.filter(l=>!l.includes('@')))]);
+    expect(result.checks.find(c=>c.id==='contact-email')?.severity).toBe('pass');
+    expect(result.coverageRatio).toBe(1);
+  });
+
 });

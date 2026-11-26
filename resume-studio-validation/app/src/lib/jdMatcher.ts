@@ -1,4 +1,5 @@
 import type { ResumeDocument } from '../schema/resumeSchema';
+import {visibleBasicValue} from './aiContext';
 
 export interface JdMatchResult {
   totalKeywords: number;
@@ -94,30 +95,16 @@ const ASCII_STOPWORDS = new Set([
 ]);
 
 export function collectResumePlainText(doc: ResumeDocument): string {
-  const parts: string[] = [
-    doc.title,
-    doc.basic.name,
-    doc.basic.title,
-    doc.basic.employmentStatus,
-    doc.basic.location,
-    ...doc.basic.customFields.filter((f) => f.visible).map((f) => `${f.label} ${f.value}`),
-    ...doc.education
-      .filter((e) => e.visible)
-      .map((e) => `${e.school} ${e.major} ${e.degree} ${e.gpa} ${e.description}`),
-    ...doc.experience
-      .filter((e) => e.visible)
-      .map((e) => `${e.company} ${e.position} ${e.location} ${e.description}`),
-    ...doc.projects
-      .filter((p) => p.visible)
-      .map((p) => `${p.name} ${p.role} ${p.description}`),
-    doc.skillContent,
-    doc.selfEvaluationContent,
+  const enabled=new Set(doc.menuSections.filter(s=>s.enabled).map(s=>s.id));
+  const parts:string[]=[
+    visibleBasicValue(doc,'name'),visibleBasicValue(doc,'title'),visibleBasicValue(doc,'employmentStatus'),visibleBasicValue(doc,'location'),
+    ...(enabled.has('basic')?doc.basic.customFields.filter(f=>f.visible).map(f=>f.label+' '+f.value):[]),
+    ...(enabled.has('education')?doc.education.filter(e=>e.visible).map(e=>[e.school,e.major,e.degree,e.gpa,e.description].join(' ')):[]),
+    ...(enabled.has('experience')?doc.experience.filter(e=>e.visible).map(e=>[e.company,e.position,e.location,e.description].join(' ')):[]),
+    ...(enabled.has('projects')?doc.projects.filter(p=>p.visible).map(p=>[p.name,p.role,p.description].join(' ')):[]),
+    enabled.has('skills')?doc.skillContent:'',enabled.has('selfEvaluation')?doc.selfEvaluationContent:'',
   ];
-  for (const list of Object.values(doc.customData)) {
-    for (const item of list.filter((i) => i.visible)) {
-      parts.push(`${item.title} ${item.subtitle} ${item.description}`);
-    }
-  }
+  for(const [id,list] of Object.entries(doc.customData))if(enabled.has(id))for(const item of list.filter(i=>i.visible))parts.push([item.title,item.subtitle,item.description].join(' '));
   return parts.join('\n').toLowerCase();
 }
 

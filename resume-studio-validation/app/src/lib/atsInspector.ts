@@ -21,6 +21,7 @@ import {
   summarizeColumnLayout,
 } from './pdfTextLayout';
 import type { ResumeDocument } from '../schema/resumeSchema';
+import {visibleBasicValue} from './aiContext';
 
 export type AtsCheckSeverity = 'pass' | 'warn' | 'error';
 
@@ -151,24 +152,26 @@ export function collectExpectedEntities(doc: ResumeDocument): string[] {
     if (trimmed.length >= 2) entities.push(trimmed);
   };
 
-  push(doc.basic.name);
+  const enabled=new Set(doc.menuSections.filter(s=>s.enabled).map(s=>s.id));
+  push(visibleBasicValue(doc,'name'));
   for (const field of doc.basic.customFields) {
-    if (field.visible) push(field.value);
+    if (enabled.has('basic')&&field.visible) push(field.value);
   }
   for (const edu of doc.education) {
-    if (!edu.visible) continue;
+    if (!enabled.has('education')||!edu.visible) continue;
     push(edu.school);
     push(edu.gpa);
   }
   for (const exp of doc.experience) {
-    if (!exp.visible) continue;
+    if (!enabled.has('experience')||!exp.visible) continue;
     push(exp.company);
   }
   for (const proj of doc.projects) {
-    if (!proj.visible) continue;
+    if (!enabled.has('projects')||!proj.visible) continue;
     push(proj.name);
   }
   for (const section of doc.menuSections) {
+    if(!section.enabled)continue;
     for (const item of doc.customData[section.id] ?? []) {
       if (item.visible) push(item.title);
     }
@@ -209,9 +212,9 @@ export function inspectAtsFromExtractedPages(
     isEmail?: boolean;
     isPhone?: boolean;
   }> = [
-    { id: 'contact-name', label: '姓名可机读', value: doc.basic.name, penalty: PENALTY.missingName },
-    { id: 'contact-phone', label: '手机号可机读', value: doc.basic.phone, penalty: PENALTY.missingPhone, isPhone: true },
-    { id: 'contact-email', label: '邮箱可机读', value: doc.basic.email, penalty: PENALTY.missingEmail, isEmail: true },
+    { id: 'contact-name', label: '姓名可机读', value: visibleBasicValue(doc,'name'), penalty: PENALTY.missingName },
+    { id: 'contact-phone', label: '手机号可机读', value: visibleBasicValue(doc,'phone'), penalty: PENALTY.missingPhone, isPhone: true },
+    { id: 'contact-email', label: '邮箱可机读', value: visibleBasicValue(doc,'email'), penalty: PENALTY.missingEmail, isEmail: true },
   ];
 
   for (const item of contactChecks) {
@@ -221,7 +224,7 @@ export function inspectAtsFromExtractedPages(
         id: item.id,
         label: item.label,
         severity: 'pass',
-        detail: '简历未填写该字段，跳过核验。',
+        detail: '该字段未填写或未显示，跳过核验。',
         penalty: 0,
       });
       continue;

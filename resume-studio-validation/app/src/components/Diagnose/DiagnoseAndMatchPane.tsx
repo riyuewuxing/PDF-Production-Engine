@@ -46,6 +46,8 @@ import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
 import {AiLayoutPane} from './AiLayoutPane';
+import {TextPdfReviewGate} from './TextPdfReviewGate';
+import {useTextPdfReview} from '../../hooks/useTextPdfReview';
 import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
 import type { ResumeDocument } from '../../schema/resumeSchema';
 
@@ -175,6 +177,12 @@ export function DiagnoseAndMatchPane({
     (basis.jdText === undefined || contextRef.current.jdText === basis.jdText) &&
     (basis.blockKey === undefined || contextRef.current.blockKey === basis.blockKey);
 
+  const singleBasis=polishBasisRef.current;
+  const singleCandidates=singleBasis&&suggestedText!==null&&selectedBlock&&selectedBlock.key===singleBasis.blockKey?[{blockKey:singleBasis.blockKey,originalText:singleBasis.text,suggestedText,reason:'单段精修（人工核对）',factIds:(currentSources[singleBasis.blockKey]??[]).map(s=>s.id)}]:[];
+  const singleReview=useTextPdfReview({document,slug:activeSlug,requestId:singleBasis?.requestId??'',enabled:subTab==='ai'&&aiSubMode==='single'&&polishRiskConfirmed&&!!singleBasis&&isCurrent(singleBasis)&&!polishing,candidates:singleCandidates});
+  const wholeBasis=tailorBasisRef.current;
+  const wholeCandidates=tailorProposals.filter(p=>p.accepted);
+  const wholeReview=useTextPdfReview({document,slug:activeSlug,requestId:wholeBasis?.requestId??'',enabled:subTab==='ai'&&aiSubMode==='tailor'&&!!wholeBasis&&isCurrent(wholeBasis)&&!tailoring,candidates:wholeCandidates});
   useEffect(() => {
     setSuggestedText(null);
     setPolishRiskConfirmed(false);
@@ -329,6 +337,7 @@ export function DiagnoseAndMatchPane({
       setSuggestedText(null);
       return;
     }
+    if(!singleReview.canApply){setPolishError('请先完成当前候选真实 PDF 对照和批准。');return;}
     if (!polishRiskConfirmed) {
       setPolishError('请逐项核对新事实风险后再确认采纳。');
       return;
@@ -343,9 +352,10 @@ export function DiagnoseAndMatchPane({
       const revision=getCurrentRevision();
       const envelope=await buildTextPatchEnvelope({document,slug:activeSlug,baseRevision:revision,sourceRequestId:basis.requestId,candidates:[{blockKey:basis.blockKey,originalText:basis.text,suggestedText,reason:'单段精修（人工核对）',factIds:(currentSources[basis.blockKey]??[]).map(s=>s.id)}]});
       const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
+      if(!singleReview.matches(next))throw new Error('单段候选与已审核 PDF 不一致。');
       if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
       await apiClient.createSnapshot(activeSlug,'AI 单段润色前快照',revision);
-      if (!isCurrent(basis)||getCurrentRevision()!==revision) throw new Error('简历已变化，请重新生成润色建议。');
+      if (!isCurrent(basis)||getCurrentRevision()!==revision||!singleReview.matches(next)) throw new Error('简历或审批已变化，请重新生成润色建议。');
       onImmediateChange(next);
       setPolishError(null);
       setSuggestedText(null);
@@ -428,7 +438,7 @@ export function DiagnoseAndMatchPane({
 
   const handleApplyTailorProposals = async () => {
     const selected = tailorProposals.filter((p) => p.accepted);
-    if (selected.length === 0 || applyingRef.current) return;
+    if (selected.length === 0 || applyingRef.current || !wholeReview.canApply) return;
     const basis = tailorBasisRef.current;
     if (!basis || !isCurrent(basis) || !activeSlug) {
       setTailorError('简历版本或岗位要求已变化，请重新生成提案。');
@@ -453,9 +463,10 @@ export function DiagnoseAndMatchPane({
       const revision=getCurrentRevision();
       const envelope=await buildTextPatchEnvelope({document,slug:activeSlug,baseRevision:revision,sourceRequestId:basis.requestId,candidates:selected});
       const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
+      if(!wholeReview.matches(next))throw new Error('整卷候选与已审核 PDF 不一致。');
       if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
       await apiClient.createSnapshot(activeSlug,'AI 整卷定向改写前快照',revision);
-      if (!isCurrent(basis)||getCurrentRevision()!==revision) throw new Error('简历已变化，未应用修改。');
+      if (!isCurrent(basis)||getCurrentRevision()!==revision||!wholeReview.matches(next)) throw new Error('简历或审批已变化，未应用修改。');
       onImmediateChange(next);
       setTailorError(null);
       setTailorProposals([]);
@@ -1030,6 +1041,7 @@ export function DiagnoseAndMatchPane({
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
+                          disabled={applying}
                           onClick={() => {
                             if (window.confirm('机器未报出预警不代表事实属实。确认你已经人工核对这些提案？')) {
                               setTailorProposals(prev=>prev.map(p=>({...p,accepted:p.factWarnings.length===0})));
@@ -1041,6 +1053,7 @@ export function DiagnoseAndMatchPane({
                         </button>
                         <button
                           type="button"
+                          disabled={applying}
                           onClick={() =>
                             setTailorProposals((prev) => prev.map((p) => ({ ...p, accepted: false })))
                           }
@@ -1052,7 +1065,7 @@ export function DiagnoseAndMatchPane({
 
                       <button
                         type="button"
-                        disabled={applying || !tailorProposals.some((p) => p.accepted)}
+                        disabled={applying || !tailorProposals.some((p) => p.accepted) || !wholeReview.canApply}
                         onClick={() => void handleApplyTailorProposals()}
                         className="inline-flex items-center gap-1 rounded bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
                       >
@@ -1060,6 +1073,7 @@ export function DiagnoseAndMatchPane({
                       </button>
                     </div>
 
+                    <TextPdfReviewGate gate={wholeReview} disabled={applying||!wholeCandidates.length} label="试渲染整卷提案"/>
                     {tailorProposals.map((proposal) => {
                       const linesDiff = computeLineDiff(proposal.originalText, proposal.suggestedText);
                       const isEditing = tailorEditingKey === proposal.blockKey;
@@ -1261,7 +1275,7 @@ export function DiagnoseAndMatchPane({
                     </button>
                     <button
                       type="button"
-                      disabled={applying || !polishRiskConfirmed}
+                      disabled={applying || !polishRiskConfirmed || !singleReview.canApply}
                       onClick={() => void handleAdoptDiff()}
                       className="inline-flex items-center gap-1 rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-500"
                     >
@@ -1279,6 +1293,7 @@ export function DiagnoseAndMatchPane({
                     我已核对以上事实，确认属实
                   </label>
                 </div>
+                <TextPdfReviewGate gate={singleReview} disabled={applying||!polishRiskConfirmed} label="试渲染单段提案"/>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="rounded border border-slate-200 bg-white p-2">
                     <div className="mb-1 text-[10px] font-bold text-slate-500">当前原文</div>
