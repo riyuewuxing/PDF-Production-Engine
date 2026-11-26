@@ -30,6 +30,14 @@ jobs:
           $env:RESUME_STUDIO_CONTEXT_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-context-evidence'
           node validation-context-safety.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full public application source tree and zero-change delta
+        timeout-minutes: 3
+        env:
+          RESUME_STUDIO_CONTEXT_SOURCE_SHA: 8b89f90781d4e0abd156bc1056a2c2c391341857
+        run: |
+          $env:RESUME_STUDIO_CONTEXT_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-context-evidence'
+          node validation-context-scale.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload context evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
