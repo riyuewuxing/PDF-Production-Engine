@@ -1300,6 +1300,18 @@ async function run() {
     if(!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster)||providerCalls!==backupCalls)throw Error('backup modified master or contacted provider');
     await js('document.querySelector("[aria-label=\\"工作区备份结果\\"]")?.scrollIntoView({block:"center"})');await capture('83-workspace-restored-copy');
     checks.workspaceRestoreIndependent=true;
+    // Independent fresh Electron process: read restored data through the real renderer IPC.
+    await new Promise((resolve,reject)=>{
+      const proc=require('node:child_process').spawn(process.execPath,[path.join(__dirname,'validation-restored.cjs')],{cwd:__dirname,env:{...process.env,RESUME_STUDIO_DATA_DIR:restoreFolder},stdio:['ignore','pipe','pipe']});
+      let logs='',expired=false;
+      const collect=b=>{logs=(logs+b.toString()).slice(-8000);};proc.stdout.on('data',collect);proc.stderr.on('data',collect);
+      const watchdog=setTimeout(()=>{expired=true;proc.kill();},25000);
+      proc.once('error',e=>{clearTimeout(watchdog);reject(e);});
+      proc.once('close',code=>{clearTimeout(watchdog);if(expired||code!==0)reject(Error('restored workspace cold process failed: '+code+' '+logs));else resolve();});
+    });
+    const cold=JSON.parse(fs.readFileSync(path.join(out,'workspace-restored-cold.json'),'utf8'));
+    if(!cold.master||!cold.ledger||!cold.facts||!cold.evidence||cold.jobReviews<2||cold.pdfArchives<1)throw Error('restored workspace failed independent readback');
+    checks.workspaceRestoredColdProcess=true;
   }finally{dialog.showOpenDialog=originalBackupDialog;fs.rmSync(backupParent,{recursive:true,force:true});}
 
   // At the very end, mutate only the isolated synthetic disk to simulate another process.
