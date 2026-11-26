@@ -24,6 +24,10 @@ async function run(){
   const evidence=JSON.parse(fs.readFileSync(path.join(main.dataDir,'.evidence-index-v1.json'),'utf8'));
   const result={master:JSON.stringify(values[0])===JSON.stringify(master),ledger:JSON.stringify(values[1].jobReviews)===JSON.stringify(ledger.jobReviews)&&JSON.stringify(values[1].applications)===JSON.stringify(ledger.applications),facts:JSON.stringify(values[2])===JSON.stringify(facts),evidence:JSON.stringify(values[3])===JSON.stringify(evidence),jobReviews:ledger.jobReviews.length,pdfArchives:ledger.jobReviews.filter(x=>x.pdfOrigin).length};
   if(!result.master||!result.ledger||!result.facts||!result.evidence)throw Error('restored IPC values differ from persisted data: '+JSON.stringify(result));
+  await until('restored identity banner',()=>js('document.querySelector("[aria-label=\\"独立恢复工作区标识\\"]")?.innerText.includes("编辑仅写入此副本")'));
+  const context=await js('window.resumeDesktop.workspaceBackup.context()');
+  if(!context.restored||path.relative(root,context.folder)!=='')throw Error('restored identity mismatch');
+  result.restoredIdentity=true;
   await js('document.fonts.ready.then(()=>true)');await wait(250);
   const image=await win.webContents.capturePage();if(image.isEmpty())throw Error('empty restored screenshot');
   fs.writeFileSync(path.join(out,'84-workspace-restored-cold-editor.png'),image.toPNG());

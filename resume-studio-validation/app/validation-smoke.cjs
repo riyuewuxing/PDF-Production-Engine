@@ -1330,7 +1330,7 @@ async function run() {
       proc.once('close',code=>{clearTimeout(watchdog);if(expired||code!==0)reject(Error('restored workspace cold process failed: '+code+' '+logs));else resolve();});
     });
     const cold=JSON.parse(fs.readFileSync(path.join(out,'workspace-restored-cold.json'),'utf8'));
-    if(!cold.master||!cold.ledger||!cold.facts||!cold.evidence||cold.jobReviews<2||cold.pdfArchives<1)throw Error('restored workspace failed independent readback');
+    if(!cold.master||!cold.ledger||!cold.facts||!cold.evidence||cold.jobReviews<2||cold.pdfArchives<1||!cold.restoredIdentity)throw Error('restored workspace failed independent readback');
     checks.workspaceRestoredColdProcess=true;
     // Use the production desktop IPC and the real independent application entry, not the cold harness.
     const badLaunch=await js('window.resumeDesktop.workspaceBackup.launch("invalid","OPEN_INDEPENDENT_WORKSPACE").then(()=>false,()=>true)');
