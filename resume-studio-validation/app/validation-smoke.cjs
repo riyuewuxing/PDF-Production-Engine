@@ -64,6 +64,7 @@ async function run() {
   const deniedShell=await js('window.resumeDesktop.shell.openPath("C:\\\\Windows\\\\System32\\\\cmd.exe").then(()=>false,()=>true)');
   if(!deniedShell)throw Error('unsafe shell path accepted');
   checks.unsafeShellDenied=true;
+  await win.webContents.executeJavaScript("window.resumeDesktop.shell.saveTextFile({defaultFileName:'bad.exe',extension:'exe',content:'synthetic'}).then(()=>false,()=>true)").then(v=>{if(!v)throw new Error('unsafe text export accepted');checks.unsafeTextExportDenied=true;});
   const beforeUrl=win.webContents.getURL();
   await js('(()=>{const a=document.createElement("a");a.href="https://example.invalid/";document.body.append(a);a.click();return true})()');
   await sleep(250);

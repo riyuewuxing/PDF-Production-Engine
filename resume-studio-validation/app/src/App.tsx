@@ -358,6 +358,7 @@ export default function App() {
           <p className="mt-1 text-sm text-slate-400">{loadError ?? 'data/ 目录中暂无可用简历'}</p>
           <button
             type="button"
+            disabled={versionTransitioning}
             onClick={() => void refreshListAndLoad()}
             className="mt-4 rounded bg-teal-600 px-4 py-2 text-xs font-medium text-white hover:bg-teal-500"
           >

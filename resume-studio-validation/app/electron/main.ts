@@ -720,10 +720,12 @@ function registerIpcHandlers(): void {
     return shell.openPath(exportsDir);
   });
   trustedEditorHandle('shell:saveTextFile', async (_event, options: SaveTextFileOptions) => {
+    if(!options||typeof options.defaultFileName!=='string'||typeof options.content!=='string'||Buffer.byteLength(options.content,'utf8')>10*1024*1024)throw new Error('文本导出参数无效或超过 10 MiB 上限。');
     await fs.mkdir(exportsDir, { recursive: true });
     const extRaw = (options.extension || path.extname(options.defaultFileName).slice(1) || 'txt')
       .replace(/[^a-zA-Z0-9]/g, '')
       .toLowerCase();
+    if(!['json','csv','ics','txt','md','html'].includes(extRaw))throw new Error('不支持该文本导出文件类型。');
     const baseNameRaw = path.basename(options.defaultFileName, path.extname(options.defaultFileName));
     const safeName = `${sanitizeFilePart(baseNameRaw, 'export')}.${extRaw || 'txt'}`;
     let targetPath = path.join(exportsDir, safeName);
@@ -740,6 +742,7 @@ function registerIpcHandlers(): void {
     } else {
       targetPath = resolveUniqueExportPath(targetPath);
     }
+    if(path.extname(targetPath).toLowerCase()!=='.'+extRaw)throw new Error('另存文件扩展名与导出格式不一致。');
     const writtenPath = await writeFileSafely(targetPath, options.content);
     await rememberOutput(writtenPath);
     return {

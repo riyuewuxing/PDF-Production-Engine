@@ -39,6 +39,11 @@ async function handleJsonResponse<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Strip only Electron's known IPC wrapper, preserving the actual domain error. */
+export function localErrorMessage(error:unknown,fallback:string):string {
+  const message=error instanceof Error?error.message:fallback;
+  return message.replace(/^Error invoking remote method '[^']+':\s*(?:LocalFsApiError|Error):\s*/,'')||fallback;
+}
 export function isDesktopMode(): boolean {
   return typeof window !== 'undefined' && Boolean(window.resumeDesktop?.isDesktop);
 }
@@ -341,19 +346,19 @@ export const apiClient = {
 
   async openFile(filePath: string): Promise<void> {
     if (window.resumeDesktop) {
-      await window.resumeDesktop.shell.openPath(filePath);
+      try{await window.resumeDesktop.shell.openPath(filePath);}catch(err){window.alert(localErrorMessage(err,'无法打开导出文件'));}
     }
   },
 
   async showInFolder(filePath: string): Promise<void> {
     if (window.resumeDesktop) {
-      await window.resumeDesktop.shell.showItemInFolder(filePath);
+      try{await window.resumeDesktop.shell.showItemInFolder(filePath);}catch(err){window.alert(localErrorMessage(err,'无法定位导出文件'));}
     }
   },
 
   async openExportsDir(): Promise<void> {
     if (window.resumeDesktop) {
-      await window.resumeDesktop.shell.openExportsDir();
+      try{await window.resumeDesktop.shell.openExportsDir();}catch(err){window.alert(localErrorMessage(err,'无法打开导出目录'));}
     }
   },
 

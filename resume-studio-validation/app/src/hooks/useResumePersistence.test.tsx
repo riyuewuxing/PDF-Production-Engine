@@ -136,4 +136,14 @@ describe('resume persistence failure safety', () => {
     expect(result.current.summaries.map(x=>x.slug)).toContain('restored');
   });
 
+  it('adopts a restored same-slug document rather than assigning its revision to stale editor content',async()=>{
+    const {result}=renderHook(()=>useResumePersistence());
+    await waitFor(()=>expect(result.current.activeSlug).toBe('fixture'));
+    const restored={...fixture(),title:'Restored newer content',updatedAt:'2026-01-04T00:00:00Z'};
+    mocks.restoreTrash.mockResolvedValueOnce({slug:'fixture',document:restored});
+    await act(async()=>{await result.current.handleRestoreTrash('archive','revision',false);});
+    expect(result.current.activeDoc?.title).toBe('Restored newer content');
+    expect(result.current.getCurrentRevision()).toBe(JSON.stringify([restored.id,restored.updatedAt]));
+  });
+
 });

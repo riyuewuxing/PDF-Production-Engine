@@ -308,10 +308,15 @@ export function useResumePersistence(options?: {
     await withVersionTransition(async()=>{
       await flushPendingSave();
       const restored=await apiClient.restoreTrash(id,revision,asCopy);
-      registerVersion(restored.slug,restored.document);
-      if(!activeDocRef.current)adoptVersion(restored.slug,restored.document);
+      if(!activeDocRef.current||restored.slug===activeSlug){
+        if(pendingSaveRef.current||inFlightSaveRef.current){
+          setSaveState('error');setSaveError('归档已恢复，但当前内存仍有晚到编辑。请先另存草稿，勿覆盖恢复文件。');
+          throw new Error('恢复已落盘，未替换当前草稿。');
+        }
+        adoptVersion(restored.slug,restored.document);
+      }else registerVersion(restored.slug,restored.document);
     });
-  },[adoptVersion,flushPendingSave,registerVersion,withVersionTransition]);
+  },[activeSlug,adoptVersion,flushPendingSave,registerVersion,withVersionTransition]);
 
   const handleRestoreSnapshot=useCallback(async(snapshotId:string)=>{
     if(!activeSlug)throw new Error('未选择简历版本。');
