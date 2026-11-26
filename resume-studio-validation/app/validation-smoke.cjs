@@ -1251,6 +1251,23 @@ async function run() {
   if(providerCalls!==noticeCalls||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(reviewDoc))throw Error('Chinese notice import modified resume or contacted model');
   checks.jobPdfChineseNative=true;
 
+  // Previous evidence lifecycle test intentionally purged its attachment. Create a new active fixture using trusted IPC.
+  const backupFactDoc=await main.store.getResume('master'),backupFactBank=await js('window.resumeDesktop.facts.get()');
+  const backupFactInput={slug:'master',docRevision:JSON.stringify([backupFactDoc.id,backupFactDoc.updatedAt]),blockKey:'edu:'+backupFactDoc.education[0].id,bankRevision:backupFactBank.revision,fact:{kind:'credential',assertion:'合成工作区备份附件核对',value:'',unit:'',timeframe:'2025',evidenceRef:'SYNTHETIC_BACKUP_LOCAL_ONLY',sensitivity:'local-only'},confirmation:'CONFIRM_SELF_REPORTED_FACT'};
+  const backupBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(backupFactInput)+')');
+  const backupFact=backupBank.records.find(r=>r.assertion===backupFactInput.fact.assertion);
+  const backupIndex=await js('window.resumeDesktop.evidence.get()');
+  const backupAttachmentPath=path.join(root,'synthetic-backup-attachment.txt'),backupAttachmentBytes=Buffer.from('SYNTHETIC_BACKUP_ATTACHMENT_BYTES\n合成备份附件','utf8');
+  fs.writeFileSync(backupAttachmentPath,backupAttachmentBytes);
+  const backupAttachmentPicker=dialog.showOpenDialog;
+  let backupAttached;
+  try{
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupAttachmentPath]});
+    const request={slug:'master',docRevision:backupFactInput.docRevision,factId:backupFact.id,bankRevision:backupBank.revision,indexRevision:backupIndex.revision,note:'合成备份验收',confirmation:'CONFIRM_LOCAL_EVIDENCE_COPY'};
+    await js('window.resumeDesktop.evidence.attach('+JSON.stringify(request)+')');
+    backupAttached=(await js('window.resumeDesktop.evidence.get()')).entries.find(e=>e.factId===backupFact.id&&e.status==='attached');
+  }finally{dialog.showOpenDialog=backupAttachmentPicker;}
+  if(!backupAttached||!fs.readFileSync(path.join(main.dataDir,'.evidence-files-v1',backupAttached.id+'.txt')).equals(backupAttachmentBytes))throw Error('active backup attachment fixture unavailable');
   // Backup all persisted managed data from the real workspace, never secrets or exports.
   await click('版本母库');
   await until('backup pane mounted',()=>bodyHas('工作区备份与安全恢复'));
@@ -1270,7 +1287,10 @@ async function run() {
     await until('backup created',()=>bodyHas('已创建并校验工作区备份。'));
     backupFolder=path.join(backupParent,fs.readdirSync(backupParent).find(n=>n.startsWith('resume-studio-backup-v1-')));
     const manifest=JSON.parse(fs.readFileSync(path.join(backupFolder,'workspace-backup-v1.json'),'utf8'));
-    if(!manifest.files.some(f=>f.path==='master.json')||!manifest.files.some(f=>f.path==='applications.json')||!manifest.files.some(f=>f.path==='.fact-bank-v1.json')||!manifest.files.some(f=>f.path==='.evidence-index-v1.json')||!manifest.files.some(f=>f.path.startsWith('.application-snapshots/'))||!manifest.files.some(f=>f.path.startsWith('.evidence-files-v1/')))throw Error('backup omitted managed data');
+    const requiredPaths=['master.json','applications.json','.fact-bank-v1.json','.evidence-index-v1.json','.evidence-files-v1/'+backupAttached.id+'.txt'];
+    const omitted=requiredPaths.filter(p=>!manifest.files.some(f=>f.path===p));
+    if(omitted.length||!manifest.files.some(f=>f.path.startsWith('.application-snapshots/')))throw Error('backup omitted managed data: '+JSON.stringify({omitted,files:manifest.files.map(f=>f.path)}));
+    if(!fs.readFileSync(path.join(backupFolder,'data','.evidence-files-v1',backupAttached.id+'.txt')).equals(backupAttachmentBytes))throw Error('active attachment bytes not preserved');
     if(manifest.files.some(f=>f.path.includes('ai-settings')||f.path.includes('resume-write-lock'))||fs.existsSync(path.join(backupFolder,'data','.ai-settings.json')))throw Error('backup copied secret or lock');
     for(const row of manifest.files){const b=fs.readFileSync(path.join(backupFolder,'data',...row.path.split('/')));if(b.length!==row.size||require('node:crypto').createHash('sha256').update(b).digest('hex')!==row.sha256)throw Error('backup bytes invalid');}
     if(!fs.readFileSync(path.join(backupFolder,'data','master.json')).equals(currentMaster))throw Error('backup master differs');
