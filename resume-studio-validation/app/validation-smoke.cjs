@@ -733,6 +733,35 @@ async function run() {
   await until('career proposal adopted',()=>js('[...document.querySelectorAll("textarea")].some(e=>e.value.includes("感谢审阅。")&&e.value.includes("演示候选人"))'));
   checks.careerSharedGateway=true;checks.careerLocalIdentityRestored=true;
   await capture('23-career-ai-applied');
+  const careerBefore=await main.store.getResume('master'),careerFactCalls=providerCalls;
+  let careerBank=await js('window.resumeDesktop.facts.get()');
+  const careerFactInput={slug:'master',docRevision:JSON.stringify([careerBefore.id,careerBefore.updatedAt]),blockKey:'edu:'+careerBefore.education[0].id,bankRevision:careerBank.revision,fact:{kind:'achievement',assertion:'核对 18 份合成面试资料',value:'18',unit:'份',timeframe:'2025',evidenceRef:'CAREER_LOCAL_ONLY_REF',sensitivity:'shareable'},confirmation:'CONFIRM_SELF_REPORTED_FACT'};
+  careerBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(careerFactInput)+')');
+  const careerRecord=careerBank.records.find(r=>r.assertion===careerFactInput.fact.assertion);
+  await js('(()=>{const s=[...document.querySelectorAll("summary")].find(e=>e.innerText.includes("本地事实资料库 · 文案选择"));if(s&&!s.parentElement.open)s.click();return !!s})()');
+  await click('加载 / 刷新文案事实');
+  await until('career fact loaded',()=>js('[...document.querySelectorAll("input")].some(e=>e.getAttribute("aria-label")==="文案选择事实 核对 18 份合成面试资料"&&!e.disabled)'));
+  await click('预览文案精修请求');await until('career default private preview',()=>bodyHas('文案发送前确认'));
+  const getCareerPreview=()=>js('Array.from(document.querySelectorAll("section[aria-label=\\"文案 AI 数据发送预览\\"] pre")).map((e,i)=>({role:i===0?"system":"user",content:e.textContent}))');
+  if(JSON.stringify(await getCareerPreview()).includes(careerFactInput.fact.assertion))throw Error('career default leaked record');
+  await click('取消文案发送');
+  if(!await checkLabel(careerFactInput.fact.assertion))throw Error('career fact selection missing');
+  await click('预览文案精修请求');await until('career scoped preview',()=>bodyHas('本次外发 1 条本人确认事实'));
+  const careerScoped=await getCareerPreview(),cp=JSON.stringify(careerScoped);
+  if(!cp.includes(careerFactInput.fact.assertion)||!cp.includes('record-1')||cp.includes(careerFactInput.fact.evidenceRef)||cp.includes(careerRecord.id)||cp.includes(careerRecord.docId))throw Error('career selected fact privacy mismatch');
+  await js('(()=>{document.querySelector("section[aria-label=\\"文案 AI 数据发送预览\\"]")?.scrollIntoView({block:"start"});return true})()');
+  await capture('45-career-fact-preview');
+  await click('确认发送文案给模型');await until('career scoped proposal',()=>bodyHas('候选文案（本地还原）'));
+  if(providerCalls!==careerFactCalls+1||JSON.stringify(lastAiRequest.body.messages)!==cp||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('career fact preview differs from request');
+  if(!await checkLabel('我已核对候选文案'))throw Error('career fact approval missing');
+  const oldDrafts=await js('[...document.querySelectorAll("textarea")].map(e=>e.value)');
+  await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:careerRecord.id,bankRevision:careerBank.revision,confirmation:'REVOKE_FACT'})+')');
+  await click('采纳文案草稿');await until('career stale approval blocked',()=>bodyHas('本地事实库已变化'));
+  if(JSON.stringify(await js('[...document.querySelectorAll("textarea")].map(e=>e.value)'))!==JSON.stringify(oldDrafts)||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(careerBefore)||providerCalls!==careerFactCalls+1)throw Error('stale career approval modified a draft or resume');
+  checks.careerFactScope=true;checks.careerFactRevokedApproval=true;
+  await js('(()=>{const e=[...document.querySelectorAll("[role=alert]")].find(e=>e.innerText.includes("本地事实库已变化"));e?.scrollIntoView({block:"center"});return !!e})()');
+  await capture('46-career-fact-revoked');
+
   // At the very end, mutate only the isolated synthetic disk to simulate another process.
   await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');await click('分步工作');
   await setValue('textarea[aria-label="AI 自由任务目标"]','测试磁盘版本变化');
