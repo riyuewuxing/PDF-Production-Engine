@@ -2,13 +2,14 @@ import {promises as fs,constants} from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {TextDecoder} from 'node:util';
-import {AttachEvidenceSchema,DetachEvidenceSchema,EvidenceIndexSchema,EvidenceReadSchema,PurgeEvidenceSchema,MAX_EVIDENCE_FILE_BYTES,MAX_EVIDENCE_RECORDS,MAX_EVIDENCE_VAULT_BYTES,type EvidenceEntry,type EvidenceIndex,type EvidenceIntegrity,type EvidenceKind} from '../schema/evidenceSchema';
+import {AttachEvidenceSchema,DetachEvidenceSchema,EvidenceIndexSchema,EvidenceReadSchema,PurgeEvidenceSchema,MAX_EVIDENCE_FILE_BYTES,MAX_EVIDENCE_RECORDS,MAX_EVIDENCE_VAULT_BYTES,type EvidenceEntry,type EvidenceIndex,type EvidenceIntegrity,type EvidenceKind,type EvidenceVaultAudit} from '../schema/evidenceSchema';
 import {resumeRevision} from '../schema/resumeSchema';
 import {factEntityId} from '../lib/aiContext';
 import {FactBankStore} from './factBankStore';
 import {LocalFsApiError,withResumeWriteLock,type LocalResumeStore} from './localFsApi';
 
 const MAX_INDEX_BYTES=1024*1024;
+const MAX_SCAN_ENTRIES=1000;
 const hash=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 const fail=(code:string,message:string)=>new LocalFsApiError(422,code,message);
 const missing=(e:unknown)=>(e as NodeJS.ErrnoException).code==='ENOENT';
@@ -73,6 +74,39 @@ export class EvidenceStore{
     return index;
   }
   private fileFor(entry:EvidenceEntry){return path.join(this.vault,entry.id+'.'+entry.kind);}
+  private async scanVault(){
+    const files=new Map<string,{regular:boolean;size:number}>();
+    let totalBytes=0,unsafeEntries=0;
+    try{await this.assertVault();}
+    catch(e){if(missing(e))return {exists:false,files,totalBytes,unsafeEntries};throw e;}
+    const dir=await fs.opendir(this.vault);
+    for await(const item of dir){
+      if(files.size>=MAX_SCAN_ENTRIES)throw fail('EVIDENCE_LIMIT','证据目录项目过多，请在本地检查，未执行自动清理。');
+      const info=await fs.lstat(path.join(this.vault,item.name));
+      const regular=info.isFile()&&!info.isSymbolicLink();
+      files.set(item.name,{regular,size:regular?info.size:0});
+      if(regular)totalBytes+=info.size;else unsafeEntries++;
+    }
+    return {exists:true,files,totalBytes,unsafeEntries};
+  }
+  async audit():Promise<EvidenceVaultAudit>{
+    return withResumeWriteLock(this.resumes.dataDir,async()=>{
+      const index=await this.get(),scan=await this.scanVault();
+      const known=new Set(index.entries.map(e=>path.basename(this.fileFor(e))));
+      let missingCopies=0,sizeMismatches=0,purgedResiduals=0;
+      for(const e of index.entries){
+        const found=scan.files.get(path.basename(this.fileFor(e)));
+        if(e.status==='purged'){if(found)purgedResiduals++;continue;}
+        if(!found)missingCopies++;
+        else if(found.regular&&found.size!==e.size)sizeMismatches++;
+      }
+      return {checkedAt:new Date().toISOString(),exists:scan.exists,totalBytes:scan.totalBytes,
+        regularFiles:[...scan.files.values()].filter(e=>e.regular).length,missingCopies,sizeMismatches,
+        unsafeEntries:scan.unsafeEntries,unindexedFiles:[...scan.files.entries()].filter(([name,e])=>e.regular&&!known.has(name)).length,purgedResiduals};
+    });
+  }
+  /** Explicitly open the validated managed directory; no renderer-provided path. */
+  async vaultPath():Promise<string>{await this.assertVault();return this.vault;}
   private async basis(raw:unknown){
     const input=AttachEvidenceSchema.parse(raw),index=await this.get();this.check(index,input.indexRevision);
     const bank=await this.facts.get(),doc=await this.resumes.getResume(input.slug);
@@ -94,13 +128,9 @@ export class EvidenceStore{
       const {input,index,fact}=await this.basis(raw);
       if(index.entries.some(e=>e.factId===fact.id&&e.sha256===sha256&&e.status==='attached'))throw fail('EVIDENCE_DUPLICATE','该事实已关联相同内容的附件。');
       await this.assertVault(true);
-      let used=0;
-      for(const name of await fs.readdir(this.vault)){
-        const info=await fs.lstat(path.join(this.vault,name));
-        if(!info.isFile()||info.isSymbolicLink())throw fail('EVIDENCE_VAULT','证据目录含异常项目，请在本地检查。');
-        used+=info.size;
-        if(used+bytes.length>MAX_EVIDENCE_VAULT_BYTES)throw fail('EVIDENCE_LIMIT','证据目录达到 200 MB 上限。');
-      }
+      const scan=await this.scanVault();
+      if(scan.unsafeEntries)throw fail('EVIDENCE_VAULT','证据目录含异常项目，请在本地检查。');
+      if(scan.totalBytes+bytes.length>MAX_EVIDENCE_VAULT_BYTES)throw fail('EVIDENCE_LIMIT','证据目录达到 200 MB 上限。');
       const now=new Date().toISOString(),entry:EvidenceEntry={id:randomUUID(),factId:fact.id,docId:fact.docId,originalName:name,kind,size:bytes.length,sha256,note:input.note,createdAt:now,changedAt:now,status:'attached'};
       const dest=this.fileFor(entry);
       const handle=await fs.open(dest,'wx',0o600);

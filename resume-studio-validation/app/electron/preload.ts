@@ -61,7 +61,7 @@ const bridge: ResumeDesktopBridge = {
     notifyReady: (jobId: string) => ipcRenderer.invoke('pdf:notifyReady', jobId),
   },
   facts: {get:()=>ipcRenderer.invoke('facts:get'),add:input=>ipcRenderer.invoke('facts:add',input),link:input=>ipcRenderer.invoke('facts:link',input),revoke:input=>ipcRenderer.invoke('facts:revoke',input)},
-  evidence:{get:()=>ipcRenderer.invoke('evidence:get'),attach:input=>ipcRenderer.invoke('evidence:attach',input),verify:input=>ipcRenderer.invoke('evidence:verify',input),detach:input=>ipcRenderer.invoke('evidence:detach',input),purge:input=>ipcRenderer.invoke('evidence:purge',input),reveal:input=>ipcRenderer.invoke('evidence:reveal',input)},
+  evidence:{get:()=>ipcRenderer.invoke('evidence:get'),audit:()=>ipcRenderer.invoke('evidence:audit'),openVault:()=>ipcRenderer.invoke('evidence:openVault'),attach:input=>ipcRenderer.invoke('evidence:attach',input),verify:input=>ipcRenderer.invoke('evidence:verify',input),detach:input=>ipcRenderer.invoke('evidence:detach',input),purge:input=>ipcRenderer.invoke('evidence:purge',input),reveal:input=>ipcRenderer.invoke('evidence:reveal',input)},
   ai: {
     getSettings: () => ipcRenderer.invoke('ai:getSettings'),
     listProfiles:()=>ipcRenderer.invoke('ai:listProfiles'),

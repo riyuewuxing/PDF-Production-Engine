@@ -474,6 +474,11 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('facts:link',(_event,input:unknown)=>facts.link(input));
   trustedEditorHandle('facts:revoke',(_event,input:unknown)=>facts.revoke(input));
   trustedEditorHandle('evidence:get',()=>evidence.get());
+  trustedEditorHandle('evidence:audit',()=>evidence.audit());
+  trustedEditorHandle('evidence:openVault',async(event)=>{
+    const dir=await evidence.vaultPath();assertTrustedEditor(event);
+    const error=await shell.openPath(dir);if(error)throw new Error('无法打开本地证据目录。');
+  });
   trustedEditorHandle('evidence:attach',async(event,raw:unknown)=>{
     if(evidencePickerBusy||!mainWindow||mainWindow.isDestroyed())throw new Error('证据附件选择窗口不可用或正在使用。');
     const input=AttachEvidenceSchema.parse(raw);

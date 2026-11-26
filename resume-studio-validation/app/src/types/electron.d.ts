@@ -1,5 +1,5 @@
 import type {FactBank,AddFactInput,RevokeFactInput,LinkFactInput} from '../schema/factBankSchema';
-import type {EvidenceIndex,AttachEvidenceInput,EvidenceReadInput,DetachEvidenceInput,PurgeEvidenceInput,EvidenceIntegrity} from '../schema/evidenceSchema';
+import type {EvidenceIndex,AttachEvidenceInput,EvidenceReadInput,DetachEvidenceInput,PurgeEvidenceInput,EvidenceIntegrity,EvidenceVaultAudit} from '../schema/evidenceSchema';
 import type { ByokAiSettings, ByokCompletionRequest, AiProfileCatalog } from '../lib/byokAiClient';
 import type {
   ApplicationSnapshotMeta,
@@ -111,6 +111,8 @@ export interface ResumeDesktopBridge {
   facts?: {get:()=>Promise<FactBank>;add:(input:AddFactInput)=>Promise<FactBank>;link:(input:LinkFactInput)=>Promise<FactBank>;revoke:(input:RevokeFactInput)=>Promise<FactBank>};
   evidence?:{
     get:()=>Promise<EvidenceIndex>;
+    audit:()=>Promise<EvidenceVaultAudit>;
+    openVault:()=>Promise<void>;
     attach:(input:AttachEvidenceInput)=>Promise<{canceled:true}|{canceled:false;index:EvidenceIndex}>;
     verify:(input:EvidenceReadInput)=>Promise<EvidenceIntegrity>;
     detach:(input:DetachEvidenceInput)=>Promise<EvidenceIndex>;

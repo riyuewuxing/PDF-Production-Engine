@@ -839,6 +839,20 @@ async function run() {
   const managedEvidence=path.join(main.dataDir,'.evidence-files-v1',attachedEvidence.id+'.txt');
   if(pickerCalls!==2||attachedIndex.entries.length!==1||attachedEvidence.factId!==linkRoot.id||attachedEvidence.note!==evidenceNote||!fs.readFileSync(managedEvidence).equals(evidenceBytes)||!fs.readFileSync(evidenceSource).equals(evidenceBytes)||JSON.stringify(attachedIndex).includes(evidenceSource)||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(linkBase)||JSON.stringify(await js('window.resumeDesktop.facts.get()'))!==JSON.stringify(linkBank))throw Error('evidence copy persistence or isolation failed');
   await click('校验副本 SHA-256');await until('evidence intact',()=>bodyHas('字节校验一致'));
+  await click('核对本地附件目录');await until('clean evidence directory',()=>bodyHas('普通文件 1 个')&&bodyHas('未索引文件 0'));
+  const vault=path.dirname(managedEvidence),orphan=path.join(vault,'synthetic-orphan.txt');
+  fs.writeFileSync(orphan,'SYNTHETIC_ORPHAN_ONLY');
+  await click('核对本地附件目录');await until('orphan detected',()=>bodyHas('未索引文件 1')&&bodyHas('系统未自动更改任何附件'));
+  if(fs.readFileSync(orphan,'utf8')!=='SYNTHETIC_ORPHAN_ONLY')throw Error('directory audit modified orphan');
+  await scrollEvidence();await capture('58-evidence-vault-audit');
+  const originalOpenPath=require('electron').shell.openPath;let openedVault='';
+  try{
+    require('electron').shell.openPath=async p=>{openedVault=p;return '';};
+    await click('打开本地证据目录');await until('vault directory opened',()=>openedVault===vault);
+  }finally{require('electron').shell.openPath=originalOpenPath;}
+  fs.unlinkSync(orphan);
+  await click('核对本地附件目录');await until('directory audit clean after explicit test cleanup',()=>bodyHas('未索引文件 0'));
+  checks.evidenceVaultAuditNoMutation=true;checks.evidenceVaultOpenScoped=true;
   await scrollEvidence();await capture('54-evidence-intact');
   fs.writeFileSync(managedEvidence,Buffer.alloc(evidenceBytes.length,65));
   await click('校验副本 SHA-256');await until('evidence changed',()=>bodyHas('本地副本已变化'));

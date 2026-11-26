@@ -1,5 +1,5 @@
 {
-  "sourceSha": "5c0e40c4e29e69a185b1c446f104815223571ca3",
+  "sourceSha": "6eff113a503d75611e9b387dc2dbbb4de1e9ee1a",
   "scope": "Audited runtime/build dependency closure and targeted synthetic regression suite; actual Electron runtime with synthetic fixtures and local mock providers; no private history or data",
   "publicOverlays": [
     "src/lib/sampleResumeData.ts entirely synthetic",
@@ -10,5 +10,5 @@
     "omitted binary icons and all pre-existing personal-data-dependent tests"
   ],
   "fixture": "synthetic, no actual personal data",
-  "sourceValidation": "fixed-SHA runtime and synthetic regression code; private-only .gitignore and context-packing privacy exclusion remain private; public runner does not contain fact records from a user."
+  "sourceValidation": "fixed-SHA runtime and synthetic regression code; private-only .gitignore and context-packing privacy exclusion remain private; public runner does not contain fact records from a user. Private-only gitignore/context pack integration is statically inspected; only synthetic path exclusion helper/test mirrored."
 }

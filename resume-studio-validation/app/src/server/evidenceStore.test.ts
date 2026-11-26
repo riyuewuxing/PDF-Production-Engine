@@ -122,6 +122,33 @@ describe('isolated evidence vault',()=>{
     await expect(evidence.attachSelectedFile({...input,indexRevision:index.revision},other)).rejects.toThrow('损坏');
     expect(await fs.readFile(indexFile,'utf8')).toBe('{corrupt');
   });
+  it('reports an empty vault and reconciles missing, unexpected, residual and orphan copies without modifying them',async()=>{
+    const empty=await evidence.audit();
+    expect(empty).toMatchObject({exists:false,totalBytes:0,regularFiles:0,missingCopies:0,sizeMismatches:0,unsafeEntries:0,unindexedFiles:0,purgedResiduals:0});
+    await expect(evidence.vaultPath()).rejects.toThrow();
+    const first=await evidence.attachSelectedFile(input,source);
+    const secondFile=path.join(root,'second.txt');await fs.writeFile(secondFile,'SYNTHETIC_SECOND_CONTENT');
+    const second=await evidence.attachSelectedFile({...input,indexRevision:first.revision},secondFile);
+    const [a,b]=second.entries;
+    const vault=path.dirname(file(a!));
+    expect(await evidence.vaultPath()).toBe(vault);
+    expect(await evidence.audit()).toMatchObject({exists:true,regularFiles:2,missingCopies:0,unindexedFiles:0,sizeMismatches:0});
+    await fs.unlink(file(a!));
+    await fs.appendFile(file(b!),'modified');
+    const orphan=path.join(vault,'unindexed-synthetic.txt');await fs.writeFile(orphan,'SYNTHETIC_ORPHAN');
+    const abnormal=path.join(vault,'unexpected-directory');await fs.mkdir(abnormal);
+    const changed=await evidence.audit();
+    expect(changed).toMatchObject({regularFiles:2,missingCopies:1,sizeMismatches:1,unsafeEntries:1,unindexedFiles:1,purgedResiduals:0});
+    expect(JSON.stringify(changed)).not.toContain(orphan);
+    expect(await evidence.get()).toEqual(second);
+    expect(await fs.readFile(orphan,'utf8')).toBe('SYNTHETIC_ORPHAN');
+    const detached=await evidence.detach({id:a!.id,indexRevision:second.revision,confirmation:'DETACH_LOCAL_EVIDENCE'});
+    const purged=await evidence.purge({id:a!.id,indexRevision:detached.revision,confirmation:'DELETE_MANAGED_EVIDENCE_COPY'});
+    await fs.writeFile(file(a!),'SYNTHETIC_RESIDUAL');
+    expect(await evidence.audit()).toMatchObject({missingCopies:0,sizeMismatches:1,unsafeEntries:1,unindexedFiles:1,purgedResiduals:1});
+    expect(await fs.readFile(file(a!),'utf8')).toBe('SYNTHETIC_RESIDUAL');
+    expect(await evidence.get()).toEqual(purged);
+  });
   it('refuses unsafe managed directory and nonregular managed file',async()=>{
     const index=await evidence.attachSelectedFile(input,source),entry=index.entries[0]!,read={id:entry.id,indexRevision:index.revision};
     await fs.unlink(file(entry));await fs.mkdir(file(entry));

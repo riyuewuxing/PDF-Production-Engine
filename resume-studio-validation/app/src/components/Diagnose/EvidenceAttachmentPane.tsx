@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import type {FactRecord} from '../../schema/factBankSchema';
-import type {EvidenceEntry,EvidenceIndex,EvidenceIntegrity} from '../../schema/evidenceSchema';
+import type {EvidenceEntry,EvidenceIndex,EvidenceIntegrity,EvidenceVaultAudit} from '../../schema/evidenceSchema';
 import {MAX_EVIDENCE_FILE_BYTES,MAX_EVIDENCE_RECORDS,MAX_EVIDENCE_VAULT_BYTES} from '../../schema/evidenceSchema';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import {factEntityId} from '../../lib/aiContext';
@@ -12,6 +12,7 @@ const sizeLabel=(n:number)=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n
 
 export function EvidenceAttachmentPane(props:Props){
   const [index,setIndex]=useState<EvidenceIndex|null>(null);
+  const [audit,setAudit]=useState<EvidenceVaultAudit|null>(null);
   const [integrity,setIntegrity]=useState<Record<string,EvidenceIntegrity>>({});
   const [note,setNote]=useState('');
   const [consent,setConsent]=useState(false);
@@ -29,7 +30,7 @@ export function EvidenceAttachmentPane(props:Props){
   const rows=(index?.entries.filter(e=>e.factId===rootId)??[]).slice().reverse();
   const search=query.trim().toLocaleLowerCase();
   const shown=rows.filter(e=>!search||[e.originalName,e.note,e.kind,e.sha256].join(' ').toLocaleLowerCase().includes(search));
-  const update=(value:EvidenceIndex)=>{setIndex(value);setIntegrity({});};
+  const update=(value:EvidenceIndex)=>{setIndex(value);setIntegrity({});setAudit(null);};
   const task=async(work:()=>Promise<void>)=>{
     if(!bridge||busyRef.current||props.locked)return;
     busyRef.current=true;setBusy(true);props.onBusy(true);setError('');setNotice('');
@@ -71,6 +72,18 @@ export function EvidenceAttachmentPane(props:Props){
     <p>附件、文件名、说明和 SHA-256 仅存本地，不进入 AI 请求或简历导出。字节一致仅表示与导入副本相符，不代表内容真实或已独立鉴证。附件管理不改变既有事实外发授权。</p>
     {!bridge&&<p>当前仅桌面版支持本地附件管理。</p>}
     <button type="button" disabled={locked||!bridge} onClick={refresh} className="rounded border bg-white px-2 py-1">加载 / 刷新附件索引</button>
+    <div className="flex flex-wrap gap-1">
+      <button type="button" disabled={locked||!bridge} onClick={()=>void task(async()=>{const value=await bridge!.audit();if(mounted.current)setAudit(value);})} className="rounded border bg-white px-2 py-1">核对本地附件目录</button>
+      <button type="button" disabled={locked||!bridge||!audit?.exists} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1">打开本地证据目录</button>
+    </div>
+    {audit&&<div aria-label="本地附件目录核对结果" className="rounded border border-indigo-200 bg-white p-2 space-y-1">
+      <div className="font-semibold">目录核对（全库，非全文哈希）</div>
+      <div>普通文件 {audit.regularFiles} 个 · {sizeLabel(audit.totalBytes)} / {MAX_EVIDENCE_VAULT_BYTES/1048576} MB</div>
+      <div>缺失副本 {audit.missingCopies} · 大小变化 {audit.sizeMismatches} · 未索引文件 {audit.unindexedFiles}</div>
+      <div>异常项目 {audit.unsafeEntries} · 已删除记录残留 {audit.purgedResiduals}</div>
+      <div className="text-slate-600">检查时间：{audit.checkedAt.replace('T',' ').slice(0,19)} UTC。仅报告，不自动删除或修复；同大小内容变化需逐个 SHA-256 校验。</div>
+      {(audit.missingCopies+audit.sizeMismatches+audit.unindexedFiles+audit.unsafeEntries+audit.purgedResiduals)>0&&<p className="text-amber-800">发现目录差异，请先核对并备份；系统未自动更改任何附件。</p>}
+    </div>}
     {busy&&<p role="status">正在处理本地附件…</p>}
     {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</div>}
     {notice&&<div role="status" className="text-teal-800">{notice}</div>}
