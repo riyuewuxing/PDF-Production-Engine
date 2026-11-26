@@ -65,6 +65,30 @@ describe('resume persistence failure safety', () => {
     expect(mocks.saveResume).toHaveBeenLastCalledWith('fixture', { ...base, updatedAt: revision1 });
   });
 
+  it('retains pending edits if an explicitly requested disk reload fails', async () => {
+    const { result } = renderHook(() => useResumePersistence());
+    await waitFor(() => expect(result.current.activeSlug).toBe('fixture'));
+    const next={...result.current.activeDoc!,title:'unsaved edit'};
+    act(()=>result.current.scheduleAutoSave(next));
+    mocks.getResume.mockRejectedValueOnce(new Error('disk read failed'));
+    await act(async()=>{await expect(result.current.reloadActiveFromDisk()).rejects.toThrow('disk read failed');});
+    expect(result.current.saveState).toBe('error');
+    await act(async()=>{await result.current.flushPendingSave();});
+    expect(mocks.saveResume).toHaveBeenLastCalledWith('fixture',next);
+  });
+
+  it('discards pending edits only after a successful explicitly requested reload', async () => {
+    const { result } = renderHook(() => useResumePersistence());
+    await waitFor(() => expect(result.current.activeSlug).toBe('fixture'));
+    act(()=>result.current.scheduleAutoSave({...result.current.activeDoc!,title:'discard me'}));
+    const latest={...fixture(),title:'External update',updatedAt:'2026-01-03T00:00:00Z'};
+    mocks.getResume.mockResolvedValueOnce(latest);
+    await act(async()=>{await result.current.reloadActiveFromDisk();});
+    expect(result.current.activeDoc?.title).toBe('External update');
+    await act(async()=>{await result.current.flushPendingSave();});
+    expect(mocks.saveResume).not.toHaveBeenCalled();
+  });
+
   it('reports failed close flush and retries the retained batch on the next request', async () => {
     const { result } = renderHook(() => useResumePersistence());
     await waitFor(() => expect(result.current.activeSlug).toBe('fixture'));

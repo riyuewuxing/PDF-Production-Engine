@@ -96,7 +96,7 @@ export function VersionAndMasterPane({
     setError(null);
     try {
       await onFlushBeforeMutation();
-      await apiClient.createSnapshot(activeSlug, '手动创建快照');
+      await apiClient.createSnapshot(activeSlug, '手动创建快照', getCurrentRevision());
       await refreshSnapshots();
       setSnapshotStatus('已创建本地时间机器快照');
       setTimeout(() => setSnapshotStatus(null), 2600);

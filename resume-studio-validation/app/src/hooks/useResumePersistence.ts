@@ -23,6 +23,8 @@ export function useResumePersistence(options?: {
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveSeqRef = useRef(0);
+  const switchGenerationRef = useRef(0);
+  const versionTransitionRef = useRef(false);
   const revisionsRef = useRef(new Map<string, Pick<ResumeDocument, 'id' | 'updatedAt'>>());
   const activeDocRef = useRef<ResumeDocument | null>(null);
   activeDocRef.current = activeDoc;
@@ -183,9 +185,13 @@ export function useResumePersistence(options?: {
 
   const handleSwitchVersion = useCallback(
     async (targetSlug: string) => {
-      if (!targetSlug || targetSlug === activeSlug) return;
+      if (!targetSlug || targetSlug === activeSlug || versionTransitionRef.current) return;
+      const generation = ++switchGenerationRef.current;
       await flushPendingSave();
       const rawDoc = await apiClient.getResume(targetSlug);
+      // A new edit can arrive while reading another version. Persist it before switching.
+      await flushPendingSave();
+      if (generation !== switchGenerationRef.current || versionTransitionRef.current) return;
       const doc = cleanResumeRichText(rawDoc);
       revisionsRef.current.set(targetSlug, { id: rawDoc.id, updatedAt: rawDoc.updatedAt });
       setActiveSlug(targetSlug);
@@ -193,10 +199,43 @@ export function useResumePersistence(options?: {
       resetHistory(doc);
       pendingSaveRef.current = null;
       setSaveState('saved');
+      setSaveError(null);
       onVersionChangedRef.current?.();
     },
     [activeSlug, flushPendingSave, resetHistory],
   );
+
+  const reloadActiveFromDisk = useCallback(async () => {
+    if (!activeSlug || versionTransitionRef.current) return;
+    versionTransitionRef.current = true;
+    ++switchGenerationRef.current;
+    const original = activeDocRef.current;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    setLoading(true);
+    try {
+      if (inFlightSaveRef.current) await inFlightSaveRef.current.catch(() => {});
+      const raw = await apiClient.getResume(activeSlug);
+      if (activeDocRef.current !== original) throw new Error('重载期间出现新的编辑，已保留草稿。');
+      const doc = cleanResumeRichText(raw);
+      revisionsRef.current.set(activeSlug,{id:raw.id,updatedAt:raw.updatedAt});
+      setSummaries(prev=>prev.map(item=>item.slug===activeSlug?{...item,id:raw.id,title:raw.title,templateId:raw.templateId,updatedAt:raw.updatedAt}:item));
+      if(activeSlug==='master')setMasterSummary(prev=>prev?{...prev,id:raw.id,title:raw.title,templateId:raw.templateId,updatedAt:raw.updatedAt}:prev);
+      // Caller has explicitly confirmed discard. Only discard after successful read.
+      pendingSaveRef.current=null;
+      activeDocRef.current=doc;
+      resetHistory(doc);
+      setSaveState('saved');
+      setSaveError(null);
+      onVersionChangedRef.current?.();
+    } catch(err) {
+      setSaveState('error');
+      setSaveError(err instanceof Error?err.message:'重载磁盘版本失败，草稿仍保留。');
+      throw err;
+    } finally {
+      versionTransitionRef.current=false;
+      setLoading(false);
+    }
+  },[activeSlug,resetHistory]);
 
   const handleCreateVersion = useCallback(
     async (title: string, sourceSlug?: string) => {
@@ -287,6 +326,7 @@ export function useResumePersistence(options?: {
     handleImportJson,
     markSavedFromSnapshot,
     getCurrentRevision,
+    reloadActiveFromDisk,
     ensureCurrentQueued,
   };
 }

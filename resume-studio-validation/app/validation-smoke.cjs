@@ -139,6 +139,37 @@ async function run() {
   fs.writeFileSync(path.join(out,'actual-export.png'),png);
   checks.pdfBytes=pdf.length;
   checks.pngBytes=png.length;
+
+  // An independent writer changes the disk version while the real editor still has its old revision.
+  await click('内容编辑');
+  await until('editor visible',()=>js('!!document.querySelector("#basic-field-name")'));
+  const externalBase=await main.store.getResume('runner-fixture');
+  await originalSave('runner-fixture',{...externalBase,basic:{...externalBase.basic,name:'外部写入的新版本'}},{requireExisting:true});
+  await js('(()=>{const e=document.querySelector("#basic-field-name");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,"本地未保存草稿");e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  await until('revision conflict shown',()=>bodyHas('简历已被其他窗口或进程修改'));
+  if((await main.store.getResume('runner-fixture')).basic.name!=='外部写入的新版本')throw Error('stale editor overwrote disk');
+  checks.staleEditorRejected=true;
+  await capture('07-revision-conflict');
+  const originalSaveDialog=dialog.showSaveDialog;
+  const draftPath=path.join(out,'synthetic-recovery-draft.json');
+  dialog.showSaveDialog=async()=>({canceled:false,filePath:draftPath});
+  await click('另存未保存草稿');
+  await until('draft saved without changing original',()=>fs.existsSync(draftPath));
+  const draft=JSON.parse(fs.readFileSync(draftPath,'utf8'));
+  if(draft.basic.name!=='本地未保存草稿')throw Error('backup contains wrong draft');
+  dialog.showSaveDialog=originalSaveDialog;
+  checks.unsavedDraftBackedUp=true;
+  await js('window.confirm=()=>false');
+  await click('重载磁盘版本');
+  if(await js('document.querySelector("#basic-field-name").value')!=='本地未保存草稿')throw Error('cancelled reload discarded draft');
+  checks.cancelledReloadPreservedDraft=true;
+  await js('window.confirm=()=>true');
+  await click('重载磁盘版本');
+  await until('latest disk version opened',()=>js('document.querySelector("#basic-field-name")?.value==="外部写入的新版本"'));
+  if(await bodyHas('简历已被其他窗口或进程修改'))throw Error('stale conflict banner after reload');
+  checks.diskReloadRecovered=true;
+  await capture('08-conflict-recovered');
+
   fs.writeFileSync(path.join(out,'application-evidence.json'),JSON.stringify({sourceSha:source.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,electron:process.versions.electron,checks},null,2));
 }
 app.whenReady().then(run).then(()=>{clearTimeout(deadline);server?.close();app.exit(0);}).catch(err=>{console.error(err.message);fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({checks,error:err.message},null,2));clearTimeout(deadline);server?.close();app.exit(1);});

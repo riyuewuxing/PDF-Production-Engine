@@ -42,6 +42,14 @@ jobs:
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence'
           & .\node_modules\.bin\electron.cmd .\validation-smoke.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: One bounded DeepSeek synthetic connectivity probe
+        timeout-minutes: 2
+        env:
+          DEEPSEEK_SMOKE_KEY: ${{ secrets.DRRPSEEK }}
+        run: |
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence'
+          node --import tsx scripts/real-provider-probe.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload synthetic application evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -417,9 +417,10 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle('snapshots:list', (_event, slug: string) => store.listSnapshots(slug));
-  ipcMain.handle('snapshots:create', (_event, slug: string, reason?: string) =>
-    store.createSnapshot(slug, reason),
-  );
+  ipcMain.handle('snapshots:create', (_event, slug: string, reason: string, expectedRevision: string) => {
+    if (typeof expectedRevision !== 'string') throw new Error('快照前必须提供版本标识。');
+    return store.createSnapshot(slug, reason, undefined, expectedRevision);
+  });
   ipcMain.handle('snapshots:restore', (_event, slug: string, snapshotId: string, expectedRevision: string) => {
     if (typeof expectedRevision !== 'string') throw new Error('回滚前必须提供版本标识。');
     return store.restoreSnapshot(slug, snapshotId, expectedRevision);

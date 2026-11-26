@@ -52,6 +52,8 @@ describe('resume revision and cross-process locking', () => {
     const current = await store.saveResume('demo', {...doc, title:'Changed'});
     await expect(store.deleteResume('demo', resumeRevision(doc))).rejects.toMatchObject({code:'REVISION_CONFLICT'});
     await expect(store.restoreSnapshot('demo',snap.id,resumeRevision(doc))).rejects.toMatchObject({code:'REVISION_CONFLICT'});
+    await expect(store.createSnapshot('demo','stale snapshot',undefined,resumeRevision(doc))).rejects.toMatchObject({code:'REVISION_CONFLICT'});
+    expect(await store.listSnapshots('demo')).toHaveLength(1);
     expect((await store.getResume('demo')).title).toBe('Changed');
     await store.deleteResume('demo',resumeRevision(current));
     await expect(store.saveResume('demo',current,{requireExisting:true})).rejects.toMatchObject({code:'REVISION_CONFLICT'});

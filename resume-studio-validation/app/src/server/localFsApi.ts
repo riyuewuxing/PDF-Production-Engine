@@ -480,7 +480,16 @@ export class LocalResumeStore {
     rawSlug: string,
     reason = '手动创建快照',
     docOverride?: ResumeDocument,
+    expectedRevision?: string,
   ): Promise<ResumeSnapshotMeta> {
+    if (expectedRevision !== undefined) {
+      return withResumeWriteLock(this.dataDir, async () => {
+        const current = await this.readOptionalResume(this.resolveResumePath(rawSlug).filePath);
+        assertExpectedRevision(current, expectedRevision);
+        if (!current) throw new LocalFsApiError(409,'REVISION_CONFLICT','简历已不存在。');
+        return this.createSnapshot(rawSlug,reason,current);
+      });
+    }
     const { slug, dir } = this.resolveSnapshotDir(rawSlug);
     const sourceDoc = docOverride
       ? ResumeDocumentSchema.parse(docOverride)
@@ -805,8 +814,9 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
             return;
           }
           if (method === 'POST' && !isRestore) {
-            const body = (await readJsonBody(req)) as { reason?: string };
-            const meta = await store.createSnapshot(slug, body.reason);
+            const body = (await readJsonBody(req)) as { reason?: string; expectedRevision?: string };
+            if (typeof body.expectedRevision !== 'string') throw new LocalFsApiError(428, 'REVISION_REQUIRED', '快照前必须提供已读取的版本标识。');
+            const meta = await store.createSnapshot(slug, body.reason, undefined, body.expectedRevision);
             sendJson(res, 201, meta);
             return;
           }

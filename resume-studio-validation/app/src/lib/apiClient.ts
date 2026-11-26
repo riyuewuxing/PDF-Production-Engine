@@ -118,14 +118,14 @@ export const apiClient = {
     return handleJsonResponse<ResumeSnapshotMeta[]>(res);
   },
 
-  async createSnapshot(slug: string, reason = '手动创建快照'): Promise<ResumeSnapshotMeta> {
+  async createSnapshot(slug: string, reason: string, expectedRevision: string): Promise<ResumeSnapshotMeta> {
     if (window.resumeDesktop?.snapshots) {
-      return window.resumeDesktop.snapshots.create(slug, reason);
+      return window.resumeDesktop.snapshots.create(slug, reason, expectedRevision);
     }
     const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason, expectedRevision }),
     });
     return handleJsonResponse<ResumeSnapshotMeta>(res);
   },

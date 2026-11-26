@@ -111,6 +111,7 @@ export default function App() {
     handleImportJson,
     markSavedFromSnapshot,
     getCurrentRevision,
+    reloadActiveFromDisk,
     ensureCurrentQueued,
   } = useResumePersistence({
     onVersionChanged: () => {
@@ -186,12 +187,41 @@ export default function App() {
     }
   }, [ensureCurrentQueued, flushPendingSave]);
 
+  const handleSafeSwitchVersion = useCallback(async (slug:string):Promise<boolean> => {
+    try { await handleSwitchVersion(slug); return true; }
+    catch(err) {
+      setFitFeedback({type:'warn',text:err instanceof Error?err.message:'无法切换版本，当前编辑已保留。'});
+      return false;
+    }
+  },[handleSwitchVersion]);
+
+  const handleBackupDraft = useCallback(async () => {
+    const draft=activeDocRef.current;
+    if(!draft)return;
+    try {
+      const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+      const result=await apiClient.saveTextFile({
+        defaultFileName:`${activeSlug||'resume'}-未保存草稿-${stamp}.json`,
+        content:JSON.stringify(draft,null,2)+'\n',
+        extension:'json',filterName:'JSON 草稿',dialogTitle:'另存未保存简历草稿',
+        mimeType:'application/json;charset=utf-8',saveAs:true,
+      });
+      if(!result.canceled)setFitFeedback({type:'ok',text:result.filePath?'草稿已另存：'+result.filePath:'已发起本地草稿下载；请确认文件保存成功。'});
+    }catch(err){setFitFeedback({type:'warn',text:err instanceof Error?err.message:'草稿备份失败。'});}
+  },[activeDocRef,activeSlug]);
+
+  const handleReloadDraft = useCallback(async () => {
+    if(!window.confirm('重载将放弃当前未保存编辑。请先另存草稿；确认放弃并重新读取磁盘版本吗？'))return;
+    try{await reloadActiveFromDisk();}
+    catch(err){setFitFeedback({type:'warn',text:err instanceof Error?err.message:'重载失败，未丢弃草稿。'});}
+  },[reloadActiveFromDisk]);
+
   const toggleCommandPalette = useCallback(() => {
     setIsCommandPaletteOpen((prev) => !prev);
   }, []);
 
   useGlobalShortcuts({
-    hasActiveDoc: Boolean(activeDoc),
+    hasActiveDoc: Boolean(activeDoc) && !loading,
     onManualSave: handleManualSave,
     onUndo: handleUndo,
     onRedo: handleRedo,
@@ -279,17 +309,19 @@ export default function App() {
 
   const handleMasterMergeCommit = useCallback(
     async (mergedDoc: ResumeDocument) => {
-      if (activeSlug && activeSlug !== 'master') {
-        try {
-          await flushPendingSave();
-          await apiClient.createSnapshot(activeSlug, '母库合并前自动快照');
-        } catch {
-          // Do not block user's merge if snapshot creation is unsupported in mocked environment
-        }
+      const basis = activeDocRef.current;
+      if (!activeSlug || !basis || basis.id !== mergedDoc.id || activeSlug === 'master') return;
+      try {
+        await flushPendingSave();
+        if (activeDocRef.current !== basis) throw new Error('简历已变化，请重新选择合并内容。');
+        await apiClient.createSnapshot(activeSlug, '母库合并前自动快照', getCurrentRevision());
+        if (activeDocRef.current !== basis) throw new Error('简历已变化，请重新选择合并内容。');
+        handleImmediateChange(mergedDoc);
+      } catch(err) {
+        setFitFeedback({type:'warn',text:err instanceof Error?err.message:'母库合并前备份失败，未应用修改。'});
       }
-      handleImmediateChange(mergedDoc);
     },
-    [activeSlug, flushPendingSave, handleImmediateChange],
+    [activeSlug, activeDocRef, flushPendingSave, getCurrentRevision, handleImmediateChange],
   );
 
   const parsedRedactionTerms = useMemo(
@@ -367,7 +399,7 @@ export default function App() {
         isExporting={isExporting}
         isExportMenuOpen={isExportMenuOpen}
         desktop={desktop}
-        onSwitchVersion={(slug) => void handleSwitchVersion(slug)}
+        onSwitchVersion={(slug) => void handleSafeSwitchVersion(slug)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onManualSave={() => void handleManualSave()}
@@ -382,6 +414,15 @@ export default function App() {
         onExportFormat={(format, saveAs) => void handleExportFormat(format, saveAs)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
+      {saveState==='error' && (
+        <div role="alert" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-300 bg-red-50 px-4 py-2 text-xs text-red-900">
+          <div className="min-w-0 flex-1 break-words">{saveError || '保存失败。'} 当前编辑仍在内存中；可以先另存草稿，不会覆盖原简历。</div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button type="button" onClick={()=>void handleBackupDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 font-semibold">另存未保存草稿</button>
+            <button type="button" onClick={()=>void handleReloadDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1">重载磁盘版本</button>
+          </div>
+        </div>
+      )}
 
       <div className="flex min-w-0 min-h-0 flex-1">
         <nav
@@ -445,7 +486,7 @@ export default function App() {
                   activeDoc={activeDoc}
                   summaries={summaries}
                   masterSummary={masterSummary}
-                  onSwitchVersion={(slug) => void handleSwitchVersion(slug)}
+                  onSwitchVersion={(slug) => void handleSafeSwitchVersion(slug)}
                   onCreateVersion={handleCreateVersion}
                   onRenameVersion={handleRenameVersion}
                   onDeleteVersion={handleDeleteVersion}
@@ -468,6 +509,7 @@ export default function App() {
                   onJumpToSection={handlePreviewSelectSection}
                   onImmediateChange={handleImmediateChange}
                   onFlushBeforeApply={flushPendingSave}
+                  getCurrentRevision={getCurrentRevision}
                 />
               )}
               {activeTab === 'career' && (
@@ -477,7 +519,7 @@ export default function App() {
                   summaries={summaries}
                   refreshKey={applicationsRefreshKey}
                   onSwitchToResumeForEdit={(slug) => {
-                    void handleSwitchVersion(slug).then(() => setActiveTab('edit'));
+                    void handleSafeSwitchVersion(slug).then(ok => {if(ok)setActiveTab('edit');});
                   }}
                   onCloneSnapshot={async (doc, suggestedTitle) => {
                     await handleImportJson(doc, suggestedTitle);
@@ -523,7 +565,7 @@ export default function App() {
         summaries={summaries}
         masterSummary={masterSummary}
         onSelectTab={setActiveTab}
-        onSwitchVersion={(slug) => void handleSwitchVersion(slug)}
+        onSwitchVersion={(slug) => void handleSafeSwitchVersion(slug)}
         onSelectTemplate={handleSelectTemplate}
         onExportFormat={(format) => void handleExportFormat(format, false)}
         onFitOnePage={() => void handleFitOnePage()}

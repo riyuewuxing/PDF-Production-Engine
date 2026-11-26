@@ -68,7 +68,7 @@ export interface ResumeDesktopBridge {
   };
   snapshots: {
     list: (slug: string) => Promise<ResumeSnapshotMeta[]>;
-    create: (slug: string, reason?: string) => Promise<ResumeSnapshotMeta>;
+    create: (slug: string, reason: string, expectedRevision: string) => Promise<ResumeSnapshotMeta>;
     restore: (slug: string, snapshotId: string, expectedRevision: string) => Promise<ResumeDocument>;
   };
   applications: {

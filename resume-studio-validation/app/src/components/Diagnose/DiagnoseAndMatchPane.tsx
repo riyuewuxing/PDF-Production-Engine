@@ -60,6 +60,7 @@ export function DiagnoseAndMatchPane({
   onJumpToSection,
   onImmediateChange,
   onFlushBeforeApply,
+  getCurrentRevision,
 }: {
   document: ResumeDocument;
   activeSlug?: string;
@@ -70,6 +71,7 @@ export function DiagnoseAndMatchPane({
   onJumpToSection: (sectionId: string) => void;
   onImmediateChange: (next: ResumeDocument) => void;
   onFlushBeforeApply: () => Promise<void>;
+  getCurrentRevision: () => string;
 }) {
   const [subTab, setSubTab] = useState<DiagnoseSubTab>('hr');
   const [internalJdText, setInternalJdText] = useState('');
@@ -289,7 +291,7 @@ export function DiagnoseAndMatchPane({
     try {
       await onFlushBeforeApply();
       if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
-      await apiClient.createSnapshot(activeSlug, 'AI 单段润色前快照');
+      await apiClient.createSnapshot(activeSlug, 'AI 单段润色前快照', getCurrentRevision());
       if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
       onImmediateChange(applyBlockUpdates(document, { [basis.blockKey]: suggestedText }));
       setPolishError(null);
@@ -395,7 +397,7 @@ export function DiagnoseAndMatchPane({
     try {
       await onFlushBeforeApply();
       if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
-      await apiClient.createSnapshot(activeSlug, 'AI 整卷定向改写前快照');
+      await apiClient.createSnapshot(activeSlug, 'AI 整卷定向改写前快照', getCurrentRevision());
       if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
       onImmediateChange(applyBlockUpdates(document, updates));
       setTailorError(null);
