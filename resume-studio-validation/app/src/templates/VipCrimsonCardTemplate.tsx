@@ -75,12 +75,12 @@ export function VipCrimsonCardTemplate({ document }: ResumeTemplateProps) {
               {metaItems.length > 0 && (
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[0.87em] text-slate-700">
                   {metaItems.map((item) => (
-                    <span key={item.key} className="inline-flex items-center gap-1.5">
+                    <span key={item.key} className={`inline-flex min-w-0 items-start gap-1.5 ${item.key === 'email' ? 'col-span-2' : ''}`}>
                       {globalSettings.useIconMode && item.iconName && (
-                        <LucideIconByName name={item.iconName} size={12} className="shrink-0 text-slate-400" />
+                        <LucideIconByName name={item.iconName} size={12} className="mt-0.5 shrink-0 text-slate-400" />
                       )}
-                      <span className="text-slate-500">{item.label}：</span>
-                      <span className="font-medium text-slate-900">{item.value}</span>
+                      <span className="shrink-0 text-slate-500">{item.label}：</span>
+                      <span className="min-w-0 [overflow-wrap:anywhere] font-medium text-slate-900">{item.value}</span>
                     </span>
                   ))}
                 </div>
