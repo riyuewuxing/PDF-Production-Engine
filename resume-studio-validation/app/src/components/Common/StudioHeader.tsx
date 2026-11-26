@@ -229,7 +229,7 @@ export function StudioHeader({
                     data-native-undo="true"
                     value={redactionTermsInput}
                     onChange={(e) => onRedactionTermsChange(e.target.value)}
-                    placeholder="例如：示例大学, 示例研究机构"
+                    placeholder="例如：云南大学, 中国科学院"
                     className="mt-2 w-full rounded border border-slate-700 bg-slate-900 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none"
                   />
                   <div className="mt-2 flex items-center justify-between">
@@ -330,7 +330,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('jsonResume', false)}
                 className="flex w-full items-center gap-2 border-t border-slate-800 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileDown size={13} className="text-indigo-400" /> 标准 JSON Resume (.json)
+                <FileDown size={13} className="text-indigo-400" /> 标准 JSON Resume（仅可见内容）
               </button>
               <button
                 type="button"
@@ -338,7 +338,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('json', false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileDown size={13} className="text-slate-400" /> 导出本地 JSON 备份
+                <FileDown size={13} className="text-slate-400" /> 本地 JSON 备份（含隐藏内容）
               </button>
             </div>
           )}

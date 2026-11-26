@@ -90,7 +90,7 @@ export function useResumeExport({
             content: jrText,
             extension: 'json',
             filterName: 'JSON Resume 文件',
-            dialogTitle: '导出标准 JSON Resume',
+            dialogTitle: '导出标准 JSON Resume（仅可见内容）',
             mimeType: 'application/json;charset=utf-8',
             saveAs,
           });
@@ -98,7 +98,7 @@ export function useResumeExport({
           if (!jrRes.canceled) {
             setExportStatus({
               type: 'ok',
-              text: `已导出标准 JSON Resume${suffix}：${jrRes.filePath ?? jrRes.fileName}`,
+              text: `已导出标准 JSON Resume（仅可见内容；非完整备份）${suffix}：${jrRes.filePath ?? jrRes.fileName}`,
               filePath: jrRes.filePath,
             });
           }
