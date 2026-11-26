@@ -126,7 +126,10 @@ async function run() {
       let content='- 学生达标率提高30%。';
       if(second){
         const user=JSON.parse(body.messages[1].content);
-        if(typeof user.draftText==='string')content='感谢审阅。\n'+user.draftText+'\n我获得了30%的提升。';
+        if(typeof user.draftText==='string'){
+          const selected=(user.toolResults?.inspect_block_facts??[]).flatMap(row=>row.sources.filter(s=>s.scope==='record'));
+          content='感谢审阅。\n'+user.draftText+'\n'+(selected.length?selected[0].facts.split('\n')[0]:'我获得了30%的提升。');
+        }
         else if(typeof user.originalText==='string')content=user.originalText+'\n- 核对合成资料。';
         else if(user.mode==='workflow')content=JSON.stringify({steps:[{action:'clarify',blockKeys:['B1'],reason:'合成计划第一步：核对教育表达'},{action:'concise',blockKeys:['B2'],reason:'DISPLAY_ONLY_PLAN_REASON'}]});
         else if(user.mode==='ask')content='仅供参考：当前可见正文可以更简洁。';
@@ -761,6 +764,37 @@ async function run() {
   checks.careerFactScope=true;checks.careerFactRevokedApproval=true;
   await js('(()=>{const e=[...document.querySelectorAll("[role=alert]")].find(e=>e.innerText.includes("本地事实库已变化"));e?.scrollIntoView({block:"center"});return !!e})()');
   await capture('46-career-fact-revoked');
+  // Verify the other two career output modes use independent approval and actual selected evidence.
+  careerBank=await js('window.resumeDesktop.facts.get()');
+  const extraCareerInput={...careerFactInput,bankRevision:careerBank.revision,fact:{...careerFactInput.fact,assertion:'整理 19 份合成岗位材料',value:'19'}};
+  careerBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(extraCareerInput)+')');
+  const extraCareer=careerBank.records.find(r=>r.assertion===extraCareerInput.fact.assertion);
+  const extraCalls=providerCalls;
+  const switchCareerKind=kind=>js('(()=>{const e=document.querySelector("select[aria-label=\\"文案精修对象\\"]");e.value='+JSON.stringify(kind)+';e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  for(const [kind,label,shot] of [['email','投递邮件正文','50-career-email-facts'],['boss','招聘平台开场白','51-career-boss-facts']]){
+    await switchCareerKind(kind);
+    await js('(()=>{const s=[...document.querySelectorAll("summary")].find(e=>e.innerText.includes("本地事实资料库 · 文案选择"));if(s&&!s.parentElement.open)s.click();return !!s})()');
+    await click('加载 / 刷新文案事实');
+    await until('other career fact ready',()=>js('[...document.querySelectorAll("input")].some(e=>e.getAttribute("aria-label")==="文案选择事实 整理 19 份合成岗位材料"&&!e.disabled)'));
+    await click('预览文案精修请求');await until('other career default preview',()=>bodyHas('文案发送前确认'));
+    if(JSON.stringify(await getCareerPreview()).includes(extraCareerInput.fact.assertion))throw Error('career mode retained prior fact selection');
+    await click('取消文案发送');
+    if(!await checkLabel(extraCareerInput.fact.assertion))throw Error('career mode fact choice unavailable');
+    await click('预览文案精修请求');await until('other career scoped preview',()=>bodyHas('本次外发 1 条本人确认事实'));
+    const messages=await getCareerPreview(),payload=JSON.parse(messages[1].content);
+    if(payload.kind!==label||!messages[1].content.includes(extraCareerInput.fact.assertion)||JSON.stringify(messages).includes(extraCareer.id)||JSON.stringify(messages).includes(extraCareer.evidenceRef))throw Error('career mode scope mismatch');
+    await click('确认发送文案给模型');await until('other career scoped candidate',()=>bodyHas('候选文案（本地还原）'));
+    if(JSON.stringify(lastAiRequest.body.messages)!==JSON.stringify(messages)||!await checkLabel('我已核对候选文案'))throw Error('career mode exact approval failed');
+    await js('(()=>{document.querySelector("section[aria-label=\\"文案 AI 审核\\"]")?.scrollIntoView({block:"start"});return true})()');
+    await capture(shot);
+    const draftsBefore=await js('[...document.querySelectorAll("textarea")].map(e=>e.value)');
+    await click('采纳文案草稿');
+    await until('other career applied',async()=>{const current=await js('[...document.querySelectorAll("textarea")].map(e=>e.value)');return current.filter((s,i)=>s!==draftsBefore[i]).length===1&&current.some((s,i)=>s!==draftsBefore[i]&&s.includes(extraCareerInput.fact.assertion));});
+    if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(careerBefore))throw Error('career mode mutated resume');
+  }
+  if(providerCalls!==extraCalls+2)throw Error('unexpected other career provider calls');
+  checks.careerEmailAndBossFactScope=true;
+  await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:extraCareer.id,bankRevision:careerBank.revision,confirmation:'REVOKE_FACT'})+')');
   // Create a synthetic cloned version through the real editor, then explicitly link a root fact.
   const linkBase=await main.store.getResume('master'),linkCalls=providerCalls;
   let linkBank=await js('window.resumeDesktop.facts.get()');
@@ -815,10 +849,24 @@ async function run() {
   await click('预览 AI 自由任务');await until('linked fact preview',()=>bodyHas('自由任务发送前确认'));
   const linkedPreview=await getFactPreview();
   if(!linkedPreview.includes(rootInput.fact.assertion)||!linkedPreview.includes('record-1')||linkedPreview.includes(rootInput.fact.evidenceRef)||linkedPreview.includes(linkRoot.id)||linkedPreview.includes(shareLink.id)||linkedPreview.includes(linkSlug))throw Error('linked fact privacy mismatch');
+  // A valid linked request reaches the same gated provider; origin mutation alone must then block reuse.
+  await click('确认发送自由任务');await until('valid linked model answer',()=>bodyHas('当前可见正文可以更简洁'));
+  if(providerCalls!==linkCalls+1||!JSON.stringify(lastAiRequest.body.messages).includes(rootInput.fact.assertion)||JSON.stringify(lastAiRequest.body).includes(shareLink.id)||JSON.stringify(lastAiRequest.body).includes(linkRoot.id)||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('valid linked transport mismatch');
+  await click('预览 AI 自由任务');await until('origin-change preview',()=>bodyHas('自由任务发送前确认'));
+  const originBefore=await main.store.getResume('master');
+  await main.store.saveResume('master',{...originBefore,education:originBefore.education.map((e,i)=>i===0?{...e,school:'SYNTHETIC_CHANGED_ORIGIN'}:e)});
+  await click('确认发送自由任务');await until('origin changed blocked',()=>bodyHas('跨版本来源主体或隐私范围已变化'));
+  if(providerCalls!==linkCalls+1||(await js('window.resumeDesktop.facts.get()')).revision!==linkBank.revision)throw Error('changed origin reached provider or bank unexpectedly changed');
+  await js('(()=>{const e=[...document.querySelectorAll("[role=alert]")].find(e=>e.innerText.includes("跨版本来源主体"));e?.scrollIntoView({block:"center"});return !!e})()');
+  await capture('52-fact-link-origin-changed');
+  const originAfter=await main.store.getResume('master');
+  await main.store.saveResume('master',{...originAfter,education:originBefore.education});
+  await click('预览 AI 自由任务');await until('linked revoke preview',()=>bodyHas('自由任务发送前确认'));
+  checks.factLinkValidTransport=true;checks.factLinkOriginMutationBlocked=true;
   await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:linkRoot.id,bankRevision:linkBank.revision,confirmation:'REVOKE_FACT'})+')');
   await click('确认发送自由任务');await until('linked stale authorization',()=>bodyHas('本地事实库已变化'));
   const family=await js('window.resumeDesktop.facts.get()');
-  if(family.records.filter(r=>r.id===linkRoot.id||r.linkedFrom?.recordId===linkRoot.id).some(r=>r.verifiedStatus!=='revoked')||providerCalls!==linkCalls||JSON.stringify(await main.store.getResume(linkSlug))!==JSON.stringify(targetBefore))throw Error('root revoke failed to invalidate linked preview');
+  if(family.records.filter(r=>r.id===linkRoot.id||r.linkedFrom?.recordId===linkRoot.id).some(r=>r.verifiedStatus!=='revoked')||providerCalls!==linkCalls+1||JSON.stringify(await main.store.getResume(linkSlug))!==JSON.stringify(targetBefore))throw Error('root revoke failed to invalidate linked preview');
   checks.factLinkDefaultLocal=true;checks.factLinkExplicitShare=true;checks.factLinkCascadeNoNetwork=true;
   await loadLinkBank();
   await js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("跨版本关联来源")&&e.innerText.includes("核对 24 份跨版本合成记录")&&e.innerText.includes("已撤销"));a?.scrollIntoView({block:"center"});return !!a})()');
