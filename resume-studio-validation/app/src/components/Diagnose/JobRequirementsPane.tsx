@@ -205,7 +205,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
         {session.clauses.map((c,i)=><option key={c.id} value={c.id}>{i+1}. 第 {c.line} 行 · {c.quote.slice(0,68)}{reviews[c.id]?' · 已记录':''}</option>)}
       </select></label>
       {clause&&<div className="space-y-2 rounded border border-indigo-200 bg-white p-2">
-        <div className="font-semibold">原文定位：{jobPdfPageForRange(pdfOrigin,clause.start,clause.end)!==undefined&&<span aria-label="公告 PDF 页码">PDF 第 {jobPdfPageForRange(pdfOrigin,clause.start,clause.end)} 页 · </span>}第 {clause.line} 行 · 字符区间 [{clause.start}, {clause.end})</div>
+        <div className="font-semibold">原文定位：{jobPdfPageForRange(pdfOrigin,clause.start,clause.end)!==undefined&&<span aria-label="公告 PDF 页码">PDF 第 {jobPdfPageForRange(pdfOrigin,clause.start,clause.end)} 页 · 确认提取文本</span>}第 {clause.line} 行 · 字符区间 [{clause.start}, {clause.end})</div>
         <blockquote aria-label="岗位条款原文" className="whitespace-pre-wrap rounded bg-slate-50 p-2 text-slate-900">{clause.quote}</blockquote>
         <p>类别线索：{clause.categories.join(' / ')} · 规则提示：{priorityLabel[clause.priorityHint]}（未自动采纳）</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -230,7 +230,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       </div>}
       <div className="space-y-1" aria-label="岗位核对记录">
         {session.clauses.filter(c=>reviews[c.id]).map(c=>{const review=reviews[c.id]!;return <button type="button" key={c.id} disabled={busy} onClick={()=>select(c.id)} className="block w-full rounded border bg-white p-2 text-left">
-          <span className="font-semibold">{priorityLabel[review.priority]} · {outcomeLabel[review.outcome]}</span><span className="block whitespace-pre-wrap">{jobPdfPageForRange(pdfOrigin,c.start,c.end)!==undefined?'PDF 第 '+jobPdfPageForRange(pdfOrigin,c.start,c.end)+' 页 · ':''}第 {c.line} 行：{c.quote}</span><span className="block text-slate-600">{review.evidenceIds.length} 条本地依据 · {review.note}</span>
+          <span className="font-semibold">{priorityLabel[review.priority]} · {outcomeLabel[review.outcome]}</span><span className="block whitespace-pre-wrap">{jobPdfPageForRange(pdfOrigin,c.start,c.end)!==undefined?'PDF 第 '+jobPdfPageForRange(pdfOrigin,c.start,c.end)+' 页 · 确认提取文本': ''}第 {c.line} 行：{c.quote}</span><span className="block text-slate-600">{review.evidenceIds.length} 条本地依据 · {review.note}</span>
         </button>;})}
       </div>
       {desktop&&<div className="space-y-1 rounded border bg-white p-2">

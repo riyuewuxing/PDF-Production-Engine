@@ -77,6 +77,9 @@ describe('confirmed local PDF notice source',()=>{
     expect(origin.pages.map(p=>p.page)).toEqual([1,3]);
     expect(origin.totalPages).toBe(3);
     expect(validJobPdfOrigin(source,origin)).toBe(true);
+    const lineEnding=prepareJobPdfSource({...pdfDraft,pages:[{page:1,text:'甲；\r\n乙。\r丙。',hasColumns:false}]},[1]);
+    expect(lineEnding.source).toBe('甲；\n乙。\n丙。');
+    expect(validJobPdfOrigin(lineEnding.source,lineEnding.origin)).toBe(true);
     const clauses=splitJobRequirements(source);
     expect(clauses.map(c=>jobPdfPageForRange(origin,c.start,c.end))).toEqual([1,1,3]);
     expect(jobPdfPageForRange(origin,0,source.length)).toBeUndefined();

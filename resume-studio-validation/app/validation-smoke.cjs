@@ -1121,11 +1121,13 @@ async function run() {
   const noticeBefore=jobSource+'\n合成附加条件',noticeCalls=providerCalls;
   const noticeInput='input[aria-label="选择本地招聘公告 PDF"]';
   const sendNotice=async(name,buf)=>js('(()=>{const f=document.querySelector('+JSON.stringify(noticeInput)+');if(!f||f.disabled)return false;const dt=new DataTransfer();dt.items.add(new File([new Uint8Array('+JSON.stringify([...buf])+')],'+JSON.stringify(name)+',{type:"application/pdf"}));f.files=dt.files;f.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  if(!await js('(()=>{const f=document.querySelector('+JSON.stringify(noticeInput)+');if(!f||f.disabled)return false;const dt=new DataTransfer();dt.items.add(new File([new Uint8Array(10*1024*1024+1)],"synthetic-oversized.pdf",{type:"application/pdf"}));f.files=dt.files;f.dispatchEvent(new Event("change",{bubbles:true}));return true})()'))throw Error('oversize notice input unavailable');
+  await until('oversized PDF refused',()=>bodyHas('最多10 MB'));
   if(!await sendNotice('synthetic-invalid.pdf',Buffer.from('not a PDF')))throw Error('notice input unavailable');
   await until('invalid PDF refused',()=>bodyHas('文件没有有效 PDF 文件头'));
   const noticeJd=()=>js('document.querySelector(\'textarea[placeholder^="例如：招聘高中物理教师"]\')?.value');
   if(await noticeJd()!==noticeBefore)throw Error('invalid file changed existing JD');
-  checks.jobPdfInvalidPreservesJd=true;
+  checks.jobPdfInvalidPreservesJd=true;checks.jobPdfOversizeRejected=true;
   const stream=s=>'<< /Length '+Buffer.byteLength(s)+' >>\nstream\n'+s+'\nendstream';
   const objects=[
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -1166,7 +1168,12 @@ async function run() {
   if(!await namedCheck('确认已对照 PDF 第 3 页'))throw Error('review page three unavailable');
   if(await buttonEnabled('确认导入所选公告页'))throw Error('import allowed without final approval');
   if(!await namedCheck('确认公告所选页和替换 JD'))throw Error('final PDF confirmation missing');
+  await waitJobButton('确认导入所选公告页');
+  await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',noticeBefore+'\nAnother draft');
+  await until('changed JD revokes previous replacement approval',async()=>!(await buttonEnabled('确认导入所选公告页')));
+  if(!await namedCheck('确认公告所选页和替换 JD'))throw Error('new replacement approval missing');
   await waitJobButton('确认导入所选公告页');await click('确认导入所选公告页');
+  checks.jobPdfReplacementApprovalBound=true;
   await until('confirmed PDF source visible',()=>bodyHas('当前来源：synthetic-notice.pdf · 第 1、3 页 / 共 3 页'));
   const confirmedPdfJd=await noticeJd();
   if(!confirmedPdfJd.includes('Physics degree required;')||!confirmedPdfJd.includes('Teaching certificate required;')||confirmedPdfJd.includes(noticeBefore))throw Error('confirmed PDF source is wrong');
