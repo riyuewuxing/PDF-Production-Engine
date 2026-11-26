@@ -3,6 +3,7 @@ import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {FactBank,FactInput,FactRecord} from '../../schema/factBankSchema';
 import {factEntityId,isShareableFact} from '../../lib/aiContext';
 import {canLinkFactToDocument} from '../../lib/factLink';
+import {EvidenceAttachmentPane} from './EvidenceAttachmentPane';
 import {localErrorMessage} from '../../lib/apiClient';
 import type {EditableBlockOption} from '../../lib/resumeBlocks';
 
@@ -21,6 +22,8 @@ export function FactBankPane(props:Props){
   const [notice,setNotice]=useState('');
   const [showOther,setShowOther]=useState(false);
   const [query,setQuery]=useState('');
+  const [evidenceId,setEvidenceId]=useState<string|null>(null);
+  const evidenceRecord=props.bank?.records.find(r=>r.id===evidenceId);
   const busy=useRef(false);
   const latest=useRef(props);latest.current=props;
   const bridge=window.resumeDesktop?.facts;
@@ -96,9 +99,11 @@ export function FactBankPane(props:Props){
           <label className="flex items-start gap-1"><input type="checkbox" aria-label={'选择事实 '+r.assertion} disabled={props.locked||!eligible} checked={eligible&&props.selected.includes(r.id)} onChange={e=>props.onSelected(e.target.checked?[...props.selected,r.id]:props.selected.filter(id=>id!==r.id))}/>加入本次 AI 任务</label>
           {canLinkFactToDocument(props.document,r)&&!props.bank?.records.some(s=>s.linkedFrom?.recordId===r.id&&s.docId===props.document.id&&s.verifiedStatus==='user-confirmed')&&<button type="button" disabled={props.locked||!bridge?.link} className="mr-3 text-teal-800" onClick={()=>{setLinking(r);setLinkShareable(false);setLinkConfirmed(false);}}>关联到当前同源段落</button>}
           {r.sourceScope==='manual'&&r.verifiedStatus==='user-confirmed'&&matches&&<button type="button" disabled={props.locked} className="mr-3 text-teal-800" onClick={()=>beginCorrection(r)}>更正事实</button>}
+          <button type="button" disabled={props.locked||!window.resumeDesktop?.evidence} className="mr-3 text-indigo-800" onClick={()=>setEvidenceId(r.id)}>证据附件索引</button>
           {r.verifiedStatus!=='revoked'&&<button type="button" disabled={props.locked} className="text-red-700" onClick={()=>revoke(r.id)}>撤销事实授权</button>}
         </article>;
       })}</div>
+      {evidenceRecord&&<EvidenceAttachmentPane key={props.slug+':'+evidenceRecord.id} document={props.document} slug={props.slug} fact={evidenceRecord} bankRevision={props.bank.revision} locked={props.locked} onBusy={props.onBusy} onFlush={props.onFlush} getRevision={props.getRevision} onClose={()=>setEvidenceId(null)}/>}
       {linking&&<section aria-label="跨版本事实关联确认" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2 break-words">
         <div className="font-semibold">跨版本关联（不修改简历正文）</div>
         <div>来源：{linking.documentTitle||'原版本'} · {linking.blockLabel||'原关联段落'}</div><div>{linking.assertion}</div>

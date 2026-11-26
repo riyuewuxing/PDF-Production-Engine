@@ -56,6 +56,9 @@ async function run() {
     if(!denied)throw Error('untrusted window was able to list resumes');
     const aiDenied=await rogue.webContents.executeJavaScript('window.resumeDesktop.ai.getSettings().then(()=>false,()=>true)');
     if(!aiDenied)throw Error('untrusted window read AI settings');
+    const evidenceDenied=await rogue.webContents.executeJavaScript('window.resumeDesktop.evidence.get().then(()=>false,()=>true)');
+    if(!evidenceDenied)throw Error('untrusted window read evidence index');
+    checks.rogueEvidenceDenied=true;
   } finally {rogue.destroy();}
   checks.rogueWindowDenied=true;
   const deniedPrint=await js('window.resumeDesktop.pdf.getPrintPayload("wrong-job").then(()=>false,()=>true)');
@@ -801,6 +804,57 @@ async function run() {
   const rootInput={slug:'master',docRevision:JSON.stringify([linkBase.id,linkBase.updatedAt]),blockKey:'edu:'+linkBase.education[0].id,bankRevision:linkBank.revision,fact:{kind:'achievement',assertion:'核对 24 份跨版本合成记录',value:'24',unit:'份',timeframe:'2025',evidenceRef:'LINK_LOCAL_ONLY_REF',sensitivity:'shareable'},confirmation:'CONFIRM_SELF_REPORTED_FACT'};
   linkBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(rootInput)+')');
   const linkRoot=linkBank.records.find(r=>r.assertion===rootInput.fact.assertion);
+  // Root fact evidence: actual renderer controls and trusted main-process native picker IPC.
+  const evidenceCalls=providerCalls;
+  await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');
+  const refreshEvidenceFacts=async()=>{
+    await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.innerText.includes("本地事实资料库"));if(e&&!e.parentElement.open)e.click();return !!e})()');
+    await click('加载 / 刷新事实库');
+    await until('evidence fact bank ready',async()=>await bodyHas('已读取本地事实资料库。')&&await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="加载 / 刷新事实库")?.disabled===false'));
+  };
+  const openEvidence=linked=>js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("核对 24 份跨版本合成记录")&&e.innerText.includes("跨版本关联来源")==='+JSON.stringify(linked)+'&&[...e.querySelectorAll("button")].some(b=>b.innerText==="证据附件索引"));const b=[...a?.querySelectorAll("button")||[]].find(b=>b.innerText==="证据附件索引");if(!b||b.disabled)return false;b.click();return true})()');
+  const scrollEvidence=()=>js('(()=>{document.querySelector("section[aria-label=\\"本地证据附件索引\\"]")?.scrollIntoView({block:"start"});return true})()');
+  await refreshEvidenceFacts();
+  if(!await openEvidence(false))throw Error('root evidence action missing');
+  await click('加载 / 刷新附件索引');await until('empty evidence index',()=>bodyHas('已读取本地证据索引。'));
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="选择文件并关联证据")?.disabled===true'))throw Error('attachment consent not required');
+  const evidenceSource=path.join(root,'synthetic-evidence-only.txt');
+  const evidenceBytes=Buffer.from('SYNTHETIC_ATTACHMENT_PRIVATE_BYTES\n合成来源资料\n','utf8');
+  fs.writeFileSync(evidenceSource,evidenceBytes);
+  const evidenceNote='SYNTHETIC_ATTACHMENT_LOCAL_NOTE';
+  await setValue('textarea[aria-label="附件来源说明"]',evidenceNote);
+  if(!await checkLabel('我确认将选择的附件复制到本地'))throw Error('attachment consent missing');
+  await scrollEvidence();await capture('53-evidence-consent');
+  const nativeOpen=dialog.showOpenDialog;let pickerCalls=0;
+  try{
+    dialog.showOpenDialog=async(_owner,options)=>{pickerCalls++;if(options.properties.join(',')!=='openFile')throw Error('unexpected native picker options');return {canceled:true,filePaths:[]};};
+    await click('选择文件并关联证据');await until('picker canceled',()=>bodyHas('已取消文件选择，未保存附件。'));
+    if((await js('window.resumeDesktop.evidence.get()')).entries.length)throw Error('canceled picker modified index');
+    const injected={slug:'master',docRevision:JSON.stringify([linkBase.id,linkBase.updatedAt]),factId:linkRoot.id,bankRevision:linkBank.revision,indexRevision:'empty-v1',note:evidenceNote,confirmation:'CONFIRM_LOCAL_EVIDENCE_COPY',selectedPath:evidenceSource};
+    if(!await js('window.resumeDesktop.evidence.attach('+JSON.stringify(injected)+').then(()=>false,()=>true)')||pickerCalls!==1)throw Error('renderer supplied file path reached picker');
+    dialog.showOpenDialog=async(_owner,options)=>{pickerCalls++;if(options.properties.join(',')!=='openFile')throw Error('unexpected native picker options');return {canceled:false,filePaths:[evidenceSource]};};
+    await click('选择文件并关联证据');await until('evidence copied',()=>bodyHas('附件已复制到独立本地证据目录'));
+  }finally{dialog.showOpenDialog=nativeOpen;}
+  const attachedIndex=await js('window.resumeDesktop.evidence.get()'),attachedEvidence=attachedIndex.entries[0];
+  const managedEvidence=path.join(main.dataDir,'.evidence-files-v1',attachedEvidence.id+'.txt');
+  if(pickerCalls!==2||attachedIndex.entries.length!==1||attachedEvidence.factId!==linkRoot.id||attachedEvidence.note!==evidenceNote||!fs.readFileSync(managedEvidence).equals(evidenceBytes)||!fs.readFileSync(evidenceSource).equals(evidenceBytes)||JSON.stringify(attachedIndex).includes(evidenceSource)||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(linkBase)||JSON.stringify(await js('window.resumeDesktop.facts.get()'))!==JSON.stringify(linkBank))throw Error('evidence copy persistence or isolation failed');
+  await click('校验副本 SHA-256');await until('evidence intact',()=>bodyHas('字节校验一致'));
+  await scrollEvidence();await capture('54-evidence-intact');
+  fs.writeFileSync(managedEvidence,Buffer.alloc(evidenceBytes.length,65));
+  await click('校验副本 SHA-256');await until('evidence changed',()=>bodyHas('本地副本已变化'));
+  await click('在文件夹定位副本');await until('unsafe reveal denied',()=>bodyHas('副本缺失、已变化或不可读'));
+  await scrollEvidence();await capture('55-evidence-tampered');
+  fs.writeFileSync(managedEvidence,evidenceBytes);
+  await click('校验副本 SHA-256');await until('evidence restored',()=>bodyHas('字节校验一致'));
+  const nativeReveal=require('electron').shell.showItemInFolder;let revealed='';
+  try{
+    require('electron').shell.showItemInFolder=file=>{revealed=file;};
+    await click('在文件夹定位副本');await until('evidence reveal requested',()=>revealed===managedEvidence);
+  }finally{require('electron').shell.showItemInFolder=nativeReveal;}
+  if(providerCalls!==evidenceCalls)throw Error('local attachment management contacted provider');
+  checks.evidenceNativePickerConsent=true;checks.evidenceExactLocalCopy=true;checks.evidenceTamperDetected=true;checks.evidenceVerifiedReveal=true;
+  await click('关闭附件索引');
+
   await click('版本母库');await click('基于当前版本');
   await setValue('input[placeholder="输入新岗位名称，如：物理教研员"]','合成关联测试版本');
   await click('创建');
@@ -844,6 +898,14 @@ async function run() {
   if(!shareLink||shareLink.sensitivity!=='shareable'||linkBank.records.find(r=>r.id===linkRoot.id)?.verifiedStatus!=='user-confirmed')throw Error('share link missing or target revoke affected root');
   await js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("跨版本关联来源")&&e.innerText.includes("核对 24 份跨版本合成记录")&&!e.innerText.includes("已撤销"));a?.scrollIntoView({block:"center"});return !!a})()');
   await capture('48-fact-link-saved');
+  // Linked facts view the root evidence, without allowing another version to alter the root attachment.
+  if(!await openEvidence(true))throw Error('linked evidence view missing');
+  await click('加载 / 刷新附件索引');await until('linked source attachment',()=>bodyHas('synthetic-evidence-only.txt'));
+  if(!await js('(()=>{const s=document.querySelector("section[aria-label=\\"本地证据附件索引\\"]");return s.innerText.includes("只读查看原始事实")&&![...s.querySelectorAll("button")].some(b=>/选择文件并关联证据|解除附件关联|删除本地附件副本/.test(b.innerText))})()'))throw Error('linked version allowed source attachment mutations');
+  await scrollEvidence();await capture('56-evidence-linked-readonly');
+  await click('关闭附件索引');
+  checks.evidenceLinkedReadonly=true;
+
   const selectLinked=await js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("跨版本关联来源")&&e.innerText.includes("核对 24 份跨版本合成记录")&&!e.innerText.includes("已撤销"));const b=a?.querySelector("input[type=checkbox]");if(!b||b.disabled)return false;b.click();return true})()');
   if(!selectLinked)throw Error('linked selection unavailable');
   await click('预览 AI 自由任务');await until('linked fact preview',()=>bodyHas('自由任务发送前确认'));
@@ -852,6 +914,9 @@ async function run() {
   // A valid linked request reaches the same gated provider; origin mutation alone must then block reuse.
   await click('确认发送自由任务');await until('valid linked model answer',()=>bodyHas('当前可见正文可以更简洁'));
   if(providerCalls!==linkCalls+1||!JSON.stringify(lastAiRequest.body.messages).includes(rootInput.fact.assertion)||JSON.stringify(lastAiRequest.body).includes(shareLink.id)||JSON.stringify(lastAiRequest.body).includes(linkRoot.id)||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('valid linked transport mismatch');
+  const sentLinkedEvidence=JSON.stringify(lastAiRequest.body);
+  for(const privateValue of [attachedEvidence.id,attachedEvidence.sha256,attachedEvidence.originalName,evidenceNote,'SYNTHETIC_ATTACHMENT_PRIVATE_BYTES',evidenceSource,managedEvidence])if(sentLinkedEvidence.includes(privateValue))throw Error('attachment metadata or bytes leaked to model');
+  checks.evidenceNeverOutbound=true;
   await click('预览 AI 自由任务');await until('origin-change preview',()=>bodyHas('自由任务发送前确认'));
   const originBefore=await main.store.getResume('master');
   await main.store.saveResume('master',{...originBefore,education:originBefore.education.map((e,i)=>i===0?{...e,school:'SYNTHETIC_CHANGED_ORIGIN'}:e)});
@@ -873,6 +938,20 @@ async function run() {
   await capture('49-fact-link-revoked');
   await js('(()=>{const e=document.querySelector("select[aria-label=\\"快速切换简历版本\\"]");e.value="master";e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
   await until('master restored after link',()=>js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value==="master"'));
+  await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');
+  await refreshEvidenceFacts();
+  if(!await openEvidence(false))throw Error('historical root evidence view missing');
+  await click('加载 / 刷新附件索引');await until('historic evidence loaded',()=>bodyHas('synthetic-evidence-only.txt'));
+  if(await js('[...document.querySelectorAll("button")].some(b=>b.innerText==="选择文件并关联证据")'))throw Error('revoked root could add evidence');
+  await click('解除附件关联');await until('evidence detached',()=>bodyHas('已解除附件关联，副本与历史索引仍保留。'));
+  if(!fs.existsSync(managedEvidence))throw Error('detach removed managed file');
+  await click('删除本地附件副本');await until('evidence purged',()=>bodyHas('已删除工作台副本，保留历史索引。'));
+  const finalEvidenceIndex=await js('window.resumeDesktop.evidence.get()');
+  if(finalEvidenceIndex.entries[0].status!=='purged'||fs.existsSync(managedEvidence)||!fs.readFileSync(evidenceSource).equals(evidenceBytes))throw Error('purge failed to preserve original and historical metadata');
+  await scrollEvidence();await capture('57-evidence-purged');
+  await click('关闭附件索引');
+  checks.evidenceDetachedAndPurgedOriginalSafe=true;
+
 
 
   // At the very end, mutate only the isolated synthetic disk to simulate another process.

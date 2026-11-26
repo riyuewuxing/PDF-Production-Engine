@@ -7,6 +7,8 @@ import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byo
 import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
 import {FactBankStore} from '../src/server/factBankStore';
+import {EvidenceStore} from '../src/server/evidenceStore';
+import {AttachEvidenceSchema} from '../src/schema/evidenceSchema';
 import {FactRequestBindingSchema} from '../src/schema/factBankSchema';
 import {hasRecordFactSources} from '../src/lib/factPromptGate';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
@@ -52,6 +54,8 @@ const dataDir = resolvedPaths.dataDir;
 const exportsDir = resolvedPaths.exportsDir;
 const store = new LocalResumeStore(dataDir);
 const facts=new FactBankStore(store);
+const evidence=new EvidenceStore(store,facts);
+let evidencePickerBusy=false;
 
 let mainWindow: BrowserWindow | null = null;
 let isClosingConfirmed = false;
@@ -469,6 +473,30 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('facts:add',(_event,input:unknown)=>facts.add(input));
   trustedEditorHandle('facts:link',(_event,input:unknown)=>facts.link(input));
   trustedEditorHandle('facts:revoke',(_event,input:unknown)=>facts.revoke(input));
+  trustedEditorHandle('evidence:get',()=>evidence.get());
+  trustedEditorHandle('evidence:attach',async(event,raw:unknown)=>{
+    if(evidencePickerBusy||!mainWindow||mainWindow.isDestroyed())throw new Error('证据附件选择窗口不可用或正在使用。');
+    const input=AttachEvidenceSchema.parse(raw);
+    evidencePickerBusy=true;
+    try{
+      await evidence.assertAttachAllowed(input);
+      assertTrustedEditor(event);
+      const owner=mainWindow;if(!owner||owner.isDestroyed())throw new Error('工作台已关闭。');
+      const picked=await dialog.showOpenDialog(owner,{title:'选择本地证据附件（仅保存本地副本）',properties:['openFile'],filters:[{name:'证据附件 PDF / 图片 / UTF-8 文本',extensions:['pdf','png','jpg','jpeg','txt']}]});
+      if(picked.canceled)return {canceled:true as const};
+      if(picked.filePaths.length!==1)throw new Error('每次仅允许选择一个证据文件。');
+      assertTrustedEditor(event);
+      return {canceled:false as const,index:await evidence.attachSelectedFile(input,picked.filePaths[0]!)};
+    }finally{evidencePickerBusy=false;}
+  });
+  trustedEditorHandle('evidence:verify',(_event,input:unknown)=>evidence.verify(input));
+  trustedEditorHandle('evidence:detach',(_event,input:unknown)=>evidence.detach(input));
+  trustedEditorHandle('evidence:purge',(_event,input:unknown)=>evidence.purge(input));
+  trustedEditorHandle('evidence:reveal',async(event,input:unknown)=>{
+    const file=await evidence.revealPath(input);
+    assertTrustedEditor(event);
+    shell.showItemInFolder(file);
+  });
   trustedEditorHandle('resumes:list', () => store.listResumes());
   trustedEditorHandle('resumes:get', (_event, slug: string) => store.getResume(slug));
   trustedEditorHandle('resumes:save', (_event, slug: string, doc: unknown) => store.saveResume(slug, doc, { requireExisting: true }));
