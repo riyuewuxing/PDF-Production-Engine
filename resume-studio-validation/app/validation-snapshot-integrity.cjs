@@ -109,7 +109,7 @@ async function run(){
     await click('手动创建快照');await until('unsafe creation refused',()=>has('历史快照目录不安全'));
     assert(JSON.stringify(fs.readdirSync(outside))===JSON.stringify(['keep.txt'])&&fs.readFileSync(path.join(outside,'keep.txt'),'utf8')==='PRESERVE','redirected directory modified');
     checks.unsafeDirectoryIsVisibleAndNeverWritten=true;
-  }finally{fs.unlinkSync(dir);fs.renameSync(held,dir);}
+  }finally{fs.rmSync(dir,{recursive:false});fs.renameSync(held,dir);}
   preserve();
   observations.invalidRecordHashes={alias:digest(aliasBytes),invalid:digest(invalidBytes)};observations.newestSha256=digest(newestBytes);observations.validCount=after.length;observations.allFiles=fs.readdirSync(dir).length;
   report();

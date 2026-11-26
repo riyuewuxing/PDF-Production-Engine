@@ -100,6 +100,7 @@ export function VersionAndMasterPane({
   useEffect(() => {
     void refreshSnapshots();
   }, [refreshSnapshots, activeDoc.updatedAt]);
+  useEffect(()=>setSnapshotStatus(null),[activeSlug]);
 
   const handleCreateManualSnapshot = async () => {
     if (!activeSlug) return;
@@ -384,7 +385,7 @@ export function VersionAndMasterPane({
             >
               {snapshotsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               <History size={13} className="text-teal-700" />
-              <span>历史快照回滚 ({snapshots.length}/15)</span>
+              <span>历史快照回滚 {snapshotView?.error?'（检查失败）':!snapshotView?'（检查中）':`(${snapshots.length}/15)`}</span>
             </button>
             <button
               type="button"
