@@ -199,6 +199,19 @@ export function ResumeEditorPane({
       </div>
 
       <div className="flex-1 space-y-2.5 overflow-y-auto p-3.5">
+        {!orderedSections.some(s => s.id === 'basic') && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-slate-700">
+            <p className="mb-2">导入文档未包含基本信息模块，原有字段仍保留。恢复后只显示已启用的字段。</p>
+            <button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 font-medium hover:bg-amber-100"
+              onClick={() => {
+                updateSections([{id:'basic',title:'基本信息',icon:'User',enabled:true,order:0,pageBreakBefore:false},
+                  ...orderedSections.map((s,index)=>({...s,order:index+1}))]);
+                setOpenSectionIds(prev=>({...prev,basic:true}));
+              }}>
+              恢复基本信息模块
+            </button>
+          </div>
+        )}
         {orderedSections.map((section, index) => {
           const isOpen = !!openSectionIds[section.id];
           const isBasic = section.id === 'basic';
@@ -334,7 +347,7 @@ export function ResumeEditorPane({
                       <SeparatorHorizontal size={13} />
                     </button>
                   )}
-                  {!isBasic && (
+                  {(!isBasic || !section.enabled) && (
                     <button
                       type="button"
                       onClick={() =>

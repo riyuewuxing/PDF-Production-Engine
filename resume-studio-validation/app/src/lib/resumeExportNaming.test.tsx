@@ -8,7 +8,7 @@ import { useResumeExport } from '../hooks/useResumeExport';
 
 const date = new Date(2026,10,26,12);
 function fixture(){
-  return ResumeDocumentSchema.parse({id:'synthetic-export-20',title:'INTERNAL_TITLE_20',createdAt:'2026-01-01',updatedAt:'2026-01-01',basic:{name:'SYNTH_NAME_20',title:'SYNTH_ROLE_20',email:'demo@example.invalid'},menuSections:[{id:'basic',title:'Basic',order:0},{id:'skills',title:'Skills',order:1}],skillContent:'VISIBLE_SKILL_20'});
+  return ResumeDocumentSchema.parse({id:'synthetic-export-20',title:'INTERNAL_TITLE_20',createdAt:'2026-01-01',updatedAt:'2026-01-01',basic:{name:'SYNTH_NAME_20',title:'SYNTH_ROLE_20',email:'demo@example.invalid'},menuSections:[{id:'basic',title:'Basic',order:0},{id:'skills',title:'Skills',order:1}],skillContent:'VISIBLE_SKILL_20',globalSettings:{}});
 }
 function hidden(){
   const doc=fixture();doc.basic.fieldOrder=doc.basic.fieldOrder.map(f=>['name','title'].includes(f.key)?{...f,visible:false}:f);return doc;
