@@ -377,8 +377,36 @@ function buildDeltaPack(safeFiles, headSha, branch, manifest, deltaSeq) {
   return prepareValidatedPack(deltaFileName, sections.join('\n'));
 }
 
+// Serialize all manifest reads, sequence allocation and publication for one
+// output directory. A crashed process can leave a lock; fail closed rather
+// than guessing whether another publisher is still active.
+function withOutputLock(action) {
+  const lockPath = path.join(outDir, '.context-pack.lock');
+  let fd;
+  try { fd = fs.openSync(lockPath, 'wx'); }
+  catch (err) {
+    if (err?.code === 'EEXIST') throw Error('Context output is locked. Check that no pack process is running; use another output directory or manually recover a confirmed stale lock.');
+    throw err;
+  }
+  try {
+    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), 'utf8');
+    fs.fsyncSync(fd);
+    return action();
+  } finally {
+    try { fs.closeSync(fd); }
+    finally {
+      try { fs.unlinkSync(lockPath); }
+      catch (err) { if (err?.code !== 'ENOENT') console.warn('[pack-context] Output lock retained; inspect before retry.'); }
+    }
+  }
+}
+
 function main() {
   fs.mkdirSync(outDir, { recursive: true });
+  return withOutputLock(buildAndPublish);
+}
+
+function buildAndPublish() {
   const headSha = runGit(['rev-parse', '--short', 'HEAD']);
   const branch = runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
   const safeFiles = collectTrackedContextFiles(rootDir);
@@ -390,8 +418,7 @@ function main() {
 
   if (deltaOnly) {
     if (!prevManifest) {
-      console.error(`[pack-context] Missing baseline manifest at ${metaPath}. Run "pnpm context:pack" first.`);
-      process.exit(1);
+      throw Error(`Missing baseline manifest at ${metaPath}. Run "pnpm context:pack" first.`);
     }
     if(prevManifest.policyVersion!==CONTEXT_POLICY_VERSION)throw Error('Context privacy policy changed. Run pnpm context:pack to regenerate the baseline before delta export.');
     verifyBaselineFile(prevManifest);
