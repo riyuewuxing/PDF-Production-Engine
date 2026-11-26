@@ -1,0 +1,96 @@
+name: Resume Studio V6 workspace entry containment
+on:
+  push:
+    branches: ['resume-studio/v6-workspace-containment-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-workspace-containment-validation
+  cancel-in-progress: true
+jobs:
+  containment:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 11
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reproduce prior managed-entry failures
+        timeout-minutes: 2
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-containment-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $target = Join-Path (Get-Location) 'src/server/localFsApi.ts'
+          $candidate = [IO.File]::ReadAllBytes($target)
+          try {
+            [IO.File]::WriteAllBytes($target,[IO.File]::ReadAllBytes((Join-Path (Get-Location) 'validation-fixtures/localFsApi.turn28-baseline.txt')))
+            pnpm exec vitest run src/server/workspaceContainment.test.ts --reporter=json --outputFile="$out/baseline-vitest.json"
+            $baselineCode = $LASTEXITCODE
+          } finally {
+            [IO.File]::WriteAllBytes($target,$candidate)
+          }
+          $report = Get-Content "$out/baseline-vitest.json" -Raw | ConvertFrom-Json
+          $expected = if ($IsWindows) { 9 } else { 10 }
+          if ($baselineCode -eq 0 -or $report.numFailedTests -ne $expected -or $report.numTotalTests -ne 11) { throw "Unexpected baseline reproduction $($report.numFailedTests)/$($report.numTotalTests)" }
+          $LASTEXITCODE = 0
+      - name: Candidate typecheck
+        timeout-minutes: 2
+        run: pnpm typecheck
+      - name: All synthetic unit regressions
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-containment-evidence'
+          pnpm exec vitest run --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Cross-platform containment regression
+        if: runner.os == 'Linux'
+        timeout-minutes: 2
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-containment-evidence'
+          pnpm exec vitest run src/server/workspaceContainment.test.ts --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron and MCP runtime
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Actual production startup preserves external directory
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_BOOTSTRAP_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-containment-evidence'
+          node validation-workspace-containment.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real MCP permission and CAS regression
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('mcp-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-containment-evidence'
+          node validation-mcp-process.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload real evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-containment-${{ matrix.os }}
+          path: resume-studio-containment-evidence/
+          if-no-files-found: error
+          retention-days: 3

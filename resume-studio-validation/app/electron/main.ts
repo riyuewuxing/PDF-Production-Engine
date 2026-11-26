@@ -22,7 +22,7 @@ import { resumeToMarkdown } from '../src/lib/markdownExporter';
 import { buildResumeExportFilename, formatLocalDate, sanitizeFilePart } from '../src/lib/resumeExportNaming';
 import type { CoverLetterPdfPayload, ApplicationLogInput } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
-import { LocalResumeStore, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
+import { LocalResumeStore, LocalFsApiError, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
 import type {
   PdfExportOptions,
   SaveApplicationSnapshotInput,
@@ -1060,7 +1060,16 @@ if (shouldBootstrapWorkspace({commonJsMain:require.main===module,hasHandoff:laun
         const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),120000);
         try{const checked=await inspectRestoredWorkspace(rootDir,ctl.signal);if(launchHandoff&&checked.basis!==launchHandoff.basis)throw new Error('独立工作区启动前数据已变化，拒绝加载。');}
         finally{clearTimeout(timer);}
-      }else{if(launchHandoff)throw new Error('独立启动目标不是恢复工作区。');await ensureInitialDataFromLegacy({ rootDir, force: false });}
+      }else{
+        if(launchHandoff)throw new Error('独立启动目标不是恢复工作区。');
+        try{await ensureInitialDataFromLegacy({rootDir,force:false});}
+        catch(err){
+          // Refuse unsafe initialization but keep the existing recovery screen
+          // available. Restored-workspace verification above remains strict.
+          if(!(err instanceof LocalFsApiError&&err.code==='UNSAFE_DIRECTORY'))throw err;
+          console.warn('[resume-studio] Unsafe workspace directory; initialization skipped.');
+        }
+      }
       recordLaunchStage(launchHandoff,'workspace-verified');
       await registerAssetProtocol();
       registerIpcHandlers();

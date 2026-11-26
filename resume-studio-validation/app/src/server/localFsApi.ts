@@ -141,6 +141,33 @@ async function pathEntryExists(targetPath: string): Promise<boolean> {
   }
 }
 
+async function checkWorkspaceDirectory(root:string,dir:string,create=false):Promise<void>{
+  const relative=path.relative(root,dir);
+  if(!['resumes','assets','.trash'].includes(relative))throw new LocalFsApiError(422,'UNSAFE_DIRECTORY','工作区目录不安全，未读取或写入。');
+  if(create){
+    await fs.mkdir(root,{recursive:true});
+    try{await fs.mkdir(dir);}catch(err){if((err as NodeJS.ErrnoException).code!=='EEXIST')throw err;}
+  }
+  const st=await fs.lstat(dir);
+  const realRoot=await fs.realpath(root);
+  if(!st.isDirectory()||st.isSymbolicLink()||path.relative(path.join(realRoot,relative),await fs.realpath(dir))!==''){
+    throw new LocalFsApiError(422,'UNSAFE_DIRECTORY','工作区目录不安全：'+relative+'。未读取或写入，请检查独立备份。');
+  }
+}
+
+async function checkWorkspaceFile(root:string,file:string):Promise<void>{
+  const dir=path.dirname(file);
+  if(path.relative(root,dir)!=='')await checkWorkspaceDirectory(root,dir);
+  const st=await fs.lstat(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1){
+    throw new LocalFsApiError(422,'UNSAFE_ENTRY','工作区文件不是独立普通文件：'+path.basename(file)+'。原件保留，未读取或写入。');
+  }
+  const expected=path.join(await fs.realpath(dir),path.basename(file));
+  if(path.relative(expected,await fs.realpath(file))!==''){
+    throw new LocalFsApiError(422,'UNSAFE_ENTRY','工作区文件路径不安全：'+path.basename(file)+'。原件保留。');
+  }
+}
+
 export interface ResumeTrashMeta {
   id: string;
   slug: string;
@@ -315,8 +342,12 @@ export class LocalResumeStore {
   }
 
   async ensureDirs(): Promise<void> {
-    await fs.mkdir(this.resumesDir, { recursive: true });
-    await fs.mkdir(this.assetsDir, { recursive: true });
+    await checkWorkspaceDirectory(this.dataDir,this.resumesDir,true);
+    await checkWorkspaceDirectory(this.dataDir,this.assetsDir,true);
+  }
+
+  private async ensureResumeDir():Promise<void>{
+    await checkWorkspaceDirectory(this.dataDir,this.resumesDir,true);
   }
 
   resolveResumePath(rawSlug: string): { slug: string; filePath: string; isMaster: boolean } {
@@ -336,20 +367,15 @@ export class LocalResumeStore {
   }
 
   async listResumes(): Promise<ResumeListResult> {
-    await this.ensureDirs();
+    await this.ensureResumeDir();
     const issues: ResumeListIssue[] = [];
     const summarize = async (slug:string,filePath:string):Promise<ResumeSummary|null> => {
       try {
-        const entry = await fs.lstat(filePath);
-        if (!entry.isFile() || entry.isSymbolicLink()) {
-          issues.push({slug,reason:'UNSAFE_ENTRY'});
-          return null;
-        }
         const doc = await this.readAndValidateFile(filePath);
         return {slug,id:doc.id,title:doc.title,templateId:doc.templateId,updatedAt:doc.updatedAt,isMaster:slug==='master'};
       } catch (err) {
         if (err instanceof LocalFsApiError) {
-          issues.push({slug,reason:err.code==='CORRUPTED_JSON'?'CORRUPTED_JSON':err.code==='SCHEMA_INVALID'?'SCHEMA_INVALID':'UNREADABLE'});
+          issues.push({slug,reason:err.code==='CORRUPTED_JSON'?'CORRUPTED_JSON':err.code==='SCHEMA_INVALID'?'SCHEMA_INVALID':err.code==='UNSAFE_ENTRY'||err.code==='UNSAFE_DIRECTORY'?'UNSAFE_ENTRY':'UNREADABLE'});
           return null;
         }
         if (typeof (err as NodeJS.ErrnoException)?.code === 'string') {
@@ -377,6 +403,7 @@ export class LocalResumeStore {
   }
 
   private async readAndValidateFile(filePath: string): Promise<ResumeDocument> {
+    await checkWorkspaceFile(this.dataDir,filePath);
     const text = await fs.readFile(filePath, 'utf-8');
     let parsedJson: unknown;
     try {
@@ -394,10 +421,11 @@ export class LocalResumeStore {
 
   async getResume(rawSlug: string): Promise<ResumeDocument> {
     const { filePath } = this.resolveResumePath(rawSlug);
-    if (!(await fileExists(filePath))) {
-      throw new LocalFsApiError(404, 'NOT_FOUND', `未找到简历版本: ${rawSlug}`);
+    try{return await this.readAndValidateFile(filePath);}
+    catch(err){
+      if(isMissing(err))throw new LocalFsApiError(404,'NOT_FOUND',`未找到简历版本: ${rawSlug}`);
+      throw err;
     }
-    return this.readAndValidateFile(filePath);
   }
 
   async saveResume(rawSlug: string, payload: unknown, options?: {
@@ -406,7 +434,7 @@ export class LocalResumeStore {
     onSnapshotCreated?: (snapshot: ResumeSnapshotMeta) => void;
     requireExisting?: boolean;
   }): Promise<ResumeDocument> {
-    await this.ensureDirs();
+    await this.ensureResumeDir();
     const { slug, filePath } = this.resolveResumePath(rawSlug);
     let validated: ResumeDocument;
     try {
@@ -416,6 +444,7 @@ export class LocalResumeStore {
       throw new LocalFsApiError(422, 'VALIDATION_ERROR', `保存失败，数据校验未通过: ${detail}`);
     }
     return withResumeWriteLock(this.dataDir, async () => {
+      await checkWorkspaceDirectory(this.dataDir,this.resumesDir);
       const current = await this.readOptionalResume(filePath);
       // Existing files always need a matching revision, including legacy direct callers.
       const expected = options?.expectedRevision !== undefined ? options.expectedRevision
@@ -452,7 +481,7 @@ export class LocalResumeStore {
     cloneFromSlug?: string;
     document?: unknown;
   }): Promise<{ slug: string; document: ResumeDocument }> {
-    await this.ensureDirs();
+    await this.ensureResumeDir();
     const nowIso = new Date().toISOString();
 
     let baseDoc: ResumeDocument;
@@ -468,7 +497,7 @@ export class LocalResumeStore {
       }
     } else if (input.cloneFromSlug) {
       baseDoc = await this.getResume(input.cloneFromSlug);
-    } else if (await fileExists(this.masterPath)) {
+    } else if (await pathEntryExists(this.masterPath)) {
       baseDoc = await this.readAndValidateFile(this.masterPath);
     } else {
       throw new LocalFsApiError(400, 'MISSING_SOURCE', '缺少复制源简历或导入文档。');
@@ -481,6 +510,7 @@ export class LocalResumeStore {
     }
 
     return withResumeWriteLock(this.dataDir, async () => {
+      await checkWorkspaceDirectory(this.dataDir,this.resumesDir);
       const reserved=await this.reservedTrashSlugs();
       const baseSlug=candidateSlug;
       const occupied=async(slug:string)=>reserved.has(slug.toLowerCase())||await pathEntryExists(this.resolveResumePath(slug).filePath);
@@ -502,7 +532,7 @@ export class LocalResumeStore {
   }
 
   private async trashEntries() {
-    try {return await fs.readdir(this.trashDir,{withFileTypes:true});}
+    try {await checkWorkspaceDirectory(this.dataDir,this.trashDir);return await fs.readdir(this.trashDir,{withFileTypes:true});}
     catch(err){if((err as NodeJS.ErrnoException).code==='ENOENT')return [];throw err;}
   }
 
@@ -542,7 +572,7 @@ export class LocalResumeStore {
       const current=await this.readOptionalResume(filePath);
       if(!current)throw new LocalFsApiError(404,'NOT_FOUND','简历版本不存在。');
       if(expectedRevision!==undefined)assertExpectedRevision(current,expectedRevision);
-      await fs.mkdir(this.trashDir,{recursive:true});
+      await checkWorkspaceDirectory(this.dataDir,this.trashDir,true);
       const trashId=`${slug}.${Date.now()}.${crypto.randomUUID()}`;
       // A single atomic rename; the document never exists in a partially archived state.
       await fs.rename(filePath,resolveContainedPath(this.trashDir,trashId+'.json'));
@@ -554,7 +584,7 @@ export class LocalResumeStore {
     const record=parseTrashId(rawId);
     const filePath=resolveContainedPath(this.trashDir,record.id+'.json');
     let info;
-    try{info=await fs.lstat(filePath);}catch(err){
+    try{await checkWorkspaceDirectory(this.dataDir,this.trashDir);info=await fs.lstat(filePath);}catch(err){
       if((err as NodeJS.ErrnoException).code==='ENOENT')throw new LocalFsApiError(404,'TRASH_NOT_FOUND','回收站记录不存在或已恢复。');
       throw err;
     }
@@ -564,8 +594,9 @@ export class LocalResumeStore {
 
   async restoreTrash(rawId:string,expectedRevision:string,asCopy=false):Promise<{slug:string;document:ResumeDocument}> {
     if(typeof expectedRevision!=='string')throw new LocalFsApiError(428,'REVISION_REQUIRED','恢复前必须提供回收站记录版本。');
-    await this.ensureDirs();
+    await this.ensureResumeDir();
     return withResumeWriteLock(this.dataDir,async()=>{
+      await checkWorkspaceDirectory(this.dataDir,this.resumesDir);
       const archived=await this.readTrash(rawId);
       assertExpectedRevision(archived.document,expectedRevision);
       let slug=archived.slug;
@@ -603,7 +634,7 @@ export class LocalResumeStore {
   }
 
   async saveAsset(input: { filename?: string; dataUrl: string }): Promise<{ filename: string; url: string }> {
-    await this.ensureDirs();
+    await checkWorkspaceDirectory(this.dataDir,this.assetsDir,true);
     if (typeof input.dataUrl !== 'string') {
       throw new LocalFsApiError(400, 'INVALID_IMAGE', '缺少图片 dataUrl 数据。');
     }
@@ -625,10 +656,14 @@ export class LocalResumeStore {
       .replace(/[^a-zA-Z0-9_-]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 40) || 'photo';
-    const filename = assertSafeAssetName(`${rawBase}-${Date.now().toString(36)}.${ext}`);
+    const filename = assertSafeAssetName(`${rawBase}-${Date.now().toString(36)}-${randomUUID().slice(0,8)}.${ext}`);
     const targetPath = resolveContainedPath(this.assetsDir, filename);
 
-    await withResumeWriteLock(this.dataDir,()=>atomicWriteFile(targetPath, buffer));
+    await withResumeWriteLock(this.dataDir,async()=>{
+      await checkWorkspaceDirectory(this.dataDir,this.assetsDir);
+      if(await pathEntryExists(targetPath))throw new LocalFsApiError(409,'ASSET_EXISTS','图片文件名已被占用，未覆盖。');
+      await atomicWriteFile(targetPath,buffer);
+    });
     return {
       filename,
       url: `/api/assets/${filename}`,
@@ -638,8 +673,10 @@ export class LocalResumeStore {
   async readAsset(rawFilename: string): Promise<{ buffer: Buffer; mimeType: string }> {
     const filename = assertSafeAssetName(rawFilename);
     const targetPath = resolveContainedPath(this.assetsDir, filename);
-    if (!(await fileExists(targetPath))) {
-      throw new LocalFsApiError(404, 'ASSET_NOT_FOUND', '图片资源不存在。');
+    try{await checkWorkspaceFile(this.dataDir,targetPath);}
+    catch(err){
+      if(isMissing(err))throw new LocalFsApiError(404,'ASSET_NOT_FOUND','图片资源不存在。');
+      throw err;
     }
     const buffer = await fs.readFile(targetPath);
     const ext = path.extname(filename).toLowerCase();
@@ -1230,6 +1267,12 @@ export async function ensureInitialDataFromLegacy(options: {
 
   if (!options.force && hasMaster && hasResume) {
     return { initialized: false, masterPath, resumePath };
+  }
+
+  // Explicit force still does not authorize replacing a linked file.
+  if(options.force){
+    if(hasMaster)await checkWorkspaceFile(dataDir,masterPath);
+    if(hasResume)await checkWorkspaceFile(dataDir,resumePath);
   }
 
   if (!(await pathEntryExists(legacyFile))) {
