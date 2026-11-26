@@ -19,6 +19,7 @@ import {hasRecordFactSources} from '../src/lib/factPromptGate';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
+import { visibleBasicValue } from '../src/lib/aiContext';
 import type { CoverLetterPdfPayload, ApplicationLogInput } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
 import { LocalResumeStore, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
@@ -156,9 +157,9 @@ function buildDefaultExportFilename(
   ext: 'pdf' | 'png' | 'docx' | 'md' | 'html',
   suffix = '',
 ): string {
-  const rawName = doc.basic.name.trim();
+  const rawName = visibleBasicValue(doc, 'name').trim();
   const namePart = rawName && rawName !== '[姓名]' ? sanitizeFilePart(rawName, '简历') : '个人简历';
-  const rolePart = sanitizeFilePart(doc.basic.title || doc.title, '求职简历');
+  const rolePart = sanitizeFilePart(visibleBasicValue(doc, 'title').trim(), '求职简历');
   const cleanSuffix = suffix ? sanitizeFilePart(suffix, '') : '';
   return `${namePart}-${rolePart}-${formatLocalDate()}${cleanSuffix}.${ext}`;
 }
@@ -383,7 +384,7 @@ async function listInstalledSystemFonts(): Promise<SystemFontResult> {
 }
 
 async function resolveDocxPhotoOptions(doc: ResumeDocument): Promise<DocxExportOptions | undefined> {
-  if (!doc.basic.photoConfig.visible) return undefined;
+  if (!doc.menuSections.some(s => s.id === 'basic' && s.enabled) || !doc.basic.photoConfig.visible) return undefined;
   const rawPhoto = doc.basic.photo.trim();
   if (!rawPhoto) return undefined;
 

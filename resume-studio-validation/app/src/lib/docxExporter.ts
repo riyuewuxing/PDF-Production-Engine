@@ -18,6 +18,7 @@ import type { GlobalSettings, ResumeDocument } from '../schema/resumeSchema';
 import { getBasicMetaItems, getOrderedVisibleSections } from '../templates/shared';
 import { formatCjkSpacing } from './cjkSpacing';
 import { getLocaleLabels } from './resumeLocale';
+import { visibleBasicValue } from './aiContext';
 import { parseRichTextBlocks } from './richText';
 
 export interface DocxFontPair {
@@ -284,8 +285,11 @@ export function buildResumeDocxDocument(
   const labels = getLocaleLabels(doc.globalSettings.locale);
   const font = resolveDocxFontPair(doc.globalSettings);
   const fmt = (txt: string) => (autoCjk ? formatCjkSpacing(txt) : txt);
-  const resolvedPhoto = resolveDocxPhoto(doc, options);
-  const metaItems = getBasicMetaItems(doc);
+  const basicEnabled = doc.menuSections.some(s => s.id === 'basic' && s.enabled);
+  const resolvedPhoto = basicEnabled ? resolveDocxPhoto(doc, options) : null;
+  const metaItems = basicEnabled ? getBasicMetaItems(doc) : [];
+  const name = visibleBasicValue(doc, 'name').trim() || labels.unnamed;
+  const role = visibleBasicValue(doc, 'title').trim();
   const headingBold = doc.globalSettings.headingWeight !== 'normal';
 
   const children: Array<Paragraph | Table> = [];
@@ -296,7 +300,7 @@ export function buildResumeDocxDocument(
         spacing: { after: 70 },
         children: [
           new TextRun({
-            text: doc.basic.name.trim() || '[姓名]',
+            text: name,
             bold: headingBold,
             size: 36,
             color: '0F172A',
@@ -305,13 +309,13 @@ export function buildResumeDocxDocument(
         ],
       }),
     ];
-    if (doc.basic.title.trim()) {
+    if (role) {
       leftParas.push(
         new Paragraph({
           spacing: { after: 70 },
           children: [
             new TextRun({
-              text: `${labels.targetRole}${fmt(doc.basic.title.trim())}`,
+              text: `${labels.targetRole}${fmt(role)}`,
               bold: true,
               size: (basePt + 1) * 2,
               color: accentHex,
@@ -401,7 +405,7 @@ export function buildResumeDocxDocument(
         spacing: { after: 80 },
         children: [
           new TextRun({
-            text: doc.basic.name.trim() || '[姓名]',
+            text: name,
             bold: headingBold,
             size: 36,
             color: '0F172A',
@@ -411,14 +415,14 @@ export function buildResumeDocxDocument(
       }),
     );
 
-    if (doc.basic.title.trim()) {
+    if (role) {
       children.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { after: 80 },
           children: [
             new TextRun({
-              text: `${labels.targetRole}${fmt(doc.basic.title.trim())}`,
+              text: `${labels.targetRole}${fmt(role)}`,
               bold: true,
               size: (basePt + 1) * 2,
               color: accentHex,

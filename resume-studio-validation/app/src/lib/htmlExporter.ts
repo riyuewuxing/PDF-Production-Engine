@@ -1,6 +1,7 @@
 import type { ResumeDocument } from '../schema/resumeSchema';
 import { getBasicMetaItems, getOrderedVisibleSections, resolveFontFamilyStack } from '../templates/shared';
 import { getLocaleLabels } from './resumeLocale';
+import { visibleBasicValue } from './aiContext';
 import { parseRichTextBlocks } from './richText';
 
 export interface StandaloneHtmlOptions {
@@ -99,12 +100,13 @@ export function buildStandaloneResumeHtml(
     ? doc.globalSettings.themeColor
     : '#167883';
   const fontStack = resolveFontFamilyStack(doc.globalSettings).replaceAll('"', "'");
-  const metaItems = getBasicMetaItems(doc);
+  const basicEnabled = doc.menuSections.some(s => s.id === 'basic' && s.enabled);
+  const metaItems = basicEnabled ? getBasicMetaItems(doc) : [];
   const sections = getOrderedVisibleSections(doc);
   const photoUrl =
-    doc.basic.photoConfig.visible && options?.embeddedPhotoDataUrl?.startsWith('data:image/')
+    basicEnabled && doc.basic.photoConfig.visible && options?.embeddedPhotoDataUrl?.startsWith('data:image/')
       ? options.embeddedPhotoDataUrl
-      : doc.basic.photoConfig.visible && doc.basic.photo.trim().startsWith('data:image/')
+      : basicEnabled && doc.basic.photoConfig.visible && doc.basic.photo.trim().startsWith('data:image/')
         ? doc.basic.photo.trim()
         : '';
 
@@ -182,8 +184,9 @@ export function buildStandaloneResumeHtml(
     </section>`;
   });
 
-  const name = doc.basic.name.trim() || labels.unnamed;
-  const pageTitle = `${name} - ${doc.basic.title.trim() || doc.title}`;
+  const name = visibleBasicValue(doc, 'name').trim() || labels.unnamed;
+  const role = visibleBasicValue(doc, 'title').trim();
+  const pageTitle = [name, role].filter(Boolean).join(' - ');
   const isEn = doc.globalSettings.locale === 'en-US';
 
   return `<!doctype html>
@@ -313,7 +316,7 @@ export function buildStandaloneResumeHtml(
     <header class="hero">
       <div>
         <h1>${escapeHtml(name)}</h1>
-        ${doc.basic.title.trim() ? `<div class="role">${escapeHtml(labels.targetRole)}${escapeHtml(doc.basic.title.trim())}</div>` : ''}
+        ${role ? `<div class="role">${escapeHtml(labels.targetRole)}${escapeHtml(role)}</div>` : ''}
         ${
           metaItems.length > 0
             ? `<div class="meta-list">${metaItems

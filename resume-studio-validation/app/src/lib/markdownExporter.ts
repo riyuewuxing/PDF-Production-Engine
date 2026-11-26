@@ -3,19 +3,22 @@ import {
   getOrderedVisibleSections,
 } from '../templates/shared';
 import { getLocaleLabels } from './resumeLocale';
+import { visibleBasicValue } from './aiContext';
 import type { ResumeDocument } from '../schema/resumeSchema';
 
 export function resumeToMarkdown(doc: ResumeDocument): string {
   const labels = getLocaleLabels(doc.globalSettings.locale);
   const lines: string[] = [];
-  const name = doc.basic.name.trim() || labels.unnamed;
+  const basicEnabled = doc.menuSections.some(s => s.id === 'basic' && s.enabled);
+  const name = visibleBasicValue(doc, 'name').trim() || labels.unnamed;
+  const role = visibleBasicValue(doc, 'title').trim();
   lines.push(`# ${name}`);
 
   const metaParts: string[] = [];
-  if (doc.basic.title.trim()) {
-    metaParts.push(`${labels.targetRole}${doc.basic.title.trim()}`);
+  if (role) {
+    metaParts.push(`${labels.targetRole}${role}`);
   }
-  for (const item of getBasicMetaItems(doc)) {
+  for (const item of basicEnabled ? getBasicMetaItems(doc) : []) {
     metaParts.push(`${item.label}${labels.colon}${item.value}`);
   }
   if (metaParts.length > 0) {
