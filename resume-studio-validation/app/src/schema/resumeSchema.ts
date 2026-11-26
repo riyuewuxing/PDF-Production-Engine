@@ -280,6 +280,17 @@ export interface ResumeSummary {
   isMaster: boolean;
 }
 
+/** Listing isolates damaged entries without changing their on-disk bytes. */
+export interface ResumeListIssue {
+  slug:string;
+  reason:'CORRUPTED_JSON'|'SCHEMA_INVALID'|'UNSAFE_ENTRY'|'UNREADABLE';
+}
+export interface ResumeListResult {
+  master:ResumeSummary|null;
+  resumes:ResumeSummary[];
+  issues?:ResumeListIssue[];
+}
+
 export type MenuSectionInput = Omit<MenuSection, 'pageBreakBefore'> & {
   pageBreakBefore?: boolean;
 };

@@ -10,7 +10,7 @@ import type {
   ApplicationLogInput,
   JobApplication,
 } from '../schema/applicationSchema';
-import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
+import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
 import type { ResumeSnapshotMeta, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
 import type {
   CoverLetterExportOptions,
@@ -21,10 +21,7 @@ import type {
   SystemFontResult,
 } from '../types/electron';
 
-export interface ResumeListResponse {
-  master: ResumeSummary | null;
-  resumes: ResumeSummary[];
-}
+export type ResumeListResponse = ResumeListResult;
 
 async function handleJsonResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {

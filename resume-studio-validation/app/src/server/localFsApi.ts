@@ -21,6 +21,8 @@ import {
   ResumeDocumentSchema,
   resumeRevision,
   ResumeSummary,
+  type ResumeListIssue,
+  type ResumeListResult,
   type TemplateId,
 } from '../schema/resumeSchema';
 
@@ -126,6 +128,16 @@ async function fileExists(targetPath: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+// Occupancy is not readability: an inaccessible or dangling entry must not be
+// treated as free space for initialization, import, or recovery.
+async function pathEntryExists(targetPath: string): Promise<boolean> {
+  try { await fs.lstat(targetPath); return true; }
+  catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
   }
 }
 
@@ -321,42 +333,45 @@ export class LocalResumeStore {
     };
   }
 
-  async listResumes(): Promise<{ master: ResumeSummary | null; resumes: ResumeSummary[] }> {
+  async listResumes(): Promise<ResumeListResult> {
     await this.ensureDirs();
-
-    let master: ResumeSummary | null = null;
-    if (await fileExists(this.masterPath)) {
-      const doc = await this.readAndValidateFile(this.masterPath);
-      master = {
-        slug: 'master',
-        id: doc.id,
-        title: doc.title,
-        templateId: doc.templateId,
-        updatedAt: doc.updatedAt,
-        isMaster: true,
-      };
-    }
-
+    const issues: ResumeListIssue[] = [];
+    const summarize = async (slug:string,filePath:string):Promise<ResumeSummary|null> => {
+      try {
+        const entry = await fs.lstat(filePath);
+        if (!entry.isFile() || entry.isSymbolicLink()) {
+          issues.push({slug,reason:'UNSAFE_ENTRY'});
+          return null;
+        }
+        const doc = await this.readAndValidateFile(filePath);
+        return {slug,id:doc.id,title:doc.title,templateId:doc.templateId,updatedAt:doc.updatedAt,isMaster:slug==='master'};
+      } catch (err) {
+        if (err instanceof LocalFsApiError) {
+          issues.push({slug,reason:err.code==='CORRUPTED_JSON'?'CORRUPTED_JSON':err.code==='SCHEMA_INVALID'?'SCHEMA_INVALID':'UNREADABLE'});
+          return null;
+        }
+        if (typeof (err as NodeJS.ErrnoException)?.code === 'string') {
+          // A file removed during listing is no longer available; any other
+          // file-specific error is reported, not silently hidden.
+          if ((err as NodeJS.ErrnoException).code !== 'ENOENT') issues.push({slug,reason:'UNREADABLE'});
+          return null;
+        }
+        throw err;
+      }
+    };
+    const master = await summarize('master',this.masterPath);
     const entries = await fs.readdir(this.resumesDir, { withFileTypes: true });
-    const resumes: ResumeSummary[] = [];
+    const resumes:ResumeSummary[] = [];
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
-      const slug = entry.name.slice(0, -5);
+      if (!entry.name.endsWith('.json')) continue;
+      const slug = entry.name.slice(0,-5);
       if (!SAFE_SLUG_REGEX.test(slug) || slug === 'master') continue;
-      const fullPath = resolveContainedPath(this.resumesDir, entry.name);
-      const doc = await this.readAndValidateFile(fullPath);
-      resumes.push({
-        slug,
-        id: doc.id,
-        title: doc.title,
-        templateId: doc.templateId,
-        updatedAt: doc.updatedAt,
-        isMaster: false,
-      });
+      const row = await summarize(slug,resolveContainedPath(this.resumesDir,entry.name));
+      if (row) resumes.push(row);
     }
-
-    resumes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return { master, resumes };
+    resumes.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+    issues.sort((a,b)=>a.slug.localeCompare(b.slug));
+    return {master,resumes,...(issues.length?{issues}:{})};
   }
 
   private async readAndValidateFile(filePath: string): Promise<ResumeDocument> {
@@ -466,7 +481,7 @@ export class LocalResumeStore {
     return withResumeWriteLock(this.dataDir, async () => {
       const reserved=await this.reservedTrashSlugs();
       const baseSlug=candidateSlug;
-      const occupied=async(slug:string)=>reserved.has(slug.toLowerCase())||await fileExists(this.resolveResumePath(slug).filePath);
+      const occupied=async(slug:string)=>reserved.has(slug.toLowerCase())||await pathEntryExists(this.resolveResumePath(slug).filePath);
       if(input.slug&&await occupied(candidateSlug)){
         throw new LocalFsApiError(409,reserved.has(candidateSlug.toLowerCase())?'SLUG_RESERVED':'SLUG_EXISTS','版本标识已存在或在回收站中保留。');
       }
@@ -557,7 +572,7 @@ export class LocalResumeStore {
         const base=slug.slice(0,60)+'-restored';
         slug=base;
         let i=2;
-        while(reserved.has(slug.toLowerCase())||await fileExists(this.resolveResumePath(slug).filePath)){
+        while(reserved.has(slug.toLowerCase())||await pathEntryExists(this.resolveResumePath(slug).filePath)){
           const tail='-'+i++;slug=base.slice(0,80-tail.length)+tail;
         }
         const now=new Date().toISOString();
@@ -566,7 +581,7 @@ export class LocalResumeStore {
         return {slug,document:doc};
       }
       const target=this.resolveResumePath(slug).filePath;
-      if(await fileExists(target))throw new LocalFsApiError(409,'RESTORE_CONFLICT','原版本标识已被占用，未覆盖现有文件。可另存恢复副本。');
+      if(await pathEntryExists(target))throw new LocalFsApiError(409,'RESTORE_CONFLICT','原版本标识已被占用，未覆盖现有文件。可另存恢复副本。');
       // Advance revision before moving back so old open editors cannot write using a pre-delete revision.
       const doc=await this.writeResume(archived.filePath,archived.document,archived.document);
       await fs.rename(archived.filePath,target);
@@ -1175,16 +1190,16 @@ export async function ensureInitialDataFromLegacy(options: {
   const store = new LocalResumeStore(dataDir);
   await store.ensureDirs();
 
-  const hasMaster = await fileExists(masterPath);
-  const hasResume = await fileExists(resumePath);
+  const hasMaster = await pathEntryExists(masterPath);
+  const hasResume = await pathEntryExists(resumePath);
 
   if (!options.force && hasMaster && hasResume) {
     return { initialized: false, masterPath, resumePath };
   }
 
-  if (!(await fileExists(legacyFile))) {
+  if (!(await pathEntryExists(legacyFile))) {
     const existingList = await store.listResumes();
-    if (existingList.master || existingList.resumes.length > 0) {
+    if (existingList.master || existingList.resumes.length > 0 || existingList.issues?.length) {
       return { initialized: false, masterPath, resumePath };
     }
     const nowIso = new Date().toISOString();

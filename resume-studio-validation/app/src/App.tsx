@@ -92,6 +92,7 @@ export default function App() {
   const {
     summaries,
     masterSummary,
+    listIssues,
     activeSlug,
     activeDoc,
     activeDocRef,
@@ -352,6 +353,16 @@ export default function App() {
     });
   }, [activeDoc, isRedacted, parsedRedactionTerms]);
 
+  const resumeListWarning = listIssues.length > 0 && (
+    <details aria-label="简历文件读取异常" className="no-print shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-2 text-left text-xs text-amber-950">
+      <summary className="cursor-pointer font-semibold">有 {listIssues.length} 份简历文件无法读取，检查未删除或覆盖原文件。</summary>
+      <p className="mt-1">仍可使用正常简历；请先保留异常文件，在本地核对或从备份恢复后重新启动。</p>
+      <ul className="mt-1 max-h-24 list-disc overflow-y-auto pl-5">
+        {listIssues.map(issue=><li className="break-all" key={issue.slug}>{issue.slug}.json：{{CORRUPTED_JSON:'JSON 损坏',SCHEMA_INVALID:'数据格式不符合规范',UNSAFE_ENTRY:'不是普通文件',UNREADABLE:'无法读取'}[issue.reason]}</li>)}
+      </ul>
+    </details>
+  );
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#11161f] text-sm text-slate-300">
@@ -376,7 +387,7 @@ export default function App() {
           >
             重试加载
           </button>
-          <div className="mt-4 space-y-2"><RecoveryDraftPanel onImport={handleImportJson}/><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/></div>
+          <div className="mt-4 space-y-2">{resumeListWarning}<RecoveryDraftPanel onImport={handleImportJson}/><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/></div>
         </div>
       </div>
     );
@@ -429,6 +440,7 @@ export default function App() {
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
       {workspaceContext?.restored&&<div aria-label="独立恢复工作区标识" className="no-print flex shrink-0 flex-wrap items-center gap-x-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"><strong className="shrink-0">独立恢复工作区</strong><span className="min-w-0 break-all">{workspaceContext.folder}</span><span>编辑仅写入此副本；原工作区不受影响。</span></div>}
+      {resumeListWarning}
       <RecoveryDraftPanel onImport={handleImportJson}/>
       {recoveryError&&<div role="alert" className="no-print shrink-0 bg-amber-50 px-3 py-1 text-xs text-amber-900">{recoveryError}</div>}
       {saveState==='error' && (

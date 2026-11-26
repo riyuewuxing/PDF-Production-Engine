@@ -4,7 +4,7 @@ import { careerLedger } from '../lib/careerLedgerSession';
 import {checkpointRecovery,clearRecovery,type Checkpoint} from '../lib/recoveryCheckpoint';
 import { cleanResumeRichText } from '../lib/htmlToMarkdown';
 import { useHistoryState } from '../lib/useHistoryState';
-import { resumeRevision, type ResumeDocument, type ResumeSummary } from '../schema/resumeSchema';
+import { resumeRevision, type ResumeDocument, type ResumeSummary, type ResumeListIssue } from '../schema/resumeSchema';
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -13,6 +13,7 @@ export function useResumePersistence(options?: {
 }) {
   const [summaries, setSummaries] = useState<ResumeSummary[]>([]);
   const [masterSummary, setMasterSummary] = useState<ResumeSummary | null>(null);
+  const [listIssues,setListIssues]=useState<ResumeListIssue[]>([]);
   const [activeSlug, setActiveSlug] = useState<string>('');
   const history = useHistoryState<ResumeDocument>(null);
   const { reset: resetHistory } = history;
@@ -115,6 +116,7 @@ export function useResumePersistence(options?: {
         const list = await apiClient.listResumes();
         setMasterSummary(list.master);
         setSummaries(list.resumes);
+        setListIssues(list.issues??[]);
         revisionsRef.current = new Map([...(list.master ? [list.master] : []), ...list.resumes]
           .map(item => [item.slug, { id: item.id, updatedAt: item.updatedAt }]));
 
@@ -280,7 +282,7 @@ export function useResumePersistence(options?: {
       }
       try{
         const list=await apiClient.listResumes();
-        setMasterSummary(list.master);setSummaries(list.resumes);
+        setMasterSummary(list.master);setSummaries(list.resumes);setListIssues(list.issues??[]);
         for(const item of [...list.resumes,...(list.master?[list.master]:[])])revisionsRef.current.set(item.slug,{id:item.id,updatedAt:item.updatedAt});
         const next=list.resumes[0]?.slug??(list.master?'master':'');
         if(next){
@@ -360,6 +362,7 @@ export function useResumePersistence(options?: {
   return {
     summaries,
     masterSummary,
+    listIssues,
     activeSlug,
     activeDoc,
     activeDocRef,

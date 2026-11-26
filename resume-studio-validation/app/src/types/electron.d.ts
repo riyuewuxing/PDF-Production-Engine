@@ -9,7 +9,7 @@ import type {
   JobApplication,
   CoverLetterPdfPayload,
 } from '../schema/applicationSchema';
-import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
+import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
 import type { ResumeSnapshotMeta, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
 
 export interface SystemFontResult {
@@ -64,7 +64,7 @@ export interface ResumeDesktopBridge {
   workspaceBackup?:{create:()=>Promise<BackupResult|null>;inspect:()=>Promise<BackupInspection|null>;restore:(token:string,confirmation:'RESTORE_TO_NEW_WORKSPACE')=>Promise<BackupResult|null>;context?:()=>Promise<{folder:string;restored:boolean}>;editorReady?:(slug:string,id:string)=>Promise<void>;prepareLaunch?:(mode:'last'|'choose')=>Promise<BackupInspection|null>;launch?:(token:string,confirmation:'OPEN_INDEPENDENT_WORKSPACE')=>Promise<{folder:string;pid:number;ready:true}>};
   readonly isDesktop: true;
   resumes: {
-    list: () => Promise<{ master: ResumeSummary | null; resumes: ResumeSummary[] }>;
+    list: () => Promise<ResumeListResult>;
     get: (slug: string) => Promise<ResumeDocument>;
     save: (slug: string, doc: ResumeDocument) => Promise<ResumeDocument>;
     create: (input: {
