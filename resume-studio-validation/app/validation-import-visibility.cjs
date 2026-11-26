@@ -36,8 +36,8 @@ async function run(){
     try{
       picker.attach('1.3');await picker.sendCommand('Page.enable');await picker.sendCommand('Page.setInterceptFileChooserDialog',{enabled:true});
       const opened=new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('JSON picker watchdog expired')),8000);listener=(_event,method,params)=>{if(method==='Page.fileChooserOpened'){clearTimeout(timer);resolve(params);}};picker.on('message',listener);});
-      const [chosen]=await Promise.all([opened,click('导入 JSON')]);
-      if(!chosen.backendNodeId)throw Error('actual JSON picker did not open file input');
+      const [chosen,clicked]=await Promise.all([opened,win.webContents.executeJavaScript('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==="导入 JSON");if(!b||b.disabled)return false;b.click();return true})()',true)]);
+      if(!clicked||!chosen.backendNodeId)throw Error('actual JSON picker did not open file input');
       await picker.sendCommand('DOM.setFileInputFiles',{files:[inputPath],backendNodeId:chosen.backendNodeId});
     }finally{clearTimeout(timer);if(listener)picker.removeListener('message',listener);if(picker.isAttached()){await picker.sendCommand('Page.setInterceptFileChooserDialog',{enabled:false}).catch(()=>{});picker.detach();}}
     await until('imported version selected',async()=>{const slug=await active();if(!slug||slug===previous)return false;try{return (await main.store.getResume(slug)).basic.name===name;}catch{return false;}});
