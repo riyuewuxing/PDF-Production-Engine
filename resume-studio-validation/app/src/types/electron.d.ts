@@ -10,7 +10,7 @@ import type {
   CoverLetterPdfPayload,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
-import type { ResumeSnapshotMeta, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
+import type { ResumeSnapshotMeta, ResumeSnapshotInventory, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
 
 export interface SystemFontResult {
   fonts: string[];
@@ -83,6 +83,7 @@ export interface ResumeDesktopBridge {
   };
   snapshots: {
     list: (slug: string) => Promise<ResumeSnapshotMeta[]>;
+    inventory?: (slug:string)=>Promise<ResumeSnapshotInventory>;
     create: (slug: string, reason: string, expectedRevision: string) => Promise<ResumeSnapshotMeta>;
     restore: (slug: string, snapshotId: string, expectedRevision: string) => Promise<ResumeDocument>;
   };

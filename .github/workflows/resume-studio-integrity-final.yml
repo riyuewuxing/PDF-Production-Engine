@@ -1,0 +1,104 @@
+name: Resume Studio V6 combined MCP and snapshot integrity regression
+on:
+  push:
+    branches: ['resume-studio/v6-integrity-final-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-integrity-final-validation
+  cancel-in-progress: true
+jobs:
+  combined:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck combined source
+        timeout-minutes: 2
+        run: pnpm typecheck
+      - name: All synthetic unit regressions
+        if: runner.os == 'Windows'
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          pnpm exec vitest run --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Cross-platform snapshot integrity and inventory tests
+        if: runner.os == 'Linux'
+        timeout-minutes: 2
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          pnpm exec vitest run src/server/snapshotIntegrity.test.ts src/server/snapshotInventory.test.ts --reporter=json --outputFile="$out/snapshot-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application and MCP entry
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Real MCP transport verification on combined source
+        timeout-minutes: 3
+        run: |
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence'
+          node validation-mcp-transport.cjs candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real MCP permission and CAS regression
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('mcp-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence'
+          node validation-mcp-process.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual snapshot warning, retention, rollback and version isolation
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-snapshot-ui-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence\history'
+          & .\node_modules\.bin\electron.cmd .\validation-snapshot-integrity.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full real Electron application smoke and fault injection
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('resume-studio-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence\application'
+          & .\node_modules\.bin\electron.cmd .\validation-smoke.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Force terminate and restart real Electron recovery
+        if: runner.os == 'Windows'
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_CRASH_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-integrity-final-evidence\crash'
+          node scripts/qa-crash-draft.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload combined evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-integrity-final-${{ matrix.os }}
+          path: resume-studio-integrity-final-evidence/
+          if-no-files-found: error
+          retention-days: 3

@@ -15,6 +15,8 @@ const report=error=>fs.writeFileSync(path.join(out,'snapshot-ui-evidence.json'),
 async function run(){
   const saved=await main.store.saveResume('runner-fixture',{...fixture,id:'synthetic-history-ui',title:'合成历史保护原稿',basic:{...fixture.basic,name:'合成当前候选人'}});
   await main.store.saveResume('master',{...fixture,id:'synthetic-history-master',title:'合成母库'});
+  const alternate=await main.store.saveResume('alternate',{...fixture,id:'synthetic-history-alternate',title:'合成另一版本',basic:{...fixture.basic,name:'合成另一候选人'}});
+  await main.store.createSnapshot('alternate','另一版本唯一历史',undefined,JSON.stringify([alternate.id,alternate.updatedAt]));
   const file=path.join(main.dataDir,'resumes','runner-fixture.json'),original=fs.readFileSync(file);
   const dir=path.join(main.dataDir,'.backups','runner-fixture');fs.mkdirSync(dir,{recursive:true});
   const make=(id,reason,createdAt,doc)=>({meta:{id,slug:'runner-fixture',reason,createdAt,title:doc.title,templateId:doc.templateId,charCount:100},document:doc});
@@ -37,6 +39,9 @@ async function run(){
   await until('normal editor',()=>js('document.querySelector("#basic-field-name")?.value==="合成当前候选人"'));
   await click('版本母库');await until('history list',()=>has('历史快照回滚 (15/15)'));
   await until('verified newest visible',()=>has('合成最新有效历史'));
+  await until('two retained anomalies visible',()=>has('有 2 份异常快照'));
+  const inventory=await js('window.resumeDesktop.snapshots.inventory("runner-fixture")');
+  assert(inventory.unreadableCount===2&&inventory.items.length===15,'inventory mismatch');
   assert(!await has('合成错误别名')&&!await has('合成坏快照'),'invalid snapshots exposed as valid');
   checks.realHistoryListExcludesInvalidRecords=true;
   await click('手动创建快照');await until('manual snapshot confirmed',()=>has('已创建本地时间机器快照'));
@@ -45,6 +50,7 @@ async function run(){
   assert(!fs.existsSync(path.join(dir,'history-00.json'))&&fs.existsSync(path.join(dir,'history-01.json')),'wrong valid retention target');
   assert(fs.readFileSync(file).equals(original),'manual snapshot changed source');
   preserve();checks.manualCreationRetainsNewestAndOriginals=true;
+  await until('anomaly notice retained after creation',()=>has('有 2 份异常快照'));
   await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("历史快照回滚"));e?.scrollIntoView({block:"start"});return true})()');
   await capture('01-history-valid-retention');
   const revision=JSON.stringify([saved.id,saved.updatedAt]);
@@ -65,7 +71,46 @@ async function run(){
   assert(rec.document.basic.name==='合成当前候选人'&&rec.document.id===saved.id,'rollback backup does not contain former current document');
   assert(after.length===15,'valid retention cap not maintained');preserve();checks.realRollbackRetainsVerifiedPreRollbackBackup=true;
   await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("历史快照回滚"));e?.scrollIntoView({block:"start"});return true})()');
+  await until('anomaly notice retained after rollback',()=>has('有 2 份异常快照'));
   await capture('02-history-rollback-preserved');
+  checks.inventoryNoticePersistsThroughManualCreationAndRollback=true;
+  // Exercise an actual late IPC result while switching to another document.
+  const originalInventory=main.store.listSnapshotInventory.bind(main.store);let started=false,release;
+  const gate=new Promise(r=>release=r);
+  main.store.listSnapshotInventory=async slug=>{if(slug==='runner-fixture'&&!started){started=true;await gate;}return originalInventory(slug);};
+  const switchTo=async slug=>{
+    const ok=await js('(()=>{const e=document.querySelector("select[aria-label=\\"快速切换简历版本\\"]");if(!e)return false;Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(e,'+JSON.stringify(slug)+');e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+    assert(ok,'version selector absent');
+    await until('selected '+slug,()=>js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value==='+JSON.stringify(slug)));
+  };
+  try{
+    await click('内容编辑');await click('版本母库');await until('delayed inventory entered',()=>started);
+    await switchTo('alternate');
+    await until('alternate history',()=>has('另一版本唯一历史'));
+    assert(await has('历史快照回滚 (1/15)')&&!await has('有 2 份异常快照'),'old inventory visible before response');
+    release();await sleep(400);
+    assert(await has('另一版本唯一历史')&&await has('历史快照回滚 (1/15)')&&!await has('有 2 份异常快照'),'late inventory replaced another version');
+    checks.lateInventoryCannotReplaceSwitchedVersion=true;
+    await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("历史快照回滚"));e?.scrollIntoView({block:"start"});return true})()');
+    await capture('03-other-version-history-isolated');
+  }finally{release();main.store.listSnapshotInventory=originalInventory;}
+  await switchTo('runner-fixture');await until('first version warning restored',()=>has('有 2 份异常快照'));
+  // A redirected directory is not an empty history. Keep originals outside the
+  // junction temporarily, then restore them; the external target stays intact.
+  const held=dir+'.held',outside=path.join(root,'external-snapshot-sentinel');
+  fs.mkdirSync(outside);fs.writeFileSync(path.join(outside,'keep.txt'),'PRESERVE');
+  fs.renameSync(dir,held);fs.symlinkSync(outside,dir,'junction');
+  try{
+    win.webContents.reload();await until('editor loaded after redirect',()=>js('document.querySelector("#basic-field-name")?.value==="合成历史候选人"'));
+    await click('版本母库');await until('explicit history inspection error',()=>has('历史快照检查失败'));
+    assert(await has('历史快照目录不安全')&&!await has('暂无磁盘快照'),'failed directory appeared as empty');
+    await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("历史快照回滚"));e?.scrollIntoView({block:"start"});return true})()');
+    await capture('04-unsafe-history-directory-error');
+    await click('手动创建快照');await until('unsafe creation refused',()=>has('历史快照目录不安全'));
+    assert(JSON.stringify(fs.readdirSync(outside))===JSON.stringify(['keep.txt'])&&fs.readFileSync(path.join(outside,'keep.txt'),'utf8')==='PRESERVE','redirected directory modified');
+    checks.unsafeDirectoryIsVisibleAndNeverWritten=true;
+  }finally{fs.unlinkSync(dir);fs.renameSync(held,dir);}
+  preserve();
   observations.invalidRecordHashes={alias:digest(aliasBytes),invalid:digest(invalidBytes)};observations.newestSha256=digest(newestBytes);observations.validCount=after.length;observations.allFiles=fs.readdirSync(dir).length;
   report();
 }

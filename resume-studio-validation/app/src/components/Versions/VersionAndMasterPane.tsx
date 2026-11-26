@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { apiClient } from '../../lib/apiClient';
+import { apiClient, localErrorMessage } from '../../lib/apiClient';
 import {
   type PdfImportDraft,
   extractAndParsePdfResume,
@@ -79,16 +79,21 @@ export function VersionAndMasterPane({
   const [pdfDraft, setPdfDraft] = useState<PdfImportDraft | null>(null);
 
   const [snapshotsOpen, setSnapshotsOpen] = useState(true);
-  const [snapshots, setSnapshots] = useState<ResumeSnapshotMeta[]>([]);
+  const [snapshotState,setSnapshotState]=useState<{slug:string;items:ResumeSnapshotMeta[];unreadableCount:number|null;error:string|null}|null>(null);
+  const snapshotView=snapshotState?.slug===activeSlug?snapshotState:null;
+  const snapshots=snapshotView?.items??[];
+  const snapshotSlug=useRef(activeSlug);snapshotSlug.current=activeSlug;
+  const snapshotRequest=useRef(0);
   const [snapshotStatus, setSnapshotStatus] = useState<string | null>(null);
 
   const refreshSnapshots = useCallback(async () => {
-    if (!activeSlug) return;
+    if(!activeSlug||snapshotSlug.current!==activeSlug)return;
+    const seq=++snapshotRequest.current;
     try {
-      const list = await apiClient.listSnapshots(activeSlug);
-      setSnapshots(list);
-    } catch {
-      setSnapshots([]);
+      const inventory=await apiClient.listSnapshotInventory(activeSlug);
+      if(seq===snapshotRequest.current&&snapshotSlug.current===activeSlug)setSnapshotState({slug:activeSlug,...inventory,error:null});
+    } catch(err) {
+      if(seq===snapshotRequest.current&&snapshotSlug.current===activeSlug)setSnapshotState({slug:activeSlug,items:[],unreadableCount:null,error:localErrorMessage(err,'无法读取历史快照。')});
     }
   }, [activeSlug]);
 
@@ -397,9 +402,12 @@ export function VersionAndMasterPane({
             </div>
           )}
 
+          {snapshotView?.error&&<p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-[11px] text-red-800">历史快照检查失败：{snapshotView.error} 未确认磁盘历史记录数量。</p>}
+          {!snapshotView?.error&&typeof snapshotView?.unreadableCount==='number'&&snapshotView.unreadableCount>0&&<p role="alert" className="rounded border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900">有 {snapshotView.unreadableCount} 份异常快照，原文件保留，不计入 15 份有效快照上限。请在本地核对原件或备份。</p>}
+          {snapshotView&&!snapshotView.error&&snapshotView.unreadableCount===null&&<p className="text-[11px] text-slate-600">当前桥接版本无法检查异常快照数量。</p>}
           {snapshotsOpen && (
             <div className="space-y-1.5">
-              {snapshots.length === 0 ? (
+              {!snapshotView ? <p className="text-[11px] text-slate-500">正在检查磁盘快照…</p> : snapshotView.error ? null : snapshots.length === 0 ? (
                 <div className="rounded border border-dashed border-slate-200 bg-white p-3 text-center text-[11px] text-slate-400">
                   暂无磁盘快照。导出 PDF/DOCX、母库合并或点击右上角“手动创建快照”时将自动留存（最多滚动保留 15 份）。
                 </div>

@@ -27,6 +27,7 @@ const bridge: ResumeDesktopBridge = {
   },
   snapshots: {
     list: (slug: string) => ipcRenderer.invoke('snapshots:list', slug),
+    inventory: slug=>ipcRenderer.invoke('snapshots:inventory',slug),
     create: (slug, reason, expectedRevision) => ipcRenderer.invoke('snapshots:create', slug, reason, expectedRevision),
     restore: (slug, snapshotId, expectedRevision) =>
       ipcRenderer.invoke('snapshots:restore', slug, snapshotId, expectedRevision),

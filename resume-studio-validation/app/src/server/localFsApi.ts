@@ -169,6 +169,8 @@ export interface ResumeSnapshotMeta {
   charCount: number;
 }
 
+export interface ResumeSnapshotInventory { items: ResumeSnapshotMeta[]; unreadableCount:number; }
+
 export function assertSafeSnapshotId(rawId: string): string {
   const clean = rawId.trim().replace(/\.json$/i, '');
   if (!SAFE_SNAPSHOT_ID_REGEX.test(clean) || clean.includes('..') || clean.includes('/') || clean.includes('\\')) {
@@ -763,24 +765,31 @@ export class LocalResumeStore {
     return meta;
   }
 
-  async listSnapshots(rawSlug: string): Promise<ResumeSnapshotMeta[]> {
+  async listSnapshots(rawSlug:string):Promise<ResumeSnapshotMeta[]>{
+    return (await this.listSnapshotInventory(rawSlug)).items;
+  }
+
+  async listSnapshotInventory(rawSlug:string):Promise<ResumeSnapshotInventory>{
     const checked=await this.checkedSnapshotDir(rawSlug,false);
-    if(!checked)return [];
+    if(!checked)return {items:[],unreadableCount:0};
     const {slug,dir}=checked;
     const entries=await fs.readdir(dir,{withFileTypes:true});
-    const metas:ResumeSnapshotMeta[]=[];
+    const items:ResumeSnapshotMeta[]=[];let unreadableCount=0;
     for(const entry of entries){
-      if(!entry.isFile()||!entry.name.endsWith('.json'))continue;
+      if(!entry.name.endsWith('.json'))continue;
       const id=entry.name.slice(0,-5);
       try{
-        if(assertSafeSnapshotId(id)!==id)continue;
-        metas.push((await this.readSnapshotRecord(slug,dir,id)).meta);
-      }catch{
+        if(!entry.isFile()||assertSafeSnapshotId(id)!==id){unreadableCount++;continue;}
+        items.push((await this.readSnapshotRecord(slug,dir,id)).meta);
+      }catch(err){
         // A corrupt/foreign record is preserved, never counted toward the
         // retention cap and never used as the target of automatic deletion.
+        // A concurrently removed file is no longer an abnormal record.
+        if(!(err instanceof LocalFsApiError&&err.code==='SNAPSHOT_NOT_FOUND'))unreadableCount++;
       }
     }
-    return metas.sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)||b.id.localeCompare(a.id));
+    items.sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)||b.id.localeCompare(a.id));
+    return {items,unreadableCount};
   }
 
   async restoreSnapshot(rawSlug:string,rawSnapshotId:string,expectedRevision?:string):Promise<ResumeDocument>{
@@ -1125,6 +1134,10 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
 
       if (pathname.startsWith('/api/resumes/')) {
         const tail = pathname.slice('/api/resumes/'.length);
+        const inventoryMatch=/^([^/]+)\/snapshot-inventory$/.exec(tail);
+        if(method==='GET'&&inventoryMatch?.[1]){
+          sendJson(res,200,await store.listSnapshotInventory(inventoryMatch[1]));return;
+        }
         const snapMatch = /^([^/]+)\/snapshots(\/restore)?$/.exec(tail);
         if (snapMatch && snapMatch[1]) {
           const slug = snapMatch[1];

@@ -11,7 +11,7 @@ import type {
   JobApplication,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
-import type { ResumeSnapshotMeta, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
+import type { ResumeSnapshotMeta, ResumeSnapshotInventory, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
 import type {
   CoverLetterExportOptions,
   PdfExportOptions,
@@ -134,6 +134,12 @@ export const apiClient = {
     }
     const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshots`);
     return handleJsonResponse<ResumeSnapshotMeta[]>(res);
+  },
+
+  async listSnapshotInventory(slug:string):Promise<{items:ResumeSnapshotMeta[];unreadableCount:number|null}>{
+    const bridge=window.resumeDesktop?.snapshots;
+    if(bridge)return bridge.inventory?bridge.inventory(slug):{items:await bridge.list(slug),unreadableCount:null};
+    return handleJsonResponse<ResumeSnapshotInventory>(await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshot-inventory`));
   },
 
   async createSnapshot(slug: string, reason: string, expectedRevision: string): Promise<ResumeSnapshotMeta> {
