@@ -37,7 +37,7 @@ describe('resume revision and cross-process locking', () => {
       child.once('close', code => {clearTimeout(timer);resolve({code,stdout,stderr});});
     });
     const results = await Promise.all([run('Writer A'),run('Writer B')]);
-    expect(results.map(r => r.code).sort()).toEqual([0, 3]);
+    expect(results.map(r => r.code).sort(), JSON.stringify(results)).toEqual([0, 3]);
     expect(results.find(r => r.code === 3)?.stdout).toContain('REVISION_CONFLICT');
     const final = await store.getResume('demo');
     expect(final.title).toBe(results.find(r => r.code === 0)?.stdout.trim());

@@ -1026,7 +1026,7 @@ async function run() {
   const jobSource='合成招聘公告\n须持高中物理教师资格证；硕士优先。\n不要求班主任经验；必须硕士且经验优先\n报名截止2026-12-01。';
   await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',jobSource);
   await click('分析岗位原文');await until('six source clauses',()=>bodyHas('候选 6 条'));
-  await click('加载 / 刷新岗位事实依据');await until('current job evidence loaded',()=>bodyHas('已加载本地有效原始事实')&&js('[...document.querySelectorAll("button")].some(b=>b.innerText==="记录本条人工核对"&&!b.disabled)'));
+  await click('加载 / 刷新岗位事实依据');await until('current job evidence loaded',async()=>await bodyHas('已加载本地有效原始事实')&&await js('[...document.querySelectorAll("button")].some(b=>b.innerText==="记录本条人工核对"&&!b.disabled)'));
   const jobSelect=(name,val)=>js('(()=>{const e=document.querySelector("select[aria-label="+JSON.stringify('+JSON.stringify(name)+')+"]");if(!e||e.disabled)return false;e.value='+JSON.stringify(val)+';e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
   const jobQuote=()=>js('document.querySelector("[aria-label=\\"岗位条款原文\\"]")?.innerText');
   const clauseId=(quote)=>{const start=jobSource.indexOf(quote);return start+':'+(start+quote.length);};
