@@ -1,0 +1,47 @@
+name: Resume Studio V6 isolated MCP process validation
+on:
+  push:
+    branches: ['resume-studio/v6-mcp-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-mcp-validation
+  cancel-in-progress: true
+jobs:
+  windows-mcp-process:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual packaged MCP entry
+        run: pnpm desktop:build
+      - name: Real Node child process MCP stdio and concurrent CAS verification
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('mcp-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-mcp-evidence'
+          node validation-mcp-process.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload process evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-mcp-process-evidence
+          path: resume-studio-mcp-evidence/
+          if-no-files-found: ignore
+          retention-days: 3
