@@ -1,7 +1,9 @@
 // @vitest-environment node
 import path from 'node:path';
+import os from 'node:os';
+import {promises as fs} from 'node:fs';
 import {describe,expect,it} from 'vitest';
-import {buildWorkspaceLaunch,checkLaunchReceipt,readLaunchHandoff,outerLaunchTemp} from './workspaceLaunch';
+import {buildWorkspaceLaunch,checkLaunchReceipt,readLaunchHandoff,outerLaunchTemp,recordLaunchStage,lastLaunchStage,shouldBootstrapWorkspace} from './workspaceLaunch';
 const dir=path.resolve('temp','resume-studio-launch-test');
 const root=path.resolve('copies','resume-studio-restored-v1-test');
 const handoff={dir,token:'2e18a861-5562-48ec-8191-d0bf92b6d0e3',basis:'a'.repeat(64)};
@@ -22,6 +24,17 @@ describe('isolated workspace process launch',()=>{
     expect(plan.env.PORTABLE_EXECUTABLE_FILE).toBeUndefined();
     expect(outerLaunchTemp(path.join(dir,'portable-temp'))).toBe(path.dirname(dir));
     expect(()=>buildWorkspaceLaunch({isPackaged:true,exePath,appDir,root,handoff,env:{PORTABLE_EXECUTABLE_DIR:path.dirname(wrapper)}})).toThrow();
+  });
+  it('reports only bounded, recognized startup stages',async()=>{
+    const folder=await fs.mkdtemp(path.join(os.tmpdir(),'resume-studio-launch-test-'));
+    try{const h={...handoff,dir:folder};expect(await lastLaunchStage(folder)).toContain('尚未');recordLaunchStage(h,'module-loaded');recordLaunchStage(h,'entry-main');await fs.appendFile(path.join(folder,'progress.txt'),'unrecognized secret\n');expect(await lastLaunchStage(folder)).toBe('entry-main');}finally{await fs.rm(folder,{recursive:true,force:true});}
+  });
+  it('boots the exact app entry even when Electron imports CJS through ESM, but not a test harness',()=>{
+    const context={commonJsMain:false,hasHandoff:false,isPackaged:false,appDir};
+    expect(shouldBootstrapWorkspace({...context,argvEntry:appDir})).toBe(true);
+    expect(shouldBootstrapWorkspace({...context,argvEntry:path.join(appDir,'dist-electron','main.cjs')})).toBe(true);
+    expect(shouldBootstrapWorkspace({...context,argvEntry:path.join(appDir,'validation-smoke.cjs')})).toBe(false);
+    expect(shouldBootstrapWorkspace({...context,hasHandoff:true})).toBe(true);
   });
   it('requires a matching one-time receipt and complete launch handoff',()=>{
     const receipt={token:handoff.token,folder:root,pid:100,status:'ready'};

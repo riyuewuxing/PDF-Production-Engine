@@ -1,4 +1,4 @@
-import {promises as fs} from 'node:fs';
+import {promises as fs, appendFileSync, lstatSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {randomUUID} from 'node:crypto';
@@ -9,12 +9,29 @@ const PREFIX='resume-studio-launch-';
 const TOKEN=/^[a-f0-9-]{36}$/i;
 const BASIS=/^[a-f0-9]{64}$/;
 export type LaunchHandoff={dir:string;token:string;basis:string};
+const STAGES=['module-loaded','entry-main','profile-ready','instance-lock-acquired','app-ready','workspace-verified','window-loaded','renderer-document-ready','receipt-written'] as const;
+type LaunchStage=typeof STAGES[number];
+export function recordLaunchStage(handoff:LaunchHandoff|null,stage:LaunchStage):void{
+  if(!handoff)return;
+  try{const st=lstatSync(handoff.dir);if(st.isDirectory()&&!st.isSymbolicLink())appendFileSync(path.join(handoff.dir,'progress.txt'),stage+'\n',{mode:0o600});}catch{/* Diagnostics must not prevent safe startup. */}
+}
+export async function lastLaunchStage(dir:string):Promise<string>{
+  try{const file=path.join(dir,'progress.txt'),st=await fs.lstat(file);if(!st.isFile()||st.isSymbolicLink()||st.size>4096)return '无法读取启动阶段';const lines=(await fs.readFile(file,'utf8')).split('\n').filter(x=>(STAGES as readonly string[]).includes(x));return lines.at(-1)??'尚未进入应用主程序';}catch{return '尚未进入应用主程序';}
+}
 export function readLaunchHandoff(env:NodeJS.ProcessEnv):LaunchHandoff|null{
   const dir=env.RESUME_STUDIO_LAUNCH_DIR,token=env.RESUME_STUDIO_LAUNCH_TOKEN,basis=env.RESUME_STUDIO_LAUNCH_BASIS;
   delete env.RESUME_STUDIO_LAUNCH_DIR;delete env.RESUME_STUDIO_LAUNCH_TOKEN;delete env.RESUME_STUDIO_LAUNCH_BASIS;
   if(dir===undefined&&token===undefined&&basis===undefined)return null;
   if(!dir||!path.isAbsolute(dir)||!path.basename(dir).startsWith(PREFIX)||!token||!TOKEN.test(token)||!basis||!BASIS.test(basis))throw new Error('独立工作区启动凭据无效。');
   return {dir,token,basis};
+}
+/** Electron may import a CommonJS package entry via its ESM loader, leaving require.main unset.
+ * Recognize explicit launch handoffs or the exact app entry; do not auto-start imported test helpers. */
+export function shouldBootstrapWorkspace(input:{commonJsMain:boolean;hasHandoff:boolean;isPackaged:boolean;argvEntry?:string;appDir:string}):boolean{
+  if(input.commonJsMain||input.hasHandoff||input.isPackaged)return true;
+  if(!input.argvEntry)return false;
+  const candidate=path.resolve(input.argvEntry);
+  return path.relative(input.appDir,candidate)===''||path.relative(path.join(input.appDir,'dist-electron','main.cjs'),candidate)==='';
 }
 export function buildWorkspaceLaunch(input:{isPackaged:boolean;exePath:string;appDir:string;env:NodeJS.ProcessEnv;root:string;handoff:LaunchHandoff}){
   const portable=input.isPackaged&&Boolean(input.env.PORTABLE_EXECUTABLE_DIR||input.env.PORTABLE_EXECUTABLE_FILE);
@@ -75,10 +92,10 @@ export async function launchWorkspace(input:{isPackaged:boolean;exePath:string;a
         return {folder:receipt.folder,pid:receipt.pid,ready:true as const};
       }catch(err){if((err as NodeJS.ErrnoException).code!=='ENOENT')throw err;}
       if(spawnError)throw new Error('无法启动独立工作区：'+spawnError.message);
-      if(exited)throw new Error('独立程序已退出，未收到就绪确认（可能已在运行）。');
+      if(exited)throw new Error('独立程序已退出，未收到就绪确认（阶段：'+await lastLaunchStage(dir)+'）。');
       await new Promise(resolve=>setTimeout(resolve,150));
     }
-    throw new Error('未收到独立窗口就绪确认。原工作区仍保留；请检查是否已有新窗口，不要立即重复启动。');
+    throw new Error('未收到独立窗口就绪确认（阶段：'+await lastLaunchStage(dir)+'）。原工作区仍保留；请检查是否已有新窗口，不要立即重复启动。');
   }finally{
     finished=true;
     // Never delete a portable child's executable extraction directory while it may be running.
