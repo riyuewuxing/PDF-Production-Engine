@@ -154,7 +154,7 @@ async function run() {
     ['导出 PDF','.pdf','已导出'],
     ['高清 2x PNG 长图','.png','已导出'],
     ['Word 可编辑 (.docx)','.docx','已导出Word 文档'],
-    ['Markdown (.md)','.md','已导出Markdown 文档'],
+    ['Markdown (.md)','.md','已导出Markdown (.md 脱敏版)'],
     ['单文件网页主页 (.html)','.html','已导出离线网页主页'],
     ['标准 JSON Resume（仅可见内容）','.json','已导出标准 JSON Resume']
   ]){
