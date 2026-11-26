@@ -1,4 +1,4 @@
-import type {FactBank,AddFactInput,RevokeFactInput} from '../schema/factBankSchema';
+import type {FactBank,AddFactInput,RevokeFactInput,LinkFactInput} from '../schema/factBankSchema';
 import type { ByokAiSettings, ByokCompletionRequest, AiProfileCatalog } from '../lib/byokAiClient';
 import type {
   ApplicationSnapshotMeta,
@@ -107,7 +107,7 @@ export interface ResumeDesktopBridge {
     getCoverLetterPayload: (jobId: string) => Promise<CoverLetterPdfPayload>;
     notifyReady: (jobId: string) => Promise<void>;
   };
-  facts?: {get:()=>Promise<FactBank>;add:(input:AddFactInput)=>Promise<FactBank>;revoke:(input:RevokeFactInput)=>Promise<FactBank>};
+  facts?: {get:()=>Promise<FactBank>;add:(input:AddFactInput)=>Promise<FactBank>;link:(input:LinkFactInput)=>Promise<FactBank>;revoke:(input:RevokeFactInput)=>Promise<FactBank>};
   ai: {
     getSettings: () => Promise<ByokAiSettings>;
     listProfiles:()=>Promise<AiProfileCatalog>;

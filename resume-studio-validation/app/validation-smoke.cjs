@@ -761,6 +761,71 @@ async function run() {
   checks.careerFactScope=true;checks.careerFactRevokedApproval=true;
   await js('(()=>{const e=[...document.querySelectorAll("[role=alert]")].find(e=>e.innerText.includes("本地事实库已变化"));e?.scrollIntoView({block:"center"});return !!e})()');
   await capture('46-career-fact-revoked');
+  // Create a synthetic cloned version through the real editor, then explicitly link a root fact.
+  const linkBase=await main.store.getResume('master'),linkCalls=providerCalls;
+  let linkBank=await js('window.resumeDesktop.facts.get()');
+  const rootInput={slug:'master',docRevision:JSON.stringify([linkBase.id,linkBase.updatedAt]),blockKey:'edu:'+linkBase.education[0].id,bankRevision:linkBank.revision,fact:{kind:'achievement',assertion:'核对 24 份跨版本合成记录',value:'24',unit:'份',timeframe:'2025',evidenceRef:'LINK_LOCAL_ONLY_REF',sensitivity:'shareable'},confirmation:'CONFIRM_SELF_REPORTED_FACT'};
+  linkBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(rootInput)+')');
+  const linkRoot=linkBank.records.find(r=>r.assertion===rootInput.fact.assertion);
+  await click('版本母库');await click('基于当前版本');
+  await setValue('input[placeholder="输入新岗位名称，如：物理教研员"]','合成关联测试版本');
+  await click('创建');
+  let linkSlug='';
+  await until('clone opened',async()=>{
+    const list=await main.store.listResumes(),summary=list.resumes.find(s=>s.title==='合成关联测试版本');
+    if(!summary)return false;
+    linkSlug=summary.slug;return await js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value')===linkSlug;
+  });
+  const targetBefore=await main.store.getResume(linkSlug);
+  if(targetBefore.id===linkBase.id||targetBefore.education[0].id!==linkBase.education[0].id)throw Error('clone identity unexpected');
+  await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');
+  await setValue('textarea[aria-label="AI 自由任务目标"]','检查跨版本事实');
+  const loadLinkBank=async()=>{
+    await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.innerText.includes("本地事实资料库"));if(e&&!e.parentElement.open)e.click();return !!e})()');
+    await click('加载 / 刷新事实库');
+    await until('linked fact bank ready',async()=>await bodyHas('已读取本地事实资料库。')&&await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="加载 / 刷新事实库")?.disabled===false'));
+  };
+  await loadLinkBank();
+  if(!await checkLabel('显示其他版本及孤立记录'))throw Error('other version records not exposed');
+  await until('link root listed',()=>bodyHas(rootInput.fact.assertion));
+  const chooseLink=()=>js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("核对 24 份跨版本合成记录")&&[...e.querySelectorAll("button")].some(b=>b.innerText==="关联到当前同源段落"));const b=[...a?.querySelectorAll("button")||[]].find(b=>b.innerText==="关联到当前同源段落");if(!b||b.disabled)return false;b.click();return true})()');
+  if(!await chooseLink())throw Error('explicit link action unavailable');
+  await until('link confirmation visible',()=>bodyHas('跨版本关联（不修改简历正文）'));
+  const defaultLocal=await js('(()=>{const s=document.querySelector("section[aria-label=\\"跨版本事实关联确认\\"]");const boxes=[...s.querySelectorAll("input[type=checkbox]")];return boxes.every(b=>!b.checked)&&[...s.querySelectorAll("button")].find(b=>b.innerText==="确认跨版本关联")?.disabled===true})()');
+  if(!defaultLocal)throw Error('link defaults to share or lacks confirmation');
+  await js('(()=>{document.querySelector("section[aria-label=\\"跨版本事实关联确认\\"]")?.scrollIntoView({block:"start"});return true})()');
+  await capture('47-fact-link-consent');
+  if(!await checkLabel('我已核对原事实与当前段落'))throw Error('link confirmation missing');
+  await click('确认跨版本关联');await until('local link saved',()=>bodyHas('已关联到当前版本'));
+  linkBank=await js('window.resumeDesktop.facts.get()');
+  const localLink=linkBank.records.find(r=>r.linkedFrom?.recordId===linkRoot.id&&r.docId===targetBefore.id&&r.verifiedStatus==='user-confirmed');
+  if(!localLink||localLink.sensitivity!=='local-only'||JSON.stringify(await main.store.getResume(linkSlug))!==JSON.stringify(targetBefore))throw Error('local-only link failed or changed resume');
+  await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:localLink.id,bankRevision:linkBank.revision,confirmation:'REVOKE_FACT'})+')');
+  await loadLinkBank();
+  if(!await chooseLink())throw Error('re-link after target revocation unavailable');
+  if(!await checkLabel('允许今后逐次选择该关联事实外发')||!await checkLabel('我已核对原事实与当前段落'))throw Error('explicit share link consent unavailable');
+  await click('确认跨版本关联');await until('share link saved',()=>bodyHas('已关联到当前版本'));
+  linkBank=await js('window.resumeDesktop.facts.get()');
+  const shareLink=linkBank.records.find(r=>r.linkedFrom?.recordId===linkRoot.id&&r.docId===targetBefore.id&&r.verifiedStatus==='user-confirmed');
+  if(!shareLink||shareLink.sensitivity!=='shareable'||linkBank.records.find(r=>r.id===linkRoot.id)?.verifiedStatus!=='user-confirmed')throw Error('share link missing or target revoke affected root');
+  await js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("跨版本关联来源")&&e.innerText.includes("核对 24 份跨版本合成记录")&&!e.innerText.includes("已撤销"));a?.scrollIntoView({block:"center"});return !!a})()');
+  await capture('48-fact-link-saved');
+  const selectLinked=await js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("跨版本关联来源")&&e.innerText.includes("核对 24 份跨版本合成记录")&&!e.innerText.includes("已撤销"));const b=a?.querySelector("input[type=checkbox]");if(!b||b.disabled)return false;b.click();return true})()');
+  if(!selectLinked)throw Error('linked selection unavailable');
+  await click('预览 AI 自由任务');await until('linked fact preview',()=>bodyHas('自由任务发送前确认'));
+  const linkedPreview=await getFactPreview();
+  if(!linkedPreview.includes(rootInput.fact.assertion)||!linkedPreview.includes('record-1')||linkedPreview.includes(rootInput.fact.evidenceRef)||linkedPreview.includes(linkRoot.id)||linkedPreview.includes(shareLink.id)||linkedPreview.includes(linkSlug))throw Error('linked fact privacy mismatch');
+  await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:linkRoot.id,bankRevision:linkBank.revision,confirmation:'REVOKE_FACT'})+')');
+  await click('确认发送自由任务');await until('linked stale authorization',()=>bodyHas('本地事实库已变化'));
+  const family=await js('window.resumeDesktop.facts.get()');
+  if(family.records.filter(r=>r.id===linkRoot.id||r.linkedFrom?.recordId===linkRoot.id).some(r=>r.verifiedStatus!=='revoked')||providerCalls!==linkCalls||JSON.stringify(await main.store.getResume(linkSlug))!==JSON.stringify(targetBefore))throw Error('root revoke failed to invalidate linked preview');
+  checks.factLinkDefaultLocal=true;checks.factLinkExplicitShare=true;checks.factLinkCascadeNoNetwork=true;
+  await loadLinkBank();
+  await js('(()=>{const a=[...document.querySelectorAll("article")].find(e=>e.innerText.includes("跨版本关联来源")&&e.innerText.includes("核对 24 份跨版本合成记录")&&e.innerText.includes("已撤销"));a?.scrollIntoView({block:"center"});return !!a})()');
+  await capture('49-fact-link-revoked');
+  await js('(()=>{const e=document.querySelector("select[aria-label=\\"快速切换简历版本\\"]");e.value="master";e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  await until('master restored after link',()=>js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value==="master"'));
+
 
   // At the very end, mutate only the isolated synthetic disk to simulate another process.
   await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');await click('分步工作');

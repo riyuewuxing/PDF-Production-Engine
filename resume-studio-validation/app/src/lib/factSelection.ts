@@ -1,6 +1,7 @@
 import {FactRequestBindingSchema,type FactBank,type FactRecord,type FactRequestBinding} from '../schema/factBankSchema';
 import type {ResumeDocument} from '../schema/resumeSchema';
 import {isShareableFact} from './aiContext';
+import {assertLinkedFactOrigin} from './factLink';
 
 export type FactSelection={records:FactRecord[];binding?:FactRequestBinding};
 /** Only exact, expressly selected records enter a task. An unavailable bank is not an empty selection. */
@@ -12,13 +13,19 @@ export function prepareFactSelection(document:ResumeDocument,slug:string,keys:re
   return {records:records as FactRecord[],binding:FactRequestBindingSchema.parse({slug,docId:document.id,bankRevision:bank.revision,ids:[...ids],selectedKeys:[...keys]})};
 }
 /** Re-read persisted records before sending, showing a result, rendering, and applying. */
-export async function assertFreshFactSelection(document:ResumeDocument,selection:FactSelection,load:()=>Promise<FactBank>):Promise<void>{
+export async function assertFreshFactSelection(document:ResumeDocument,selection:FactSelection,load:()=>Promise<FactBank>,loadDoc:(slug:string)=>Promise<ResumeDocument>=loadLocalResume):Promise<void>{
   if(!selection.records.length)return;
   const b=selection.binding;
   if(!b)throw new Error('本地事实授权绑定缺失。');
   const latest=await load();
   if(latest.revision!==b.bankRevision||!selection.records.every(r=>latest.records.some(s=>s.id===r.id&&JSON.stringify(s)===JSON.stringify(r)&&isShareableFact(document,s))))
     throw new Error('本地事实库已变化，请刷新并重新预览；旧审批作废。');
+  for(const record of selection.records)await assertLinkedFactOrigin(latest,document,record,loadDoc);
+}
+function loadLocalResume(slug:string):Promise<ResumeDocument>{
+  const bridge=typeof window!=='undefined'?window.resumeDesktop:undefined;
+  if(!bridge)throw new Error('本地来源简历不可用。');
+  return bridge.resumes.get(slug);
 }
 export function loadLocalFactBank():Promise<FactBank>{
   const bridge=typeof window!=='undefined'?window.resumeDesktop?.facts:undefined;

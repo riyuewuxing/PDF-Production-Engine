@@ -6,7 +6,8 @@ import os from 'node:os';
 import {LocalResumeStore} from './localFsApi';
 import {FactBankStore} from './factBankStore';
 import {ResumeDocumentSchema,resumeRevision,type ResumeDocument} from '../schema/resumeSchema';
-import {type AddFactInput} from '../schema/factBankSchema';
+import {FactBankSchema,type AddFactInput} from '../schema/factBankSchema';
+import {prepareFactSelection,assertFreshFactSelection} from '../lib/factSelection';
 import {isShareableFact} from '../lib/aiContext';
 import {prepareAssistantTask} from '../lib/aiAssistant';
 import {prepareTailorRequest} from '../lib/aiTailor';
@@ -102,6 +103,78 @@ describe('independent local fact bank',()=>{
     expect(isShareableFact(doc,corrected.records[1]!)).toBe(false);
     await expect(bank.add({...correctedInput,bankRevision:corrected.revision})).rejects.toThrow('原事实已撤销');
     expect(await bank.get()).toEqual(corrected);
+  });
+  const createTarget=async()=>store.saveResume('target',{...doc,id:'synthetic-target',title:'合成目标简历'});
+  const linkInput=(target:ResumeDocument,bankRevision:string,sourceId:string)=>({slug:'target',docRevision:resumeRevision(target),bankRevision,sourceId,confirmation:'CONFIRM_SAME_ENTITY_FACT_LINK' as const});
+  it('links only explicitly confirmed same-entity records across versions, defaulting to local-only',async()=>{
+    const rootBank=await bank.add(input),r=rootBank.records[0]!,target=await createTarget();
+    const link=linkInput(target,rootBank.revision,r.id);
+    await expect(bank.link({...link,confirmation:'no'})).rejects.toThrow();
+    await expect(bank.link({...link,docRevision:'stale'})).rejects.toThrow('当前简历已变化');
+    await expect(bank.link({...link,bankRevision:'empty-v1'})).rejects.toThrow('事实库已被其他操作更新');
+    const linked=await bank.link(link),copy=linked.records[1]!;
+    expect(copy).toMatchObject({docId:target.id,blockKey:r.blockKey,sourceScope:'linked',linkedFrom:{recordId:r.id,slug:'synthetic'},sensitivity:'local-only',assertion:r.assertion,evidenceRef:r.evidenceRef});
+    expect(copy.id).not.toBe(r.id);expect(copy.entityId).not.toBe(r.entityId);
+    expect(isShareableFact(target,copy)).toBe(false);
+    expect(await store.getResume('target')).toEqual(target);
+    expect(await store.getResume('synthetic')).toEqual(doc);
+    expect(await new FactBankStore(new LocalResumeStore(root)).get()).toEqual(linked);
+    await expect(bank.link({...link,bankRevision:linked.revision})).rejects.toThrow('已有关联记录');
+    await expect(bank.add({...input,slug:'target',docRevision:resumeRevision(target),bankRevision:linked.revision,supersedesId:copy.id})).rejects.toThrow();
+    const revoked=await bank.revoke({id:copy.id,bankRevision:linked.revision,confirmation:'REVOKE_FACT'});
+    expect(revoked.records[0]?.verifiedStatus).toBe('user-confirmed');
+    expect(revoked.records[1]?.verifiedStatus).toBe('revoked');
+  });
+  it('refuses subject mismatch, hidden target, unrelated versions, and promotion of local-only root',async()=>{
+    const saved=await bank.add({...input,fact:{...input.fact,sensitivity:'local-only'}}),r=saved.records[0]!;
+    const target=await createTarget();
+    await expect(bank.link({...linkInput(target,saved.revision,r.id),sensitivity:'shareable'})).rejects.toThrow('不能提升外发权限');
+    for(const patch of [{company:'Changed entity'},{startDate:'2023.01'},{visible:false}]){
+      const changed=await store.saveResume('target',{...target,experience:target.experience.map(e=>e.id==='synthetic-exp'?{...e,...patch}:e)});
+      await expect(bank.link(linkInput(changed,saved.revision,r.id))).rejects.toThrow('主体、时间完全匹配');
+    }
+    const changedSource=await store.saveResume('synthetic',{...doc,experience:doc.experience.map(e=>({...e,position:'Changed origin'}))});
+    const clean=await createTarget();
+    expect(changedSource.id).toBe(doc.id);
+    await expect(bank.link(linkInput(clean,saved.revision,r.id))).rejects.toThrow('来源版本主体已变化');
+    expect(await bank.get()).toEqual(saved);
+  });
+  it('requires explicit share permission and revalidates actual origin at transport and subsequent approval',async()=>{
+    const saved=await bank.add(input),r=saved.records[0]!,target=await createTarget();
+    const linked=await bank.link({...linkInput(target,saved.revision,r.id),sensitivity:'shareable'}),copy=linked.records[1]!;
+    const selection=prepareFactSelection(target,'target',[r.blockKey],linked,[copy.id]);
+    const prompt=prepareAssistantTask({document:target,mode:'ask',goal:'检查',keys:[r.blockKey],overflowPx:0,records:selection.records}).options.userPrompt;
+    for(const value of [r.id,copy.id,r.docId,copy.docId,r.evidenceRef,copy.entityId,r.blockKey])expect(prompt).not.toContain(value);
+    await expect(bank.assertCurrentBinding(selection.binding!,prompt)).resolves.toBeUndefined();
+    await expect(assertFreshFactSelection(target,selection,()=>bank.get(),slug=>store.getResume(slug))).resolves.toBeUndefined();
+    const before=await store.saveResume('synthetic',{...doc,experience:doc.experience.map(e=>({...e,position:'Changed origin'}))});
+    expect(before.id).toBe(doc.id);
+    await expect(bank.assertCurrentBinding(selection.binding!,prompt)).rejects.toThrow('跨版本来源主体');
+    await expect(assertFreshFactSelection(target,selection,()=>bank.get(),slug=>store.getResume(slug))).rejects.toThrow('跨版本来源主体');
+    expect(await bank.get()).toEqual(linked);
+  });
+  it('blocks a cross-version identity that only the original sanitizer knows',async()=>{
+    const saved=await bank.add({...input,fact:{...input.fact,assertion:'演示甲 核对 12 份合成资料'}}),r=saved.records[0]!;
+    const target=await store.saveResume('target',{...doc,id:'synthetic-target',basic:{...doc.basic,name:'其他演示身份'}});
+    await expect(bank.link({...linkInput(target,saved.revision,r.id),sensitivity:'shareable'})).rejects.toThrow('不能提升外发权限');
+    const linked=await bank.link(linkInput(target,saved.revision,r.id));
+    expect(linked.records[1]?.sensitivity).toBe('local-only');
+  });
+  it('revokes linked records atomically with root correction and rejects forged lineage',async()=>{
+    const saved=await bank.add(input),r=saved.records[0]!,target=await createTarget();
+    const linked=await bank.link({...linkInput(target,saved.revision,r.id),sensitivity:'shareable'}),copy=linked.records[1]!;
+    expect(FactBankSchema.safeParse({...linked,records:[r,{...copy,assertion:'FORGED'}]}).success).toBe(false);
+    expect(FactBankSchema.safeParse({...linked,records:[r,{...copy,linkedFrom:{recordId:copy.id,slug:'target'}}]}).success).toBe(false);
+    expect(FactBankSchema.safeParse({...linked,records:[{...r,verifiedStatus:'revoked'},copy]}).success).toBe(false);
+    const corrected=await bank.add({...input,bankRevision:linked.revision,supersedesId:r.id,fact:{...input.fact,assertion:'修订合成事实'}});
+    expect(corrected.records.map(r=>r.verifiedStatus)).toEqual(['revoked','revoked','user-confirmed']);
+    expect(corrected.records[1]?.linkedFrom?.recordId).toBe(r.id);
+    expect(corrected.records[2]?.sourceScope).toBe('manual');
+    await expect(bank.link({...linkInput(target,corrected.revision,r.id)})).rejects.toThrow();
+    const fresh=await bank.link(linkInput(target,corrected.revision,corrected.records[2]!.id));
+    expect(fresh.records[3]?.sensitivity).toBe('local-only');
+    const revoked=await bank.revoke({id:corrected.records[2]!.id,bankRevision:fresh.revision,confirmation:'REVOKE_FACT'});
+    expect(revoked.records.every(r=>r.verifiedStatus==='revoked')).toBe(true);
   });
   it('fails closed on corrupted data and does not overwrite the source file',async()=>{
     const f=path.join(root,'.fact-bank-v1.json');await fs.writeFile(f,'BROKEN');

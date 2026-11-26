@@ -467,6 +467,7 @@ async function authorizeShellFile(filePath:string):Promise<string> {
 function registerIpcHandlers(): void {
   trustedEditorHandle('facts:get',()=>facts.get());
   trustedEditorHandle('facts:add',(_event,input:unknown)=>facts.add(input));
+  trustedEditorHandle('facts:link',(_event,input:unknown)=>facts.link(input));
   trustedEditorHandle('facts:revoke',(_event,input:unknown)=>facts.revoke(input));
   trustedEditorHandle('resumes:list', () => store.listResumes());
   trustedEditorHandle('resumes:get', (_event, slug: string) => store.getResume(slug));
