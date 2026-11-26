@@ -6,8 +6,9 @@ import os from 'node:os';
 import {randomUUID} from 'node:crypto';
 import {afterEach,describe,it,expect,vi} from 'vitest';
 import {LocalResumeStore,inspectResumeWriteLock,recoverResumeWriteLock,withResumeWriteLock} from './localFsApi';
-import {JobApplicationSchema} from '../schema/applicationSchema';
-import {ResumeDocumentSchema} from '../schema/resumeSchema';
+import {JobApplicationSchema,JobReviewArchiveSchema} from '../schema/applicationSchema';
+import {ResumeDocumentSchema,resumeRevision} from '../schema/resumeSchema';
+import {jobReviewBasisHash,splitJobRequirements} from '../lib/jobRequirements';
 const dirs:string[]=[];
 async function fixture(){
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'resume-lock-ledger-'));dirs.push(dir);
@@ -113,4 +114,27 @@ describe('application ledger CAS and immutable snapshots',()=>{
     await expect(store.saveApplications(base,base.revision)).rejects.toMatchObject({code:'CORRUPTED_JSON'});
     expect(await fs.readFile(store.applicationsPath,'utf8')).toBe('malformed');
   });
+});
+
+it('persists immutable job reviews with CAS and verified application snapshot linkage',async()=>{
+  const {store,dir}=await fixture();
+  const savedDoc=await store.saveResume('master',doc());
+  const source='必须具备合成经历。';
+  const logged=await store.logApplication({entry:app({resumeSlug:'master',jdText:source}),document:savedDoc});
+  const archive=JobReviewArchiveSchema.parse({reviewVersion:1,id:randomUUID(),slug:'master',docId:savedDoc.id,documentRevision:resumeRevision(savedDoc),factRevision:null,basisHash:await jobReviewBasisHash(savedDoc,null,source),source,createdAt:'2026-11-26T00:00:00Z',applicationId:logged.entry.id,snapshotId:logged.entry.snapshotId,rows:[{clauseId:splitJobRequirements(source)[0]!.id,review:{priority:'mandatory',outcome:'gap',evidenceIds:[],note:'合成缺口'}}]});
+  const base=logged.store;
+  await expect(store.saveApplications({...base,jobReviews:[{...archive,documentRevision:'stale'}]},base.revision)).rejects.toMatchObject({code:'JOB_REVIEW_STALE'});
+  await expect(store.saveApplications({...base,jobReviews:[{...archive,source:'不同招聘条件。',basisHash:await jobReviewBasisHash(savedDoc,null,'不同招聘条件。'),rows:[{...archive.rows[0]!,clauseId:splitJobRequirements('不同招聘条件。')[0]!.id}]}]},base.revision)).rejects.toMatchObject({code:'JOB_REVIEW_LINK'});
+  const saved=await store.saveApplications({...base,jobReviews:[archive]},base.revision);
+  expect(saved.revision).not.toBe(base.revision);
+  expect((await new LocalResumeStore(dir).getApplications()).jobReviews).toEqual([archive]);
+  await expect(store.saveApplications({...base,jobReviews:[]},base.revision)).rejects.toMatchObject({code:'APPLICATION_CONFLICT'});
+  await expect(store.saveApplications({...saved,jobReviews:[{...archive,createdAt:'2026-11-27T00:00:00Z'}]},saved.revision)).rejects.toMatchObject({code:'JOB_REVIEW_IMMUTABLE'});
+  const {jobReviews:_omitted,...legacy}=saved;
+  const preserved=await store.saveApplications({...legacy,applications:[]},saved.revision);
+  expect(preserved.jobReviews).toEqual([archive]);
+  await expect(store.deleteApplicationSnapshot(logged.entry.snapshotId)).rejects.toMatchObject({code:'SNAPSHOT_REFERENCED'});
+  const removed=await store.saveApplications({...preserved,jobReviews:[]},preserved.revision);
+  expect(removed.jobReviews).toEqual([]);
+  expect(await store.deleteApplicationSnapshot(logged.entry.snapshotId)).toEqual({deleted:true});
 });

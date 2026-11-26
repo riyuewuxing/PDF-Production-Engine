@@ -657,6 +657,11 @@ export function JobCareerPane({
                             </button>
                           </div>
 
+                          {!ledger.dirty&&(storeData.jobReviews??[]).some(a=>a.applicationId===item.id&&a.snapshotId===item.snapshotId)&&(
+                            <div className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-900">
+                              已关联 {(storeData.jobReviews??[]).filter(a=>a.applicationId===item.id&&a.snapshotId===item.snapshotId).length} 份历史岗位人工核对档案（非当前资格结论）。在 JD 雷达中按原版本恢复并重新校验。
+                            </div>
+                          )}
                           {item.jdText && (
                             <div className="rounded border border-slate-200 bg-slate-50/70">
                               <button

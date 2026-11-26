@@ -1,7 +1,9 @@
+// @vitest-environment node
 import {describe,it,expect} from 'vitest';
-import {ResumeDocumentSchema} from '../schema/resumeSchema';
+import {JobReviewArchiveSchema} from '../schema/applicationSchema';
+import {ResumeDocumentSchema,resumeRevision} from '../schema/resumeSchema';
 import {factEntityId} from './aiContext';
-import {splitJobRequirements,suggestRequirementPriority,collectLocalJobEvidence,validateRequirementReview,blankRequirementReview,evidenceKeywordHints,MAX_JD_CLAUSES,MAX_JD_SOURCE} from './jobRequirements';
+import {splitJobRequirements,suggestRequirementPriority,collectLocalJobEvidence,validateRequirementReview,blankRequirementReview,evidenceKeywordHints,MAX_JD_CLAUSES,MAX_JD_SOURCE,jobReviewBasisHash,restoreArchivedJobReview,sameJobReviewDocument} from './jobRequirements';
 import type {FactBank,FactRecord} from '../schema/factBankSchema';
 const doc=ResumeDocumentSchema.parse({id:'synthetic-jd-doc',title:'合成岗位',createdAt:'2026-01-01',updatedAt:'2026-01-01',basic:{name:'PRIVATE_NAME',email:'fixture@example.invalid',employmentStatus:'合成应届毕业生'},
   menuSections:[{id:'basic',title:'Basic',order:0},{id:'education',title:'Education',order:1},{id:'experience',title:'Experience',order:2},{id:'skills',title:'Skills',order:3,enabled:false}],
@@ -43,4 +45,20 @@ describe('source-grounded offline job review',()=>{
     expect(()=>validateRequirementReview({...review,priority:'not-requirement',outcome:'gap'},rows)).toThrow('非条件');
     expect(validateRequirementReview({...review,priority:'mandatory',outcome:'gap',evidenceIds:[evidence.id],note:' 尚无经验 '},rows)).toMatchObject({outcome:'gap',note:'尚无经验'});
   });
+});
+
+it('binds saved review to exact source, full content and current evidence revision',async()=>{
+  const source='须持高中物理教师资格证；硕士优先。',bank:FactBank={schemaVersion:1,revision:'r1',records:[r]};
+  const first=splitJobRequirements(source)[0]!;
+  const archive=JobReviewArchiveSchema.parse({reviewVersion:1,id:crypto.randomUUID(),slug:'demo',docId:doc.id,documentRevision:resumeRevision(doc),factRevision:bank.revision,basisHash:await jobReviewBasisHash(doc,bank,source),source,createdAt:'2026-11-26T00:00:00Z',applicationId:null,snapshotId:null,rows:[{clauseId:first.id,review:{priority:'mandatory',outcome:'supported',evidenceIds:['fact:'+r.id],note:'合成'}}]});
+  expect((await restoreArchivedJobReview(archive,doc,bank,resumeRevision(doc)))[first.id]?.outcome).toBe('supported');
+  await expect(restoreArchivedJobReview(archive,doc,{...bank,revision:'r2'},resumeRevision(doc))).rejects.toThrow('事实库版本');
+  await expect(restoreArchivedJobReview(archive,{...doc,title:'changed'},bank,resumeRevision(doc))).rejects.toThrow('内容已变化');
+  await expect(restoreArchivedJobReview(archive,doc,{...bank,records:[{...r,assertion:'changed'}]},resumeRevision(doc))).rejects.toThrow('内容已变化');
+  await expect(restoreArchivedJobReview({...archive,rows:[{...archive.rows[0]!,clauseId:'0:1'}]},doc,bank,resumeRevision(doc))).rejects.toThrow('条款位置');
+  await expect(restoreArchivedJobReview({...archive,source:source.replace('高中','初中')},doc,bank,resumeRevision(doc))).rejects.toThrow('内容已变化');
+  await expect(restoreArchivedJobReview(archive,doc,bank,'changed')).rejects.toThrow('简历版本');
+  expect(sameJobReviewDocument(doc,{...doc,updatedAt:'2026-11-26'})).toBe(true);
+  expect(sameJobReviewDocument(doc,{...doc,title:'different'})).toBe(false);
+  expect(()=>JobReviewArchiveSchema.parse({...archive,applicationId:'app'})).toThrow();
 });

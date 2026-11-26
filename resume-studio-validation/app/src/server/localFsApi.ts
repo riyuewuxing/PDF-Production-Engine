@@ -5,6 +5,7 @@ import os from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 import { ZodError } from 'zod';
+import {restoreArchivedJobReview,sameJobReviewDocument} from '../lib/jobRequirements';
 import { adaptResumeOrLegacy } from '../schema/legacyAdapter';
 import {
   type ApplicationSnapshotMeta,
@@ -749,7 +750,7 @@ export class LocalResumeStore {
   }
 
   private applicationRevision(data:ApplicationsStoreData):string {
-    const content={schemaVersion:data.schemaVersion,applications:data.applications,coverLetters:data.coverLetters,interviewAnswers:Object.fromEntries(Object.entries(data.interviewAnswers).sort(([a],[b])=>a.localeCompare(b)))};
+    const content={schemaVersion:data.schemaVersion,applications:data.applications,coverLetters:data.coverLetters,interviewAnswers:Object.fromEntries(Object.entries(data.interviewAnswers).sort(([a],[b])=>a.localeCompare(b))),jobReviews:data.jobReviews};
     return createHash('sha256').update(JSON.stringify(content)).digest('hex');
   }
   private async writeApplications(data:ApplicationsStoreData):Promise<ApplicationsStoreData>{
@@ -884,7 +885,7 @@ export class LocalResumeStore {
     const targetPath = resolveContainedPath(this.appSnapshotsDir, `${id}.json`);
     return withResumeWriteLock(this.dataDir,async()=>{
       const current=await this.getApplications();
-      if(current.applications.some(a=>a.snapshotId===id))throw new LocalFsApiError(409,'SNAPSHOT_REFERENCED','永久快照仍被投递记录引用，不允许删除。');
+      if(current.applications.some(a=>a.snapshotId===id)||current.jobReviews?.some(a=>a.snapshotId===id))throw new LocalFsApiError(409,'SNAPSHOT_REFERENCED','永久快照仍被投递记录或岗位核对档案引用，不允许删除。');
       if(!(await fileExists(targetPath)))return {deleted:false};
       await fs.unlink(targetPath);return {deleted:true};
     });
@@ -911,6 +912,29 @@ export class LocalResumeStore {
         const old=current.applications.find(x=>x.id===a.id);
         if(old&&(a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联及原导出信息不能通过整表保存修改。');
         if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
+      }
+      // Older clients omitting the optional field cannot silently erase local review archives.
+      if(validated.jobReviews===undefined&&current.jobReviews!==undefined)validated={...validated,jobReviews:current.jobReviews};
+      for(const archive of validated.jobReviews??[]){
+        const old=current.jobReviews?.find(a=>a.id===archive.id);
+        if(old){
+          if(JSON.stringify(old)!==JSON.stringify(archive))throw new LocalFsApiError(409,'JOB_REVIEW_IMMUTABLE','已保存岗位核对档案不可覆盖，请另存新档案。');
+          continue;
+        }
+        // The same data-directory write lock covers the resume, fact bank and application ledger.
+        const doc=await this.getResume(archive.slug);
+        const {FactBankStore}=await import('./factBankStore');
+        const bank=archive.factRevision===null?null:await new FactBankStore(this).get();
+        try{await restoreArchivedJobReview(archive,doc,bank,resumeRevision(doc));}
+        catch(err){throw new LocalFsApiError(409,'JOB_REVIEW_STALE',err instanceof Error?err.message:'岗位核对依据无效。');}
+        if(archive.applicationId!==null){
+          const linked=validated.applications.find(a=>a.id===archive.applicationId);
+          if(!linked||linked.snapshotId!==archive.snapshotId||linked.resumeSlug!==archive.slug||linked.jdText!==archive.source)
+            throw new LocalFsApiError(409,'JOB_REVIEW_LINK','投递关联与原文或版本不一致。');
+          const snap=await this.getApplicationSnapshot(linked.snapshotId);
+          if(snap.meta.applicationId!==linked.id||snap.meta.resumeSlug!==archive.slug||!sameJobReviewDocument(snap.document,doc))
+            throw new LocalFsApiError(409,'JOB_REVIEW_LINK','永久投递快照与核对版本内容不一致。');
+        }
       }
       return this.writeApplications(validated);
     });

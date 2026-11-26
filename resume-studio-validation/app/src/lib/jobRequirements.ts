@@ -1,4 +1,6 @@
 import type {ResumeDocument} from '../schema/resumeSchema';
+import type {JobReviewArchive} from '../schema/applicationSchema';
+import {cleanResumeRichText} from './htmlToMarkdown';
 import type {FactBank} from '../schema/factBankSchema';
 import {factEntityId,visibleBasicValue} from './aiContext';
 import {collectEditableBlocks} from './resumeBlocks';
@@ -93,4 +95,39 @@ export function validateRequirementReview(review:RequirementReview,evidence:read
   if(review.priority==='not-requirement'&&(review.outcome!=='unchecked'||review.evidenceIds.length))throw new Error('非条件条款不能标记为支持或缺口。');
   if(review.outcome==='supported'&&!review.evidenceIds.length)throw new Error('标记自述支持前须明确选择至少一条本地依据。');
   return {...review,evidenceIds:[...review.evidenceIds],note:review.note.trim().slice(0,500)};
+}
+
+/** Stable full document content excluding the separately bound disk revision timestamp. */
+function canonicalReviewValue(value:unknown):string{
+  return JSON.stringify(value,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?
+    Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);
+}
+function jobReviewDocumentContent(doc:ResumeDocument):string{
+  return canonicalReviewValue({...cleanResumeRichText(doc),updatedAt:''});
+}
+export function sameJobReviewDocument(a:ResumeDocument,b:ResumeDocument):boolean{
+  return jobReviewDocumentContent(a)===jobReviewDocumentContent(b);
+}
+export async function jobReviewBasisHash(doc:ResumeDocument,bank:FactBank|null,source:string):Promise<string>{
+  if(!globalThis.crypto?.subtle)throw new Error('当前环境无法校验岗位核对内容。');
+  const normalized=cleanResumeRichText(doc);
+  const value=canonicalReviewValue([source,{...normalized,updatedAt:''},collectLocalJobEvidence(normalized,bank)]);
+  const digest=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+}
+/** Recompute candidate offsets and allowed evidence from authoritative current data, never trust stored IDs alone. */
+export async function restoreArchivedJobReview(archive:JobReviewArchive,doc:ResumeDocument,bank:FactBank|null,revision:string):Promise<Record<string,RequirementReview>>{
+  if(archive.reviewVersion!==1||archive.docId!==doc.id||archive.documentRevision!==revision)
+    throw new Error('简历版本已变化，历史核对档案不能恢复为当前结果。');
+  if(archive.factRevision!==(bank?.revision??null))
+    throw new Error('事实库版本已变化，历史核对档案不能恢复为当前结果。');
+  if(archive.basisHash!==await jobReviewBasisHash(doc,bank,archive.source))throw new Error('核对依据内容已变化，须重新核对。');
+  const clauses=splitJobRequirements(archive.source),evidence=collectLocalJobEvidence(cleanResumeRichText(doc),bank);
+  const result:Record<string,RequirementReview>={};
+  for(const row of archive.rows){
+    if(!clauses.some(c=>c.id===row.clauseId)||Object.hasOwn(result,row.clauseId))throw new Error('历史条款位置无效或重复。');
+    result[row.clauseId]=validateRequirementReview(row.review,evidence);
+  }
+  if(!Object.keys(result).length)throw new Error('没有可恢复的核对记录。');
+  return result;
 }

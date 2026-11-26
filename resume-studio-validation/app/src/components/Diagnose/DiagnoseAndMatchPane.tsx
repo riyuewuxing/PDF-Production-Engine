@@ -649,7 +649,7 @@ export function DiagnoseAndMatchPane({
               />
             </label>
 
-            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText}/>
+            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision}/>
             {jdResult.totalKeywords > 0 ? (
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex items-center justify-between">

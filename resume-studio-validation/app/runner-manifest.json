@@ -1,5 +1,5 @@
 {
-  "sourceSha": "d767dd5ccc11b6073c3a8b79ed418c5da4f166a8",
+  "sourceSha": "bffbb4ab74f881697caeb67447ebb3e12c93a670",
   "scope": "Audited runtime/build dependency closure and targeted synthetic regression suite; actual Electron runtime with synthetic fixtures and local mock providers; no private history or data",
   "publicOverlays": [
     "src/lib/sampleResumeData.ts entirely synthetic",
@@ -7,8 +7,10 @@
     "src/lib/atsInspector.ts example string",
     "src/lib/privacyRedactor.ts example comments",
     "src/templates/shared.tsx example comment",
-    "omitted binary icons and all pre-existing personal-data-dependent tests"
+    "omitted binary icons and all pre-existing personal-data-dependent tests",
+    "JobCareerPane: two generic example placeholders",
+    "localFsApi: synthetic legacy fixture slug"
   ],
   "fixture": "synthetic, no actual personal data",
-  "sourceValidation": "fixed-SHA runtime and synthetic regression code; private-only .gitignore and context-packing privacy exclusion remain private; public runner does not contain fact records from a user. Private-only gitignore/context pack integration is statically inspected; only synthetic path exclusion helper/test mirrored."
+  "sourceValidation": "fixed-SHA runtime and synthetic regression code; private-only .gitignore and context-packing privacy exclusion remain private; public runner does not contain fact records from a user. Private-only gitignore/context pack integration is statically inspected; only synthetic path exclusion helper/test mirrored.; explicit local job archive schema, disk CAS, snapshot linkage and renderer reload regression; ledger data and permanent snapshots remain synthetic and excluded from source bundles."
 }

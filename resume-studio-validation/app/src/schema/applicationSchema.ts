@@ -67,12 +67,43 @@ export const SavedCoverLetterSchema = z.object({
 
 export type SavedCoverLetter = z.infer<typeof SavedCoverLetterSchema>;
 
+/** Historical, explicitly saved local job review. No source evidence text is duplicated. */
+export const JobReviewArchiveSchema = z.object({
+  reviewVersion:z.literal(1),
+  id:z.string().uuid(),
+  slug:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/),
+  docId:z.string().min(1).max(500),
+  documentRevision:z.string().min(1).max(1000),
+  factRevision:z.string().min(1).max(64).nullable(),
+  basisHash:z.string().regex(/^[a-f0-9]{64}$/),
+  source:z.string().min(1).max(20000).refine(s=>!!s.trim()),
+  createdAt:z.string().datetime(),
+  applicationId:z.string().min(1).max(200).nullable(),
+  snapshotId:z.string().min(1).max(120).nullable(),
+  rows:z.array(z.object({
+    clauseId:z.string().regex(/^\d+:\d+$/).max(24),
+    review:z.object({
+      priority:z.enum(['mandatory','preferred','unknown','not-requirement']),
+      outcome:z.enum(['unchecked','supported','gap']),
+      evidenceIds:z.array(z.string().min(1).max(2000)).max(5),
+      note:z.string().max(500),
+    }),
+  })).min(1).max(80),
+}).superRefine((a,ctx)=>{
+  if((a.applicationId===null)!==(a.snapshotId===null))ctx.addIssue({code:'custom',message:'投递关联与快照标识须同时存在或同时为空'});
+  if(new Set(a.rows.map(r=>r.clauseId)).size!==a.rows.length)ctx.addIssue({code:'custom',message:'岗位条款标识重复'});
+});
+export type JobReviewArchive = z.infer<typeof JobReviewArchiveSchema>;
+export const MAX_JOB_REVIEW_ARCHIVES=40;
+export const MAX_JOB_REVIEW_ARCHIVE_CHARS=2000000;
+
 export const ApplicationsStoreSchema = z.object({
   schemaVersion: z.literal(1).default(1),
   revision: z.string().optional(),
   applications: z.array(JobApplicationSchema).default([]),
   coverLetters: z.array(SavedCoverLetterSchema).default([]),
   interviewAnswers: z.record(z.string(), z.string()).default({}),
+  jobReviews: z.array(JobReviewArchiveSchema).max(MAX_JOB_REVIEW_ARCHIVES).refine(rows=>new Set(rows.map(r=>r.id)).size===rows.length,'岗位核对档案标识重复').refine(rows=>JSON.stringify(rows).length<=MAX_JOB_REVIEW_ARCHIVE_CHARS,'岗位核对档案总容量已达上限').optional(),
 });
 
 export type ApplicationsStoreData = z.infer<typeof ApplicationsStoreSchema>;
