@@ -110,7 +110,10 @@ async function run(){
     assert(await has('历史快照目录不安全')&&!await has('暂无磁盘快照'),'failed directory appeared as empty');
     await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("历史快照回滚"));e?.scrollIntoView({block:"start"});return true})()');
     await capture('04-unsafe-history-directory-error');
-    await click('手动创建快照');await until('unsafe creation refused',()=>has('历史快照目录不安全'));
+    const originalCreate=main.store.createSnapshot.bind(main.store);let completed=false,refused=false;
+    main.store.createSnapshot=async(...args)=>{try{return await originalCreate(...args);}catch(e){refused=e.code==='SNAPSHOT_UNSAFE';throw e;}finally{completed=true;}};
+    try{await click('手动创建快照');await until('actual unsafe creation returned',()=>completed);assert(refused,'unsafe creation did not fail with domain error');}
+    finally{main.store.createSnapshot=originalCreate;}
     assert(JSON.stringify(fs.readdirSync(outside))===JSON.stringify(['keep.txt'])&&fs.readFileSync(path.join(outside,'keep.txt'),'utf8')==='PRESERVE','redirected directory modified');
     checks.unsafeDirectoryIsVisibleAndNeverWritten=true;
   }finally{fs.rmSync(dir,{recursive:false});fs.renameSync(held,dir);}
