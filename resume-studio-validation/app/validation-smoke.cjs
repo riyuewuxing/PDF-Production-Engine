@@ -74,6 +74,8 @@ async function run() {
   await capture('03-save-recovered');
   checks.saveRecovered = true;
 
+  let providerCalls = 0;
+  let approvedMessages;
   server = http.createServer((req,res) => {
     res.setHeader('Access-Control-Allow-Origin','*');
     res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
@@ -82,8 +84,8 @@ async function run() {
     if(req.method!=='POST'||req.url!=='/v1/chat/completions'){res.writeHead(404);res.end();return;}
     if(req.headers.authorization !== 'Bearer synthetic-test-key'){res.writeHead(401);res.end();return;}
     checks.mainProcessCredentialUsed = true;
-    req.resume();
-    req.on('end',()=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:'- 学生达标率提高30%。'}}]}));});
+    let raw=''; req.on('data',chunk=>raw+=String(chunk));
+    req.on('end',()=>{providerCalls++; const body=JSON.parse(raw); checks.exactPreviewMatched=JSON.stringify(body.messages)===JSON.stringify(approvedMessages);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:'- 学生达标率提高30%。'}}]}));});
   });
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
   const settings={enabled:true,providerLabel:'Isolated mock',baseUrl:'http://127.0.0.1:'+server.address().port+'/v1',apiKey:'synthetic-test-key',model:'synthetic'};
@@ -97,11 +99,23 @@ async function run() {
   await click('AI 润色 Diff');
   await until('AI config loaded', () => bodyHas('已启用 · 修改'));
   await click('生成润色对比 Diff');
+  await until('preview appears',()=>bodyHas('发送前确认（尚未调用模型）'));
+  if(providerCalls!==0)throw Error('request sent before confirmation');
+  await capture('04a-outbound-preview');
+  await click('取消发送');
+  await sleep(200);
+  if(providerCalls!==0)throw Error('cancelled preview sent a request');
+  checks.cancelledPreviewNoNetwork=true;
+  await click('生成润色对比 Diff');
+  await until('preview reopened',()=>bodyHas('发送前确认（尚未调用模型）'));
+  approvedMessages=await js('Array.from(document.querySelectorAll("section[aria-label=\\\"AI 数据发送预览\\\"] pre")).map((e,i)=>({role:i===0?"system":"user",content:e.textContent}))');
+  await click('确认发送给模型');
   await until('fact guard appears', () => bodyHas('我已核对以上事实，确认属实'));
   const blocked = await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("采纳替换"))?.disabled === true');
   if (!blocked) throw Error('risky single polish was not blocked');
   await capture('04-ai-fact-review');
   checks.riskRequiresApproval = true;
+  if(providerCalls!==1||!checks.exactPreviewMatched)throw Error('request did not match preview');
   const origSnapshot = main.store.createSnapshot.bind(main.store);
   main.store.createSnapshot = async () => { throw Error('受控快照失败'); };
   await js('(()=>{const l=[...document.querySelectorAll("label")].find(x=>x.innerText.includes("我已核对以上事实"));l?.querySelector("input")?.click();return !!l})()');

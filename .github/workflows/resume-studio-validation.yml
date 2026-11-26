@@ -32,7 +32,7 @@ jobs:
       - name: Typecheck audited runtime
         run: pnpm typecheck
       - name: Targeted V6 regression tests
-        run: pnpm exec vitest run src/hooks/useResumePersistence.test.tsx src/lib/v6Safety.test.ts electron/aiSettingsStore.test.ts src/mcp/mcpHandlers.test.ts src/server/localFsApi.test.ts src/server/revisionConcurrency.test.ts
+        run: pnpm exec vitest run src/hooks/useResumePersistence.test.tsx src/lib/aiTailor.test.ts electron/aiSettingsStore.test.ts src/mcp/mcpHandlers.test.ts src/server/localFsApi.test.ts src/server/revisionConcurrency.test.ts
       - name: Build actual Electron application
         run: pnpm desktop:build
       - name: Run real application with synthetic fixture and failure injection

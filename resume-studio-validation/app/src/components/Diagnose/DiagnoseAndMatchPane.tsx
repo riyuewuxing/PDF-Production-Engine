@@ -18,8 +18,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type TailorBlockProposal,
   generateTailorProposals,
+  prepareTailorRequest,
   scanFactGuardWarnings,
-  buildTrustedFactCorpus,
+  scanScopedProposalWarnings,
+  type PreparedTailorRequest,
 } from '../../lib/aiTailor';
 import { apiClient } from '../../lib/apiClient';
 import { type AtsInspectionResult, runLiveAtsInspection } from '../../lib/atsInspector';
@@ -29,15 +31,24 @@ import {
   DEFAULT_BYOK_SETTINGS,
   type PolishMode,
   computeLineDiff,
-  polishResumeBlockWithByok,
+  preparePolishRequest,
+  requestByokCompletion,
+  validateByokBaseUrl,
+  type ByokCompletionOptions,
 } from '../../lib/byokAiClient';
 import { matchResumeWithJd } from '../../lib/jdMatcher';
+import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from '../../lib/aiContext';
 import { applyBlockUpdates, collectEditableBlocks } from '../../lib/resumeBlocks';
 import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
 import type { ResumeDocument } from '../../schema/resumeSchema';
 
 type DiagnoseSubTab = 'hr' | 'jd' | 'ats' | 'ai';
 type AiSubMode = 'single' | 'tailor';
+type PolishBasis = { document: ResumeDocument; slug: string; blockKey: string; text: string };
+type TailorBasis = { document: ResumeDocument; slug: string; jdText: string };
+type PendingAiRequest =
+  | { mode: 'single'; basis: PolishBasis; settings: ByokAiSettings; options: ByokCompletionOptions; polishMode: PolishMode }
+  | { mode: 'tailor'; basis: TailorBasis; settings: ByokAiSettings; prepared: PreparedTailorRequest; masterRef: boolean };
 
 export function DiagnoseAndMatchPane({
   document,
@@ -77,6 +88,7 @@ export function DiagnoseAndMatchPane({
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<PendingAiRequest | null>(null);
 
   const editableBlocks = useMemo(() => collectEditableBlocks(document), [document]);
   const [selectedBlockKey, setSelectedBlockKey] = useState<string>(() => editableBlocks[0]?.key ?? 'skills');
@@ -97,7 +109,7 @@ export function DiagnoseAndMatchPane({
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [tailorProposals, setTailorProposals] = useState<TailorBlockProposal[]>([]);
-  const [tailorCorpus, setTailorCorpus] = useState('');
+  const [tailorSources, setTailorSources] = useState<AiFactSourceMap>({});
   const [tailorEditingKey, setTailorEditingKey] = useState<string | null>(null);
   const [tailorNotice, setTailorNotice] = useState<string | null>(null);
   const tailorAbortRef = useRef<AbortController | null>(null);
@@ -130,11 +142,13 @@ export function DiagnoseAndMatchPane({
   const jdResult = useMemo(() => matchResumeWithJd(document, jdText), [document, jdText]);
 
   const selectedBlock = editableBlocks.find((b) => b.key === selectedBlockKey) ?? editableBlocks[0];
-  const contextRef = useRef({ document, slug: activeSlug, jdText, blockKey: selectedBlock?.key });
-  contextRef.current = { document, slug: activeSlug, jdText, blockKey: selectedBlock?.key };
+  const contextRef = useRef({ document, slug: activeSlug, jdText, blockKey: selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab });
+  contextRef.current = { document, slug: activeSlug, jdText, blockKey: selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab };
+  const currentSources = useMemo(() => buildAiFactSources(document), [document]);
   const polishWarnings = useMemo(
-    () => suggestedText === null ? [] : scanFactGuardWarnings(suggestedText, buildTrustedFactCorpus(document)),
-    [suggestedText, document],
+    () => suggestedText === null || !selectedBlock ? [] :
+      scanFactGuardWarnings(suggestedText, currentSourceCorpus(currentSources[selectedBlock.key] ?? [])),
+    [suggestedText, selectedBlock, currentSources],
   );
   const isCurrent = (basis: { document: ResumeDocument; slug: string; jdText?: string; blockKey?: string }) =>
     mountedRef.current && contextRef.current.document === basis.document &&
@@ -150,10 +164,13 @@ export function DiagnoseAndMatchPane({
 
   useEffect(() => {
     setTailorProposals([]);
-    setTailorCorpus('');
+    setTailorSources({});
     setTailorNotice(null);
     tailorAbortRef.current?.abort();
   }, [document, activeSlug, jdText]);
+  useEffect(() => {
+    setPendingRequest(null);
+  }, [document, activeSlug, jdText, selectedBlock?.key, aiSettings, aiSubMode, polishMode, tailorUseMasterRef, subTab]);
   const diffSegments = useMemo(
     () =>
       selectedBlock && suggestedText !== null
@@ -203,24 +220,47 @@ export function DiagnoseAndMatchPane({
     }
   };
 
-  const handleRunPolish = async () => {
-    if (!selectedBlock || applyingRef.current) return;
+  const assertPreviewSettings = (settings: ByokAiSettings) => {
+    if (!settings.enabled) throw new Error('请先开启并保存 AI 配置。');
+    if (window.resumeDesktop && (settings.apiKey || settings.clearApiKey)) throw new Error('请先保存 AI 配置再发送。');
+    validateByokBaseUrl(settings.baseUrl);
+  };
+
+  const handlePreparePolish = () => {
+    if (!selectedBlock || applyingRef.current || polishing) return;
+    setPolishError(null);
+    setPendingRequest(null);
+    try {
+      assertPreviewSettings(aiSettings);
+      const sanitize = createAiTextSanitizer([document]);
+      const basis: PolishBasis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text };
+      const options = preparePolishRequest({
+        mode: polishMode, targetTitle: sanitize(selectedBlock.label),
+        content: sanitize(selectedBlock.text), jobTitle: sanitize(document.basic.title),
+      });
+      setPendingRequest({ mode:'single', basis, settings:aiSettings, options, polishMode });
+    } catch(err) {
+      setPolishError(err instanceof Error ? err.message : '无法准备发送内容。');
+    }
+  };
+
+  const handleRunPolish = async (request: Extract<PendingAiRequest,{mode:'single'}>) => {
+    if (!isCurrent(request.basis) || applyingRef.current) return;
     polishAbortRef.current?.abort();
     const controller = new AbortController();
     polishAbortRef.current = controller;
-    const basis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text };
+    const basis = request.basis;
     polishBasisRef.current = basis;
     setPolishing(true);
     setPolishError(null);
     setSuggestedText(null);
     setPolishRiskConfirmed(false);
     try {
-      const output = await polishResumeBlockWithByok({
-        settings: aiSettings, mode: polishMode, targetTitle: selectedBlock.label,
-        content: selectedBlock.text, jobTitle: document.basic.title, signal: controller.signal,
-      });
+      const output = await requestByokCompletion({...request.options,settings:request.settings,signal:controller.signal});
       if (controller.signal.aborted || polishAbortRef.current !== controller || !isCurrent(basis)) return;
-      if (output.length > selectedBlock.maxCharsHint) throw new Error('润色结果超出段落字数预算，请缩短后重试。');
+      const block = editableBlocks.find(b=>b.key===basis.blockKey);
+      if (!block || output.length > block.maxCharsHint) throw new Error('润色结果超出段落字数预算，请缩短后重试。');
+      if (output.includes(PRIVACY_PLACEHOLDER)) throw new Error('模型保留了隐私省略标记，未生成可直接应用的建议。');
       setSuggestedText(output);
     } catch (err) {
       if (polishAbortRef.current === controller && isCurrent(basis)) {
@@ -239,7 +279,7 @@ export function DiagnoseAndMatchPane({
       setSuggestedText(null);
       return;
     }
-    if (polishWarnings.length && !polishRiskConfirmed) {
+    if (!polishRiskConfirmed) {
       setPolishError('请逐项核对新事实风险后再确认采纳。');
       return;
     }
@@ -262,32 +302,50 @@ export function DiagnoseAndMatchPane({
     }
   };
 
-  const handleRunTailor = async () => {
-    if (applyingRef.current) return;
+  const handlePrepareTailor = async () => {
+    if (applyingRef.current || tailoring) return;
     tailorAbortRef.current?.abort();
     const controller = new AbortController();
     tailorAbortRef.current = controller;
-    const basis = { document, slug: activeSlug, jdText };
+    const basis: TailorBasis = { document, slug: activeSlug, jdText };
+    const settings = aiSettings;
+    const masterRef = tailorUseMasterRef;
+    setTailoring(true);
+    setTailorError(null);
+    setPendingRequest(null);
+    try {
+      assertPreviewSettings(settings);
+      let masterDoc: ResumeDocument | null = null;
+      if (masterRef && activeSlug !== 'master') masterDoc = await apiClient.getResume('master');
+      if (controller.signal.aborted || !isCurrent(basis) || contextRef.current.aiSettings !== settings ||
+          contextRef.current.tailorUseMasterRef !== masterRef || contextRef.current.aiSubMode !== 'tailor' ||
+          contextRef.current.subTab !== 'ai') return;
+      const prepared = prepareTailorRequest({document,masterDocument:masterDoc,jdText});
+      setPendingRequest({mode:'tailor',basis,settings,prepared,masterRef});
+    } catch(err) {
+      if (isCurrent(basis)) setTailorError(err instanceof Error?err.message:'无法准备整卷请求。');
+    } finally {
+      if(tailorAbortRef.current===controller&&mountedRef.current)setTailoring(false);
+    }
+  };
+
+  const handleRunTailor = async (request: Extract<PendingAiRequest,{mode:'tailor'}>) => {
+    if (applyingRef.current || !isCurrent(request.basis)) return;
+    tailorAbortRef.current?.abort();
+    const controller = new AbortController();
+    tailorAbortRef.current = controller;
+    const basis = request.basis;
     tailorBasisRef.current = basis;
     setTailoring(true);
     setTailorError(null);
     setTailorNotice(null);
     setTailorProposals([]);
     try {
-      let masterDoc: ResumeDocument | null = null;
-      if (tailorUseMasterRef && activeSlug !== 'master') {
-        masterDoc = await apiClient.getResume('master');
-      }
-      if (controller.signal.aborted || !isCurrent(basis)) return;
-      const res = await generateTailorProposals({
-        settings: aiSettings, document, masterDocument: masterDoc, jdText, signal: controller.signal,
-      });
+      const res = await generateTailorProposals({settings:request.settings,prepared:request.prepared,signal:controller.signal});
       if (controller.signal.aborted || tailorAbortRef.current !== controller || !isCurrent(basis)) return;
       setTailorProposals(res.proposals);
-      setTailorCorpus(res.trustedCorpus);
-      if (res.proposals.length === 0) {
-        setTailorNotice('模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。');
-      }
+      setTailorSources(res.sourceMap);
+      if (res.proposals.length === 0) setTailorNotice('模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。');
     } catch (err) {
       if (tailorAbortRef.current !== controller || !isCurrent(basis)) return;
       setTailorError(controller.signal.aborted ? '已取消整卷改写请求。' :
@@ -295,6 +353,21 @@ export function DiagnoseAndMatchPane({
     } finally {
       if (tailorAbortRef.current === controller && mountedRef.current) setTailoring(false);
     }
+  };
+
+  const confirmPendingRequest = () => {
+    const request = pendingRequest;
+    if (!request) return;
+    setPendingRequest(null);
+    const current = contextRef.current;
+    if (!isCurrent(request.basis) || current.aiSettings !== request.settings ||
+        current.aiSubMode !== request.mode || current.subTab !== 'ai' ||
+        (request.mode === 'single' ? current.polishMode !== request.polishMode : current.tailorUseMasterRef !== request.masterRef)) {
+      const message = '发送范围或设置已变化，请重新预览确认。';
+      if (request.mode === 'single') setPolishError(message); else setTailorError(message);
+      return;
+    }
+    if (request.mode === 'single') void handleRunPolish(request); else void handleRunTailor(request);
   };
 
   const handleApplyTailorProposals = async () => {
@@ -308,9 +381,9 @@ export function DiagnoseAndMatchPane({
     const updates: Record<string, string> = {};
     for (const item of selected) {
       const block = editableBlocks.find((b) => b.key === item.blockKey);
-      const warnings = scanFactGuardWarnings(item.suggestedText, tailorCorpus);
+      const warnings = scanScopedProposalWarnings(item.suggestedText, item.blockKey, tailorSources, item.factIds);
       if (!block || block.text !== item.originalText || !item.suggestedText.trim() ||
-          item.suggestedText.length > block.maxCharsHint ||
+          item.suggestedText.length > block.maxCharsHint || item.suggestedText.includes(PRIVACY_PLACEHOLDER) ||
           JSON.stringify(warnings) !== JSON.stringify(item.factWarnings)) {
         setTailorError('提案已变化、超出字数上限或事实风险未重新确认，未应用修改。');
         return;
@@ -788,6 +861,25 @@ export function DiagnoseAndMatchPane({
               </button>
             </div>
 
+            {pendingRequest && (
+              <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800">
+                <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>
+                <p>接收方：{validateByokBaseUrl(pendingRequest.settings.baseUrl).baseUrl}/chat/completions</p>
+                <p>模型：{pendingRequest.settings.model}</p>
+                <p>下方是本次实际发送的消息内容。基本联系方式、照片和已识别的隐私内容已尽量省略；仍请检查可见经历或 JD 中是否有其他敏感信息。密钥不在预览中。</p>
+                <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-amber-200 bg-white p-2">
+                  <div className="font-semibold">系统消息</div>
+                  <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).systemPrompt}</pre>
+                  <div className="mt-2 font-semibold">用户消息</div>
+                  <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).userPrompt}</pre>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white">确认发送给模型</button>
+                  <button type="button" onClick={()=>setPendingRequest(null)} className="rounded border border-slate-300 bg-white px-3 py-1.5">取消发送</button>
+                </div>
+              </section>
+            )}
+
             {aiSubMode === 'tailor' && (
               <div className="space-y-3">
                 <label className="flex flex-col gap-1">
@@ -809,14 +901,14 @@ export function DiagnoseAndMatchPane({
                     onChange={(e) => setTailorUseMasterRef(e.target.checked)}
                     className="rounded border-slate-300"
                   />
-                  <span>参考母库（master.json）作为可信事实与未展示经历补充边界</span>
+                  <span>可选：仅参考母库中与本段主体及时间相同的可见经历（自述，须人工核实）</span>
                 </label>
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={tailoring || applying}
-                    onClick={() => void handleRunTailor()}
+                    onClick={() => void handlePrepareTailor()}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
                   >
                     <Wand2 size={13} />
@@ -850,14 +942,14 @@ export function DiagnoseAndMatchPane({
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
-                          onClick={() =>
-                            setTailorProposals((prev) =>
-                              prev.map((p) => ({ ...p, accepted: p.factWarnings.length === 0 })),
-                            )
-                          }
+                          onClick={() => {
+                            if (window.confirm('机器未报出预警不代表事实属实。确认你已经人工核对这些提案？')) {
+                              setTailorProposals(prev=>prev.map(p=>({...p,accepted:p.factWarnings.length===0})));
+                            }
+                          }}
                           className="rounded border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50"
                         >
-                          全选无预警提案
+                          已核对后全选无机器预警项
                         </button>
                         <button
                           type="button"
@@ -924,6 +1016,13 @@ export function DiagnoseAndMatchPane({
                           </div>
 
                           <div className="text-[11px] text-slate-600">{proposal.reason}</div>
+                          <div className="rounded border border-slate-200 bg-slate-50 p-2 text-[10px] text-slate-600">
+                            事实来源（候选人自述，不是独立证明）：
+                            {(tailorSources[proposal.blockKey] ?? []).map(source=>(
+                              <div key={source.id}>{source.scope==='current'?'当前段落':'同源母库'} · {source.label} · {source.id}{proposal.factIds.includes(source.id)?'（模型引用）':''}</div>
+                            ))}
+                            <div>请人工核对主体、日期、限定词及因果关系；机器预警无法证明语义真实性。</div>
+                          </div>
 
                           {proposal.matchedJdKeywords.length > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -960,11 +1059,11 @@ export function DiagnoseAndMatchPane({
                               disabled={applying}
                               onChange={(e) => {
                                 const nextText = e.target.value;
-                                const nextWarnings = scanFactGuardWarnings(nextText, tailorCorpus);
+                                const nextWarnings = scanScopedProposalWarnings(nextText, proposal.blockKey, tailorSources, []);
                                 setTailorProposals((prev) =>
                                   prev.map((item) =>
                                     item.blockKey === proposal.blockKey
-                                      ? { ...item, suggestedText: nextText, factWarnings: nextWarnings, accepted: false }
+                                      ? { ...item, suggestedText: nextText, factWarnings: nextWarnings, factIds: [], accepted: false }
                                       : item,
                                   ),
                                 );
@@ -1046,7 +1145,7 @@ export function DiagnoseAndMatchPane({
               <button
                 type="button"
                 disabled={polishing || applying || !selectedBlock}
-                onClick={() => void handleRunPolish()}
+                onClick={handlePreparePolish}
                 className="flex w-full items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
               >
                 <Wand2 size={13} /> {polishing ? '请求模型生成中...' : '生成润色对比 Diff'}
@@ -1074,7 +1173,7 @@ export function DiagnoseAndMatchPane({
                     </button>
                     <button
                       type="button"
-                      disabled={applying || (polishWarnings.length > 0 && !polishRiskConfirmed)}
+                      disabled={applying || !polishRiskConfirmed}
                       onClick={() => void handleAdoptDiff()}
                       className="inline-flex items-center gap-1 rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-500"
                     >
@@ -1083,16 +1182,15 @@ export function DiagnoseAndMatchPane({
                   </div>
                 </div>
 
-                {polishWarnings.length > 0 && (
-                  <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
-                    {polishWarnings.map((warning, i) => <div key={i}>{warning.message}</div>)}
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={polishRiskConfirmed} disabled={applying}
-                        onChange={(e) => setPolishRiskConfirmed(e.target.checked)} />
-                      我已核对以上事实，确认属实
-                    </label>
-                  </div>
-                )}
+                <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
+                  <div>来源：当前所选段落（候选人自述）。数字检查不等于事实或语义验证，请核对主体、角色、时间及否定限定。</div>
+                  {polishWarnings.map((warning, i) => <div key={i}>{warning.message}</div>)}
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={polishRiskConfirmed} disabled={applying}
+                      onChange={(e) => setPolishRiskConfirmed(e.target.checked)} />
+                    我已核对以上事实，确认属实
+                  </label>
+                </div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="rounded border border-slate-200 bg-white p-2">
                     <div className="mb-1 text-[10px] font-bold text-slate-500">当前原文</div>
