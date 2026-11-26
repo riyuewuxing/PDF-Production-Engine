@@ -10,7 +10,7 @@ export const FactInputSchema=z.object({
 export const FactRecordSchema=FactInputSchema.extend({
   id:z.string().uuid(),docId:z.string().min(1).max(500),
   blockKey:z.string().min(1).max(500),entityId:z.string().min(1).max(8000),
-  sourceScope:z.literal('manual'),
+  sourceScope:z.literal('manual'),supersedesId:z.string().uuid().optional(),
   verifiedStatus:z.enum(['user-confirmed','revoked']),
   modifiedAt:z.string().datetime(),
 }).strict();
@@ -20,11 +20,21 @@ export const FactBankSchema=z.object({
 }).strict().superRefine((bank,ctx)=>{
   if(new Set(bank.records.map(r=>r.id)).size!==bank.records.length)
     ctx.addIssue({code:z.ZodIssueCode.custom,message:'事实记录 ID 重复'});
+  const prior=new Map<string,z.infer<typeof FactRecordSchema>>(),superseded=new Set<string>();
+  for(const record of bank.records){
+    if(record.supersedesId){
+      const old=prior.get(record.supersedesId);
+      if(!old||old.verifiedStatus!=='revoked'||superseded.has(old.id)||old.entityId!==record.entityId||old.docId!==record.docId||old.blockKey!==record.blockKey)
+        ctx.addIssue({code:z.ZodIssueCode.custom,message:'事实修订链不一致'});
+      superseded.add(record.supersedesId);
+    }
+    prior.set(record.id,record);
+  }
 });
 export const AddFactSchema=z.object({
   slug:z.string().min(1).max(80),docRevision:z.string().min(1).max(1000),
   blockKey:z.string().min(1).max(500),bankRevision:z.string().min(1).max(64),
-  fact:FactInputSchema,confirmation:z.literal('CONFIRM_SELF_REPORTED_FACT'),
+  fact:FactInputSchema,supersedesId:z.string().uuid().optional(),confirmation:z.literal('CONFIRM_SELF_REPORTED_FACT'),
 }).strict();
 export const RevokeFactSchema=z.object({
   id:z.string().uuid(),bankRevision:z.string().min(1).max(64),

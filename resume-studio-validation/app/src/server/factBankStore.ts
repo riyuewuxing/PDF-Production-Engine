@@ -58,9 +58,13 @@ export class FactBankStore {
       if(resumeRevision(doc)!==input.docRevision)throw new LocalFsApiError(409,'FACT_DOCUMENT_CONFLICT','关联简历已变化，请重新核对事实主体。');
       const entityId=factEntityId(doc,input.blockKey);
       if(!entityId)throw new LocalFsApiError(422,'FACT_TARGET_INVALID','只能关联唯一可见段落。');
+      const old=input.supersedesId?bank.records.find(r=>r.id===input.supersedesId):undefined;
+      if(input.supersedesId&&(!old||old.verifiedStatus!=='user-confirmed'||old.docId!==doc.id||old.blockKey!==input.blockKey||old.entityId!==entityId))
+        throw new LocalFsApiError(409,'FACT_CORRECTION_CONFLICT','原事实已撤销或关联主体已变化，不能直接更正。');
+      const modifiedAt=new Date().toISOString();
       const record:FactRecord={...input.fact,id:randomUUID(),docId:doc.id,blockKey:input.blockKey,entityId,
-        sourceScope:'manual',verifiedStatus:'user-confirmed',modifiedAt:new Date().toISOString()};
-      return this.write([...bank.records,record]);
+        sourceScope:'manual',verifiedStatus:'user-confirmed',modifiedAt,...(old?{supersedesId:old.id}:{})};
+      return this.write([...bank.records.map(r=>old&&r.id===old.id?{...r,verifiedStatus:'revoked' as const,modifiedAt}:r),record]);
     });
   }
   async revoke(raw:unknown):Promise<FactBank>{

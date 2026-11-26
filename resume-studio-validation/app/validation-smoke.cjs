@@ -465,6 +465,27 @@ async function run() {
   await click('加载 / 刷新事实库');
   await until('revoked fact visible',()=>bodyHas('已撤销'));
   await capture('33-fact-revoked');
+  await setValue('textarea[aria-label="事实陈述"]','核对 5 份合成练习材料');
+  await setValue('input[aria-label="本地证据位置 / 来源说明"]','SYNTHETIC_SOURCE_SECOND');
+  if(!await checkLabel('我已核对该陈述'))throw Error('second fact confirmation unavailable');
+  await click('确认保存事实');
+  await until('second local-only fact saved',()=>bodyHas('事实已保存到独立本地资料库'));
+  const beforeCorrection=await js('window.resumeDesktop.facts.get()');
+  const old=beforeCorrection.records.find(r=>r.verifiedStatus==='user-confirmed');
+  if(!old||old.sensitivity!=='local-only'||beforeCorrection.records.length!==2)throw Error('local-only default failed');
+  await click('更正事实');
+  await setValue('textarea[aria-label="事实陈述"]','核对 6 份合成练习材料');
+  if(!await checkLabel('我已核对该陈述'))throw Error('correction confirmation unavailable');
+  await click('确认更正事实');
+  await until('fact corrected',()=>bodyHas('事实已更正，原记录保留且不再可引用'));
+  const afterCorrection=await js('window.resumeDesktop.facts.get()');
+  const corrected=afterCorrection.records.find(r=>r.supersedesId===old.id);
+  if(afterCorrection.records.length!==3||afterCorrection.records.find(r=>r.id===old.id)?.verifiedStatus!=='revoked'||!corrected||corrected.sensitivity!=='local-only'||corrected.assertion!=='核对 6 份合成练习材料')throw Error('fact correction not atomic or historical record lost');
+  if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(beforeFacts)||providerCalls!==callsBeforeFacts+1)throw Error('fact correction modified resume or contacted provider');
+  checks.factCorrectionHistory=true;
+  await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.textContent.includes("本地事实资料库"));e?.scrollIntoView({block:"start"});return true})()');
+  await capture('34-fact-corrected');
+
   await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.textContent.includes("本地事实资料库"));if(e?.parentElement?.open)e.click();return true})()');
 
   await click('AI 版式优化');

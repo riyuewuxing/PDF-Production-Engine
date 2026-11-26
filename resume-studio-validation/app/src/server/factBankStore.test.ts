@@ -73,6 +73,19 @@ describe('independent local fact bank',()=>{
     await expect(bank.assertCurrentBinding(binding)).rejects.toThrow('事实库已被其他操作更新');
     await expect(bank.assertCurrentBinding({...binding,bankRevision:revoked.revision})).rejects.toThrow('事实主体');
   });
+  it('corrects a fact atomically, retains its original evidence and invalidates prior approvals',async()=>{
+    const saved=await bank.add(input),old=saved.records[0]!;
+    const correctedInput={...input,bankRevision:saved.revision,supersedesId:old.id,fact:{...input.fact,assertion:'修正后的合成记录',sensitivity:'local-only' as const}};
+    await expect(bank.add({...correctedInput,bankRevision:'empty-v1'})).rejects.toThrow();
+    const corrected=await bank.add(correctedInput);
+    expect(corrected.records).toHaveLength(2);
+    expect(corrected.records[0]).toMatchObject({id:old.id,assertion:old.assertion,evidenceRef:old.evidenceRef,verifiedStatus:'revoked'});
+    expect(corrected.records[1]).toMatchObject({supersedesId:old.id,verifiedStatus:'user-confirmed',assertion:'修正后的合成记录'});
+    expect(corrected.records[1]!.id).not.toBe(old.id);
+    expect(isShareableFact(doc,corrected.records[1]!)).toBe(false);
+    await expect(bank.add({...correctedInput,bankRevision:corrected.revision})).rejects.toThrow('原事实已撤销');
+    expect(await bank.get()).toEqual(corrected);
+  });
   it('fails closed on corrupted data and does not overwrite the source file',async()=>{
     const f=path.join(root,'.fact-bank-v1.json');await fs.writeFile(f,'BROKEN');
     await expect(bank.get()).rejects.toThrow('事实库损坏');
