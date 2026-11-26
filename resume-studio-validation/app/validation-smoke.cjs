@@ -1026,8 +1026,22 @@ async function run() {
   reviewBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(reviewFactInput)+')');
   const reviewFact=reviewBank.records.find(r=>r.assertion===reviewFactInput.fact.assertion);
   await click('JD 雷达');
-  const jobSource='合成招聘公告\n须持高中物理教师资格证；硕士优先。\n不要求班主任经验；必须硕士且经验优先\n报名截止2026-12-01。';
-  const reviewApplication=await main.store.logApplication({entry:{id:require('node:crypto').randomUUID(),company:'合成岗位核对招聘单位',role:'合成物理教师',resumeSlug:'master',jdText:jobSource,updatedAt:new Date().toISOString()},document:reviewDoc});
+  const jobSource='  合成招聘公告\n须持高中物理教师资格证；硕士优先。\n不要求班主任经验；必须硕士且经验优先\n报名截止2026-12-01。\n  ';
+  // Exercise the user's actual PDF export + quick-log path, including significant pasted whitespace.
+  await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',jobSource);
+  await click('导出 PDF');
+  await until('job PDF export ready',()=>bodyHas('记入投递'));
+  if(!await js('(()=>{const b=[...document.querySelectorAll("button")].find(x=>x.innerText.includes("记入投递")&&!x.innerText.includes("确认"));if(!b)return false;b.click();return true})()'))throw Error('job quick log button missing');
+  await until('job quick log dialog',()=>js('!!document.querySelector("[role=dialog][aria-label=\\"记入投递并锁定永久快照\\"]")'));
+  if(!await setInput(companySelector,'合成岗位核对招聘单位'))throw Error('job quick log company missing');
+  if(!await js('document.querySelector(\'[role="dialog"] textarea\')?.value==='+JSON.stringify(jobSource)))throw Error('quick log did not retain exact JD before save');
+  await capture('74-job-review-quick-log');
+  await click('确认记入并锁定快照');
+  await until('job quick log persisted',async()=>(await main.store.getApplications()).applications.some(a=>a.company==='合成岗位核对招聘单位'&&a.snapshotId));
+  await until('job quick log modal closed',()=>js('!document.querySelector("[role=dialog][aria-label=\\"记入投递并锁定永久快照\\"]")'));
+  const reviewApplication={entry:(await main.store.getApplications()).applications.find(a=>a.company==='合成岗位核对招聘单位')};
+  if(reviewApplication.entry.jdText!==jobSource||!reviewApplication.entry.exportedFilePath||!fs.existsSync(reviewApplication.entry.exportedFilePath))throw Error('quick log altered exact JD or failed actual PDF export');
+  checks.jobReviewQuickLogExactSource=true;
   const waitJobButton=label=>until('enabled job button '+label,()=>js('[...document.querySelectorAll("button")].some(b=>b.innerText.trim()==='+JSON.stringify(label)+'&&!b.disabled)'));
   await waitJobButton('刷新本地核对档案');await click('刷新本地核对档案');await until('job history refreshed',()=>bodyHas('已读取本地核对档案'));
   await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',jobSource);

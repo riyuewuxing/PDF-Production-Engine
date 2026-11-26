@@ -85,7 +85,8 @@ export function QuickLogApplicationModal({
         status,
         appliedDate: now.slice(0, 10),
         notes: notes.trim(),
-        jdText: jdText.trim(),
+        // Keep the exact pasted source: review offsets and sealed-JD linkage depend on it.
+        jdText,
         snapshotId: '',
         exportedFilePath: snapshot.filePath,
         interviewAt: '',
