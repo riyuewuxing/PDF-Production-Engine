@@ -10,7 +10,7 @@ concurrency:
 jobs:
   windows-damaged-document-recovery:
     runs-on: windows-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     defaults:
       run:
         working-directory: resume-studio-validation/app
@@ -77,6 +77,14 @@ jobs:
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-recovery-evidence\all-corrupt'
           $env:RESUME_STUDIO_LIST_MODE = 'all-corrupt'
           & .\node_modules\.bin\electron.cmd .\validation-list-recovery.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Restore and launch verified backup directly from the startup error screen
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-list-backup-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-recovery-evidence\backup-only'
+          & .\node_modules\.bin\electron.cmd .\validation-startup-backup.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload damaged document recovery evidence
         if: always()

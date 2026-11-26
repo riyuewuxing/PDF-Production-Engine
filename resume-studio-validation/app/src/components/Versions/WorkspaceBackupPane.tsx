@@ -12,7 +12,7 @@ function Summary({value,timeLabel='备份时间'}:{value:BackupSummary;timeLabel
     {value.warnings.length>0&&<div className="max-h-40 overflow-auto rounded bg-amber-50 p-2 text-amber-900"><p className="font-semibold">原数据存在异常，备份不会修复这些问题：</p>{value.warnings.map((w,i)=><p key={i}>{w}</p>)}</div>}
   </div>;
 }
-export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
+export function WorkspaceBackupPane({onFlush,recoveryOnly=false}:{onFlush:()=>Promise<void>;recoveryOnly?:boolean}){
   const bridge=window.resumeDesktop?.workspaceBackup;
   const [busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [inspection,setInspection]=useState<BackupInspection|null>(null),[result,setResult]=useState<BackupResult|null>(null),[confirmed,setConfirmed]=useState(false);
@@ -43,6 +43,7 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
   });
   return <section aria-label="工作区备份与安全恢复" className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/50 p-3 text-xs break-words">
     <div className="font-bold text-teal-900">工作区备份与安全恢复</div>
+    {recoveryOnly&&<p className="rounded bg-amber-50 p-2 font-medium text-amber-900">当前简历未正常加载。本入口仅检查已有备份、恢复独立副本或打开已恢复工作区，不创建新备份、不覆盖原数据。</p>}
     <p>备份已落盘的母库、简历、资源、历史快照、回收站、求职台账、事实库与附件。逐文件 SHA-256 校验（用于检查内容一致性，不代表来源鉴真）；恢复仅创建独立新工作区，不覆盖当前数据。</p>
     <p className="rounded bg-amber-50 p-2 text-amber-900">备份文件夹含未加密私人资料，请保存在可信本地磁盘。不会备份 AI 密钥/模型配置、已导出成品、外部原件或临时锁；未保存的编辑及独立自动恢复草稿不属于备份。</p>
     {(busy||error||notice||openedWorkspace)&&<div ref={feedbackRef} aria-label="工作区操作反馈" className="sticky top-0 z-10 max-h-40 overflow-y-auto rounded border border-teal-200 bg-white p-2 shadow-sm">
@@ -52,12 +53,12 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
       {openedWorkspace&&<div aria-label="独立工作区启动结果" className="mt-1 border-t border-teal-100 pt-1"><p>已收到独立窗口就绪确认（进程 ID：<span aria-label="独立工作区进程 ID">{openedWorkspace.pid}</span>）。</p><p className="break-all">{openedWorkspace.folder}</p></div>}
     </div>}
     <div className="flex flex-wrap gap-1">
-      <button type="button" disabled={!!busy} className="rounded bg-teal-700 px-2 py-1.5 text-white disabled:opacity-50" onClick={()=>void run('正在创建备份',async()=>{
+      {!recoveryOnly&&<button type="button" disabled={!!busy} className="rounded bg-teal-700 px-2 py-1.5 text-white disabled:opacity-50" onClick={()=>void run('正在创建备份',async()=>{
         setResult(null);setInspection(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
         await onFlush();await careerLedger.flush();
         if(careerLedger.getSnapshot().dirty||careerLedger.getSnapshot().saving)throw new Error('投递台账还有未确认写入，请先保存。');
         const saved=await bridge.create();if(saved){setResultKind('backup');setResult(saved);setNotice('已创建并校验工作区备份。');}else setNotice('已取消创建备份，未发布备份文件夹。');
-      })}>创建本地工作区备份</button>
+      })}>创建本地工作区备份</button>}
       <button type="button" disabled={!!busy} className="rounded border bg-white px-2 py-1.5" onClick={()=>void run('正在检查备份',async()=>{
         setInspection(null);setResult(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
         const checked=await bridge.inspect();if(checked){setInspection(checked);setNotice('备份文件清单及内容校验完成，当前工作区未改动。');}else setNotice('已取消检查备份，当前工作区未改动。');

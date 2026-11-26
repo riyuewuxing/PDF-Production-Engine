@@ -23,6 +23,22 @@ async function inspectLaunch(){
   fireEvent.click(screen.getByRole('button',{name:'确认打开独立工作区'}));
 }
 describe('workspace backup feedback',()=>{
+  it('offers only existing backup recovery and explicit independent restore in startup recovery mode',async()=>{
+    const flush=vi.fn().mockRejectedValue(new Error('no active document'));
+    render(<WorkspaceBackupPane onFlush={flush} recoveryOnly/>);
+    expect(screen.queryByRole('button',{name:'创建本地工作区备份'})).toBeNull();
+    expect(screen.getByText(/本入口仅检查已有备份/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'检查已有备份'}));
+    await screen.findByLabelText('确认恢复到独立新工作区');
+    expect(screen.getByRole('button',{name:'恢复到独立新工作区'})).toHaveProperty('disabled',true);
+    expect(mocks.restore).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('确认恢复到独立新工作区'));
+    fireEvent.click(screen.getByRole('button',{name:'恢复到独立新工作区'}));
+    await screen.findByText('手动启动（备用方式）');
+    expect(mocks.restore).toHaveBeenCalledWith('backup-token','RESTORE_TO_NEW_WORKSPACE');
+    expect(flush).not.toHaveBeenCalled();expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.getByRole('button',{name:'检查并打开刚恢复的工作区'})).toBeTruthy();
+  });
   it('shows confirmed readiness in the operation feedback region and scrolls it into view',async()=>{
     render(<WorkspaceBackupPane onFlush={async()=>{}}/>);
     await inspectLaunch();

@@ -26,6 +26,7 @@ import { VersionAndMasterPane } from './components/Versions/VersionAndMasterPane
 import { RecycleBinPanel } from './components/Versions/RecycleBinPanel';
 import { WriteLockPanel } from './components/Versions/WriteLockPanel';
 import { RecoveryDraftPanel } from './components/Versions/RecoveryDraftPanel';
+import { WorkspaceBackupPane } from './components/Versions/WorkspaceBackupPane';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useResumeExport } from './hooks/useResumeExport';
 import { useResumePersistence } from './hooks/useResumePersistence';
@@ -374,8 +375,8 @@ export default function App() {
 
   if (loadError || !activeDoc) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#11161f] p-6">
-        <div className="max-w-md rounded-lg border border-red-500/40 bg-slate-900 p-6 text-center text-slate-100 shadow-xl">
+      <div className="flex h-screen overflow-y-auto bg-[#11161f] p-6">
+        <div className="m-auto w-full max-w-xl shrink-0 rounded-lg border border-red-500/40 bg-slate-900 p-6 text-center text-slate-100 shadow-xl">
           <AlertCircle size={28} className="mx-auto text-red-400" />
           <h1 className="mt-3 text-base font-semibold">无法加载本地简历</h1>
           <p className="mt-1 text-sm text-slate-400">{loadError ?? 'data/ 目录中暂无可用简历'}</p>
@@ -387,7 +388,12 @@ export default function App() {
           >
             重试加载
           </button>
-          <div className="mt-4 space-y-2">{resumeListWarning}<RecoveryDraftPanel onImport={handleImportJson}/><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/></div>
+          <div className="mt-4 space-y-2">{resumeListWarning}<RecoveryDraftPanel onImport={handleImportJson}/><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/>
+            {window.resumeDesktop?.workspaceBackup&&<details aria-label="启动异常时的备份恢复" className="rounded-lg border border-teal-300 bg-white p-3 text-left text-slate-800">
+              <summary className="cursor-pointer text-sm font-semibold text-teal-800">从已有备份恢复或打开独立工作区</summary>
+              <div className="mt-2"><WorkspaceBackupPane onFlush={flushPendingSave} recoveryOnly/></div>
+            </details>}
+          </div>
         </div>
       </div>
     );
