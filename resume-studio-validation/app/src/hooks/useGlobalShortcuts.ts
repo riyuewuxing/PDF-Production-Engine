@@ -17,6 +17,9 @@ export function useGlobalShortcuts({
 }: UseGlobalShortcutsOptions): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // Do not interrupt IME candidate selection or composition with document commands.
+      // Some Chromium/Windows IME key events report 229 even when isComposing is false.
+      if (e.isComposing || e.keyCode === 229) return;
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const key = e.key.toLowerCase();
 

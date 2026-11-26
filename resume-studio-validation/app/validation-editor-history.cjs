@@ -50,6 +50,15 @@ async function run(){
   await aria('重做');
   await settled('merged text redo persisted',d=>d.basic.name==='合成编辑甲乙23');
   checks.rapidTextCoalescedUndoRedo=true;
+  // Simulated composing KeyboardEvents in the actual Electron renderer, not OS IME.
+  const composition23=await js('(()=>{const f=document.querySelector("#basic-field-name");const result=[];for(const k of ["z","y","s","k"]){const e=new KeyboardEvent("keydown",{key:k,ctrlKey:true,isComposing:true,bubbles:true,cancelable:true});f.dispatchEvent(e);result.push(e.defaultPrevented);}const legacy=new KeyboardEvent("keydown",{key:"z",ctrlKey:true,bubbles:true,cancelable:true});Object.defineProperty(legacy,"keyCode",{value:229});f.dispatchEvent(legacy);result.push(legacy.defaultPrevented);return result})()');
+  assert.deepEqual(composition23,[false,false,false,false,false]);
+  await sleep(500);
+  assert.equal(await value('name'),'合成编辑甲乙23');assert.equal((await read()).basic.name,'合成编辑甲乙23');
+  assert.equal(await enabled('撤销'),true);assert.equal(await enabled('重做'),false);
+  observations.compositionDefaultPrevented=composition23;
+  checks.compositionSyntheticEventDoesNotUndo=true;
+
   await js('document.querySelector("#basic-field-name").blur();document.body.focus();true');
   win.focus();
   const key=async (keyCode,mods)=>{win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers:mods});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers:mods});await sleep(150);};

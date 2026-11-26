@@ -31,6 +31,28 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Typecheck audited runtime
         run: pnpm typecheck
+      - name: Reproduce composing shortcut regression with exact prior runtime then restore candidate
+        timeout-minutes: 2
+        run: |
+          $target = 'src/hooks/useGlobalShortcuts.ts'
+          $candidate = [IO.File]::ReadAllBytes((Join-Path (Get-Location) $target))
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $prior = '7c23fc446c52a4e075ad88ca080b0208b0f01206'
+          # checkout is shallow: the previous source is retained as an exact public test fixture.
+          $priorFile = 'validation-fixtures/useGlobalShortcuts.baseline.txt'
+          try {
+            [IO.File]::WriteAllBytes((Join-Path (Get-Location) $target), [IO.File]::ReadAllBytes((Join-Path (Get-Location) $priorFile)))
+            pnpm exec vitest run src/hooks/useGlobalShortcutsSynthetic.test.tsx --reporter=json --outputFile="$out/ime-baseline-vitest.json"
+            $baselineCode = $LASTEXITCODE
+          } finally {
+            [IO.File]::WriteAllBytes((Join-Path (Get-Location) $target), $candidate)
+          }
+          $report = Get-Content "$out/ime-baseline-vitest.json" -Raw | ConvertFrom-Json
+          if ($baselineCode -eq 0 -or $report.numFailedTests -ne 2 -or $report.numPassedTests -ne 1 -or $report.numTotalTests -ne 3) { throw 'Unexpected baseline reproduction' }
+          $failed = @($report.testResults[0].assertionResults | Where-Object { $_.status -eq 'failed' })
+          if ($failed.Count -ne 2 -or -not ($failed[0].title -like '*composing*') -or -not ($failed[1].title -like '*229*')) { throw 'Unexpected baseline failures' }
+          $LASTEXITCODE = 0
       - name: All audited synthetic-runner regression tests
         run: pnpm test
       - name: Build actual Electron application
