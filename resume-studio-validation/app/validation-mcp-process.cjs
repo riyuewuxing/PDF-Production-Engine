@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
+const mcpBundle=process.env.RESUME_STUDIO_MCP_BUNDLE||path.join(__dirname,'dist-electron','mcp-server.cjs');
 if(!root||!out||fs.existsSync(root))throw Error('fresh isolated synthetic directory required');
 fs.mkdirSync(path.join(root,'resumes'),{recursive:true});fs.mkdirSync(out,{recursive:true});
 const fixture=require('./runner-fixture.json'),manifest=require('./runner-manifest.json');
@@ -32,7 +33,7 @@ function decode(buffer){
 }
 async function exchange(frames,policy={},fragment=false){
   const env={...process.env,RESUME_STUDIO_DATA_DIR:root,RESUME_STUDIO_MCP_ALLOW_WRITE:policy.write?'1':'0',RESUME_STUDIO_MCP_ALLOW_MASTER_WRITE:policy.master?'1':'0'};
-  const child=spawn(process.execPath,[path.join(__dirname,'dist-electron','mcp-server.cjs')],{env,stdio:['pipe','pipe','pipe'],windowsHide:true});
+  const child=spawn(process.execPath,[mcpBundle],{env,stdio:['pipe','pipe','pipe'],windowsHide:true});
   children.add(child);let stdout=[],stderr=[],bytes=0;
   const done=new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{child.kill();reject(Error('MCP subprocess watchdog'))},12000);
@@ -99,6 +100,6 @@ async function run(){
   const created=await exchange([encode(upsert('new-synthetic',{...original,id:'mcp-new-synthetic',title:'新建合成版本'},null))],{write:true});assert.equal(success(created[0].message).existedBefore,false);assert.equal(JSON.parse(fs.readFileSync(path.join(root,'resumes','new-synthetic.json'),'utf8')).title,'新建合成版本');
   checks.explicitNullCreatesNewVersion=true;
   assert.ok(fs.readFileSync(masterPath).equals(masterBytes));checks.masterBytesAlwaysUnchanged=true;
-  fs.writeFileSync(path.join(out,'mcp-process-evidence.json'),JSON.stringify({sourceSha:manifest.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,node:process.version,bundleSha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'dist-electron','mcp-server.cjs'))).digest('hex'),checks,processes},null,2));
+  fs.writeFileSync(path.join(out,'mcp-process-evidence.json'),JSON.stringify({sourceSha:manifest.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,node:process.version,bundleSha256:crypto.createHash('sha256').update(fs.readFileSync(mcpBundle)).digest('hex'),checks,processes},null,2));
 }
 run().then(()=>{clearTimeout(globalTimer);console.log('MCP real subprocess checks',Object.keys(checks).length);}).catch(e=>{clearTimeout(globalTimer);for(const child of children)child.kill();console.error(e);fs.writeFileSync(path.join(out,'mcp-process-failure.json'),JSON.stringify({checks,processes,error:String(e)},null,2));process.exitCode=1;});

@@ -1,0 +1,90 @@
+name: Resume Studio V6 workspace integrity portable validation
+on:
+  push:
+    branches: ['resume-studio/v6-workspace-portable-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-workspace-portable-validation
+  cancel-in-progress: true
+jobs:
+  windows-portable-launch:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        run: pnpm desktop:build
+      - name: Reproduce locked source loss and validate safe replacement with synthetic files
+        timeout-minutes: 2
+        run: |
+          ./validation-postpack.ps1 -EvidenceDir (Join-Path $env:GITHUB_WORKSPACE 'resume-studio-portable-evidence')
+      - name: Pack actual portable executable (synthetic icon)
+        timeout-minutes: 5
+        run: |
+          # Public validation does not include the private binary icon.
+          Add-Type -AssemblyName System.Drawing
+          $bitmap = [System.Drawing.Bitmap]::new(256, 256)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.Clear([System.Drawing.Color]::Teal)
+          $graphics.FillRectangle([System.Drawing.Brushes]::White,64,48,128,160)
+          $icon = [System.Drawing.Icon]::FromHandle($bitmap.GetHicon())
+          $stream = [System.IO.File]::Create((Join-Path (Get-Location) 'build\icon.ico'))
+          try { $icon.Save($stream) } finally { $stream.Dispose(); $icon.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
+          pnpm exec electron-builder --win portable --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Inspect actual ASAR and relocate real portable to repository root
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-portable-evidence'
+          node validation-asar.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $built = Join-Path (Get-Location) 'release\Resume Studio.exe'
+          $rootExe = Join-Path (Get-Location) 'Resume Studio.exe'
+          [IO.File]::WriteAllText($rootExe,'OLD_SYNTHETIC_LAUNCHER')
+          [IO.File]::WriteAllText((Join-Path (Get-Location) 'release\keep-synthetic.txt'),'PRESERVE_RELEASE')
+          $expected = (Get-FileHash -LiteralPath $built -Algorithm SHA256).Hash
+          node scripts/postpack-win.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $actual = (Get-FileHash -LiteralPath $rootExe -Algorithm SHA256).Hash
+          if ($actual -ne $expected -or (Test-Path -LiteralPath $built) -or ((Get-Content 'release/keep-synthetic.txt' -Raw) -ne 'PRESERVE_RELEASE')) { throw 'Portable relocation evidence mismatch' }
+          [ordered]@{sha256=$actual;bytes=(Get-Item -LiteralPath $rootExe).Length;sourceConsumed=$true;unrelatedPreserved=$true;sourceSha=(Get-Content runner-manifest.json -Raw | ConvertFrom-Json).sourceSha;runnerSha=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $env:RESUME_STUDIO_PORTABLE_EVIDENCE 'actual-root-executable.json')
+      - name: Open two real portable workspaces with separate extraction roots
+        timeout-minutes: 4
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-portable-evidence'
+          $env:RESUME_STUDIO_PORTABLE_WRAPPER = Join-Path (Get-Location) 'Resume Studio.exe'
+          pnpm exec tsx scripts/qa-portable-launch.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Execute the exact MCP bundle extracted from packaged ASAR
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_MCP_BUNDLE = Join-Path $env:RUNNER_TEMP 'synthetic-packaged-mcp.cjs'
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('mcp-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-portable-evidence'
+          node validation-mcp-process.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload portable launch evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-portable-evidence
+          path: resume-studio-portable-evidence/
+          if-no-files-found: ignore
+          retention-days: 3
