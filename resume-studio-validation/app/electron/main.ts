@@ -674,15 +674,15 @@ function registerIpcHandlers(): void {
       }),
   );
 
-  trustedEditorHandle('ai:getSettings', async (event) => {
+  trustedEditorHandle('ai:getSettings', async (_event) => {
     return aiSettings.getPublicSettings();
   });
 
-  trustedEditorHandle('ai:saveSettings', async (event, rawSettings: unknown) => {
+  trustedEditorHandle('ai:saveSettings', async (_event, rawSettings: unknown) => {
     return aiSettings.save(rawSettings);
   });
 
-  trustedEditorHandle('ai:requestCompletion', async (event, raw: unknown) => {
+  trustedEditorHandle('ai:requestCompletion', async (_event, raw: unknown) => {
     const parsed = aiCompletionSchema.safeParse(raw);
     if (!parsed.success) throw new Error('AI 请求参数超出许可范围。');
     const { requestId, profile, ...options } = parsed.data;
@@ -699,7 +699,7 @@ function registerIpcHandlers(): void {
     }
   });
 
-  trustedEditorHandle('ai:cancelCompletion', (event, requestId: string) => {
+  trustedEditorHandle('ai:cancelCompletion', (_event, requestId: string) => {
     if (typeof requestId === 'string') aiRequests.get(requestId)?.abort();
   });
 
