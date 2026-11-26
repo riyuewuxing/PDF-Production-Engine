@@ -469,7 +469,7 @@ export default function App() {
         </nav>
 
         {activeTab === 'templates' ? (
-          <TemplateGallery activeDocument={activeDoc} onSelectTemplate={handleSelectTemplate} />
+          <TemplateGallery activeDocument={previewDoc ?? activeDoc} onSelectTemplate={handleSelectTemplate} />
         ) : (
           <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
             <aside className="no-print h-full w-full shrink-0 border-r border-slate-200 bg-white lg:w-[430px]">

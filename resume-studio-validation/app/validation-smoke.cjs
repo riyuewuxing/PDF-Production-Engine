@@ -148,6 +148,33 @@ async function run() {
   await click('完成');
   await until('redaction mode active',()=>bodyHas('脱敏模式中'));
   await capture('98-redaction-preview');
+
+  // Real gallery uses the same redacted presentation document as the main canvas.
+  await click('模板库(51)');
+  const searchGallery22=JSON.stringify('[aria-label="搜索模板"]');
+  await until('gallery opened',()=>js('!!document.querySelector('+searchGallery22+')'));
+  await js('(()=>{const e=document.querySelector('+searchGallery22+');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,"minimal-ats");e.dispatchEvent(new Event("input",{bubbles:true}));return true})()');
+  await until('single matching template',()=>js('[...document.querySelectorAll("button")].filter(b=>b.innerText.trim()==="大图放大对比").length===1'));
+  const gallerySafe22=()=>js('(()=>{const b=[...document.querySelectorAll("button")].find(b=>b.innerText.trim()==="大图放大对比");const c=b?.closest(".group");return !!c&&c.innerText.includes("VISIBLE_PROJECT_21")&&!/private21_|private21@example\\.invalid|19900000000/i.test(c.innerHTML)&&!c.querySelector("img")})()');
+  await until('redacted gallery thumbnail',gallerySafe22,12000);
+  await capture('98a-redaction-gallery');
+  await click('大图放大对比');
+  const galleryModal22=JSON.stringify('[role="dialog"][aria-label^="模板大图对比"]');
+  await until('redacted gallery lightbox',()=>js('(()=>{const c=document.querySelector('+galleryModal22+');return !!c&&c.innerText.includes("VISIBLE_PROJECT_21")&&!/private21_|private21@example\\.invalid|19900000000/i.test(c.innerHTML)&&!c.querySelector(".a4-sheet img")})()'));
+  const colorBefore22=(await main.store.getResume('runner-fixture')).globalSettings.themeColor;
+  await clickAria19('试色 #9f1239');
+  await capture('98b-redaction-gallery-lightbox');
+  if((await main.store.getResume('runner-fixture')).globalSettings.themeColor!==colorBefore22)throw Error('trial gallery color changed source');
+  await click('收藏');
+  await until('favorite persisted',()=>js('JSON.parse(localStorage.getItem("resume-studio:favorite-templates")||"[]").includes("minimal-ats")'));
+  await clickAria19('关闭大图对比');
+  await click('★ 我的收藏 (1)');
+  await until('favorite gallery retains redaction',gallerySafe22);
+  await click('内容编辑');
+  await until('editor returned in redaction mode',()=>bodyHas('脱敏模式中'));
+  checks.galleryRedactedThumbnailAndLightbox=true;
+  checks.galleryTrialColorReadOnlyAndFavorite=true;
+
   const artifacts21=path.join(out,'redaction-u09');
   fs.mkdirSync(artifacts21,{recursive:true});
   for(const [label,ext,feedback] of [
