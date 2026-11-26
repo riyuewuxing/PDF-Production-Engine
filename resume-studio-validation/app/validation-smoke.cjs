@@ -250,6 +250,9 @@ async function run() {
   await until('ledger loaded',()=>bodyHas('已读取本地台账'));
   const setInput=async(selector,value)=>js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const proto=e.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,"value").set.call(e,'+JSON.stringify(value)+');e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
   if(!await setInput('input[placeholder="单位/学校名称（必填）"]','虚构招聘单位'))throw Error('career input missing');
+  const selected=await js('(()=>{const e=document.querySelector("select[aria-label=\\\"关联本地简历版本\\\"]");return {value:e?.value,label:e?.selectedOptions[0]?.textContent}})()');
+  if(selected.value!=='master'||!selected.label.includes('关联母库'))throw Error('master version selector does not reflect actual target');
+  checks.masterLinkSelectorCorrect=true;
   await click('记一笔');
   await until('application created',async()=>(await main.store.getApplications()).applications.some(a=>a.company==='虚构招聘单位'));
   await until('career row visible',()=>bodyHas('虚构招聘单位'));
@@ -277,6 +280,23 @@ async function run() {
   await until('latest ledger read',()=>js('document.querySelector('+JSON.stringify(notes)+')?.value==="外部已保存备注"'));
   checks.careerReloadRecovered=true;
   await capture('14-ledger-reloaded');
+  // A full quick-log action through the actual renderer, including the frozen PDF.
+  await click('导出 PDF');
+  await until('PDF export ready',()=>bodyHas('记入投递'));
+  const quickOpened=await js('(()=>{const b=[...document.querySelectorAll("button")].find(x=>x.innerText.includes("记入投递")&&!x.innerText.includes("确认"));if(!b)return false;b.click();return true})()');
+  if(!quickOpened)throw Error('quick log button missing');
+  await until('quick log dialog',()=>js('!!document.querySelector("[role=dialog][aria-label=\\\"记入投递并锁定永久快照\\\"]")'));
+  const companySelector='[role="dialog"] input[placeholder="如：示例第一中学"]';
+  if(!await setInput(companySelector,'虚构快照招聘单位'))throw Error('quick log company input missing');
+  await click('确认记入并锁定快照');
+  await until('quick log persisted',async()=>(await main.store.getApplications()).applications.some(a=>a.company==='虚构快照招聘单位'&&a.snapshotId));
+  const entry=(await main.store.getApplications()).applications.find(a=>a.company==='虚构快照招聘单位');
+  const archived=await main.store.getApplicationSnapshot(entry.snapshotId);
+  if(archived.meta.applicationId!==entry.id||archived.document.id!=='synthetic-master')throw Error('quick log frozen snapshot mismatch');
+  await until('quick log modal closed',()=>js('!document.querySelector("[role=dialog][aria-label=\\\"记入投递并锁定永久快照\\\"]")'));
+  checks.quickLogArchived=true;
+  await capture('15-quick-log-archived');
+
 
 
 

@@ -825,7 +825,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
         const choice = dialog.showMessageBoxSync(win, {
           type: 'warning',
           title: '未能确认保存',
-          message: '简历保存失败或尚未完成，是否留在工作台？',
+          message: '简历或求职台账保存失败或尚未完成，是否留在工作台？',
           detail: '建议返回工作台重试保存。只有明确选择放弃未保存内容才会关闭。',
           buttons: ['返回工作台', '放弃未保存内容并关闭'],
           defaultId: 0,

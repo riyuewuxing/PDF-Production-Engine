@@ -122,6 +122,7 @@ export function JobCareerPane({
   };
   const handleAddApplication = () => {
     if (!companyDraft.trim()) return;
+    if(!slugDraft||!(slugDraft==='master'&&activeSlug==='master')&&!summaries.some(s=>s.slug===slugDraft)){setErrorMsg('请选择当前有效的关联简历版本。');return;}
     const now = new Date().toISOString();
     const today = now.slice(0, 10);
     const entry: JobApplication = {
@@ -515,6 +516,7 @@ export function JobCareerPane({
                       onChange={(e) => setSlugDraft(e.target.value)}
                       className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
                     >
+                      {activeSlug==='master'&&<option value="master">关联母库：{activeDoc.title}</option>}
                       {summaries.map((s) => (
                         <option key={s.slug} value={s.slug}>
                           关联版本：{s.title}
