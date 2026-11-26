@@ -143,7 +143,7 @@ async function pathEntryExists(targetPath: string): Promise<boolean> {
 
 async function checkWorkspaceDirectory(root:string,dir:string,create=false):Promise<void>{
   const relative=path.relative(root,dir);
-  if(!['resumes','assets','.trash'].includes(relative))throw new LocalFsApiError(422,'UNSAFE_DIRECTORY','工作区目录不安全，未读取或写入。');
+  if(!['resumes','assets','.trash','.application-snapshots'].includes(relative))throw new LocalFsApiError(422,'UNSAFE_DIRECTORY','工作区目录不安全，未读取或写入。');
   if(create){
     await fs.mkdir(root,{recursive:true});
     try{await fs.mkdir(dir);}catch(err){if((err as NodeJS.ErrnoException).code!=='EEXIST')throw err;}
@@ -856,9 +856,12 @@ export class LocalResumeStore {
     return next;
   }
   async getApplications(): Promise<ApplicationsStoreData> {
-    await this.ensureDirs();
+    await fs.mkdir(this.dataDir,{recursive:true});
     let text:string;
-    try{text=await fs.readFile(this.applicationsPath,'utf8');}
+    try{
+      await checkWorkspaceFile(this.dataDir,this.applicationsPath);
+      text=await fs.readFile(this.applicationsPath,'utf8');
+    }
     catch(err){
       if(!isMissing(err))throw err;
       const empty:ApplicationsStoreData={schemaVersion:1,applications:[],coverLetters:[],interviewAnswers:{}};
@@ -887,13 +890,12 @@ export class LocalResumeStore {
     atsScore?: number | null;
     document: unknown;
   }): Promise<ApplicationSnapshotMeta> {
-    await fs.mkdir(this.appSnapshotsDir, { recursive: true });
     const resumeSlug = assertSafeSlug(input.resumeSlug);
     const parsedDoc = ResumeDocumentSchema.parse(input.document);
     const createdAt = new Date().toISOString();
     const rawId =
       input.snapshotId?.trim() ||
-      `app-${createdAt.replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 6)}`;
+      `app-${createdAt.replace(/[:.]/g, '-')}-${randomUUID()}`;
     const id = assertSafeSnapshotId(rawId);
 
     const meta: ApplicationSnapshotMeta = {
@@ -912,6 +914,7 @@ export class LocalResumeStore {
   }
 
   private async writeImmutableApplicationSnapshot(targetPath:string,record:ApplicationSnapshotRecord):Promise<ApplicationSnapshotMeta>{
+    await checkWorkspaceDirectory(this.dataDir,this.appSnapshotsDir,true);
     try{await fs.lstat(targetPath);throw new LocalFsApiError(409,'SNAPSHOT_EXISTS','永久投递快照已存在，不允许覆盖。');}catch(err){if(!isMissing(err))throw err;}
     await atomicWriteFile(targetPath,JSON.stringify(record,null,2)+'\n');
     return record.meta;
@@ -937,10 +940,10 @@ export class LocalResumeStore {
           throw new LocalFsApiError(409,'APPLICATION_EXISTS','该请求已记入不同投递资料，不会重复写入。');
         return {entry:existing,store:current};
       }
-      await fs.mkdir(this.appSnapshotsDir,{recursive:true});
+      await checkWorkspaceDirectory(this.dataDir,this.appSnapshotsDir,true);
       const target=resolveContainedPath(this.appSnapshotsDir,snapshotId+'.json');
       const meta:ApplicationSnapshotMeta={id:snapshotId,applicationId:entry.id,resumeSlug,exportedFilePath:entry.exportedFilePath,createdAt:entry.updatedAt||new Date().toISOString(),title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore};
-      if(await fileExists(target)){
+      if(await pathEntryExists(target)){
         const previous=await this.getApplicationSnapshot(snapshotId);
         if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.resumeSlug!==resumeSlug||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.atsScore!==entry.atsScore)
           throw new LocalFsApiError(409,'SNAPSHOT_EXISTS','重试请求与已有永久快照不一致，未覆盖原快照。');
@@ -953,8 +956,10 @@ export class LocalResumeStore {
   async getApplicationSnapshot(rawSnapshotId: string): Promise<ApplicationSnapshotRecord> {
     const id = assertSafeSnapshotId(rawSnapshotId);
     const targetPath = resolveContainedPath(this.appSnapshotsDir, `${id}.json`);
-    if (!(await fileExists(targetPath))) {
-      throw new LocalFsApiError(404, 'SNAPSHOT_NOT_FOUND', `未找到永久投递快照: ${id}`);
+    try{await checkWorkspaceFile(this.dataDir,targetPath);}
+    catch(err){
+      if(isMissing(err))throw new LocalFsApiError(404,'SNAPSHOT_NOT_FOUND',`未找到永久投递快照: ${id}`);
+      throw err;
     }
     const parsed = JSON.parse(await fs.readFile(targetPath, 'utf-8')) as {
       meta?: ApplicationSnapshotMeta;
@@ -981,14 +986,22 @@ export class LocalResumeStore {
     const targetPath = resolveContainedPath(this.appSnapshotsDir, `${id}.json`);
     return withResumeWriteLock(this.dataDir,async()=>{
       const current=await this.getApplications();
-      if(current.applications.some(a=>a.snapshotId===id)||current.jobReviews?.some(a=>a.snapshotId===id))throw new LocalFsApiError(409,'SNAPSHOT_REFERENCED','永久快照仍被投递记录或岗位核对档案引用，不允许删除。');
-      if(!(await fileExists(targetPath)))return {deleted:false};
+      // Compare the actual resolved filename, not unnormalized reference text.
+      // Existing ledgers can contain the optional .json suffix; Windows also
+      // treats case aliases as the same path. Protect every matching reference.
+      const referencesTarget=(raw:string|null)=>{
+        if(!raw)return false;
+        try{return path.relative(targetPath,resolveContainedPath(this.appSnapshotsDir,assertSafeSnapshotId(raw)+'.json'))==='';}
+        catch{return false;}
+      };
+      if(current.applications.some(a=>referencesTarget(a.snapshotId))||current.jobReviews?.some(a=>referencesTarget(a.snapshotId)))throw new LocalFsApiError(409,'SNAPSHOT_REFERENCED','永久快照仍被投递记录或岗位核对档案引用，不允许删除。');
+      try{await checkWorkspaceFile(this.dataDir,targetPath);}
+      catch(err){if(isMissing(err))return {deleted:false};throw err;}
       await fs.unlink(targetPath);return {deleted:true};
     });
   }
 
   async saveApplications(payload: unknown,expectedRevision?:string): Promise<ApplicationsStoreData> {
-    await this.ensureDirs();
     let validated: ApplicationsStoreData;
     try {
       validated = ApplicationsStoreSchema.parse(payload);
