@@ -131,9 +131,11 @@ async function run() {
   await until('redaction fixture loaded',()=>js('document.querySelector("#basic-field-name")?.value === "PRIVATE21_NAME"'));
   await capture('97-redaction-before');
   await clickAria19('设置自定义脱敏敏感词');
-  await until('redaction settings open',()=>js('!!document.querySelector("[aria-label=\"脱敏敏感词设置\"] textarea")'));
-  await js('(()=>{const e=document.querySelector("[aria-label=\"脱敏敏感词设置\"] textarea");Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(e,"PRIVATE21_, private21@example.invalid, 19900000000");e.dispatchEvent(new Event("input",{bubbles:true}));return true})()');
-  await js('(()=>{const e=document.querySelector("[aria-label=\"脱敏敏感词设置\"] input[type=checkbox]");if(!e.checked)e.click();return true})()');
+  const termsSelector21=JSON.stringify('[aria-label="脱敏敏感词设置"] textarea');
+  const checkboxSelector21=JSON.stringify('[aria-label="脱敏敏感词设置"] input[type=checkbox]');
+  await until('redaction settings open',()=>js('!!document.querySelector('+termsSelector21+')'));
+  await js('(()=>{const e=document.querySelector('+termsSelector21+');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(e,"PRIVATE21_, private21@example.invalid, 19900000000");e.dispatchEvent(new Event("input",{bubbles:true}));return true})()');
+  await js('(()=>{const e=document.querySelector('+checkboxSelector21+');if(!e.checked)e.click();return true})()');
   await click('完成');
   await until('redaction mode active',()=>bodyHas('脱敏模式中'));
   await capture('98-redaction-preview');
@@ -151,7 +153,7 @@ async function run() {
     if(ext!=='.pdf')await clickAria19('更多导出格式');
     await click(label);
     await until('redacted file created '+ext,()=>fs.readdirSync(main.exportsDir).some(n=>!existing.has(n)&&n.endsWith(ext)),20000);
-    await until('redacted export completed '+ext,()=>bodyHas(feedback),20000);
+    await until('redacted export completed '+ext,async()=>await bodyHas(feedback)&&await js('[...document.querySelectorAll("button")].some(b=>b.innerText.trim()==="导出 PDF"&&!b.disabled)'),20000);
     const added=fs.readdirSync(main.exportsDir).filter(n=>!existing.has(n)&&n.endsWith(ext));
     if(added.length!==1)throw Error('expected one redacted '+ext);
     const name=added[0],bytes=fs.readFileSync(path.join(main.exportsDir,name));
@@ -168,7 +170,7 @@ async function run() {
   if(after21.basic.name!==fixture21.basic.name||after21.basic.phone!==fixture21.basic.phone||after21.basic.birthDate!==fixture21.basic.birthDate)throw Error('redaction changed stored source');
   checks.redactionSourcePreserved=true;
   await click('脱敏模式中');
-  await main.store.saveResume('runner-fixture',original21);
+  await main.store.saveResume('runner-fixture',original21,{expectedRevision:JSON.stringify([after21.id,after21.updatedAt])});
   await win.webContents.reload();
   await until('original synthetic fixture restored',()=>js('document.querySelector("#basic-field-name")?.value === "演示候选人"'));
   checks.redactionFixtureRestored=true;
