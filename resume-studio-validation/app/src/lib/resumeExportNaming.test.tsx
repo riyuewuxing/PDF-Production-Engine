@@ -93,6 +93,20 @@ describe('browser and interchange export integration',()=>{
     expect(names[1]).toBe('PRIVATE_SLUG_20.json');
     expect(flush).toHaveBeenCalledTimes(2);
   });
+  it('redacted native JSON backup never uses the private slug and retains the original document',async()=>{
+    const doc=fixture();const before=JSON.stringify(doc);
+    const {result}=renderHook(()=>useResumeExport({activeSlug:'PRIVATE_SLUG_22',activeDocRef:{current:doc},flushPendingSave:async()=>{},isRedacted:true,redactionTermsInput:'SYNTH_NAME_20,SYNTH_ROLE_20'}));
+    await act(async()=>{await result.current.handleExportFormat('json');});
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/-脱敏版\.json$/);
+    expect(names[0]).not.toMatch(/PRIVATE_SLUG_22|SYNTH_NAME_20|SYNTH_ROLE_20/);
+    const blobs=vi.mocked(URL.createObjectURL).mock.calls;
+    expect(blobs).toHaveLength(1);
+    const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error);reader.readAsText(blobs[0]![0] as Blob);});
+    expect(data).not.toMatch(/SYNTH_NAME_20|SYNTH_ROLE_20|demo@example\.invalid/);
+    expect(JSON.parse(data).skillContent).toBe('VISIBLE_SKILL_20');
+    expect(JSON.stringify(doc)).toBe(before);
+  });
   it('suppresses simultaneous export actions before React state has rerendered',async()=>{
     const doc=hidden();
     let release:()=>void=()=>{};

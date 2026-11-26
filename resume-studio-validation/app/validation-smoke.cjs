@@ -115,6 +115,8 @@ async function run() {
   const fixture21=JSON.parse(JSON.stringify(original21));
   const marker21='PRIVATE21_';
   fixture21.basic.name=marker21+'NAME';
+  fixture21.basic.photo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAA8CAIAAACb22+3AAAAN0lEQVR4nO3NMQEAAAgDILV/59nBxwcK0KnUh3lZxWKxWCwWi8VisVgsFovFYrFYLBaLxWLx0QJA6QJ2HpCnXwAAAABJRU5ErkJggg==';
+  fixture21.basic.photoConfig.visible=true;
   fixture21.basic.title=marker21+'ROLE';
   fixture21.basic.email='private21@example.invalid';
   fixture21.basic.phone='19900000000';
@@ -130,6 +132,13 @@ async function run() {
   await win.webContents.reload();
   await until('redaction fixture loaded',()=>js('document.querySelector("#basic-field-name")?.value === "PRIVATE21_NAME"'));
   await capture('97-redaction-before');
+  const native21=require('electron').nativeImage;
+  const positive21=await js('window.resumeDesktop.pdf.exportPng('+JSON.stringify({slug:'',document:fixture21})+')');
+  const positiveBytes21=fs.readFileSync(positive21.filePath);
+  fs.writeFileSync(path.join(out,'97-redaction-positive.png'),positiveBytes21);
+  const pixels21=bytes=>{const img=native21.createFromBuffer(bytes);if(img.isEmpty())throw Error('invalid PNG');const p=img.toBitmap();let n=0;for(let i=0;i<p.length;i+=4)if(p[i]>240&&p[i+1]<12&&p[i+2]>240)n++;return n;};
+  if(pixels21(positiveBytes21)<100)throw Error('redaction positive portrait absent');
+
   await clickAria19('设置自定义脱敏敏感词');
   const termsSelector21=JSON.stringify('[aria-label="脱敏敏感词设置"] textarea');
   const checkboxSelector21=JSON.stringify('[aria-label="脱敏敏感词设置"] input[type=checkbox]');
@@ -163,11 +172,12 @@ async function run() {
       if(/private21_|private21@example\.invalid|19900000000/i.test(content))throw Error('redaction leak in '+ext);
       if(!content.includes('VISIBLE_PROJECT_21'))throw Error('redaction removed project in '+ext);
     }
+    if(ext==='.png'&&pixels21(bytes)!==0)throw Error('redacted portrait leaked');
     fs.writeFileSync(path.join(artifacts21,'redacted'+ext),bytes);
     checks['redaction'+ext]=true;
   }
   const after21=await main.store.getResume('runner-fixture');
-  if(after21.basic.name!==fixture21.basic.name||after21.basic.phone!==fixture21.basic.phone||after21.basic.birthDate!==fixture21.basic.birthDate)throw Error('redaction changed stored source');
+  if(JSON.stringify({...after21,updatedAt:fixture21.updatedAt})!==JSON.stringify(fixture21))throw Error('redaction changed stored source');
   checks.redactionSourcePreserved=true;
   await click('脱敏模式中');
   await main.store.saveResume('runner-fixture',original21,{expectedRevision:JSON.stringify([after21.id,after21.updatedAt])});
