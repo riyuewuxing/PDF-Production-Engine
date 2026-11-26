@@ -163,6 +163,7 @@ describe('portable workspace backup',()=>{
     const expectedDoc=await f.store.getResume('master');
     const backup=await createWorkspaceBackup(f.root,f.dest,f.signal);
     const inspection=await inspectWorkspaceBackup(backup.folder,f.signal);
+    expect(inspection.manifestHash).toBe(createHash('sha256').update(await fs.readFile(path.join(backup.folder,BACKUP_MANIFEST))).digest('hex'));
     expect(inspection.summary).toMatchObject({fileCount:backup.fileCount,warnings:[]});
     expect(inspection.manifest.files.map(x=>x.path)).toContain('applications.json');
     expect(inspection.manifest.files.some(x=>x.path.startsWith('.application-snapshots/'))).toBe(true);
@@ -201,6 +202,16 @@ describe('portable workspace backup',()=>{
     await fs.writeFile(path.join(f.data,'unexpected.txt'),'extra');
     await expect(createWorkspaceBackup(f.root,f.dest,f.signal)).rejects.toThrow('未识别');
     expect((await fs.readdir(f.dest)).length).toBe(1);
+  });
+  it('preserves orphan evidence bytes and reports missing index association',async()=>{
+    const f=await backupFixture();
+    const id=randomUUID(),relative='.evidence-files-v1/'+id+'.txt';
+    await fs.mkdir(path.join(f.data,'.evidence-files-v1'));await fs.writeFile(path.join(f.data,relative),'合成附件');
+    const backup=await createWorkspaceBackup(f.root,f.dest,f.signal),checked=await inspectWorkspaceBackup(backup.folder,f.signal);
+    expect(checked.summary.warnings.some(w=>w.includes('1 个无索引证据附件'))).toBe(true);
+    expect(checked.manifest.files.some(row=>row.path===relative)).toBe(true);
+    const restored=await restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,f.dest,f.signal);
+    expect(await fs.readFile(path.join(restored.folder,'data',relative),'utf8')).toBe('合成附件');
   });
   it('does not publish on cancellation or corrupted source',async()=>{
     const f=await backupFixture();const ctl=new AbortController();ctl.abort();

@@ -16,6 +16,7 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
   const bridge=window.resumeDesktop?.workspaceBackup;
   const [busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [inspection,setInspection]=useState<BackupInspection|null>(null),[result,setResult]=useState<BackupResult|null>(null),[confirmed,setConfirmed]=useState(false);
+  const [resultKind,setResultKind]=useState<'backup'|'restore'>('backup');
   const guard=useRef(false);
   if(!bridge)return null;
   const run=async(label:string,work:()=>Promise<void>)=>{
@@ -26,7 +27,7 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
   };
   return <section aria-label="工作区备份与安全恢复" className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/50 p-3 text-xs break-words">
     <div className="font-bold text-teal-900">工作区备份与安全恢复</div>
-    <p>备份已落盘的母库、简历、资源、历史快照、回收站、求职台账、事实库与附件。逐文件 SHA-256 校验；恢复仅创建独立新工作区，不覆盖当前数据。</p>
+    <p>备份已落盘的母库、简历、资源、历史快照、回收站、求职台账、事实库与附件。逐文件 SHA-256 校验（用于检查内容一致性，不代表来源鉴真）；恢复仅创建独立新工作区，不覆盖当前数据。</p>
     <p className="rounded bg-amber-50 p-2 text-amber-900">备份文件夹含未加密私人资料，请保存在可信本地磁盘。不会备份 AI 密钥/模型配置、已导出成品、外部原件或临时锁；未保存的编辑不属于备份。</p>
     {busy&&<p role="status">{busy}…</p>}{error&&<p role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</p>}{notice&&<p role="status" className="text-teal-800">{notice}</p>}
     <div className="flex flex-wrap gap-1">
@@ -34,7 +35,7 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
         setResult(null);setInspection(null);setConfirmed(false);
         await onFlush();await careerLedger.flush();
         if(careerLedger.getSnapshot().dirty||careerLedger.getSnapshot().saving)throw new Error('投递台账还有未确认写入，请先保存。');
-        const saved=await bridge.create();if(saved){setResult(saved);setNotice('已创建并校验工作区备份。');}
+        const saved=await bridge.create();if(saved){setResultKind('backup');setResult(saved);setNotice('已创建并校验工作区备份。');}
       })}>创建本地工作区备份</button>
       <button type="button" disabled={!!busy} className="rounded border bg-white px-2 py-1.5" onClick={()=>void run('正在检查备份',async()=>{
         setInspection(null);setResult(null);setConfirmed(false);
@@ -47,12 +48,12 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
       <button type="button" disabled={!!busy||!confirmed} className="rounded bg-teal-700 px-2 py-1.5 text-white disabled:opacity-50" onClick={()=>void run('正在恢复到新工作区',async()=>{
         const basis=inspection;setInspection(null);setConfirmed(false);
         const restored=await bridge.restore(basis.token,'RESTORE_TO_NEW_WORKSPACE');
-        if(restored){setResult(restored);setNotice('已恢复并校验独立新工作区，当前工作区未改动。');}
+        if(restored){setResultKind('restore');setResult(restored);setNotice('已恢复并校验独立新工作区，当前工作区未改动。');}
       })}>恢复到独立新工作区</button>
     </div>}
     {result&&<div aria-label="工作区备份结果" className="space-y-1">
       <p className="break-all">{result.folder}</p><Summary value={result}/>
-      {result.folder.includes('resume-studio-restored-v1-')&&<p className="rounded bg-white p-2">请保留原工作区。关闭工作台后，通过 RESUME_STUDIO_DATA_DIR 环境变量指向上述新文件夹（不是其中的 data）再启动，可打开恢复副本。外部导出文件路径可能仍指向旧位置；需要重新配置 AI 密钥。</p>}
+      {resultKind==='restore'&&<div className="space-y-1 rounded bg-white p-2"><p>请保留原工作区。关闭工作台后，在新开的 PowerShell 中复制并执行下方设置，再从该 PowerShell 启动原来的 Resume Studio.exe（源码开发版在项目目录执行 pnpm desktop:start）。关闭 PowerShell 后，此临时变量不再生效。</p><textarea aria-label="恢复工作区启动设置" readOnly rows={3} onFocus={e=>e.currentTarget.select()} value={"$env:RESUME_STUDIO_DATA_DIR = '"+result.folder.replace(/'/g,"''")+"'"} className="w-full resize-y rounded border p-1 font-mono text-[10px]"/><p>应指向上面的新文件夹，而不是其中的 data。外部导出文件路径可能仍指向旧位置；需要重新配置 AI 密钥。</p></div>}
     </div>}
   </section>;
 }

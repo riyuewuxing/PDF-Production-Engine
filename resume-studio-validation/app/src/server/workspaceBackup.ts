@@ -84,13 +84,19 @@ function validateFile(relative:string,bytes:Buffer){
     if(!record.meta||record.meta.id!==id||(relative.startsWith('.backups/')&&record.meta.slug!==parts[1]))throw new Error('快照元数据与文件名不一致：'+relative);
   }
 }
+async function writeDurable(target:string,data:Buffer|string,signal:AbortSignal){
+  check(signal);
+  const handle=await fs.open(target,'wx',0o600);
+  try{await handle.writeFile(data);check(signal);await handle.sync();check(signal);}
+  finally{await handle.close();}
+}
 async function copyVerified(dataRoot:string,destination:string,files:readonly BackupFile[],signal:AbortSignal){
   for(const entry of files){
     const bytes=await readBounded(dataRoot,entry.path,MAX_BACKUP_FILE_BYTES,signal);
     if(bytes.length!==entry.size||hash(bytes)!==entry.sha256)throw new Error('备份文件内容变化或损坏：'+entry.path);
     const target=path.join(destination,...entry.path.split('/'));
     await fs.mkdir(path.dirname(target),{recursive:true});
-    await fs.writeFile(target,bytes,{flag:'wx',mode:0o600,signal});
+    await writeDurable(target,bytes,signal);
   }
 }
 async function verifyFiles(root:string,manifest:WorkspaceBackupManifest,source:boolean,signal:AbortSignal):Promise<BackupSummary>{
@@ -109,6 +115,9 @@ async function verifyFiles(root:string,manifest:WorkspaceBackupManifest,source:b
   for(const id of new Set([...(ledger?.applications??[]).map(a=>a.snapshotId),...(ledger?.jobReviews??[]).map(a=>a.snapshotId)].filter(Boolean))){
     if(!byPath.has('.application-snapshots/'+id+'.json'))warnings.push('原数据已有缺失的永久投递快照：'+id);
   }
+  const knownEvidence=new Set((index?.entries??[]).map(e=>'.evidence-files-v1/'+e.id+'.'+e.kind));
+  const orphanCount=manifest.files.filter(f=>f.path.startsWith('.evidence-files-v1/')&&!knownEvidence.has(f.path)).length;
+  if(orphanCount)warnings.push('原数据已有 '+orphanCount+' 个无索引证据附件，保留字节但无法确认关联。');
   for(const e of index?.entries??[]){
     const file=byPath.get('.evidence-files-v1/'+e.id+'.'+e.kind);
     if(e.status!=='purged'&&(!file||file.sha256!==e.sha256||file.size!==e.size))warnings.push('原数据已有缺失或异常的证据附件：'+e.id);
@@ -146,13 +155,15 @@ export async function createWorkspaceBackup(workspace:string,parent:string,signa
         const bytes=await readBounded(data,relative,MAX_BACKUP_FILE_BYTES,signal);
         validateFile(relative,bytes);
         files.push({path:relative,size:bytes.length,sha256:hash(bytes)});
-        const out=path.join(dest,...relative.split('/'));await fs.mkdir(path.dirname(out),{recursive:true});await fs.writeFile(out,bytes,{flag:'wx',mode:0o600,signal});
+        const out=path.join(dest,...relative.split('/'));await fs.mkdir(path.dirname(out),{recursive:true});await writeDurable(out,bytes,signal);
       }
       manifest=WorkspaceBackupManifestSchema.parse({format:'resume-studio-workspace',version:1,createdAt:new Date().toISOString(),files:files.sort(sort)});
       // Check source again under the same application write lock; external edits are detected when observable.
       await verifyFiles(data,manifest,true,signal);
       summary=await verifyFiles(dest,manifest,false,signal);
-      await fs.writeFile(path.join(stage,BACKUP_MANIFEST),JSON.stringify(manifest,null,2)+'\n',{flag:'wx',mode:0o600,signal});
+      await writeDurable(path.join(stage,BACKUP_MANIFEST),JSON.stringify(manifest,null,2)+'\n',signal);
+      const staged=await inspectWorkspaceBackup(stage,signal);
+      if(JSON.stringify(staged.manifest)!==JSON.stringify(manifest))throw new Error('写入后的备份清单复核失败。');
       check(signal);
     });
     if(!summary)throw new Error('未确认备份完成。');
