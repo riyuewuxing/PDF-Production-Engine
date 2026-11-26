@@ -7,6 +7,7 @@ import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byo
 import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
 import {FactBankStore} from '../src/server/factBankStore';
+import {FactRequestBindingSchema} from '../src/schema/factBankSchema';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
@@ -419,6 +420,7 @@ const aiCompletionSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().min(1).max(8192).optional(),
   timeoutMs: z.number().int().min(1000).max(120000).optional(),
+  factBinding:FactRequestBindingSchema.optional(),
 }).strict();
 
 function frameMatches(event:IpcMainInvokeEvent, senderId:number, expectedUrl:string):boolean {
@@ -714,7 +716,7 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('ai:requestCompletion', async (_event, raw: unknown) => {
     const parsed = aiCompletionSchema.safeParse(raw);
     if (!parsed.success) throw new Error('AI 请求参数超出许可范围。');
-    const { requestId, profile, ...options } = parsed.data;
+    const { requestId, profile, factBinding, ...options } = parsed.data;
     if (aiRequests.has(requestId) || aiRequests.size >= 4) throw new Error('AI 请求重复或并发数已达上限。');
     const controller = new AbortController();
     aiRequests.set(requestId, controller);
@@ -722,6 +724,8 @@ function registerIpcHandlers(): void {
       const settings = await aiSettings.getRequestSettings(profile.profileId,profile.revision);
       if (!settings.enabled || settings.baseUrl !== validateByokBaseUrl(profile.baseUrl).baseUrl ||
           settings.model !== profile.model) throw new Error('AI 配置已变化，请先保存并重试。');
+      if(factBinding)await facts.assertCurrentBinding(factBinding);
+      if(controller.signal.aborted)throw new Error('请求已取消。');
       return await requestByokCompletionDirect({ ...options, settings, signal: controller.signal });
     } finally {
       aiRequests.delete(requestId);

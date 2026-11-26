@@ -455,6 +455,12 @@ async function run() {
   await until('stale fact rejected',()=>bodyHas('本地事实库已变化'));
   if(providerCalls!==callsBeforeFacts+1)throw Error('revoked fact reached provider');
   checks.factRevocationBlocksOldPreview=true;
+  const staleBinding={slug:'master',docId:bank.records[0].docId,bankRevision:bank.revision,ids:[bank.records[0].id]};
+  const staleSend={requestId:'a6262ca1-26df-4e63-ab03-23f1c966ac53',profile:{profileId:secondProfile.profileId,revision:secondProfile.revision,baseUrl:secondProfile.baseUrl,model:secondProfile.model},systemPrompt:'synthetic',userPrompt:'{}',factBinding:staleBinding};
+  const denied=await js('window.resumeDesktop.ai.requestCompletion('+JSON.stringify(staleSend)+').then(()=>false,e=>String(e.message).includes("事实库已被其他操作更新"))');
+  if(!denied||providerCalls!==callsBeforeFacts+1)throw Error('main-process stale fact gate failed');
+  checks.factMainProcessGate=true;
+
   await capture('32-fact-stale-rejected');
   await click('加载 / 刷新事实库');
   await until('revoked fact visible',()=>bodyHas('已撤销'));

@@ -35,3 +35,10 @@ export type FactRecord=z.infer<typeof FactRecordSchema>;
 export type FactBank=z.infer<typeof FactBankSchema>;
 export type AddFactInput=z.infer<typeof AddFactSchema>;
 export type RevokeFactInput=z.infer<typeof RevokeFactSchema>;
+
+/** Internal IPC metadata; never sent to a model provider. */
+export const FactRequestBindingSchema=z.object({
+  slug:z.string().min(1).max(80),docId:z.string().min(1).max(500),
+  bankRevision:z.string().min(1).max(64),ids:z.array(z.string().uuid()).min(1).max(20),
+}).strict().refine(b=>new Set(b.ids).size===b.ids.length,'事实绑定重复');
+export type FactRequestBinding=z.infer<typeof FactRequestBindingSchema>;

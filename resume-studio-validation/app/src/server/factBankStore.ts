@@ -1,9 +1,9 @@
 import {promises as fs} from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {AddFactSchema,FactBankSchema,RevokeFactSchema,type FactBank,type FactRecord} from '../schema/factBankSchema';
+import {AddFactSchema,FactBankSchema,RevokeFactSchema,FactRequestBindingSchema,type FactBank,type FactRecord} from '../schema/factBankSchema';
 import {resumeRevision} from '../schema/resumeSchema';
-import {factEntityId} from '../lib/aiContext';
+import {factEntityId,isShareableFact} from '../lib/aiContext';
 import {LocalFsApiError,withResumeWriteLock,type LocalResumeStore} from './localFsApi';
 
 const MAX_BYTES=5*1024*1024;
@@ -39,6 +39,16 @@ export class FactBankStore {
     try{await fs.writeFile(temp,data,{flag:'wx',mode:0o600});await fs.rename(temp,this.file);}
     finally{await fs.rm(temp,{force:true}).catch(()=>{});}
     return bank;
+  }
+  /** Last main-process gate before external transport. Does not hold a file lock over network I/O. */
+  async assertCurrentBinding(raw:unknown):Promise<void>{
+    const binding=FactRequestBindingSchema.parse(raw);
+    await withResumeWriteLock(this.resumes.dataDir,async()=>{
+      const bank=await this.get();this.check(bank,binding.bankRevision);
+      const doc=await this.resumes.getResume(binding.slug);
+      if(doc.id!==binding.docId||!binding.ids.every(id=>bank.records.some(r=>r.id===id&&isShareableFact(doc,r))))
+        throw new LocalFsApiError(409,'FACT_BINDING_CONFLICT','事实主体、敏感级别或授权状态已变化，拒绝发送。');
+    });
   }
   async add(raw:unknown):Promise<FactBank>{
     const input=AddFactSchema.parse(raw);

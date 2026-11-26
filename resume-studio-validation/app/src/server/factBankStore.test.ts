@@ -62,6 +62,17 @@ describe('independent local fact bank',()=>{
     expect(isShareableFact(doc,revoked.records[0]!)).toBe(false);
     await expect(bank.revoke({id:r.id,bankRevision:revoked.revision,confirmation:'REVOKE_FACT'})).rejects.toThrow();
   });
+  it('checks the actual persisted scope in the main-process send gate, not a renderer snapshot',async()=>{
+    const saved=await bank.add(input),r=saved.records[0]!;
+    const binding={slug:'synthetic',docId:doc.id,bankRevision:saved.revision,ids:[r.id]};
+    await expect(bank.assertCurrentBinding(binding)).resolves.toBeUndefined();
+    for(const bad of [{...binding,docId:'other'},{...binding,ids:[r.id,r.id]},{...binding,bankRevision:'empty-v1'}])await expect(bank.assertCurrentBinding(bad)).rejects.toThrow();
+    await store.saveResume('synthetic',{...doc,experience:doc.experience.map(e=>({...e,company:'Changed entity'}))});
+    await expect(bank.assertCurrentBinding(binding)).rejects.toThrow('事实主体');
+    const revoked=await bank.revoke({id:r.id,bankRevision:saved.revision,confirmation:'REVOKE_FACT'});
+    await expect(bank.assertCurrentBinding(binding)).rejects.toThrow('事实库已被其他操作更新');
+    await expect(bank.assertCurrentBinding({...binding,bankRevision:revoked.revision})).rejects.toThrow('事实主体');
+  });
   it('fails closed on corrupted data and does not overwrite the source file',async()=>{
     const f=path.join(root,'.fact-bank-v1.json');await fs.writeFile(f,'BROKEN');
     await expect(bank.get()).rejects.toThrow('事实库损坏');

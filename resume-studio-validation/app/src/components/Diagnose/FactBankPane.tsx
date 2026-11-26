@@ -10,14 +10,16 @@ type Props={document:ResumeDocument;slug:string;blocks:readonly EditableBlockOpt
 export function FactBankPane(props:Props){
   const [target,setTarget]=useState('');
   const [draft,setDraft]=useState<FactInput>(blank);
-  const [confirmed,setConfirmed]=useState(false);
+  const [confirmedEntity,setConfirmedEntity]=useState<string|null>(null);
+  const confirmed=confirmedEntity!==null&&confirmedEntity===factEntityId(props.document,target);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
+  const [showOther,setShowOther]=useState(false);
   const busy=useRef(false);
   const latest=useRef(props);latest.current=props;
   const bridge=window.resumeDesktop?.facts;
-  const records=props.bank?.records.filter(r=>r.docId===props.document.id)??[];
-  const edit=<K extends keyof FactInput>(key:K,value:FactInput[K])=>{setDraft(d=>({...d,[key]:value}));setConfirmed(false);};
+  const records=props.bank?.records.filter(r=>showOther||r.docId===props.document.id)??[];
+  const edit=<K extends keyof FactInput>(key:K,value:FactInput[K])=>{setDraft(d=>({...d,[key]:value}));setConfirmedEntity(null);};
   const task=async(work:()=>Promise<FactBank>,success:string)=>{
     if(busy.current||props.locked)return;
     busy.current=true;props.onBusy(true);setError('');setNotice('');
@@ -35,7 +37,7 @@ export function FactBankPane(props:Props){
       const current=latest.current;
       if(current.slug!==slug||current.document.id!==docId||factEntityId(current.document,target)!==identity)throw new Error('简历或关联主体已变化，请重新核对。');
       const saved=await bridge.add({slug,docRevision:current.getRevision(),blockKey:target,bankRevision:rev,fact:draft,confirmation:'CONFIRM_SELF_REPORTED_FACT'});
-      setDraft(blank);setConfirmed(false);return saved;
+      setDraft(blank);setConfirmedEntity(null);return saved;
     },'事实已保存到独立本地资料库。');
   };
   const revoke=(id:string)=>{
@@ -52,8 +54,9 @@ export function FactBankPane(props:Props){
     {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</div>}
     {notice&&<div role="status" className="text-teal-800">{notice}</div>}
     {props.bank&&<>
+      <label className="flex items-start gap-1"><input type="checkbox" disabled={props.locked} checked={showOther} onChange={e=>setShowOther(e.target.checked)}/>显示其他版本及孤立记录（仅本地管理，不可直接外发）</label>
       <div className="max-h-52 space-y-2 overflow-auto">{records.length===0&&<p>当前简历没有记录。请从下方手动添加。</p>}{records.map(r=>{
-        const matches=factEntityId(props.document,r.blockKey)===r.entityId;
+        const matches=r.docId===props.document.id&&factEntityId(props.document,r.blockKey)===r.entityId;
         const eligible=isShareableFact(props.document,r)&&props.keys.includes(r.blockKey);
         return <article key={r.id} className="rounded border p-2 space-y-1 break-words">
           <div className="font-semibold">{r.assertion}</div>
@@ -66,13 +69,13 @@ export function FactBankPane(props:Props){
       })}</div>
       <div className="rounded bg-slate-50 p-2 space-y-2">
         <div className="font-semibold">新增本人核对的事实</div>
-        <label className="block">关联段落<select aria-label="事实关联段落" disabled={props.locked} value={target} onChange={e=>{setTarget(e.target.value);setConfirmed(false);}} className="mt-1 w-full rounded border p-1.5"><option value="">选择可见段落</option>{props.blocks.map(b=><option key={b.key} value={b.key}>{b.label}</option>)}</select></label>
+        <label className="block">关联段落<select aria-label="事实关联段落" disabled={props.locked} value={target} onChange={e=>{setTarget(e.target.value);setConfirmedEntity(null);}} className="mt-1 w-full rounded border p-1.5"><option value="">选择可见段落</option>{props.blocks.map(b=><option key={b.key} value={b.key}>{b.label}</option>)}</select></label>
         <label className="block">类型<select aria-label="事实类型" disabled={props.locked} value={draft.kind} onChange={e=>edit('kind',e.target.value as FactInput['kind'])} className="mt-1 w-full rounded border p-1.5">{Object.entries({experience:'经历',achievement:'成果',credential:'资质',skill:'技能',other:'其他'}).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label>
         <label className="block">事实陈述<textarea aria-label="事实陈述" disabled={props.locked} rows={3} maxLength={2000} value={draft.assertion} onChange={e=>edit('assertion',e.target.value)} className="mt-1 w-full rounded border p-1.5"/></label>
         <div className="grid grid-cols-2 gap-2">{field('数值（可选）','value',200)}{field('单位（可选）','unit',80)}</div>
         {field('时间范围（可选）','timeframe',200)}{field('本地证据位置 / 来源说明','evidenceRef',1000)}
         <label className="flex items-start gap-1"><input type="checkbox" disabled={props.locked} checked={draft.sensitivity==='shareable'} onChange={e=>edit('sensitivity',e.target.checked?'shareable':'local-only')}/>允许今后逐次选择此外发事实（默认关闭）</label>
-        <label className="flex items-start gap-1"><input type="checkbox" disabled={props.locked} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>我已核对该陈述、主体和来源；确认新增本人自述事实</label>
+        <label className="flex items-start gap-1"><input type="checkbox" disabled={props.locked} checked={confirmed} onChange={e=>setConfirmedEntity(e.target.checked?factEntityId(props.document,target):null)}/>我已核对该陈述、主体和来源；确认新增本人自述事实</label>
         <button type="button" disabled={props.locked||!target||!draft.assertion.trim()||!draft.evidenceRef.trim()||!confirmed} onClick={create} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50">确认保存事实</button>
       </div>
     </>}

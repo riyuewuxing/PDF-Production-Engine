@@ -53,7 +53,7 @@ export function ResumeAiAssistantPane(props:Props){
     const bridge=window.resumeDesktop?.facts;
     if(!bridge)throw new Error('本地事实库不可用，旧审批作废。');
     const latest=await bridge.get();
-    if(latest.revision!==b.bankRevision||!b.records.every(r=>latest.records.some(s=>s.id===r.id&&isShareableFact(b.document,s))))throw new Error('本地事实库已变化，请刷新并重新预览；旧审批作废。');
+    if(latest.revision!==b.bankRevision||!b.records.every(r=>latest.records.some(s=>s.id===r.id&&JSON.stringify(s)===JSON.stringify(r)&&isShareableFact(b.document,s))))throw new Error('本地事实库已变化，请刷新并重新预览；旧审批作废。');
     if(!isCurrent(b))throw new Error('事实选择或简历已变化。');
   };
   const reset=()=>{setPending(null);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice(null);setError(null);};
@@ -64,11 +64,13 @@ export function ResumeAiAssistantPane(props:Props){
       const records=factIds.map(id=>bank?.records.find(r=>r.id===id));
       if(records.some(r=>!r))throw new Error('事实选择已变化，请刷新。');
       const basis:Basis={document:props.document,slug:props.slug,settings:props.settings,mode,goal,keys:[...keys],jdText:includeJd?props.jdText:undefined,overflowPx:props.overflowPx,requestId:crypto.randomUUID(),records:records as FactRecord[],bankRevision:bank?.revision??null};
-      const prepared=prepareAssistantTask(basis);assertAiPreviewSettings(props.settings,prepared.options);setPending({basis,prepared});
+      const prepared=prepareAssistantTask(basis);
+      if(basis.records.length&&basis.bankRevision)prepared.options.factBinding={slug:basis.slug,docId:basis.document.id,bankRevision:basis.bankRevision,ids:basis.records.map(r=>r.id)};
+      assertAiPreviewSettings(props.settings,prepared.options);setPending({basis,prepared});
     }catch(err){setError(localErrorMessage(err,'无法准备 AI 任务'));}
   };
   const send=async()=>{
-    if(!pending||abortRef.current||applyRef.current)return;
+    if(!pending||abortRef.current||applyRef.current||factsBusy||rendering)return;
     const req=pending;setPending(null);
     if(!isCurrent(req.basis)){setError('任务范围或模型已经变化，请重新预览。');return;}
     const ctrl=new AbortController();abortRef.current=ctrl;setBusy(true);setError(null);
@@ -91,7 +93,7 @@ export function ResumeAiAssistantPane(props:Props){
     setAccepted(prev=>checked?[...new Set([...prev,p.id])]:prev.filter(id=>id!==p.id));
   };
   const renderReview=async()=>{
-    if(!result||result.reply.kind!=='proposals'||renderAbort.current||applyRef.current||busy||!accepted.length)return;
+    if(!result||result.reply.kind!=='proposals'||renderAbort.current||applyRef.current||busy||factsBusy||!accepted.length)return;
     const {request,reply}=result;
     setReview(null);setPdfConfirmed(false);setError(null);
     if(!isCurrent(request.basis)){setError('简历或任务范围已变化，禁止试渲染旧提案。');return;}
@@ -111,7 +113,7 @@ export function ResumeAiAssistantPane(props:Props){
     finally{renderAbort.current=null;if(mounted.current)setRendering(false);}
   };
   const apply=async()=>{
-    if(!result||result.reply.kind!=='proposals'||applyRef.current||busy||rendering||!accepted.length||!review||!pdfConfirmed||review.comparison.blockers.length||review.ids!==JSON.stringify([...accepted].sort()))return;
+    if(!result||result.reply.kind!=='proposals'||applyRef.current||busy||rendering||factsBusy||!accepted.length||!review||!pdfConfirmed||review.comparison.blockers.length||review.ids!==JSON.stringify([...accepted].sort()))return;
     const {request,reply}=result;
     if(!isCurrent(request.basis)){setError('简历或任务范围已变化，禁止应用旧提案。');return;}
     if(props.slug==='master'&&!window.confirm('当前目标是母库。确认在创建本地快照后应用已逐项核对的正文修改？'))return;
@@ -148,7 +150,7 @@ export function ResumeAiAssistantPane(props:Props){
       <div className="max-h-36 overflow-auto space-y-1">{blocks.map(b=><label key={b.key} className="flex items-start gap-1"><input type="checkbox" disabled={locked} checked={keys.includes(b.key)} onChange={e=>{setKeys(prev=>e.target.checked?[...prev,b.key]:prev.filter(k=>k!==b.key));reset();}}/><span>{b.label}</span></label>)}</div>
       <label className="flex items-center gap-1"><input type="checkbox" disabled={locked} checked={includeJd} onChange={e=>{setIncludeJd(e.target.checked);reset();}}/>同时发送当前岗位 JD（默认关闭）</label>
     </div>
-    <FactBankPane document={props.document} slug={props.slug} blocks={blocks} keys={keys} bank={bank} selected={factIds} locked={locked} onBank={b=>{setBank(b);setFactIds([]);reset();}} onSelected={ids=>{setFactIds(ids);reset();}} onBusy={setFactsBusy} onFlush={props.onFlushBeforeApply} getRevision={props.getCurrentRevision}/>
+    <FactBankPane key={props.slug+':'+props.document.id} document={props.document} slug={props.slug} blocks={blocks} keys={keys} bank={bank} selected={factIds} locked={locked} onBank={b=>{setBank(b);setFactIds([]);reset();}} onSelected={ids=>{setFactIds(ids);reset();}} onBusy={setFactsBusy} onFlush={props.onFlushBeforeApply} getRevision={props.getCurrentRevision}/>
     <details className="rounded border border-slate-200 p-2"><summary className="cursor-pointer font-semibold"><BookOpen size={12} className="inline"/> 本地工具权限说明</summary>{AI_TOOL_CATALOG.map(tool=><div key={tool.name} className="mt-1"><span className="font-mono text-teal-800">{tool.name}</span> · {tool.description}</div>)}</details>
     <button type="button" disabled={locked||!goal.trim()} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">预览 AI 自由任务</button>
     {busy&&<div className="flex items-center justify-between"><span>正在运行模型任务…</span><button type="button" onClick={()=>abortRef.current?.abort()} className="rounded border px-2 py-1">取消自由任务</button></div>}
@@ -157,7 +159,7 @@ export function ResumeAiAssistantPane(props:Props){
     {pending&&<section aria-label="自由任务发送预览" className="rounded border border-amber-300 bg-amber-50 p-2 space-y-2">
       <div className="font-bold">自由任务发送前确认</div><div className="break-all">{pending.basis.settings.providerLabel} · {pending.basis.settings.model} · {validateByokBaseUrl(pending.basis.settings.baseUrl).baseUrl}/chat/completions</div>
       <div className="max-h-64 overflow-auto rounded bg-white p-2 space-y-1"><pre className="whitespace-pre-wrap break-words">{pending.prepared.options.systemPrompt}</pre><pre className="whitespace-pre-wrap break-words">{pending.prepared.options.userPrompt}</pre></div>
-      <div className="flex gap-1"><button type="button" onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送自由任务</button><button type="button" onClick={()=>setPending(null)} className="rounded border px-2 py-1">取消预览</button></div>
+      <div className="flex gap-1"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送自由任务</button><button type="button" onClick={()=>setPending(null)} className="rounded border px-2 py-1">取消预览</button></div>
     </section>}
     {result&&result.reply.kind==='text'&&<div className="space-y-2 rounded border border-slate-200 p-2"><div className="flex items-center gap-1 font-bold"><ClipboardList size={13}/>模型建议（不修改正文）</div><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words">{result.reply.text}</pre><p className="text-slate-500">模型分析不是独立事实证明。</p></div>}
     {result&&result.reply.kind==='proposals'&&<div className="space-y-2" aria-label="自由任务正文提案">

@@ -1,3 +1,4 @@
+import type {FactRequestBinding} from '../schema/factBankSchema';
 export interface ByokAiSettings {
   enabled: boolean;
   providerLabel: string;
@@ -96,6 +97,8 @@ export function computeLineDiff(original: string, suggested: string): LineDiffSe
 }
 
 export interface ByokCompletionOptions {
+  /** Local main-process freshness binding; not a provider payload field. */
+  factBinding?:FactRequestBinding;
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;
@@ -127,6 +130,7 @@ export async function requestByokCompletion(params: ByokCompletionOptions & {
   if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
   const bridge = typeof window !== 'undefined' ? window.resumeDesktop?.ai : undefined;
   if(!bridge){
+    if(options.factBinding)throw new Error('事实库授权必须由桌面主进程核验。');
     if(typeof window!=='undefined'&&window.resumeDesktop)throw new Error('桌面模型网关不可用，未绕过主进程。');
     return requestByokCompletionDirect(params);
   }

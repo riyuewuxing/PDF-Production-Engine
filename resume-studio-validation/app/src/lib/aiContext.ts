@@ -79,8 +79,9 @@ export function appendSelectedFactSources(doc:ResumeDocument,map:AiFactSourceMap
   const keys=new Set(selectedKeys),sanitize=createAiTextSanitizer([doc]);
   const next={...map};
   records.forEach((r,i)=>{
-    if(!keys.has(r.blockKey)||!isShareableFact(doc,r)||!next[r.blockKey])throw new Error('所选事实已撤销、不可外发或与当前主体不匹配。');
-    next[r.blockKey]=[...next[r.blockKey],{
+    const sources=next[r.blockKey];
+    if(!keys.has(r.blockKey)||!isShareableFact(doc,r)||!sources)throw new Error('所选事实已撤销、不可外发或与当前主体不匹配。');
+    next[r.blockKey]=[...sources,{
       id:'record-'+(i+1),blockKey:r.blockKey,scope:'record',entity:r.entityId,label:'本人确认的事实',
       facts:sanitize([r.assertion,r.value,r.unit,r.timeframe].filter(Boolean).join('\n')),
       status:'user-confirmed',
