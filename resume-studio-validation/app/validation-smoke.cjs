@@ -583,7 +583,7 @@ async function run() {
   const loadFacts=async()=>{
     await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.textContent.includes("本地事实资料库"));if(e&&!e.parentElement.open)e.click();return !!e})()');
     await click('加载 / 刷新事实库');
-    await until('shared fact bank loaded',()=>bodyHas('核对 12 份合成资料'));
+    await until('shared fact bank loaded',async()=>await bodyHas('已读取本地事实资料库。')&&await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="加载 / 刷新事实库")?.disabled===false'));
   };
   const chooseUnified=()=>js('(()=>{const b=[...document.querySelectorAll("input[type=checkbox]")].find(e=>e.getAttribute("aria-label")==="选择事实 核对 12 份合成资料");if(!b||b.disabled)return false;if(!b.checked)b.click();return true})()');
   const textPreview=()=>js('Array.from(document.querySelectorAll("section[aria-label=\\"AI 数据发送预览\\"] pre")).map(e=>e.textContent)');
