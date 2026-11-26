@@ -50,11 +50,13 @@ async function run() {
   const originalSave = main.store.saveResume.bind(main.store);
   let failSave = true;
   main.store.saveResume = async (slug, doc) => {
+    (checks.saveTrace ??= []).push({slug,name:doc?.basic?.name,failSave});
     if (slug === 'runner-fixture' && failSave) throw Error('受控写入失败');
-    return originalSave(slug, doc);
+    try {const saved=await originalSave(slug,doc);checks.saveTrace.push({saved:saved.basic.name});return saved;}
+    catch(err){checks.saveTrace.push({error:err.message});throw err;}
   };
   await js('(()=>{const e=document.querySelector("#basic-field-name");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,"演示候选人（修改）");e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
-  await until('visible save failure', () => bodyHas('受控写入失败'));
+  await until('visible save failure', () => js('[...document.querySelectorAll("[title]")].some(e=>e.title.includes("受控写入失败"))'));
   await capture('02-save-error');
   let closeDialogCount = 0;
   const originalDialog = dialog.showMessageBoxSync;
@@ -66,7 +68,8 @@ async function run() {
   checks.closeBlocked = true;
   failSave = false;
   await click('重试保存');
-  await until('edit persisted after retry', async () => (await main.store.getResume('runner-fixture')).basic.name === '演示候选人（修改）');
+  try { await until('edit persisted after retry', async () => (await main.store.getResume('runner-fixture')).basic.name === '演示候选人（修改）'); }
+  catch(err) { checks.savedName=(await main.store.getResume('runner-fixture')).basic.name; checks.uiName=await js('document.querySelector("#basic-field-name")?.value');checks.uiHead=await js('document.body.innerText.slice(0,400)'); await capture('03-retry-failure'); throw err; }
   await until('saved state', () => bodyHas('已保存至本地硬盘'));
   await capture('03-save-recovered');
   checks.saveRecovered = true;
@@ -77,12 +80,19 @@ async function run() {
     res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');
     if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
     if(req.method!=='POST'||req.url!=='/v1/chat/completions'){res.writeHead(404);res.end();return;}
+    if(req.headers.authorization !== 'Bearer synthetic-test-key'){res.writeHead(401);res.end();return;}
+    checks.mainProcessCredentialUsed = true;
     req.resume();
     req.on('end',()=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:'- 学生达标率提高30%。'}}]}));});
   });
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
-  const settings={enabled:true,providerLabel:'Isolated mock',baseUrl:'http://127.0.0.1:'+server.address().port+'/v1',apiKey:'',model:'synthetic'};
-  await js('window.resumeDesktop.ai.saveSettings('+JSON.stringify(settings)+')');
+  const settings={enabled:true,providerLabel:'Isolated mock',baseUrl:'http://127.0.0.1:'+server.address().port+'/v1',apiKey:'synthetic-test-key',model:'synthetic'};
+  fs.writeFileSync(path.join(main.dataDir,'.ai-settings.json'), JSON.stringify(settings));
+  const migrated = await js('window.resumeDesktop.ai.getSettings()');
+  if (migrated.apiKey !== '' || migrated.hasApiKey !== true) throw Error('renderer credential exposure or migration failed');
+  const stored = JSON.parse(fs.readFileSync(path.join(main.dataDir,'.ai-settings.json'),'utf8'));
+  if (stored.apiKey !== undefined || !stored.encryptedApiKey || JSON.stringify(stored).includes('synthetic-test-key')) throw Error('plaintext credential retained');
+  checks.osCredentialMigration = true;
   await click('诊断优化');
   await click('AI 润色 Diff');
   await until('AI config loaded', () => bodyHas('已启用 · 修改'));

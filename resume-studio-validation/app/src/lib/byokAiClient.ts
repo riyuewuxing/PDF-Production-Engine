@@ -2,7 +2,10 @@ export interface ByokAiSettings {
   enabled: boolean;
   providerLabel: string;
   baseUrl: string;
+  // Input-only credential; desktop reads/saves return an empty string.
   apiKey: string;
+  hasApiKey?: boolean;
+  clearApiKey?: boolean;
   model: string;
 }
 
@@ -82,13 +85,57 @@ export function computeLineDiff(original: string, suggested: string): LineDiffSe
   return segments;
 }
 
-export async function requestByokCompletion(params: {
-  settings: ByokAiSettings;
+export interface ByokCompletionOptions {
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+}
+export interface ByokCompletionRequest extends ByokCompletionOptions {
+  requestId: string;
+  profile: { baseUrl: string; model: string };
+}
+
+export function validateByokBaseUrl(raw: string): { baseUrl: string; isLoopback: boolean } {
+  let url: URL;
+  try { url = new URL(raw.trim()); } catch { throw new Error('模型 API Base URL 不合法。'); }
+  const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname.toLowerCase());
+  if (url.username || url.password || url.search || url.hash ||
+      (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback))) {
+    throw new Error('远程模型接口必须使用 HTTPS；仅允许 HTTP 回环地址，且不得包含凭据、查询参数或片段。');
+  }
+  return { baseUrl: url.toString().replace(/\/+$/, ''), isLoopback };
+}
+
+export async function requestByokCompletion(params: ByokCompletionOptions & {
+  settings: ByokAiSettings;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const { settings, signal, ...options } = params;
+  if (!settings.enabled) throw new Error('请先开启并保存 AI 配置。');
+  if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
+  const bridge = typeof window !== 'undefined' ? window.resumeDesktop?.ai : undefined;
+  if (!bridge) return requestByokCompletionDirect(params);
+  if (settings.apiKey || settings.clearApiKey) throw new Error('请先保存修改后的 AI 密钥配置。');
+  const requestId = globalThis.crypto.randomUUID();
+  const onAbort = () => { void bridge.cancelCompletion(requestId).catch(() => {}); };
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const result = await bridge.requestCompletion({
+      ...options, requestId,
+      profile: { baseUrl: validateByokBaseUrl(settings.baseUrl).baseUrl, model: settings.model.trim() },
+    });
+    if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
+    return result;
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+/** Desktop main process transport; browser fallback uses only ephemeral input. */
+export async function requestByokCompletionDirect(params: ByokCompletionOptions & {
+  settings: ByokAiSettings;
   signal?: AbortSignal;
 }): Promise<string> {
   const { settings, systemPrompt, userPrompt, temperature = 0.35, maxTokens, timeoutMs = 45000, signal } =
@@ -96,13 +143,9 @@ export async function requestByokCompletion(params: {
   if (!settings.enabled) {
     throw new Error('请先在下方开启并保存 BYOK 大模型配置，再调用 AI 能力。');
   }
-  const baseUrl = settings.baseUrl.trim().replace(/\/+$/, '');
-  if (!baseUrl) {
-    throw new Error('缺少模型 API Base URL。');
-  }
-  const isLocalOllama = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(baseUrl);
-  if (!isLocalOllama && !settings.apiKey.trim()) {
-    throw new Error('缺少 API Key（密钥仅存于本地 data/.ai-settings.json，不会上传或入库）。');
+  const { baseUrl, isLoopback } = validateByokBaseUrl(settings.baseUrl);
+  if (!isLoopback && !settings.apiKey.trim()) {
+    throw new Error('缺少 API Key，请先保存凭据。');
   }
   if (signal?.aborted) {
     throw new Error('请求已取消');
@@ -137,14 +180,13 @@ export async function requestByokCompletion(params: {
       method: 'POST',
       headers,
       signal: controller.signal,
+      redirect: 'error',
       body: JSON.stringify(bodyPayload),
     });
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      throw new Error(
-        `模型接口返回错误 (${response.status}): ${errText.slice(0, 180) || response.statusText}`,
-      );
+      // Provider bodies can echo private prompt or credential data. Never surface them.
+      throw new Error(`模型接口返回错误 (HTTP ${response.status})`);
     }
 
     const payload = (await response.json()) as {

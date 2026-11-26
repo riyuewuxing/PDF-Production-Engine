@@ -1,4 +1,4 @@
-import type { ByokAiSettings } from '../lib/byokAiClient';
+import type { ByokAiSettings, ByokCompletionRequest } from '../lib/byokAiClient';
 import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
@@ -100,6 +100,8 @@ export interface ResumeDesktopBridge {
   ai: {
     getSettings: () => Promise<ByokAiSettings>;
     saveSettings: (settings: ByokAiSettings) => Promise<ByokAiSettings>;
+    requestCompletion: (request: ByokCompletionRequest) => Promise<string>;
+    cancelCompletion: (requestId: string) => Promise<void>;
   };
   shell: {
     openPath: (filePath: string) => Promise<string>;

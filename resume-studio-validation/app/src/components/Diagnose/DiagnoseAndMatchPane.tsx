@@ -75,6 +75,7 @@ export function DiagnoseAndMatchPane({
   const [aiSubMode, setAiSubMode] = useState<AiSubMode>('single');
   const [aiSettings, setAiSettings] = useState<ByokAiSettings>(DEFAULT_BYOK_SETTINGS);
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
 
   const editableBlocks = useMemo(() => collectEditableBlocks(document), [document]);
@@ -105,7 +106,9 @@ export function DiagnoseAndMatchPane({
     mountedRef.current = true;
     void apiClient.getAiSettings().then((settings) => {
       if (mountedRef.current) setAiSettings(settings);
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      if (mountedRef.current) setSettingsError(err instanceof Error ? err.message : '无法读取 AI 配置。');
+    });
     return () => {
       mountedRef.current = false;
       polishAbortRef.current?.abort();
@@ -189,10 +192,15 @@ export function DiagnoseAndMatchPane({
   };
 
   const handleSaveAiSettings = async () => {
-    const saved = await apiClient.saveAiSettings(aiSettings);
-    setAiSettings(saved);
-    setSettingsSavedMsg('已安全保存到本地 data/.ai-settings.json（不入 Git）');
-    setTimeout(() => setSettingsSavedMsg(null), 3000);
+    setSettingsError(null);
+    setSettingsSavedMsg(null);
+    try {
+      const saved = await apiClient.saveAiSettings(aiSettings);
+      setAiSettings(saved);
+      setSettingsSavedMsg(window.resumeDesktop ? '配置已保存；密钥由系统加密保护。' : '浏览器模式：配置仅在当前页面内存中有效。');
+    } catch (err) {
+      setSettingsError(err instanceof Error ? err.message : 'AI 配置保存失败。');
+    }
   };
 
   const handleRunPolish = async () => {
@@ -669,9 +677,10 @@ export function DiagnoseAndMatchPane({
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-slate-500">
-                默认关闭且不内置任何第三方密钥。密钥仅明文保存在本地 <code className="font-mono">data/.ai-settings.json</code>（已被 Git 忽略）。
+                默认关闭。桌面端密钥由系统加密保护，已保存密钥不再回传界面；模型请求由主进程发送。浏览器模式不持久化密钥。
               </p>
 
+              {settingsError && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700">{settingsError}</div>}
               {showAiConfig && (
                 <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
                   <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
@@ -696,6 +705,9 @@ export function DiagnoseAndMatchPane({
                             providerLabel: p.label,
                             baseUrl: p.baseUrl,
                             model: p.defaultModel,
+                            apiKey: '',
+                            hasApiKey: prev.baseUrl === p.baseUrl && prev.hasApiKey,
+                            clearApiKey: false,
                           }))
                         }
                         className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100"
@@ -709,7 +721,7 @@ export function DiagnoseAndMatchPane({
                     type="text"
                     data-native-undo="true"
                     value={aiSettings.baseUrl}
-                    onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                    onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value, apiKey: '', hasApiKey: false, clearApiKey: false }))}
                     placeholder="OpenAI 兼容 Base URL"
                     className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                   />
@@ -718,8 +730,8 @@ export function DiagnoseAndMatchPane({
                       type="password"
                       data-native-undo="true"
                       value={aiSettings.apiKey}
-                      onChange={(e) => setAiSettings((prev) => ({ ...prev, apiKey: e.target.value }))}
-                      placeholder="API Key（Ollama 可留空）"
+                      onChange={(e) => setAiSettings((prev) => ({ ...prev, apiKey: e.target.value, clearApiKey: false }))}
+                      placeholder={aiSettings.hasApiKey && !aiSettings.clearApiKey ? '已保存密钥，留空保留' : 'API Key（Ollama 可留空）'}
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                     />
                     <input
@@ -731,6 +743,13 @@ export function DiagnoseAndMatchPane({
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                     />
                   </div>
+                  {aiSettings.hasApiKey && (
+                    <label className="flex items-center gap-2 text-[11px] text-slate-600">
+                      <input type="checkbox" checked={Boolean(aiSettings.clearApiKey)}
+                        onChange={(e) => setAiSettings(prev => ({ ...prev, clearApiKey: e.target.checked, apiKey: '' }))} />
+                      保存时清除已有密钥
+                    </label>
+                  )}
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-emerald-700">{settingsSavedMsg}</span>
                     <button

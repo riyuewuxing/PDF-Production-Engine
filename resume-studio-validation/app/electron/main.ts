@@ -1,9 +1,11 @@
-import { BrowserWindow, app, dialog, ipcMain, nativeImage, protocol, shell } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, nativeImage, protocol, shell, safeStorage, type IpcMainInvokeEvent } from 'electron';
 import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { type ByokAiSettings, DEFAULT_BYOK_SETTINGS } from '../src/lib/byokAiClient';
+import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
+import { z } from 'zod';
+import { AiSettingsStore } from './aiSettingsStore';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
@@ -371,29 +373,27 @@ async function resolveEmbeddedPhotoDataUrl(doc: ResumeDocument): Promise<string 
   return `data:${mime};base64,${Buffer.from(opts.photoBuffer).toString('base64')}`;
 }
 
-const aiSettingsPath = path.join(dataDir, '.ai-settings.json');
+const aiSettings = new AiSettingsStore(path.join(dataDir, '.ai-settings.json'), {
+  available: () => safeStorage.isEncryptionAvailable() &&
+    (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'),
+  encrypt: (text) => safeStorage.encryptString(text),
+  decrypt: (bytes) => safeStorage.decryptString(bytes),
+});
+const aiRequests = new Map<string, AbortController>();
+const aiCompletionSchema = z.object({
+  requestId: z.string().uuid(),
+  profile: z.object({ baseUrl: z.string().max(2048), model: z.string().max(200) }).strict(),
+  systemPrompt: z.string().min(1).max(20000),
+  userPrompt: z.string().max(100000),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().min(1).max(8192).optional(),
+  timeoutMs: z.number().int().min(1000).max(120000).optional(),
+}).strict();
 
-function sanitizeAiSettings(raw: unknown): ByokAiSettings {
-  if (typeof raw !== 'object' || raw === null) {
-    return { ...DEFAULT_BYOK_SETTINGS };
+function assertTrustedAiSender(event: IpcMainInvokeEvent): void {
+  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('未经授权的 AI 调用来源。');
   }
-  const obj = raw as Record<string, unknown>;
-  return {
-    enabled: typeof obj.enabled === 'boolean' ? obj.enabled : false,
-    providerLabel:
-      typeof obj.providerLabel === 'string' && obj.providerLabel.trim()
-        ? obj.providerLabel.trim()
-        : DEFAULT_BYOK_SETTINGS.providerLabel,
-    baseUrl:
-      typeof obj.baseUrl === 'string' && obj.baseUrl.trim()
-        ? obj.baseUrl.trim()
-        : DEFAULT_BYOK_SETTINGS.baseUrl,
-    apiKey: typeof obj.apiKey === 'string' ? obj.apiKey.trim() : '',
-    model:
-      typeof obj.model === 'string' && obj.model.trim()
-        ? obj.model.trim()
-        : DEFAULT_BYOK_SETTINGS.model,
-  };
 }
 
 function registerIpcHandlers(): void {
@@ -613,20 +613,37 @@ function registerIpcHandlers(): void {
       }),
   );
 
-  ipcMain.handle('ai:getSettings', async () => {
+  ipcMain.handle('ai:getSettings', async (event) => {
+    assertTrustedAiSender(event);
+    return aiSettings.getPublicSettings();
+  });
+
+  ipcMain.handle('ai:saveSettings', async (event, rawSettings: unknown) => {
+    assertTrustedAiSender(event);
+    return aiSettings.save(rawSettings);
+  });
+
+  ipcMain.handle('ai:requestCompletion', async (event, raw: unknown) => {
+    assertTrustedAiSender(event);
+    const parsed = aiCompletionSchema.safeParse(raw);
+    if (!parsed.success) throw new Error('AI 请求参数超出许可范围。');
+    const { requestId, profile, ...options } = parsed.data;
+    if (aiRequests.has(requestId) || aiRequests.size >= 4) throw new Error('AI 请求重复或并发数已达上限。');
+    const controller = new AbortController();
+    aiRequests.set(requestId, controller);
     try {
-      const raw = await fs.readFile(aiSettingsPath, 'utf-8');
-      return sanitizeAiSettings(JSON.parse(raw) as unknown);
-    } catch {
-      return { ...DEFAULT_BYOK_SETTINGS };
+      const settings = await aiSettings.getRequestSettings();
+      if (!settings.enabled || settings.baseUrl !== validateByokBaseUrl(profile.baseUrl).baseUrl ||
+          settings.model !== profile.model) throw new Error('AI 配置已变化，请先保存并重试。');
+      return await requestByokCompletionDirect({ ...options, settings, signal: controller.signal });
+    } finally {
+      aiRequests.delete(requestId);
     }
   });
 
-  ipcMain.handle('ai:saveSettings', async (_event, rawSettings: unknown) => {
-    const clean = sanitizeAiSettings(rawSettings);
-    await fs.mkdir(dataDir, { recursive: true });
-    await fs.writeFile(aiSettingsPath, `${JSON.stringify(clean, null, 2)}\n`, 'utf-8');
-    return clean;
+  ipcMain.handle('ai:cancelCompletion', (event, requestId: string) => {
+    assertTrustedAiSender(event);
+    if (typeof requestId === 'string') aiRequests.get(requestId)?.abort();
   });
 
   ipcMain.handle('shell:openPath', (_event, filePath: string) => shell.openPath(filePath));
@@ -756,6 +773,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
 
   win.on('closed', () => {
     clearTimeout(showFallbackTimer);
+    for (const controller of aiRequests.values()) controller.abort();
     mainWindow = null;
   });
 

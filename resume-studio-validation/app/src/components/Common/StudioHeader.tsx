@@ -150,12 +150,12 @@ export function StudioHeader({
             </span>
           )}
           {saveState === 'error' && (
-            <span className="inline-flex items-center gap-1.5 text-red-400" title={saveError ?? undefined}>
-              <AlertCircle size={12} /> {saveError ?? '保存失败'}
+            <span className="inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap text-red-400" title={saveError ?? undefined}>
+              <AlertCircle size={12} /> 保存失败
               <button
                 type="button"
                 onClick={onManualSave}
-                className="rounded border border-red-400/40 bg-red-950/60 px-1.5 py-0.5 text-[10px] font-medium text-red-200 hover:bg-red-900"
+                className="shrink-0 whitespace-nowrap rounded border border-red-400/40 bg-red-950/60 px-1.5 py-0.5 text-[10px] font-medium text-red-200 hover:bg-red-900"
               >
                 重试保存
               </button>

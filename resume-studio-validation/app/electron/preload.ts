@@ -56,6 +56,8 @@ const bridge: ResumeDesktopBridge = {
   ai: {
     getSettings: () => ipcRenderer.invoke('ai:getSettings'),
     saveSettings: (settings) => ipcRenderer.invoke('ai:saveSettings', settings),
+    requestCompletion: (request) => ipcRenderer.invoke('ai:requestCompletion', request),
+    cancelCompletion: (requestId) => ipcRenderer.invoke('ai:cancelCompletion', requestId),
   },
   shell: {
     openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath),
