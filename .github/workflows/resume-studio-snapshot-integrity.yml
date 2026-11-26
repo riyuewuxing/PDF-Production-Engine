@@ -1,0 +1,76 @@
+name: Resume Studio V6 snapshot integrity validation
+on:
+  push:
+    branches: ['resume-studio/v6-snapshot-integrity-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-snapshot-integrity-validation
+  cancel-in-progress: true
+jobs:
+  windows-snapshot-integrity:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reproduce exact prior snapshot integrity failures
+        timeout-minutes: 2
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-snapshot-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $target = 'src/server/localFsApi.ts'
+          $candidate = [IO.File]::ReadAllBytes((Join-Path (Get-Location) $target))
+          try {
+            [IO.File]::WriteAllBytes((Join-Path (Get-Location) $target), [IO.File]::ReadAllBytes((Join-Path (Get-Location) 'validation-fixtures/localFsApi.turn27-baseline.txt')))
+            pnpm exec vitest run src/server/snapshotIntegrity.test.ts --reporter=json --outputFile="$out/baseline-vitest.json"
+            $baselineCode = $LASTEXITCODE
+          } finally {
+            [IO.File]::WriteAllBytes((Join-Path (Get-Location) $target), $candidate)
+          }
+          $report = Get-Content "$out/baseline-vitest.json" -Raw | ConvertFrom-Json
+          if ($baselineCode -eq 0 -or $report.numFailedTests -ne 8 -or $report.numPassedTests -ne 1 -or $report.numTotalTests -ne 9) { throw 'Unexpected baseline reproduction' }
+          $LASTEXITCODE = 0
+      - name: Candidate typecheck
+        timeout-minutes: 2
+        run: pnpm typecheck
+      - name: Full synthetic candidate regression
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-snapshot-evidence'
+          pnpm exec vitest run --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Verify actual history UI rotation and rollback
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-snapshot-ui-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-snapshot-evidence'
+          & .\node_modules\.bin\electron.cmd .\validation-snapshot-integrity.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload snapshot evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-snapshot-integrity-evidence
+          path: resume-studio-snapshot-evidence/
+          if-no-files-found: error
+          retention-days: 3

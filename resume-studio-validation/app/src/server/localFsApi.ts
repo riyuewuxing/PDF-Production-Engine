@@ -747,10 +747,12 @@ export class LocalResumeStore {
       `${JSON.stringify({ meta, document: sourceDoc }, null, 2)}\n`,
     );
 
-    // Prune oldest snapshots strictly keeping MAX_SNAPSHOTS_PER_RESUME (15)
+    // Always retain the new verified record (including a pre-rollback backup).
+    // A backwards wall-clock change or future-dated history must not erase it.
     const all = await this.listSnapshots(slug);
+    if(!all.some(item=>item.id===id))throw new LocalFsApiError(500,'SNAPSHOT_UNVERIFIED','新快照未通过读回校验，未自动清理历史记录。');
     if (all.length > MAX_SNAPSHOTS_PER_RESUME) {
-      const stale = all.slice(MAX_SNAPSHOTS_PER_RESUME);
+      const stale = all.filter(item=>item.id!==id).slice(MAX_SNAPSHOTS_PER_RESUME-1);
       await Promise.all(
         stale.map((item) =>
           fs.unlink(resolveContainedPath(dir, `${item.id}.json`)).catch(() => {}),

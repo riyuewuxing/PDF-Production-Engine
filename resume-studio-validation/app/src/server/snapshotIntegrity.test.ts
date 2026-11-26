@@ -83,6 +83,17 @@ describe('snapshot record identity and retention integrity',()=>{
     await expect(store.listSnapshots('synthetic')).rejects.toMatchObject({code:'SNAPSHOT_UNSAFE'});
     expect(await fs.readdir(outside)).toEqual(['keep.txt']);expect(await fs.readFile(file)).toEqual(before);
   });
+  it('retains the newly created snapshot despite future-dated existing history',async()=>{
+    const {store,doc,dir}=await fixture();await fs.mkdir(dir,{recursive:true});
+    for(let i=0;i<15;i++){
+      const id='future-'+String(i).padStart(2,'0');
+      await fs.writeFile(path.join(dir,id+'.json'),JSON.stringify(record(id,doc,new Date(Date.UTC(2099,0,i+1)).toISOString())));
+    }
+    const fresh=await store.createSnapshot('synthetic','current clock');
+    expect(await exists(path.join(dir,fresh.id+'.json'))).toBe(true);
+    const list=await store.listSnapshots('synthetic');expect(list).toHaveLength(15);expect(list.map(x=>x.id)).toContain(fresh.id);
+    expect(await exists(path.join(dir,'future-00.json'))).toBe(false);
+  });
   it('keeps regular snapshot creation, listing and reversible rollback working',async()=>{
     const {store,doc}=await fixture();expect(await store.listSnapshots('synthetic')).toEqual([]);
     const snapshot=await store.createSnapshot('synthetic','normal',undefined,resumeRevision(doc));
