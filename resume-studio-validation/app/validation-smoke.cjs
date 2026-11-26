@@ -1251,6 +1251,57 @@ async function run() {
   if(providerCalls!==noticeCalls||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(reviewDoc))throw Error('Chinese notice import modified resume or contacted model');
   checks.jobPdfChineseNative=true;
 
+  // Backup all persisted managed data from the real workspace, never secrets or exports.
+  await click('版本母库');
+  await until('backup pane mounted',()=>bodyHas('工作区备份与安全恢复'));
+  const backupParent=fs.mkdtempSync(path.join(path.dirname(root),'synthetic-backup-acceptance-'));
+  const originalBackupDialog=dialog.showOpenDialog;
+  const currentMaster=fs.readFileSync(path.join(main.dataDir,'master.json'));
+  const backupCalls=providerCalls;
+  let backupFolder,restoreFolder;
+  try{
+    dialog.showOpenDialog=async(_owner,options)=>{if(!options.properties.includes('openDirectory'))throw Error('backup requires directory chooser');return {canceled:true,filePaths:[]};};
+    await click('创建本地工作区备份');
+    await until('backup canceled',()=>js('[...document.querySelectorAll("button")].some(b=>b.innerText==="创建本地工作区备份"&&!b.disabled)'));
+    if(fs.readdirSync(backupParent).length)throw Error('cancel published folder');
+    checks.workspaceBackupCancel=true;
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupParent]});
+    await click('创建本地工作区备份');
+    await until('backup created',()=>bodyHas('已创建并校验工作区备份。'));
+    backupFolder=path.join(backupParent,fs.readdirSync(backupParent).find(n=>n.startsWith('resume-studio-backup-v1-')));
+    const manifest=JSON.parse(fs.readFileSync(path.join(backupFolder,'workspace-backup-v1.json'),'utf8'));
+    if(!manifest.files.some(f=>f.path==='master.json')||!manifest.files.some(f=>f.path==='applications.json')||!manifest.files.some(f=>f.path==='.fact-bank-v1.json')||!manifest.files.some(f=>f.path==='.evidence-index-v1.json')||!manifest.files.some(f=>f.path.startsWith('.application-snapshots/'))||!manifest.files.some(f=>f.path.startsWith('.evidence-files-v1/')))throw Error('backup omitted managed data');
+    if(manifest.files.some(f=>f.path.includes('ai-settings')||f.path.includes('resume-write-lock'))||fs.existsSync(path.join(backupFolder,'data','.ai-settings.json')))throw Error('backup copied secret or lock');
+    for(const row of manifest.files){const b=fs.readFileSync(path.join(backupFolder,'data',...row.path.split('/')));if(b.length!==row.size||require('node:crypto').createHash('sha256').update(b).digest('hex')!==row.sha256)throw Error('backup bytes invalid');}
+    if(!fs.readFileSync(path.join(backupFolder,'data','master.json')).equals(currentMaster))throw Error('backup master differs');
+    await js('document.querySelector("[aria-label=\\"工作区备份结果\\"]")?.scrollIntoView({block:"center"})');await capture('80-workspace-backup-created');
+    checks.workspaceBackupExactManagedBytes=true;
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupFolder]});
+    await click('检查已有备份');await until('backup inspected',()=>bodyHas('备份文件清单及内容校验完成'));
+    if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="恢复到独立新工作区")?.disabled===true'))throw Error('restore approval not required');
+    await js('document.querySelector("[aria-label=\\"确认恢复到独立新工作区\\"]")?.scrollIntoView({block:"center"})');await capture('81-workspace-backup-review');
+    if(!await namedCheck('确认恢复到独立新工作区'))throw Error('restore confirmation missing');
+    const backupMaster=path.join(backupFolder,'data','master.json');
+    fs.appendFileSync(backupMaster,' ');
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupParent]});
+    await click('恢复到独立新工作区');
+    await until('tampered backup blocked',()=>bodyHas('校验失败'));
+    if(fs.readdirSync(backupParent).some(n=>n.startsWith('resume-studio-restored-v1-'))||!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster))throw Error('failed restore altered current workspace');
+    await js('document.querySelector("[aria-label=\\"工作区备份与安全恢复\\"] [role=alert]")?.scrollIntoView({block:"center"})');await capture('82-workspace-backup-tamper-blocked');
+    checks.workspaceBackupTamperRejected=true;
+    fs.writeFileSync(backupMaster,currentMaster);
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupFolder]});
+    await click('检查已有备份');await until('backup rechecked',()=>bodyHas('备份文件清单及内容校验完成'));
+    if(!await namedCheck('确认恢复到独立新工作区'))throw Error('restore confirmation missing after recheck');
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupParent]});
+    await click('恢复到独立新工作区');await until('new workspace restored',()=>bodyHas('已恢复并校验独立新工作区'));
+    restoreFolder=path.join(backupParent,fs.readdirSync(backupParent).find(n=>n.startsWith('resume-studio-restored-v1-')));
+    for(const row of manifest.files){const b=fs.readFileSync(path.join(restoreFolder,'data',...row.path.split('/')));if(b.length!==row.size||require('node:crypto').createHash('sha256').update(b).digest('hex')!==row.sha256)throw Error('restored bytes invalid');}
+    if(!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster)||providerCalls!==backupCalls)throw Error('backup modified master or contacted provider');
+    await js('document.querySelector("[aria-label=\\"工作区备份结果\\"]")?.scrollIntoView({block:"center"})');await capture('83-workspace-restored-copy');
+    checks.workspaceRestoreIndependent=true;
+  }finally{dialog.showOpenDialog=originalBackupDialog;fs.rmSync(backupParent,{recursive:true,force:true});}
+
   // At the very end, mutate only the isolated synthetic disk to simulate another process.
   await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');await click('分步工作');
   await setValue('textarea[aria-label="AI 自由任务目标"]','测试磁盘版本变化');

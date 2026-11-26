@@ -2,6 +2,8 @@ import { BrowserWindow, app, dialog, ipcMain, nativeImage, protocol, shell, safe
 import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from '../src/server/workspaceBackup';
 import { promisify } from 'node:util';
 import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
 import { z } from 'zod';
@@ -468,7 +470,39 @@ async function authorizeShellFile(filePath:string):Promise<string> {
   throw new Error('文件不在本地导出目录或本次另存记录中，请在系统文件管理器手动打开。');
 }
 
+let backupBusy=false;
+let inspectedBackup:{token:string;folder:string;manifestHash:string}|null=null;
+async function runBackupOperation<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
+  if(backupBusy)throw new Error('已有备份操作正在进行。');
+  backupBusy=true;const ctl=new AbortController();
+  const timer=setTimeout(()=>ctl.abort(),120000);
+  try{return await work(ctl.signal);}finally{clearTimeout(timer);backupBusy=false;}
+}
+async function pickBackupFolder(title:string){
+  const owner=mainWindow;if(!owner||owner.isDestroyed())throw new Error('工作台已关闭。');
+  const result=await dialog.showOpenDialog(owner,{title,properties:['openDirectory']});
+  return result.canceled||result.filePaths.length!==1?null:result.filePaths[0]!;
+}
 function registerIpcHandlers(): void {
+  trustedEditorHandle('workspaceBackup:create',()=>runBackupOperation(async signal=>{
+    const parent=await pickBackupFolder('选择备份保存位置（将新建文件夹，不覆盖原数据）');
+    return parent?await createWorkspaceBackup(rootDir,parent,signal):null;
+  }));
+  trustedEditorHandle('workspaceBackup:inspect',()=>runBackupOperation(async signal=>{
+    inspectedBackup=null;
+    const folder=await pickBackupFolder('选择待检查的完整工作区备份文件夹');
+    if(!folder)return null;
+    const checked=await inspectWorkspaceBackup(folder,signal),token=randomUUID();
+    inspectedBackup={token,folder:checked.root,manifestHash:checked.manifestHash};
+    return {...checked.summary,folder:checked.root,token};
+  }));
+  trustedEditorHandle('workspaceBackup:restore',(_event,token:unknown,confirmation:unknown)=>runBackupOperation(async signal=>{
+    const basis=inspectedBackup;
+    if(!basis||token!==basis.token||confirmation!=='RESTORE_TO_NEW_WORKSPACE')throw new Error('恢复前必须检查备份并明确确认创建新工作区。');
+    inspectedBackup=null;
+    const parent=await pickBackupFolder('选择恢复位置（仅新建独立工作区）');
+    return parent?await restoreWorkspaceBackup(rootDir,basis.folder,basis.manifestHash,parent,signal):null;
+  }));
   trustedEditorHandle('facts:get',()=>facts.get());
   trustedEditorHandle('facts:add',(_event,input:unknown)=>facts.add(input));
   trustedEditorHandle('facts:link',(_event,input:unknown)=>facts.link(input));

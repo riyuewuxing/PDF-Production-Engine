@@ -56,7 +56,10 @@ export interface SaveApplicationSnapshotInput {
   document: ResumeDocument;
 }
 
+import type {BackupInspection,BackupResult} from '../schema/workspaceBackupSchema';
+
 export interface ResumeDesktopBridge {
+  workspaceBackup?:{create:()=>Promise<BackupResult|null>;inspect:()=>Promise<BackupInspection|null>;restore:(token:string,confirmation:'RESTORE_TO_NEW_WORKSPACE')=>Promise<BackupResult|null>};
   readonly isDesktop: true;
   resumes: {
     list: () => Promise<{ master: ResumeSummary | null; resumes: ResumeSummary[] }>;

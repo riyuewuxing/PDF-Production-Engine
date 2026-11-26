@@ -398,7 +398,7 @@ export class LocalResumeStore {
       if (!current && (await this.reservedTrashSlugs()).has(slug.toLowerCase())) throw new LocalFsApiError(409,'SLUG_RESERVED','该版本标识在回收站中保留，请恢复或创建其他版本。');
       if (current && current.id !== validated.id) throw new LocalFsApiError(409, 'DOCUMENT_ID_CONFLICT', '不能用另一份简历的身份标识覆盖当前版本。');
       if (current && options?.snapshotReason) {
-        const snapshot = await this.createSnapshot(slug, options.snapshotReason, current);
+        const snapshot = await this.createSnapshotUnlocked(slug, options.snapshotReason, current);
         options.onSnapshotCreated?.(snapshot);
       }
       return this.writeResume(filePath, validated, current);
@@ -601,7 +601,7 @@ export class LocalResumeStore {
     const filename = assertSafeAssetName(`${rawBase}-${Date.now().toString(36)}.${ext}`);
     const targetPath = resolveContainedPath(this.assetsDir, filename);
 
-    await atomicWriteFile(targetPath, buffer);
+    await withResumeWriteLock(this.dataDir,()=>atomicWriteFile(targetPath, buffer));
     return {
       filename,
       url: `/api/assets/${filename}`,
@@ -642,14 +642,17 @@ export class LocalResumeStore {
     docOverride?: ResumeDocument,
     expectedRevision?: string,
   ): Promise<ResumeSnapshotMeta> {
-    if (expectedRevision !== undefined) {
-      return withResumeWriteLock(this.dataDir, async () => {
-        const current = await this.readOptionalResume(this.resolveResumePath(rawSlug).filePath);
-        assertExpectedRevision(current, expectedRevision);
-        if (!current) throw new LocalFsApiError(409,'REVISION_CONFLICT','简历已不存在。');
-        return this.createSnapshot(rawSlug,reason,current);
-      });
-    }
+    return withResumeWriteLock(this.dataDir,async()=>{
+      if(expectedRevision!==undefined){
+        const current=await this.readOptionalResume(this.resolveResumePath(rawSlug).filePath);
+        assertExpectedRevision(current,expectedRevision);
+        if(!current)throw new LocalFsApiError(409,'REVISION_CONFLICT','简历已不存在。');
+        return this.createSnapshotUnlocked(rawSlug,reason,current);
+      }
+      return this.createSnapshotUnlocked(rawSlug,reason,docOverride);
+    });
+  }
+  private async createSnapshotUnlocked(rawSlug:string,reason:string,docOverride?:ResumeDocument):Promise<ResumeSnapshotMeta>{
     const { slug, dir } = this.resolveSnapshotDir(rawSlug);
     const sourceDoc = docOverride
       ? ResumeDocumentSchema.parse(docOverride)
@@ -744,7 +747,7 @@ export class LocalResumeStore {
       if (!current) throw new LocalFsApiError(404,'NOT_FOUND','当前简历不存在，请通过回收站恢复原版本。');
       if (expectedRevision !== undefined) assertExpectedRevision(current, expectedRevision);
       if (current.id !== restoredDoc.id) throw new LocalFsApiError(409,'DOCUMENT_ID_CONFLICT','该历史快照属于另一份简历，未覆盖当前版本。');
-      await this.createSnapshot(slug, '回滚前自动备份', current);
+      await this.createSnapshotUnlocked(slug, '回滚前自动备份', current);
       return this.writeResume(targetPath, restoredDoc, current);
     });
   }

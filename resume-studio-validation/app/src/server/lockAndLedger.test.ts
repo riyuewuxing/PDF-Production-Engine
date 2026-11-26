@@ -139,3 +139,75 @@ it('persists immutable job reviews with CAS and verified application snapshot li
   expect(removed.jobReviews).toEqual([]);
   expect(await store.deleteApplicationSnapshot(logged.entry.snapshotId)).toEqual({deleted:true});
 });
+
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
+import {BACKUP_MANIFEST,managedBackupPath,WorkspaceBackupManifestSchema} from '../schema/workspaceBackupSchema';
+import {createHash} from 'node:crypto';
+async function backupFixture(){
+  const parent=await fs.mkdtemp(path.join(os.tmpdir(),'resume-workspace-backup-'));dirs.push(parent);
+  const root=path.join(parent,'live'),data=path.join(root,'data'),dest=path.join(parent,'copies');
+  await fs.mkdir(dest,{recursive:true});
+  const store=new LocalResumeStore(data);
+  await store.saveResume('master',doc());
+  await store.saveResume('sample',doc());
+  await store.createSnapshot('sample','合成备份');
+  await fs.writeFile(path.join(data,'.ai-settings.json'),'SYNTHETIC_SECRET_NEVER_COPY');
+  await fs.mkdir(path.join(root,'exports'));await fs.writeFile(path.join(root,'exports','demo.pdf'),'not included');
+  const signal=new AbortController().signal;
+  return {parent,root,data,dest,store,signal};
+}
+describe('portable workspace backup',()=>{
+  it('copies exact managed bytes, excludes credentials, and restores to a separate workspace',async()=>{
+    const f=await backupFixture();
+    const saved=await f.store.logApplication({entry:app({resumeSlug:'master',jdText:'合成招聘条件'}),document:await f.store.getResume('master')});
+    const expectedDoc=await f.store.getResume('master');
+    const backup=await createWorkspaceBackup(f.root,f.dest,f.signal);
+    const inspection=await inspectWorkspaceBackup(backup.folder,f.signal);
+    expect(inspection.summary).toMatchObject({fileCount:backup.fileCount,warnings:[]});
+    expect(inspection.manifest.files.map(x=>x.path)).toContain('applications.json');
+    expect(inspection.manifest.files.some(x=>x.path.startsWith('.application-snapshots/'))).toBe(true);
+    expect(inspection.manifest.files.some(x=>x.path.startsWith('.backups/'))).toBe(true);
+    await expect(fs.access(path.join(backup.folder,'data','.ai-settings.json'))).rejects.toMatchObject({code:'ENOENT'});
+    const restored=await restoreWorkspaceBackup(f.root,backup.folder,inspection.manifestHash,f.dest,f.signal);
+    const newStore=new LocalResumeStore(path.join(restored.folder,'data'));
+    expect(restored.folder).not.toBe(f.root);
+    expect(await newStore.getResume('master')).toEqual(expectedDoc);
+    expect(await newStore.getApplications()).toEqual(saved.store);
+    expect(await newStore.getApplicationSnapshot(saved.entry.snapshotId)).toEqual(await f.store.getApplicationSnapshot(saved.entry.snapshotId));
+    expect(await f.store.getResume('master')).toEqual(expectedDoc);
+    for(const row of inspection.manifest.files){
+      const bytes=await fs.readFile(path.join(restored.folder,'data',...row.path.split('/')));
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(row.sha256);
+    }
+  });
+  it('rejects tampering, unsafe paths, unexpected files, and destinations inside the original workspace',async()=>{
+    const f=await backupFixture(),backup=await createWorkspaceBackup(f.root,f.dest,f.signal);
+    const checked=await inspectWorkspaceBackup(backup.folder,f.signal);
+    const original=await fs.readFile(path.join(f.data,'master.json'));
+    await expect(restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,f.data,f.signal)).rejects.toThrow('之外');
+    await expect(restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,backup.folder,f.signal)).rejects.toThrow('之外');
+    await expect(restoreWorkspaceBackup(f.root,backup.folder,'f'.repeat(64),f.dest,f.signal)).rejects.toThrow('清单已变化');
+    expect(managedBackupPath('../master.json')).toBe(false);
+    expect(managedBackupPath('assets/CON.png')).toBe(false);
+    expect(managedBackupPath('.ai-settings.json')).toBe(false);
+    expect(()=>WorkspaceBackupManifestSchema.parse({...checked.manifest,files:[...checked.manifest.files,{...checked.manifest.files[0],path:'../master.json'}]})).toThrow();
+    const copied=path.join(backup.folder,'data','master.json');await fs.appendFile(copied,' ');
+    await expect(restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,f.dest,f.signal)).rejects.toThrow('校验失败');
+    expect(await fs.readFile(path.join(f.data,'master.json'))).toEqual(original);
+    expect((await fs.readdir(f.dest)).length).toBe(1);
+    await fs.writeFile(copied,original);
+    await fs.writeFile(path.join(backup.folder,'data','unexpected.txt'),'extra');
+    await expect(inspectWorkspaceBackup(backup.folder,f.signal)).rejects.toThrow('未识别');
+    await fs.writeFile(path.join(f.data,'unexpected.txt'),'extra');
+    await expect(createWorkspaceBackup(f.root,f.dest,f.signal)).rejects.toThrow('未识别');
+    expect((await fs.readdir(f.dest)).length).toBe(1);
+  });
+  it('does not publish on cancellation or corrupted source',async()=>{
+    const f=await backupFixture();const ctl=new AbortController();ctl.abort();
+    await expect(createWorkspaceBackup(f.root,f.dest,ctl.signal)).rejects.toThrow('取消');
+    await fs.writeFile(path.join(f.data,'master.json'),'corrupt');
+    await expect(createWorkspaceBackup(f.root,f.dest,f.signal)).rejects.toThrow();
+    expect(await fs.readdir(f.dest)).toEqual([]);
+    expect(await fs.readFile(path.join(f.data,'master.json'),'utf8')).toBe('corrupt');
+  });
+});
