@@ -1,0 +1,64 @@
+name: Resume Studio V6 isolated validation
+on:
+  push:
+    branches: ['resume-studio/v6-validation']
+    paths: ['resume-studio-validation/**', '.github/workflows/resume-studio-validation.yml']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-validation
+  cancel-in-progress: true
+jobs:
+  windows-probe:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Prepare isolated Electron evidence probe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'resume-studio-probe'
+          New-Item -ItemType Directory -Force $root | Out-Null
+          Set-Location $root
+          npm init -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm install --no-audit --no-fund --save-exact electron@45.3.4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          const { app, BrowserWindow } = require('electron');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          app.disableHardwareAcceleration();
+          const deadline = setTimeout(() => app.exit(2), 45000);
+          app.whenReady().then(async () => {
+            const win = new BrowserWindow({ width: 960, height: 640, show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+            await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><html><meta charset="utf-8"><body style="font:24px sans-serif;background:#edf2f7;color:#123;padding:48px"><h1>Resume Studio validation transport probe</h1><p>Windows Electron • synthetic data only</p><p>Infrastructure check — NOT application acceptance.</p><p>中文字体与截图传输检查</p></body></html>'));
+            await win.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
+            const image = await win.webContents.capturePage();
+            if (image.isEmpty()) throw new Error('empty screenshot');
+            const out = process.env.RESUME_STUDIO_PROBE_OUT;
+            fs.mkdirSync(out, { recursive: true });
+            fs.writeFileSync(path.join(out, 'electron-probe.png'), image.toPNG());
+            fs.writeFileSync(path.join(out, 'probe.json'), JSON.stringify({ platform: process.platform, electron: process.versions.electron, size: image.getSize(), kind: 'transport-probe-not-app', runnerSha: process.env.GITHUB_SHA }, null, 2));
+            clearTimeout(deadline);
+            app.exit(0);
+          }).catch(() => { clearTimeout(deadline); app.exit(1); });
+          '@ | Set-Content -Encoding utf8 probe.cjs
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_PROBE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-probe-evidence'
+          & .\node_modules\.bin\electron.cmd .\probe.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path (Join-Path $env:RESUME_STUDIO_PROBE_OUT 'electron-probe.png'))) { throw 'missing probe evidence' }
+      - name: Upload synthetic transport evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-electron-probe
+          path: resume-studio-probe-evidence/
+          if-no-files-found: error
+          retention-days: 3
