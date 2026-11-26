@@ -55,7 +55,7 @@ export function RedHeaderFormalTemplate({ document }: ResumeTemplateProps) {
               {metaItems.length > 0 && (
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[0.89em] text-slate-700 sm:grid-cols-3">
                   {metaItems.map((item) => (
-                    <span key={item.key} className="truncate">
+                    <span key={item.key} className={`min-w-0 [overflow-wrap:anywhere] ${item.key === 'email' ? 'col-span-2' : ''}`}>
                       <span className="font-medium text-slate-600">{item.label}：</span>
                       <span className="text-slate-900">{item.value}</span>
                     </span>

@@ -65,11 +65,11 @@ export function GridCardTemplate({ document }: ResumeTemplateProps) {
             {metaItems.length > 0 && (
               <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[0.88em] sm:grid-cols-3" style={{ color: fill.mutedColor }}>
                 {metaItems.map((item) => (
-                  <div key={item.key} className="flex min-w-0 items-center gap-1">
+                  <div key={item.key} className={`flex min-w-0 items-start gap-1 ${item.key === 'email' ? 'col-span-2' : ''}`}>
                     {globalSettings.useIconMode && item.iconName && (
-                      <LucideIconByName name={item.iconName} size={12} className="shrink-0" />
+                      <LucideIconByName name={item.iconName} size={12} className="mt-0.5 shrink-0" />
                     )}
-                    <span className="truncate">
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
                       <span>{item.label}：</span>
                       <span style={{ color: fill.textColor }}>{item.value}</span>
                     </span>

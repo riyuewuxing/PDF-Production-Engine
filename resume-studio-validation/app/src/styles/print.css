@@ -3,6 +3,17 @@
   margin: 0;
 }
 
+/* Reserve a real page margin on continuation sheets, without changing the
+ * full-bleed first page or other document kinds (e.g. cover letters). */
+@page resume-document {
+  size: A4 portrait;
+  margin: 16pt 0;
+}
+
+@page resume-document:first {
+  margin: 0;
+}
+
 @media screen {
   .a4-sheet {
     width: 210mm;
@@ -19,6 +30,10 @@
     background: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .resume-print-root {
+    page: resume-document;
   }
 
   .no-print {
@@ -68,6 +83,13 @@
   .resume-item-block {
     break-inside: avoid-page;
     page-break-inside: avoid;
+  }
+
+  /* An item taller than a full continuation page cannot be kept together.
+   * Only relax that impossible constraint; ordinary keep-together stays intact. */
+  .resume-print-root .resume-item-block.resume-print-oversize-item {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   .resume-force-page-break {

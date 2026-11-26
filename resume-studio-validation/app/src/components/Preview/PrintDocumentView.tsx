@@ -61,6 +61,15 @@ export function PrintDocumentView({ jobId }: { jobId: string }) {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         );
         if (!cancelled) {
+          // Measure only after fonts/images settle at the A4 print viewport.
+          // 297mm less the 2 x 16pt continuation margins in print.css.
+          const continuationHeight = 297 * 96 / 25.4 - 32 * 96 / 72;
+          rootEl?.querySelectorAll<HTMLElement>('.resume-item-block').forEach((item) => {
+            item.classList.toggle(
+              'resume-print-oversize-item',
+              item.getBoundingClientRect().height > continuationHeight,
+            );
+          });
           await window.resumeDesktop?.pdf.notifyReady(jobId);
         }
       } catch {
@@ -91,7 +100,7 @@ export function PrintDocumentView({ jobId }: { jobId: string }) {
       : doc.globalSettings.paperBackground || '#ffffff';
 
   return (
-    <div ref={containerRef} style={{ backgroundColor: sheetBg }}>
+    <div ref={containerRef} className="resume-print-root" style={{ backgroundColor: sheetBg }}>
       <div className="a4-sheet" style={{ backgroundColor: sheetBg }}>
         <TemplateComponent document={doc} />
       </div>
