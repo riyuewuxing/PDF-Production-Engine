@@ -20,7 +20,8 @@ export class RecoveryDraftStore{
   private readonly ids=new Map<string,string>();
   private tail:Promise<unknown>=Promise.resolve();
   private queued=0;
-  private readonly dir:string;
+  private dir:string;
+  private canonicalRoot:string|null=null;
   constructor(private root:string,private store:LocalResumeStore,private isOwnerAlive=ownerAlive){this.dir=path.join(path.resolve(root),DRAFT_DIR);}
   private serial<T>(work:()=>Promise<T>):Promise<T>{
     if(this.queued>=128)return Promise.reject(Error('恢复草稿操作队列已满，请立即保存。'));
@@ -28,17 +29,20 @@ export class RecoveryDraftStore{
     const next=this.tail.then(work,work).finally(()=>{this.queued--;});this.tail=next.catch(()=>{});return next;
   }
   private async directory(create:boolean){
+    const rootStat=await fs.lstat(this.root);
+    if(!rootStat.isDirectory()||rootStat.isSymbolicLink())throw Error('草稿工作区路径不安全。');
     const real=await fs.realpath(this.root);
-    if(real!==path.resolve(this.root)||!(await fs.lstat(real)).isDirectory())throw Error('草稿工作区路径不安全。');
+    if(this.canonicalRoot!==null&&path.relative(this.canonicalRoot,real)!=='')throw Error('草稿工作区路径已变化。');
+    this.canonicalRoot=real;this.dir=path.join(real,DRAFT_DIR);
     if(create)await fs.mkdir(this.dir,{mode:0o700}).catch(e=>{if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;});
-    try{const st=await fs.lstat(this.dir);if(!st.isDirectory()||st.isSymbolicLink()||await fs.realpath(this.dir)!==this.dir)throw Error('草稿目录不安全。');}
+    try{const st=await fs.lstat(this.dir);if(!st.isDirectory()||st.isSymbolicLink()||path.relative(this.dir,await fs.realpath(this.dir))!=='')throw Error('草稿目录不安全。');}
     catch(e){if(!create&&missing(e))return false;throw e;}
     return true;
   }
   private file(id:string){if(!UUID.test(id))throw Error('无效草稿标识。');return path.join(this.dir,id+'.json');}
   private async read(id:string):Promise<DraftRecord>{
     const p=this.file(id),st=await fs.lstat(p);
-    if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||st.size<=0||st.size>MAX_BYTES||await fs.realpath(p)!==p)throw Error('草稿文件不安全或超限。');
+    if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||st.size<=0||st.size>MAX_BYTES||path.relative(p,await fs.realpath(p))!=='')throw Error('草稿文件不安全或超限。');
     const raw=DraftRecordSchema.parse(JSON.parse(await fs.readFile(p,'utf8')));
     if(raw.id!==id)throw Error('草稿标识不一致。');
     return raw;
