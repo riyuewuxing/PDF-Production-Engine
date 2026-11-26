@@ -47,8 +47,7 @@ describe('permanent application record containment',()=>{
     await expect(store.deleteApplicationSnapshot(id)).rejects.toMatchObject({code:'SNAPSHOT_REFERENCED'});
     expect(await fs.readFile(path.join(store.appSnapshotsDir,id+'.json'))).toEqual(before);
   });
-  it('protects case aliases of a referenced snapshot on Windows',async()=>{
-    if(process.platform!=='win32')return;
+  it.skipIf(process.platform!=='win32')('protects case aliases of a referenced snapshot on Windows',async()=>{
     const {store}=await fixture();const logged=await store.logApplication({entry:entry(),document:doc()});
     const before=await fs.readFile(path.join(store.appSnapshotsDir,logged.entry.snapshotId+'.json'));
     await expect(store.deleteApplicationSnapshot(logged.entry.snapshotId.toUpperCase())).rejects.toMatchObject({code:'SNAPSHOT_REFERENCED'});

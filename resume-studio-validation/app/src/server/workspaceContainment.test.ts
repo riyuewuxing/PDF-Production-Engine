@@ -43,11 +43,10 @@ describe('managed workspace entry containment',()=>{
     const results=await Promise.allSettled([store.saveResume('linked',{...original,title:'Must not write'},{expectedRevision:resumeRevision(original)}),store.deleteResume('linked-delete',resumeRevision(original))]);
     expect({codes:results.map(code),original:await fs.readFile(external,'utf8'),files:(await fs.readdir(store.resumesDir)).sort(),links:(await fs.stat(external)).nlink}).toEqual({codes:['UNSAFE_ENTRY','UNSAFE_ENTRY'],original:bytes,files:['linked-delete.json','linked.json'],links:3});
   });
-  it('refuses a dangling linked filename instead of interpreting it as an empty slot',async()=>{
+  it.skipIf(process.platform==='win32')('refuses a dangling linked filename instead of interpreting it as an empty slot',async()=>{
     const {store,outside}=await fixture();
     // Hard links work unprivileged on both platforms; dangling file symlinks
     // need POSIX or Windows developer-mode privileges. Linux proves this case.
-    if(process.platform==='win32')return;
     const target=path.join(store.resumesDir,'dangling.json');await fs.symlink(path.join(outside,'missing.json'),target);
     const results=await Promise.allSettled([store.getResume('dangling'),store.saveResume('dangling',doc(),{expectedRevision:null})]);
     expect({codes:results.map(code),isLink:(await fs.lstat(target)).isSymbolicLink(),external:await fs.readdir(outside)}).toEqual({codes:['UNSAFE_ENTRY','UNSAFE_ENTRY'],isLink:true,external:[]});
