@@ -56,7 +56,13 @@ async function exchange(s,input,{delayRead=0,closeOutput=false,fragments=false,w
     const timer=setTimeout(()=>{child.kill();reject(Error('subprocess watchdog for '+path.basename(s.folder)))},15000);
     child.on('error',e=>{clearTimeout(timer);reject(e)});
     const attach=()=>child.stdout.on('data',b=>{stdoutBytes+=b.length;if(stdoutBytes>32*1024*1024){child.kill();reject(Error('stdout bound'));}else stdout.push(b)});
-    if(closeOutput)child.stdout.destroy();else if(delayRead)readerTimer=setTimeout(attach,delayRead);else attach();
+    if(closeOutput)child.stdout.destroy();
+    else{
+      // Install the collector immediately. A child can exit before a delayed
+      // listener is registered and Node then drains/discards an unread pipe.
+      attach();
+      if(delayRead){child.stdout.pause();readerTimer=setTimeout(()=>child.stdout.resume(),delayRead);}
+    }
     child.stderr.on('data',b=>{stderrBytes+=b.length;if(stderrBytes<32768)stderr.push(b)});
     child.stdin.on('error',e=>{inputError=e.code??e.message});
     child.on('close',(code,signal)=>{
