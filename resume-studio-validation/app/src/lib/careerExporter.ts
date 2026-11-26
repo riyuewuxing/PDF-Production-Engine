@@ -68,7 +68,9 @@ export function resolveCoverLetterHeaderVariant(
 }
 
 function escapeCsvCell(value: string | number | null | undefined): string {
-  const str = value === null || value === undefined ? '' : String(value);
+  let str = value === null || value === undefined ? '' : String(value);
+  // Spreadsheet programs may evaluate even quoted fields. Prefix user text, not numeric scores.
+  if(typeof value==='string' && (/^[\s\u0000-\u001f\u007f\uFEFF]*[=+\-@＝＋－＠]/u.test(str)||/^[\t\r\n]/.test(str)))str="'"+str;
   if (/[",\r\n]/.test(str)) {
     return `"${str.replaceAll('"', '""')}"`;
   }
@@ -76,7 +78,7 @@ function escapeCsvCell(value: string | number | null | undefined): string {
 }
 
 /**
- * 导出兼容 Excel（UTF-8 BOM `\uFEFF`）的 RFC 4180 标准投递台账 CSV。
+ * 导出兼容 Excel（UTF-8 BOM `\uFEFF`）的投递台账 CSV；危险文本前置单引号，原始数据不变。
  */
 export function buildApplicationsCsv(applications: readonly JobApplication[]): string {
   const headers = [

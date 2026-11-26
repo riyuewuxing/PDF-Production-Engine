@@ -47,6 +47,37 @@ async function run() {
   win.setSize(1440, 920);
   await capture('01-workbench');
   checks.appLoaded = true;
+  // Real renderer IPC: editor is allowed, another window with identical preload is not.
+  const { BrowserWindow, ipcMain } = require('electron');
+  const rogue = new BrowserWindow({show:false,webPreferences:{preload:path.join(__dirname,'dist-electron','preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  try {
+    await rogue.loadFile(path.join(__dirname,'dist','index.html'));
+    const denied=await rogue.webContents.executeJavaScript('window.resumeDesktop.resumes.list().then(()=>false,()=>true)');
+    if(!denied)throw Error('untrusted window was able to list resumes');
+    const aiDenied=await rogue.webContents.executeJavaScript('window.resumeDesktop.ai.getSettings().then(()=>false,()=>true)');
+    if(!aiDenied)throw Error('untrusted window read AI settings');
+  } finally {rogue.destroy();}
+  checks.rogueWindowDenied=true;
+  const deniedPrint=await js('window.resumeDesktop.pdf.getPrintPayload("wrong-job").then(()=>false,()=>true)');
+  if(!deniedPrint)throw Error('editor read unauthorized print job');
+  checks.editorPrintPayloadDenied=true;
+  const deniedShell=await js('window.resumeDesktop.shell.openPath("C:\\\\Windows\\\\System32\\\\cmd.exe").then(()=>false,()=>true)');
+  if(!deniedShell)throw Error('unsafe shell path accepted');
+  checks.unsafeShellDenied=true;
+  const beforeUrl=win.webContents.getURL();
+  await js('(()=>{const a=document.createElement("a");a.href="https://example.invalid/";document.body.append(a);a.click();return true})()');
+  await sleep(250);
+  if(win.webContents.getURL()!==beforeUrl)throw Error('navigation escape');
+  checks.navigationDenied=true;
+  const popupsBefore=BrowserWindow.getAllWindows().length;
+  await js('(()=>{window.open("https://example.invalid/");return true})()');
+  await sleep(200);
+  if(BrowserWindow.getAllWindows().length!==popupsBefore)throw Error('unexpected popup');
+  checks.popupDenied=true;
+  const csp=await js('document.querySelector("meta[http-equiv=Content-Security-Policy]")?.content||""');
+  if(!csp.includes("object-src")||!csp.includes("connect-src"))throw Error('production CSP missing');
+  checks.productionCspPresent=true;
+
   const originalSave = main.store.saveResume.bind(main.store);
   let failSave = true;
   main.store.saveResume = async (slug, doc, options) => {

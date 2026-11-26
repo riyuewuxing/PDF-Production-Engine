@@ -19,6 +19,7 @@ import type {
   SystemFontResult,
 } from '../src/types/electron';
 import { resolveAppPaths, resolveUniqueExportPath } from './paths';
+import { isLoopbackDevEntry, isPathInside, isSafeExportFileName, isTrustedRendererFrame, rendererEntryUrl } from './securityPolicy';
 
 const execFileAsync = promisify(execFile);
 
@@ -55,6 +56,8 @@ let closeWaiter: { requestId: number; finish: (saved: boolean) => void } | null 
 
 interface PendingPrintJob {
   kind: 'resume' | 'coverLetter';
+  senderId: number;
+  expectedUrl: string;
   doc?: ResumeDocument;
   coverLetter?: CoverLetterPdfPayload;
   resolveReady: () => void;
@@ -69,7 +72,8 @@ function getRendererEntry(query?: Record<string, string>): {
   search?: Record<string, string>;
 } {
   const devUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devUrl) {
+  if (devUrl && !app.isPackaged) {
+    if (!isLoopbackDevEntry(devUrl)) throw new Error('开发服务器必须是明确的本机回环地址。');
     const url = new URL(devUrl);
     if (query) {
       for (const [k, v] of Object.entries(query)) {
@@ -79,6 +83,17 @@ function getRendererEntry(query?: Record<string, string>): {
     return { type: 'url', target: url.toString() };
   }
   return { type: 'file', target: resolvedPaths.indexHtmlPath, search: query };
+}
+
+function hardenWindow(win: BrowserWindow): void {
+  const contents = win.webContents;
+  contents.setWindowOpenHandler(() => ({action:'deny'}));
+  contents.on('will-navigate', event => event.preventDefault());
+  contents.on('will-frame-navigate', event => event.preventDefault());
+  contents.on('will-redirect', event => event.preventDefault());
+  contents.on('will-attach-webview', event => event.preventDefault());
+  contents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
+  contents.session.setPermissionCheckHandler(()=>false);
 }
 
 async function loadWindowEntry(win: BrowserWindow, query?: Record<string, string>): Promise<void> {
@@ -161,10 +176,14 @@ async function withHiddenPrintWindow<T>(
       preload: resolvedPaths.preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
       offscreen: Boolean(options?.offscreen),
     },
   });
 
+  hardenWindow(printWin);
+  const printQuery = { mode: spec.kind === 'coverLetter' ? 'coverLetter' : 'print', jobId };
   const readyPromise = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error('隐藏打印窗口渲染超时'));
@@ -172,6 +191,8 @@ async function withHiddenPrintWindow<T>(
 
     pendingPrintJobs.set(jobId, {
       kind: spec.kind,
+      senderId: printWin.webContents.id,
+      expectedUrl: rendererEntryUrl(getRendererEntry(printQuery)),
       doc: spec.kind === 'resume' ? spec.doc : undefined,
       coverLetter: spec.kind === 'coverLetter' ? spec.coverLetter : undefined,
       resolveReady: () => {
@@ -186,7 +207,7 @@ async function withHiddenPrintWindow<T>(
   });
 
   try {
-    await loadWindowEntry(printWin, { mode: spec.kind === 'coverLetter' ? 'coverLetter' : 'print', jobId });
+    await loadWindowEntry(printWin, printQuery);
     await readyPromise;
     await new Promise((r) => setTimeout(r, 80));
     return await runner(printWin);
@@ -390,75 +411,109 @@ const aiCompletionSchema = z.object({
   timeoutMs: z.number().int().min(1000).max(120000).optional(),
 }).strict();
 
-function assertTrustedAiSender(event: IpcMainInvokeEvent): void {
-  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) {
-    throw new Error('未经授权的 AI 调用来源。');
+function frameMatches(event:IpcMainInvokeEvent, senderId:number, expectedUrl:string):boolean {
+  const frame=event.senderFrame;
+  return Boolean(frame && isTrustedRendererFrame({
+    senderId:event.sender.id,expectedSenderId:senderId,
+    isMainFrame:frame===event.sender.mainFrame,url:frame.url,expectedUrl,
+  }));
+}
+function assertTrustedEditor(event:IpcMainInvokeEvent):void {
+  if (!mainWindow || mainWindow.isDestroyed() ||
+      !frameMatches(event,mainWindow.webContents.id,rendererEntryUrl(getRendererEntry()))) {
+    throw new Error('未经授权的工作台调用来源。');
   }
+}
+function trustedEditorHandle(channel:string,handler:(event:IpcMainInvokeEvent,...args:any[])=>unknown):void {
+  ipcMain.handle(channel,(event,...args)=>{
+    assertTrustedEditor(event);
+    return handler(event,...args);
+  });
+}
+function getTrustedPrintJob(event:IpcMainInvokeEvent,jobId:string):PendingPrintJob {
+  const job=pendingPrintJobs.get(jobId);
+  if(!job||!frameMatches(event,job.senderId,job.expectedUrl))throw new Error('未经授权或已过期的打印任务。');
+  return job;
+}
+
+// File paths explicitly produced in this app session, including Save As outside exports.
+const authorizedOutputPaths=new Map<string,string>();
+async function rememberOutput(filePath:string):Promise<void> {
+  if(isSafeExportFileName(filePath))authorizedOutputPaths.set(path.resolve(filePath),await fs.realpath(filePath));
+}
+async function authorizeShellFile(filePath:string):Promise<string> {
+  if(!isSafeExportFileName(filePath))throw new Error('仅允许打开已导出的安全文档类型。');
+  const requested=path.resolve(filePath);
+  const real=await fs.realpath(requested);
+  if(!isSafeExportFileName(real)||(await fs.stat(real)).isFile()===false)throw new Error('导出文件无效。');
+  const root=await fs.realpath(exportsDir).catch(()=>null);
+  if((root&&isPathInside(root,real))||authorizedOutputPaths.get(requested)===real)return real;
+  throw new Error('文件不在本地导出目录或本次另存记录中，请在系统文件管理器手动打开。');
 }
 
 function registerIpcHandlers(): void {
-  ipcMain.handle('resumes:list', () => store.listResumes());
-  ipcMain.handle('resumes:get', (_event, slug: string) => store.getResume(slug));
-  ipcMain.handle('resumes:save', (_event, slug: string, doc: unknown) => store.saveResume(slug, doc, { requireExisting: true }));
-  ipcMain.handle(
+  trustedEditorHandle('resumes:list', () => store.listResumes());
+  trustedEditorHandle('resumes:get', (_event, slug: string) => store.getResume(slug));
+  trustedEditorHandle('resumes:save', (_event, slug: string, doc: unknown) => store.saveResume(slug, doc, { requireExisting: true }));
+  trustedEditorHandle(
     'resumes:create',
     (
       _event,
       input: { slug?: string; title?: string; cloneFromSlug?: string; document?: unknown },
     ) => store.createResume(input),
   );
-  ipcMain.handle('resumes:delete', (_event, slug: string, expectedRevision: string) => {
+  trustedEditorHandle('resumes:delete', (_event, slug: string, expectedRevision: string) => {
     if (typeof expectedRevision !== 'string') throw new Error('删除前必须提供版本标识。');
     return store.deleteResume(slug, expectedRevision);
   });
-  ipcMain.handle(
+  trustedEditorHandle(
     'assets:upload',
     (_event, payload: { filename?: string; dataUrl: string }) => store.saveAsset(payload),
   );
 
-  ipcMain.handle('snapshots:list', (_event, slug: string) => store.listSnapshots(slug));
-  ipcMain.handle('snapshots:create', (_event, slug: string, reason: string, expectedRevision: string) => {
+  trustedEditorHandle('snapshots:list', (_event, slug: string) => store.listSnapshots(slug));
+  trustedEditorHandle('snapshots:create', (_event, slug: string, reason: string, expectedRevision: string) => {
     if (typeof expectedRevision !== 'string') throw new Error('快照前必须提供版本标识。');
     return store.createSnapshot(slug, reason, undefined, expectedRevision);
   });
-  ipcMain.handle('snapshots:restore', (_event, slug: string, snapshotId: string, expectedRevision: string) => {
+  trustedEditorHandle('snapshots:restore', (_event, slug: string, snapshotId: string, expectedRevision: string) => {
     if (typeof expectedRevision !== 'string') throw new Error('回滚前必须提供版本标识。');
     return store.restoreSnapshot(slug, snapshotId, expectedRevision);
   });
 
-  ipcMain.handle('applications:get', () => store.getApplications());
-  ipcMain.handle('applications:save', (_event, data: unknown) => store.saveApplications(data));
-  ipcMain.handle(
+  trustedEditorHandle('applications:get', () => store.getApplications());
+  trustedEditorHandle('applications:save', (_event, data: unknown) => store.saveApplications(data));
+  trustedEditorHandle(
     'applications:saveSnapshot',
     (_event, input: SaveApplicationSnapshotInput) => store.saveApplicationSnapshot(input),
   );
-  ipcMain.handle(
+  trustedEditorHandle(
     'applications:getSnapshot',
     (_event, snapshotId: string) => store.getApplicationSnapshot(snapshotId),
   );
-  ipcMain.handle(
+  trustedEditorHandle(
     'applications:deleteSnapshot',
     (_event, snapshotId: string) => store.deleteApplicationSnapshot(snapshotId),
   );
 
-  ipcMain.handle('pdf:getPayload', (_event, jobId: string) => {
-    const job = pendingPrintJobs.get(jobId);
+  ipcMain.handle('pdf:getPayload', (event, jobId: string) => {
+    const job = getTrustedPrintJob(event,jobId);
     if (!job || job.kind !== 'resume' || !job.doc) {
       throw new Error('打印任务不存在或已过期');
     }
     return job.doc;
   });
 
-  ipcMain.handle('pdf:getCoverLetterPayload', (_event, jobId: string) => {
-    const job = pendingPrintJobs.get(jobId);
+  ipcMain.handle('pdf:getCoverLetterPayload', (event, jobId: string) => {
+    const job = getTrustedPrintJob(event,jobId);
     if (!job || job.kind !== 'coverLetter' || !job.coverLetter) {
       throw new Error('自荐信打印任务不存在或已过期');
     }
     return job.coverLetter;
   });
 
-  ipcMain.handle('pdf:notifyReady', (_event, jobId: string) => {
-    const job = pendingPrintJobs.get(jobId);
+  ipcMain.handle('pdf:notifyReady', (event, jobId: string) => {
+    const job = getTrustedPrintJob(event,jobId);
     if (job) {
       job.resolveReady();
     }
@@ -499,6 +554,7 @@ function registerIpcHandlers(): void {
 
     const content = await spec.produce(targetDoc);
     const writtenPath = await writeFileSafely(targetPath, content);
+    await rememberOutput(writtenPath);
 
     if ((spec.ext === 'pdf' || spec.ext === 'docx') && options.slug) {
       await store.createSnapshot(
@@ -517,7 +573,7 @@ function registerIpcHandlers(): void {
     };
   }
 
-  ipcMain.handle(
+  trustedEditorHandle(
     'pdf:export',
     (_event, options: PdfExportOptions) =>
       runExport(options, {
@@ -530,13 +586,13 @@ function registerIpcHandlers(): void {
 
   // 真 ATS 逆向体检：把当前文档纯内存渲染成 PDF 字节返回渲染进程。
   // 严格只读：不落盘、不写 exports/、不创建 .backups/ 快照。
-  ipcMain.handle('pdf:renderBuffer', async (_event, rawDoc: unknown) => {
+  trustedEditorHandle('pdf:renderBuffer', async (_event, rawDoc: unknown) => {
     const parsed = ResumeDocumentSchema.parse(rawDoc);
     const buffer = await renderDocumentToPdf(parsed);
     return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   });
 
-  ipcMain.handle(
+  trustedEditorHandle(
     'pdf:exportCoverLetter',
     async (_event, options: { payload: CoverLetterPdfPayload; saveAs?: boolean }) => {
       const namePart = sanitizeFilePart(options.payload.candidateName, '求职者');
@@ -557,6 +613,7 @@ function registerIpcHandlers(): void {
       }
       const pdfBytes = await renderCoverLetterToPdf(options.payload);
       const writtenPath = await writeFileSafely(targetPath, pdfBytes);
+      await rememberOutput(writtenPath);
       return {
         canceled: false,
         filePath: writtenPath,
@@ -565,7 +622,7 @@ function registerIpcHandlers(): void {
     },
   );
 
-  ipcMain.handle(
+  trustedEditorHandle(
     'export:png',
     (_event, options: PdfExportOptions) =>
       runExport(options, {
@@ -576,9 +633,9 @@ function registerIpcHandlers(): void {
       }),
   );
 
-  ipcMain.handle('fonts:listSystem', () => listInstalledSystemFonts());
+  trustedEditorHandle('fonts:listSystem', () => listInstalledSystemFonts());
 
-  ipcMain.handle(
+  trustedEditorHandle(
     'export:docx',
     (_event, options: PdfExportOptions) =>
       runExport(options, {
@@ -592,7 +649,7 @@ function registerIpcHandlers(): void {
       }),
   );
 
-  ipcMain.handle(
+  trustedEditorHandle(
     'export:markdown',
     (_event, options: PdfExportOptions) =>
       runExport(options, {
@@ -603,7 +660,7 @@ function registerIpcHandlers(): void {
       }),
   );
 
-  ipcMain.handle(
+  trustedEditorHandle(
     'export:html',
     (_event, options: PdfExportOptions) =>
       runExport(options, {
@@ -617,18 +674,15 @@ function registerIpcHandlers(): void {
       }),
   );
 
-  ipcMain.handle('ai:getSettings', async (event) => {
-    assertTrustedAiSender(event);
+  trustedEditorHandle('ai:getSettings', async (event) => {
     return aiSettings.getPublicSettings();
   });
 
-  ipcMain.handle('ai:saveSettings', async (event, rawSettings: unknown) => {
-    assertTrustedAiSender(event);
+  trustedEditorHandle('ai:saveSettings', async (event, rawSettings: unknown) => {
     return aiSettings.save(rawSettings);
   });
 
-  ipcMain.handle('ai:requestCompletion', async (event, raw: unknown) => {
-    assertTrustedAiSender(event);
+  trustedEditorHandle('ai:requestCompletion', async (event, raw: unknown) => {
     const parsed = aiCompletionSchema.safeParse(raw);
     if (!parsed.success) throw new Error('AI 请求参数超出许可范围。');
     const { requestId, profile, ...options } = parsed.data;
@@ -645,20 +699,23 @@ function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('ai:cancelCompletion', (event, requestId: string) => {
-    assertTrustedAiSender(event);
+  trustedEditorHandle('ai:cancelCompletion', (event, requestId: string) => {
     if (typeof requestId === 'string') aiRequests.get(requestId)?.abort();
   });
 
-  ipcMain.handle('shell:openPath', (_event, filePath: string) => shell.openPath(filePath));
-  ipcMain.handle('shell:showItemInFolder', (_event, filePath: string) => {
-    shell.showItemInFolder(filePath);
+  trustedEditorHandle('shell:openPath', async (_event,filePath:string)=>{
+    const error=await shell.openPath(await authorizeShellFile(filePath));
+    if(error)throw new Error('无法打开导出文件：'+error);
+    return '';
   });
-  ipcMain.handle('shell:openExportsDir', async () => {
+  trustedEditorHandle('shell:showItemInFolder', async (_event, filePath: string) => {
+    shell.showItemInFolder(await authorizeShellFile(filePath));
+  });
+  trustedEditorHandle('shell:openExportsDir', async () => {
     await fs.mkdir(exportsDir, { recursive: true });
     return shell.openPath(exportsDir);
   });
-  ipcMain.handle('shell:saveTextFile', async (_event, options: SaveTextFileOptions) => {
+  trustedEditorHandle('shell:saveTextFile', async (_event, options: SaveTextFileOptions) => {
     await fs.mkdir(exportsDir, { recursive: true });
     const extRaw = (options.extension || path.extname(options.defaultFileName).slice(1) || 'txt')
       .replace(/[^a-zA-Z0-9]/g, '')
@@ -680,6 +737,7 @@ function registerIpcHandlers(): void {
       targetPath = resolveUniqueExportPath(targetPath);
     }
     const writtenPath = await writeFileSafely(targetPath, options.content);
+    await rememberOutput(writtenPath);
     return {
       canceled: false,
       filePath: writtenPath,
@@ -688,7 +746,8 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.on('app:closeReady', (event, requestId: number, saved: boolean) => {
-    if (!mainWindow || event.sender !== mainWindow.webContents || typeof saved !== 'boolean') return;
+    try { assertTrustedEditor(event); } catch { return; }
+    if (typeof saved !== 'boolean') return;
     if (closeWaiter?.requestId === requestId) {
       closeWaiter.finish(saved);
     }
@@ -712,9 +771,12 @@ async function createMainWindow(): Promise<BrowserWindow> {
       preload: resolvedPaths.preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   });
 
+  hardenWindow(win);
   mainWindow = win;
 
   let shown = false;
@@ -800,6 +862,7 @@ export async function registerAssetProtocol(): Promise<void> {
   protocol.handle('resume-asset', async (request) => {
     try {
       const parsed = new URL(request.url);
+      if(parsed.hostname!=='local'||parsed.username||parsed.password||parsed.port||parsed.search||parsed.hash)throw new Error('invalid asset URL');
       const rawName = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
       const { buffer, mimeType } = await store.readAsset(rawName);
       return new Response(new Uint8Array(buffer), {

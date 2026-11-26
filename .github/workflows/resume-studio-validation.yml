@@ -32,7 +32,7 @@ jobs:
       - name: Typecheck audited runtime
         run: pnpm typecheck
       - name: Targeted V6 regression tests
-        run: pnpm exec vitest run src/hooks/useResumePersistence.test.tsx src/lib/aiTailor.test.ts electron/aiSettingsStore.test.ts src/mcp/mcpHandlers.test.ts src/server/localFsApi.test.ts src/server/revisionConcurrency.test.ts
+        run: pnpm exec vitest run src/hooks/useResumePersistence.test.tsx src/lib/aiTailor.test.ts electron/aiSettingsStore.test.ts src/mcp/mcpHandlers.test.ts src/server/localFsApi.test.ts src/server/revisionConcurrency.test.ts electron/securityPolicy.test.ts src/lib/careerExporter.test.ts
       - name: Build actual Electron application
         run: pnpm desktop:build
       - name: Run real application with synthetic fixture and failure injection
@@ -41,14 +41,6 @@ jobs:
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP 'resume-studio-v6-synthetic'
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence'
           & .\node_modules\.bin\electron.cmd .\validation-smoke.cjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: One bounded DeepSeek synthetic connectivity probe
-        timeout-minutes: 2
-        env:
-          DEEPSEEK_SMOKE_KEY: ${{ secrets.DRRPSEEK }}
-        run: |
-          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence'
-          node --import tsx scripts/real-provider-probe.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload synthetic application evidence
         if: always()
