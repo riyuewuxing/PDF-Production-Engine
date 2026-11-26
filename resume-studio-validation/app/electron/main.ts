@@ -184,8 +184,10 @@ async function withHiddenPrintWindow<T>(
 
   hardenWindow(printWin);
   const printQuery = { mode: spec.kind === 'coverLetter' ? 'coverLetter' : 'print', jobId };
+  let readyTimer:ReturnType<typeof setTimeout>;
+  let totalTimer:ReturnType<typeof setTimeout>|undefined;
   const readyPromise = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    readyTimer = setTimeout(() => {
       reject(new Error('隐藏打印窗口渲染超时'));
     }, 15000);
 
@@ -196,22 +198,28 @@ async function withHiddenPrintWindow<T>(
       doc: spec.kind === 'resume' ? spec.doc : undefined,
       coverLetter: spec.kind === 'coverLetter' ? spec.coverLetter : undefined,
       resolveReady: () => {
-        clearTimeout(timer);
+        clearTimeout(readyTimer);
         resolve();
       },
       rejectReady: (err) => {
-        clearTimeout(timer);
+        clearTimeout(readyTimer);
         reject(err);
       },
     });
   });
 
   try {
-    await loadWindowEntry(printWin, printQuery);
-    await readyPromise;
-    await new Promise((r) => setTimeout(r, 80));
-    return await runner(printWin);
+    const work=async()=>{
+      await Promise.all([loadWindowEntry(printWin,printQuery),readyPromise]);
+      await new Promise((r)=>setTimeout(r,80));
+      if(printWin.isDestroyed())throw new Error('打印任务已结束。');
+      return runner(printWin);
+    };
+    const deadline=new Promise<never>((_resolve,reject)=>{totalTimer=setTimeout(()=>reject(new Error('原生打印任务达到30秒总时限，已终止。')),30000);});
+    return await Promise.race([work(),deadline]);
   } finally {
+    clearTimeout(readyTimer!);
+    clearTimeout(totalTimer);
     pendingPrintJobs.delete(jobId);
     if (!printWin.isDestroyed()) {
       try {
@@ -593,10 +601,15 @@ function registerIpcHandlers(): void {
 
   // 真 ATS 逆向体检：把当前文档纯内存渲染成 PDF 字节返回渲染进程。
   // 严格只读：不落盘、不写 exports/、不创建 .backups/ 快照。
+  let activeBufferRenders=0;
   trustedEditorHandle('pdf:renderBuffer', async (_event, rawDoc: unknown) => {
+    if(activeBufferRenders>=1)throw new Error('另一个本地 PDF 试渲染仍在执行，请稍后重试。');
     const parsed = ResumeDocumentSchema.parse(rawDoc);
-    const buffer = await renderDocumentToPdf(parsed);
-    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    activeBufferRenders++;
+    try{const buffer=await renderDocumentToPdf(parsed);
+      if(buffer.byteLength>32*1024*1024)throw new Error('原生 PDF 超过32 MiB试渲染上限。');
+      return new Uint8Array(buffer.buffer,buffer.byteOffset,buffer.byteLength);
+    }finally{activeBufferRenders--;}
   });
 
   trustedEditorHandle(

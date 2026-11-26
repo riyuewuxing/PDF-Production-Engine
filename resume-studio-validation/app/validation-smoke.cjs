@@ -132,6 +132,8 @@ async function run() {
         else if(user.mode==='co-create'){
           const b=user.toolResults.list_visible_blocks[0],f=user.toolResults.inspect_block_facts[0].sources[0];
           content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 整理实验记录。',reason:'合成改写',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改'}]);
+        }else if(user.currentSettings&&typeof user.goal==='string'){
+          content=JSON.stringify({reason:'合成版式微调',changes:{baseFontSize:14,pagePadding:24,lineHeight:1.2}});
         }else content='OK';
       }
       res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content},finish_reason:'stop'}]}));
@@ -376,12 +378,53 @@ async function run() {
   await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.includes("应用已核对提案"));b?.scrollIntoView({block:"center"});return true})()');
   await capture('19-ai-assistant-proposal');
   await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("已核对本条原文"));l?.querySelector("input")?.click();return !!l})()');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("应用已核对提案"))?.disabled===true'))throw Error('text application was not gated by PDF preview');
+  const beforeTextRender=providerCalls;
+  await click('试渲染已选正文提案');
+  await until('text native PDF comparison',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(providerCalls!==beforeTextRender||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(baseline))throw Error('text PDF review modified document or called provider');
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('19b-text-pdf-comparison');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("应用已核对提案"))?.disabled===true'))throw Error('text application was not gated by PDF confirmation');
+  const textConfirm=await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("已检查正文修改后的真实 PDF 页面"));const box=l?.querySelector("input");if(!box||box.disabled)return false;box.click();return true})()');
+  if(!textConfirm)throw Error('text native comparison is blocked: '+await js('document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]")?.innerText'));
+  checks.textPdfReview=true;
   await click('应用已核对提案（1）');
   await until('assistant applied',async()=>(await main.store.getResume('master')).education[0].description.includes('整理实验记录'));
   const patched=await main.store.getResume('master');
   if(patched.basic.name!==baseline.basic.name||patched.education[0].school!==baseline.education[0].school)throw Error('assistant changed protected field');
   checks.assistantPatchApproved=true;
   await capture('20-ai-assistant-applied');
+  await click('AI 版式优化');
+  await setValue('textarea[aria-label="AI 版式目标"]','在不删减正文的情况下适度紧凑');
+  const beforeLayout=await main.store.getResume('master');
+  const beforeLayoutCalls=providerCalls;
+  await click('预览版式请求');
+  await until('layout request preview',()=>bodyHas('版式发送前确认'));
+  if(providerCalls!==beforeLayoutCalls)throw Error('layout sent before confirmation');
+  await capture('24-layout-outbound');
+  await click('确认发送版式请求');
+  await until('layout candidate',()=>bodyHas('版式候选（尚未应用）'));
+  if(!lastAiRequest.second||JSON.stringify(lastAiRequest.body.messages).includes('演示候选人')||JSON.stringify(lastAiRequest.body.messages).includes('demo@example.invalid')||JSON.stringify(lastAiRequest.body.messages).includes('整理实验记录'))throw Error('layout sent candidate data');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="应用已核对版式")?.disabled===true'))throw Error('layout not gated before render');
+  await capture('25-layout-proposal');
+  await click('本地试渲染版式对照');
+  await until('layout native PDF comparison',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(providerCalls!==beforeLayoutCalls+1||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(beforeLayout))throw Error('layout preview mutated disk or called model again');
+  const images=await js('Array.from(document.querySelectorAll("section[aria-label=\\\"真实 PDF 前后对照\\\"] img")).map(e=>({complete:e.complete,width:e.naturalWidth,src:e.src.slice(0,22)}))');
+  if(images.length!==2||images.some(e=>e.width<400||!e.complete||!e.src.startsWith("data:image/png")))throw Error('missing actual PDF page images '+JSON.stringify(images));
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('26-layout-pdf-comparison');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="应用已核对版式")?.disabled===true'))throw Error('layout not gated before PDF approval');
+  const layoutConfirm=await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("我已检查真实 PDF 前后页面"));const box=l?.querySelector("input");if(!box||box.disabled)return false;box.click();return true})()');
+  if(!layoutConfirm)throw Error('layout native comparison blocked: '+await js('document.querySelector("section[aria-label=\\\"真实 PDF 前后对照\\\"]")?.innerText'));
+  await click('应用已核对版式');
+  await until('layout applied',async()=>(await main.store.getResume('master')).globalSettings.baseFontSize===14);
+  const afterLayout=await main.store.getResume('master');
+  const omitStyle=d=>{const {globalSettings,updatedAt,...rest}=d;return rest};
+  if(JSON.stringify(omitStyle(afterLayout))!==JSON.stringify(omitStyle(beforeLayout))||afterLayout.globalSettings.pagePadding!==24)throw Error('layout altered content');
+  checks.layoutPrivacy=true;checks.layoutNativePdfReview=true;checks.layoutApproved=true;
+  await capture('27-layout-applied');
   // Actual career text UI with exact preview and reversible local placeholders.
   await click('求职面试');await click('自荐信 / 话术');
   await until('career AI visible',()=>bodyHas('预览文案精修请求'));

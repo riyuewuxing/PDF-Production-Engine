@@ -45,11 +45,12 @@ import { collectEditableBlocks } from '../../lib/resumeBlocks';
 import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
+import {AiLayoutPane} from './AiLayoutPane';
 import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
 import type { ResumeDocument } from '../../schema/resumeSchema';
 
 type DiagnoseSubTab = 'hr' | 'jd' | 'ats' | 'ai';
-type AiSubMode = 'single' | 'tailor' | 'assistant';
+type AiSubMode = 'single' | 'tailor' | 'assistant' | 'layout';
 type PolishBasis = { document: ResumeDocument; slug: string; blockKey: string; text: string;requestId:string };
 type TailorBasis = { document: ResumeDocument; slug: string; jdText: string;requestId:string };
 type PendingAiRequest =
@@ -920,7 +921,7 @@ export function DiagnoseAndMatchPane({
             </div>
 
             {/* Mode Switch: Single-Block vs Whole-Resume JD Tailor */}
-            <div className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium">
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium">
               <button
                 type="button"
                 disabled={polishing||tailoring||applying}
@@ -942,7 +943,9 @@ export function DiagnoseAndMatchPane({
                 整卷 JD 改写
               </button>
               <button type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('assistant')} className={'rounded py-1.5 '+(aiSubMode==='assistant'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:bg-slate-100')}>AI 自由任务</button>
+              <button type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('layout')} className={'rounded py-1.5 '+(aiSubMode==='layout'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:bg-slate-100')}>AI 版式优化</button>
             </div>
+            {aiSubMode==='layout'&&<AiLayoutPane document={document} slug={activeSlug} settings={aiSettings} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>} 
 
             {aiSubMode==='assistant'&&<ResumeAiAssistantPane document={document} slug={activeSlug} settings={aiSettings} jdText={jdText} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>}
             {pendingRequest && (

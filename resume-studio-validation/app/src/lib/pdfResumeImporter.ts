@@ -419,15 +419,22 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
  */
 export async function extractTokensFromPdfArrayBuffer(
   buffer: ArrayBuffer | Uint8Array,
+  maxPages=Infinity,
+  signal?:AbortSignal,
 ): Promise<ExtractedPdfPageTokens[]> {
   ensurePdfWorkerConfigured();
   // pdfjs 会接管并可能 detach 传入的 buffer，必须复制一份再交给它
   const source = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   const loadingTask = getDocument({ data: new Uint8Array(source) });
-  const pdf = await loadingTask.promise;
+  const abort=()=>{void loadingTask.destroy().catch(()=>{});};
+  signal?.addEventListener('abort',abort,{once:true});
   try {
+    if(signal?.aborted)throw new Error('PDF 抽取已取消。');
+    const pdf=await loadingTask.promise;
+    if(pdf.numPages>maxPages)throw new Error('PDF 页数超出对照上限。');
     const pages: ExtractedPdfPageTokens[] = [];
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+      if(signal?.aborted)throw new Error('PDF 抽取已取消。');
       const page = await pdf.getPage(pageNo);
       const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
@@ -461,7 +468,8 @@ export async function extractTokensFromPdfArrayBuffer(
     }
     return pages;
   } finally {
-    await loadingTask.destroy();
+    signal?.removeEventListener('abort',abort);
+    await loadingTask.destroy().catch(()=>{});
   }
 }
 
@@ -477,4 +485,29 @@ export async function extractAndParsePdfResume(
   const pages = await extractTokensFromPdfArrayBuffer(buffer);
   const { lines, lineHeights } = reconstructLinesWithHeights(pages);
   return parseExtractedResumeText(lines.join('\n'), fileName, { lineHeights });
+}
+
+/** Rasterize the actual native PDF locally, not a second approximation of the HTML canvas. */
+export async function renderPdfPageImages(buffer:Uint8Array,maxPages:number,signal:AbortSignal):Promise<string[]>{
+  ensurePdfWorkerConfigured();
+  const loadingTask=getDocument({data:new Uint8Array(buffer)});
+  const abort=()=>{void loadingTask.destroy().catch(()=>{});};
+  signal.addEventListener('abort',abort,{once:true});
+  try{
+    if(signal.aborted)throw new Error('已取消 PDF 图像渲染。');
+    const pdf=await loadingTask.promise;
+    if(pdf.numPages>maxPages)throw new Error('PDF 页数超出图像预览上限。');
+    const images:string[]=[];
+    for(let n=1;n<=pdf.numPages;n++){
+      if(signal.aborted)throw new Error('已取消 PDF 图像渲染。');
+      const page=await pdf.getPage(n),viewport=page.getViewport({scale:1.25});
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+      const context=canvas.getContext('2d');
+      if(!context)throw new Error('无法创建 PDF 预览画布。');
+      await page.render({canvas,canvasContext:context,viewport}).promise;
+      images.push(canvas.toDataURL('image/png'));canvas.width=0;canvas.height=0;page.cleanup();
+    }
+    return images;
+  }finally{signal.removeEventListener('abort',abort);await loadingTask.destroy().catch(()=>{});}
 }

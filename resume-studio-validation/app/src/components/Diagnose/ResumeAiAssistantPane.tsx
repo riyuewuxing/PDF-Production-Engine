@@ -9,6 +9,8 @@ import {AI_TOOL_CATALOG,AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {scanScopedProposalWarnings,type TailorBlockProposal} from '../../lib/aiTailor';
 import {PRIVACY_PLACEHOLDER} from '../../lib/aiContext';
+import {renderAiComparison,type AiPdfComparison} from '../../lib/aiPdfComparison';
+import {AiPdfComparisonView} from './AiPdfComparisonView';
 type Props={document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void;assertSettings:(settings:ByokAiSettings)=>void};
 type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string};
 type Pending={basis:Basis;prepared:PreparedAssistantTask};
@@ -24,19 +26,23 @@ export function ResumeAiAssistantPane(props:Props){
   const [accepted,setAccepted]=useState<string[]>([]);
   const [busy,setBusy]=useState(false);
   const [applying,setApplying]=useState(false);
+  const [rendering,setRendering]=useState(false);
+  const [review,setReview]=useState<{ids:string;next:ResumeDocument;comparison:AiPdfComparison}|null>(null);
+  const [pdfConfirmed,setPdfConfirmed]=useState(false);
+  const renderAbort=useRef<AbortController|null>(null);
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const abortRef=useRef<AbortController|null>(null);
   const applyRef=useRef(false);
   const mounted=useRef(false);
   const current=useRef({props,mode,goal,keys,includeJd});current.current={props,mode,goal,keys,includeJd};
-  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;abortRef.current?.abort();};},[]);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;abortRef.current?.abort();renderAbort.current?.abort();};},[]);
   useEffect(()=>{setKeys(prev=>prev.filter(k=>blocks.some(b=>b.key===k)));},[blocks]);
   const isCurrent=(b:Basis)=>{
     const c=current.current;
     return mounted.current&&c.props.document===b.document&&c.props.slug===b.slug&&c.props.settings===b.settings&&c.mode===b.mode&&c.goal===b.goal&&JSON.stringify(c.keys)===JSON.stringify(b.keys)&&(c.includeJd?c.props.jdText:undefined)===b.jdText&&c.props.overflowPx===b.overflowPx;
   };
-  const reset=()=>{setPending(null);setResult(null);setAccepted([]);setNotice(null);setError(null);};
+  const reset=()=>{setPending(null);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice(null);setError(null);};
   const prepare=()=>{
     if(busy||applying)return;reset();
     try{
@@ -61,10 +67,27 @@ export function ResumeAiAssistantPane(props:Props){
   };
   const toggle=(p:TailorBlockProposal,checked:boolean)=>{
     if(p.suggestedText.includes(PRIVACY_PLACEHOLDER))return;
+    setReview(null);setPdfConfirmed(false);
     setAccepted(prev=>checked?[...new Set([...prev,p.id])]:prev.filter(id=>id!==p.id));
   };
+  const renderReview=async()=>{
+    if(!result||result.reply.kind!=='proposals'||renderAbort.current||applyRef.current||busy||!accepted.length)return;
+    const {request,reply}=result;
+    setReview(null);setPdfConfirmed(false);setError(null);
+    if(!isCurrent(request.basis)){setError('简历或任务范围已变化，禁止试渲染旧提案。');return;}
+    const controller=new AbortController();renderAbort.current=controller;setRendering(true);
+    try{const selected=reply.proposals.filter(p=>accepted.includes(p.id));
+      const envelope=await buildTextPatchEnvelope({document:props.document,slug:props.slug,baseRevision:'local-preview-only',sourceRequestId:request.basis.requestId,candidates:selected});
+      const next=await previewTextPatch({document:props.document,slug:props.slug,revision:'local-preview-only',envelope});
+      const comparison=await renderAiComparison(props.document,next,false,controller.signal);
+      if(controller.signal.aborted)return;
+      if(!isCurrent(request.basis))throw new Error('原简历已变化，试渲染结果作废。');
+      setReview({ids:JSON.stringify([...accepted].sort()),next,comparison});
+    }catch(err){if(mounted.current&&!controller.signal.aborted)setError(localErrorMessage(err,'正文 PDF 对照失败'));}
+    finally{renderAbort.current=null;if(mounted.current)setRendering(false);}
+  };
   const apply=async()=>{
-    if(!result||result.reply.kind!=='proposals'||applyRef.current||busy||!accepted.length)return;
+    if(!result||result.reply.kind!=='proposals'||applyRef.current||busy||rendering||!accepted.length||!review||!pdfConfirmed||review.comparison.blockers.length||review.ids!==JSON.stringify([...accepted].sort()))return;
     const {request,reply}=result;
     if(!isCurrent(request.basis)){setError('简历或任务范围已变化，禁止应用旧提案。');return;}
     if(props.slug==='master'&&!window.confirm('当前目标是母库。确认在创建本地快照后应用已逐项核对的正文修改？'))return;
@@ -80,14 +103,15 @@ export function ResumeAiAssistantPane(props:Props){
       const revision=props.getCurrentRevision();
       const envelope=await buildTextPatchEnvelope({document:props.document,slug:props.slug,baseRevision:revision,sourceRequestId:request.basis.requestId,candidates:selected});
       const next=await previewTextPatch({document:props.document,slug:props.slug,revision,envelope});
+      if(JSON.stringify(next)!==JSON.stringify(review.next))throw new Error('候选已变化，请重新试渲染。');
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
       await apiClient.createSnapshot(props.slug,'AI 协作任务前快照',revision);
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
-      props.onImmediateChange(next);setResult(null);setAccepted([]);setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');
+      props.onImmediateChange(next);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');
     }catch(err){if(mounted.current)setError(localErrorMessage(err,'提案应用失败'));}
     finally{applyRef.current=false;if(mounted.current)setApplying(false);}
   };
-  const locked=busy||applying;
+  const locked=busy||applying||rendering;
   return <section aria-label="简历 AI 自由任务" className="space-y-3 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800">
     <div className="flex items-center gap-1.5 font-bold text-teal-900"><Sparkles size={14}/>AI 协作任务 · {AI_SKILL_VERSION}</div>
     <p>从实际可见段落、事实来源和当前排版测量构建上下文。模型没有磁盘写入权限。问答和计划永远不修改简历。</p>
@@ -111,7 +135,10 @@ export function ResumeAiAssistantPane(props:Props){
     {result&&result.reply.kind==='text'&&<div className="space-y-2 rounded border border-slate-200 p-2"><div className="flex items-center gap-1 font-bold"><ClipboardList size={13}/>模型建议（不修改正文）</div><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words">{result.reply.text}</pre><p className="text-slate-500">模型分析不是独立事实证明。</p></div>}
     {result&&result.reply.kind==='proposals'&&<div className="space-y-2" aria-label="自由任务正文提案">
       {result.reply.proposals.map(p=><article key={p.id} className="rounded border border-slate-200 p-2 space-y-1"><div className="font-semibold">{p.label}</div><p>{p.reason}</p><p className="text-slate-500">事实引用：{p.factIds.join('、')||'无'}</p><div className="max-h-40 overflow-auto space-y-1"><pre className="whitespace-pre-wrap break-words rounded bg-slate-100 p-1.5">{p.originalText}</pre><pre className="whitespace-pre-wrap break-words rounded bg-emerald-50 p-1.5">{p.suggestedText}</pre></div>{p.factWarnings.map((w,i)=><p key={i} className="text-amber-800">{w.message}</p>)}<label className="flex items-start gap-1"><input type="checkbox" disabled={locked||p.suggestedText.includes(PRIVACY_PLACEHOLDER)} checked={accepted.includes(p.id)} onChange={e=>toggle(p,e.target.checked)}/>已核对本条原文、事实及候选正文，批准应用</label></article>)}
-      <button type="button" disabled={locked||!accepted.length} onClick={()=>void apply()} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-50">应用已核对提案（{accepted.length}）</button>
+      <button type="button" disabled={locked||!accepted.length} onClick={()=>void renderReview()} className="rounded border border-teal-300 px-3 py-1.5 text-teal-800 disabled:opacity-50">试渲染已选正文提案</button>
+      {rendering&&<div className="flex justify-between"><span>正在本地渲染前后 PDF…</span><button type="button" onClick={()=>renderAbort.current?.abort()} className="rounded border px-2 py-1">取消正文试渲染</button></div>}
+      {review&&<><AiPdfComparisonView comparison={review.comparison}/><label className="flex items-start gap-2"><input type="checkbox" disabled={locked||!!review.comparison.blockers.length} checked={pdfConfirmed} onChange={e=>setPdfConfirmed(e.target.checked)}/>已检查正文修改后的真实 PDF 页面，确认应用当前选择。</label></>}
+      <button type="button" disabled={locked||!accepted.length||!review||!pdfConfirmed||!!review.comparison.blockers.length||review.ids!==JSON.stringify([...accepted].sort())} onClick={()=>void apply()} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-50">应用已核对提案（{accepted.length}）</button>
     </div>}
   </section>;
 }
