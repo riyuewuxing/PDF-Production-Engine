@@ -399,7 +399,7 @@ function assertTrustedAiSender(event: IpcMainInvokeEvent): void {
 function registerIpcHandlers(): void {
   ipcMain.handle('resumes:list', () => store.listResumes());
   ipcMain.handle('resumes:get', (_event, slug: string) => store.getResume(slug));
-  ipcMain.handle('resumes:save', (_event, slug: string, doc: unknown) => store.saveResume(slug, doc));
+  ipcMain.handle('resumes:save', (_event, slug: string, doc: unknown) => store.saveResume(slug, doc, { requireExisting: true }));
   ipcMain.handle(
     'resumes:create',
     (
@@ -407,7 +407,10 @@ function registerIpcHandlers(): void {
       input: { slug?: string; title?: string; cloneFromSlug?: string; document?: unknown },
     ) => store.createResume(input),
   );
-  ipcMain.handle('resumes:delete', (_event, slug: string) => store.deleteResume(slug));
+  ipcMain.handle('resumes:delete', (_event, slug: string, expectedRevision: string) => {
+    if (typeof expectedRevision !== 'string') throw new Error('删除前必须提供版本标识。');
+    return store.deleteResume(slug, expectedRevision);
+  });
   ipcMain.handle(
     'assets:upload',
     (_event, payload: { filename?: string; dataUrl: string }) => store.saveAsset(payload),
@@ -417,9 +420,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle('snapshots:create', (_event, slug: string, reason?: string) =>
     store.createSnapshot(slug, reason),
   );
-  ipcMain.handle('snapshots:restore', (_event, slug: string, snapshotId: string) =>
-    store.restoreSnapshot(slug, snapshotId),
-  );
+  ipcMain.handle('snapshots:restore', (_event, slug: string, snapshotId: string, expectedRevision: string) => {
+    if (typeof expectedRevision !== 'string') throw new Error('回滚前必须提供版本标识。');
+    return store.restoreSnapshot(slug, snapshotId, expectedRevision);
+  });
 
   ipcMain.handle('applications:get', () => store.getApplications());
   ipcMain.handle('applications:save', (_event, data: unknown) => store.saveApplications(data));
@@ -468,9 +472,8 @@ function registerIpcHandlers(): void {
       produce: (saved: ResumeDocument) => Promise<Buffer | string>;
     },
   ) {
-    const targetDoc = options.skipSave
-      ? ResumeDocumentSchema.parse(options.document)
-      : await store.saveResume(options.slug, options.document);
+    // The editor flushes before export. Export itself is read-only with respect to the original document.
+    const targetDoc = ResumeDocumentSchema.parse(options.document);
     const defaultFileName = buildDefaultExportFilename(
       targetDoc,
       spec.ext,

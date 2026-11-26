@@ -52,6 +52,19 @@ describe('resume persistence failure safety', () => {
     expect(result.current.saveState).toBe('saved');
   });
 
+  it('uses the returned disk revision for subsequent edits and undo, without changing the history payload', async () => {
+    const { result } = renderHook(() => useResumePersistence());
+    await waitFor(() => expect(result.current.activeSlug).toBe('fixture'));
+    const base = result.current.activeDoc!;
+    const revision1 = '2026-01-02T00:00:00Z';
+    mocks.saveResume.mockImplementationOnce(async (_slug, next) => ({ ...next, updatedAt: revision1 }));
+    act(() => result.current.scheduleAutoSave({ ...base, title: 'edit one' }));
+    await act(async () => { await result.current.flushPendingSave(); });
+    act(() => result.current.scheduleAutoSave(base));
+    await act(async () => { await result.current.flushPendingSave(); });
+    expect(mocks.saveResume).toHaveBeenLastCalledWith('fixture', { ...base, updatedAt: revision1 });
+  });
+
   it('reports failed close flush and retries the retained batch on the next request', async () => {
     const { result } = renderHook(() => useResumePersistence());
     await waitFor(() => expect(result.current.activeSlug).toBe('fixture'));

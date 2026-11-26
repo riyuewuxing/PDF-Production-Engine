@@ -110,6 +110,7 @@ export default function App() {
     handleDeleteVersion,
     handleImportJson,
     markSavedFromSnapshot,
+    getCurrentRevision,
     ensureCurrentQueued,
   } = useResumePersistence({
     onVersionChanged: () => {
@@ -451,6 +452,8 @@ export default function App() {
                   onImportJson={handleImportJson}
                   onOpenMasterMerge={() => setIsMasterMergeOpen(true)}
                   onSnapshotRestored={handleSnapshotRestored}
+                  onFlushBeforeMutation={flushPendingSave}
+                  getCurrentRevision={getCurrentRevision}
                 />
               )}
               {activeTab === 'diagnose' && (

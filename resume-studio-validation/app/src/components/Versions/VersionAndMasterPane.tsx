@@ -36,6 +36,8 @@ interface VersionAndMasterPaneProps {
   onImportJson: (rawJson: unknown, fallbackTitle: string) => Promise<void>;
   onOpenMasterMerge: () => void;
   onSnapshotRestored?: (doc: ResumeDocument) => void;
+  onFlushBeforeMutation: () => Promise<void>;
+  getCurrentRevision: () => string;
 }
 
 function formatSnapshotTime(iso: string): string {
@@ -57,6 +59,8 @@ export function VersionAndMasterPane({
   onImportJson,
   onOpenMasterMerge,
   onSnapshotRestored,
+  onFlushBeforeMutation,
+  getCurrentRevision,
 }: VersionAndMasterPaneProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -91,7 +95,7 @@ export function VersionAndMasterPane({
     setBusy(true);
     setError(null);
     try {
-      await apiClient.saveResume(activeSlug, activeDoc);
+      await onFlushBeforeMutation();
       await apiClient.createSnapshot(activeSlug, '手动创建快照');
       await refreshSnapshots();
       setSnapshotStatus('已创建本地时间机器快照');
@@ -115,7 +119,8 @@ export function VersionAndMasterPane({
     setBusy(true);
     setError(null);
     try {
-      const restored = await apiClient.restoreSnapshot(activeSlug, snapshot.id);
+      await onFlushBeforeMutation();
+      const restored = await apiClient.restoreSnapshot(activeSlug, snapshot.id, getCurrentRevision());
       onSnapshotRestored?.(restored);
       await refreshSnapshots();
       setSnapshotStatus('已回滚至选定历史快照（同时保留回滚前备份）');

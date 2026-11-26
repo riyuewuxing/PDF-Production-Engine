@@ -64,12 +64,12 @@ export interface ResumeDesktopBridge {
       cloneFromSlug?: string;
       document?: unknown;
     }) => Promise<{ slug: string; document: ResumeDocument }>;
-    delete: (slug: string) => Promise<{ deleted: boolean }>;
+    delete: (slug: string, expectedRevision: string) => Promise<{ deleted: boolean }>;
   };
   snapshots: {
     list: (slug: string) => Promise<ResumeSnapshotMeta[]>;
     create: (slug: string, reason?: string) => Promise<ResumeSnapshotMeta>;
-    restore: (slug: string, snapshotId: string) => Promise<ResumeDocument>;
+    restore: (slug: string, snapshotId: string, expectedRevision: string) => Promise<ResumeDocument>;
   };
   applications: {
     get: () => Promise<ApplicationsStoreData>;

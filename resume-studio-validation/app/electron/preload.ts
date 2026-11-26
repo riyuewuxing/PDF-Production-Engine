@@ -15,13 +15,13 @@ const bridge: ResumeDesktopBridge = {
     get: (slug: string) => ipcRenderer.invoke('resumes:get', slug),
     save: (slug: string, doc: ResumeDocument) => ipcRenderer.invoke('resumes:save', slug, doc),
     create: (input) => ipcRenderer.invoke('resumes:create', input),
-    delete: (slug: string) => ipcRenderer.invoke('resumes:delete', slug),
+    delete: (slug, expectedRevision) => ipcRenderer.invoke('resumes:delete', slug, expectedRevision),
   },
   snapshots: {
     list: (slug: string) => ipcRenderer.invoke('snapshots:list', slug),
     create: (slug: string, reason?: string) => ipcRenderer.invoke('snapshots:create', slug, reason),
-    restore: (slug: string, snapshotId: string) =>
-      ipcRenderer.invoke('snapshots:restore', slug, snapshotId),
+    restore: (slug, snapshotId, expectedRevision) =>
+      ipcRenderer.invoke('snapshots:restore', slug, snapshotId, expectedRevision),
   },
   applications: {
     get: () => ipcRenderer.invoke('applications:get'),

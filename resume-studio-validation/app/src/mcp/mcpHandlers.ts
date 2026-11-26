@@ -53,6 +53,7 @@ const InterviewArgsSchema = z.object({
 const UpsertArgsSchema = z.object({
   slug: z.string().min(1),
   document: z.unknown(),
+  expectedRevision: z.string().min(1).nullable().optional(),
   allowMasterWrite: z.boolean().optional(),
   reason: z.string().optional(),
 });
@@ -130,9 +131,10 @@ export const MCP_TOOLS: McpToolDefinition[] = [
           type: 'boolean',
           description: '是否请求覆写母库；此参数本身不授予权限',
         },
+        expectedRevision: { type: ['string', 'null'], description: '必须提供 get_resume 返回文档的 [id,updatedAt] JSON 字符串；新建时明确传 null' },
         reason: { type: 'string', description: '覆盖已有版本时写入快照的说明原因' },
       },
-      required: ['slug', 'document'],
+      required: ['slug', 'document', 'expectedRevision'],
       additionalProperties: false,
     },
   },
@@ -245,27 +247,17 @@ export function createMcpDispatcher(store: LocalResumeStore, policy: Readonly<Mc
           // Guard 3: strict Zod schema check
           const validatedDoc = ResumeDocumentSchema.parse(parsedArgs.document);
 
-          // Guard 4: create automatic snapshot before overwriting an existing version
-          let existed = false;
-          try {
-            await store.getResume(safeSlug);
-            existed = true;
-          } catch (err) {
-            if (!(err instanceof LocalFsApiError && err.code === 'NOT_FOUND')) {
-              throw err;
-            }
+          // Check the caller's explicit revision under the same lock as backup and write.
+          if (parsedArgs.expectedRevision === undefined) {
+            return toolError('必须先读取当前版本并提供 expectedRevision；新建时明确使用 null。', 'REVISION_REQUIRED');
           }
-
+          const existed = parsedArgs.expectedRevision !== null;
           let snapshotCreatedId: string | null = null;
-          if (existed) {
-            const snap = await store.createSnapshot(
-              safeSlug,
-              parsedArgs.reason?.trim() || 'MCP upsert 覆盖前自动快照',
-            );
-            snapshotCreatedId = snap.id;
-          }
-
-          const saved = await store.saveResume(safeSlug, validatedDoc);
+          const saved = await store.saveResume(safeSlug, validatedDoc, {
+            expectedRevision: parsedArgs.expectedRevision,
+            snapshotReason: parsedArgs.reason?.trim() || 'MCP upsert 覆盖前自动快照',
+            onSnapshotCreated: snapshot => { snapshotCreatedId = snapshot.id; },
+          });
           return toolSuccess({
             slug: safeSlug,
             existedBefore: existed,

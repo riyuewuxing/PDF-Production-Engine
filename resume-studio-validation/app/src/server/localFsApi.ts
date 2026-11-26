@@ -13,6 +13,7 @@ import {
 import {
   ResumeDocument,
   ResumeDocumentSchema,
+  resumeRevision,
   ResumeSummary,
   type TemplateId,
 } from '../schema/resumeSchema';
@@ -95,8 +96,12 @@ export function slugifyTitle(title: string): string {
 async function atomicWriteFile(targetPath: string, data: string | Buffer): Promise<void> {
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
   const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
-  await fs.writeFile(tempPath, data);
-  await fs.rename(tempPath, targetPath);
+  try {
+    await fs.writeFile(tempPath, data, { flag: 'wx' });
+    await fs.rename(tempPath, targetPath);
+  } finally {
+    await fs.rm(tempPath, { force: true }).catch(() => {});
+  }
 }
 
 async function fileExists(targetPath: string): Promise<boolean> {
@@ -140,6 +145,47 @@ function countDocumentChars(doc: ResumeDocument): number {
     arr.forEach((c) => chunks.push(c.title, c.subtitle, c.description)),
   );
   return chunks.join('').replace(/\s+/g, '').length;
+}
+
+/**
+ * Cross-process lock for resume mutations. Never steal an old lock based solely on age:
+ * a paused process could resume writing. A crashed owner's lock requires explicit recovery.
+ */
+export async function withResumeWriteLock<T>(dataDir: string, work: () => Promise<T>): Promise<T> {
+  await fs.mkdir(dataDir, { recursive: true });
+  const lock = path.join(dataDir, '.resume-write-lock');
+  const deadline = Date.now() + 4000;
+  while (true) {
+    try {
+      await fs.mkdir(lock);
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      if (Date.now() >= deadline) {
+        throw new LocalFsApiError(423, 'RESUME_WRITE_LOCKED',
+          '简历写入被占用。请稍后重试；若程序异常退出，请关闭所有工作台/MCP 后检查 data/.resume-write-lock。');
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+  try {
+    await fs.writeFile(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }));
+    return await work();
+  } finally {
+    await fs.rm(lock, { recursive: true, force: true });
+  }
+}
+
+function assertExpectedRevision(current: ResumeDocument | null, expected: string | null): void {
+  if ((current ? resumeRevision(current) : null) !== expected) {
+    throw new LocalFsApiError(409, 'REVISION_CONFLICT',
+      '简历已被其他窗口或进程修改，当前编辑尚未覆盖磁盘。请先备份当前编辑，再重新打开最新版本。');
+  }
+}
+
+function nextUpdatedAt(current: ResumeDocument | null): string {
+  const previous = current ? Date.parse(current.updatedAt) : NaN;
+  return new Date(Math.max(Date.now(), Number.isFinite(previous) ? previous + 1 : 0)).toISOString();
 }
 
 export class LocalResumeStore {
@@ -244,10 +290,14 @@ export class LocalResumeStore {
     return this.readAndValidateFile(filePath);
   }
 
-  async saveResume(rawSlug: string, payload: unknown): Promise<ResumeDocument> {
+  async saveResume(rawSlug: string, payload: unknown, options?: {
+    expectedRevision?: string | null;
+    snapshotReason?: string;
+    onSnapshotCreated?: (snapshot: ResumeSnapshotMeta) => void;
+    requireExisting?: boolean;
+  }): Promise<ResumeDocument> {
     await this.ensureDirs();
-    const { filePath } = this.resolveResumePath(rawSlug);
-
+    const { slug, filePath } = this.resolveResumePath(rawSlug);
     let validated: ResumeDocument;
     try {
       validated = ResumeDocumentSchema.parse(payload);
@@ -255,11 +305,32 @@ export class LocalResumeStore {
       const detail = err instanceof ZodError ? err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') : '格式非法';
       throw new LocalFsApiError(422, 'VALIDATION_ERROR', `保存失败，数据校验未通过: ${detail}`);
     }
+    return withResumeWriteLock(this.dataDir, async () => {
+      const current = await this.readOptionalResume(filePath);
+      // Existing files always need a matching revision, including legacy direct callers.
+      const expected = options?.expectedRevision !== undefined ? options.expectedRevision
+        : current || options?.requireExisting ? resumeRevision(validated) : null;
+      assertExpectedRevision(current, expected);
+      if (options?.requireExisting && !current) throw new LocalFsApiError(409, 'REVISION_CONFLICT', '简历已不存在，未重新创建。');
+      if (current && current.id !== validated.id) throw new LocalFsApiError(409, 'DOCUMENT_ID_CONFLICT', '不能用另一份简历的身份标识覆盖当前版本。');
+      if (current && options?.snapshotReason) {
+        const snapshot = await this.createSnapshot(slug, options.snapshotReason, current);
+        options.onSnapshotCreated?.(snapshot);
+      }
+      return this.writeResume(filePath, validated, current);
+    });
+  }
 
-    const updated: ResumeDocument = {
-      ...validated,
-      updatedAt: new Date().toISOString(),
-    };
+  private async readOptionalResume(filePath: string): Promise<ResumeDocument | null> {
+    try { return await this.readAndValidateFile(filePath); }
+    catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw err;
+    }
+  }
+
+  private async writeResume(filePath: string, doc: ResumeDocument, current: ResumeDocument | null): Promise<ResumeDocument> {
+    const updated = { ...doc, updatedAt: nextUpdatedAt(current) };
     await atomicWriteFile(filePath, `${JSON.stringify(updated, null, 2)}\n`);
     return updated;
   }
@@ -298,6 +369,7 @@ export class LocalResumeStore {
       throw new LocalFsApiError(400, 'RESERVED_SLUG', '不能使用保留标识 master 作为新版本文件名。');
     }
 
+    return withResumeWriteLock(this.dataDir, async () => {
     let targetPath = resolveContainedPath(this.resumesDir, `${candidateSlug}.json`);
     if (input.slug) {
       if (await fileExists(targetPath)) {
@@ -327,17 +399,20 @@ export class LocalResumeStore {
     const validated = ResumeDocumentSchema.parse(nextDoc);
     await atomicWriteFile(targetPath, `${JSON.stringify(validated, null, 2)}\n`);
     return { slug: candidateSlug, document: validated };
+    });
   }
 
-  async deleteResume(rawSlug: string): Promise<void> {
+  async deleteResume(rawSlug: string, expectedRevision?: string): Promise<void> {
     const { slug, filePath, isMaster } = this.resolveResumePath(rawSlug);
     if (isMaster) {
       throw new LocalFsApiError(400, 'MASTER_PROTECTED', '母库 master.json 受保护，不允许删除。');
     }
-    if (!(await fileExists(filePath))) {
-      throw new LocalFsApiError(404, 'NOT_FOUND', `简历版本 "${slug}" 不存在。`);
-    }
-    await fs.unlink(filePath);
+    await withResumeWriteLock(this.dataDir, async () => {
+      const current = await this.readOptionalResume(filePath);
+      if (!current) throw new LocalFsApiError(404, 'NOT_FOUND', `简历版本 "${slug}" 不存在。`);
+      if (expectedRevision !== undefined) assertExpectedRevision(current, expectedRevision);
+      await fs.unlink(filePath);
+    });
   }
 
   async saveAsset(input: { filename?: string; dataUrl: string }): Promise<{ filename: string; url: string }> {
@@ -480,7 +555,7 @@ export class LocalResumeStore {
     return metas;
   }
 
-  async restoreSnapshot(rawSlug: string, rawSnapshotId: string): Promise<ResumeDocument> {
+  async restoreSnapshot(rawSlug: string, rawSnapshotId: string, expectedRevision?: string): Promise<ResumeDocument> {
     const { slug, dir } = this.resolveSnapshotDir(rawSlug);
     const snapshotId = assertSafeSnapshotId(rawSnapshotId);
     const snapPath = resolveContainedPath(dir, `${snapshotId}.json`);
@@ -495,11 +570,12 @@ export class LocalResumeStore {
 
     // Always capture reversible pre-rollback backup if target file exists
     const { filePath: targetPath } = this.resolveResumePath(slug);
-    if (await fileExists(targetPath)) {
-      await this.createSnapshot(slug, '回滚前自动备份');
-    }
-
-    return this.saveResume(slug, restoredDoc);
+    return withResumeWriteLock(this.dataDir, async () => {
+      const current = await this.readOptionalResume(targetPath);
+      if (expectedRevision !== undefined) assertExpectedRevision(current, expectedRevision);
+      if (current) await this.createSnapshot(slug, '回滚前自动备份', current);
+      return this.writeResume(targetPath, restoredDoc, current);
+    });
   }
 
   async getApplications(): Promise<ApplicationsStoreData> {
@@ -735,8 +811,9 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
             return;
           }
           if (method === 'POST' && isRestore) {
-            const body = (await readJsonBody(req)) as { snapshotId: string };
-            const doc = await store.restoreSnapshot(slug, body.snapshotId);
+            const body = (await readJsonBody(req)) as { snapshotId: string; expectedRevision?: string };
+            if (typeof body.expectedRevision !== 'string') throw new LocalFsApiError(428, 'REVISION_REQUIRED', '回滚前必须提供已读取的版本标识。');
+            const doc = await store.restoreSnapshot(slug, body.snapshotId, body.expectedRevision);
             sendJson(res, 200, doc);
             return;
           }
@@ -749,12 +826,14 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         }
         if (method === 'PUT') {
           const body = await readJsonBody(req);
-          const saved = await store.saveResume(rawSlug, body);
+          const saved = await store.saveResume(rawSlug, body, { requireExisting: true });
           sendJson(res, 200, saved);
           return;
         }
         if (method === 'DELETE') {
-          await store.deleteResume(rawSlug);
+          const expected = req.headers['if-match'];
+          if (typeof expected !== 'string') throw new LocalFsApiError(428, 'REVISION_REQUIRED', '删除前必须提供已读取的版本标识。');
+          await store.deleteResume(rawSlug, decodeURIComponent(expected));
           sendJson(res, 200, { deleted: true });
           return;
         }
@@ -794,9 +873,10 @@ export async function ensureInitialDataFromLegacy(options: {
   force?: boolean;
 }): Promise<{ initialized: boolean; masterPath: string; resumePath: string }> {
   const dataDir = path.join(options.rootDir, 'data');
+  return withResumeWriteLock(dataDir, async () => {
   const legacyFile = path.join(options.rootDir, '高中物理教师（云南省内）.json');
   const masterPath = path.join(dataDir, 'master.json');
-  const resumePath = path.join(dataDir, 'resumes', 'physics-teacher-yunnan.json');
+  const resumePath = path.join(dataDir, 'resumes', 'synthetic-job.json');
 
   const store = new LocalResumeStore(dataDir);
   await store.ensureDirs();
@@ -874,6 +954,7 @@ export async function ensureInitialDataFromLegacy(options: {
   }
 
   return { initialized: true, masterPath, resumePath };
+  });
 }
 
 export function localFsApiPlugin(options?: { rootDir?: string }): Plugin {

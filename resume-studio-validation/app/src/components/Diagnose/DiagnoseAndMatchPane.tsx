@@ -252,6 +252,7 @@ export function DiagnoseAndMatchPane({
       await apiClient.createSnapshot(activeSlug, 'AI 单段润色前快照');
       if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
       onImmediateChange(applyBlockUpdates(document, { [basis.blockKey]: suggestedText }));
+      setPolishError(null);
       setSuggestedText(null);
     } catch (err) {
       if (mountedRef.current) setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
@@ -324,6 +325,7 @@ export function DiagnoseAndMatchPane({
       await apiClient.createSnapshot(activeSlug, 'AI 整卷定向改写前快照');
       if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
       onImmediateChange(applyBlockUpdates(document, updates));
+      setTailorError(null);
       setTailorProposals([]);
       setTailorNotice(`已一次性应用 ${selected.length} 条整卷改写（按 Ctrl+Z 可 1 步完整撤回）。`);
     } catch (err) {

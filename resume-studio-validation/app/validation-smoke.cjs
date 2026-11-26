@@ -49,10 +49,10 @@ async function run() {
   checks.appLoaded = true;
   const originalSave = main.store.saveResume.bind(main.store);
   let failSave = true;
-  main.store.saveResume = async (slug, doc) => {
+  main.store.saveResume = async (slug, doc, options) => {
     (checks.saveTrace ??= []).push({slug,name:doc?.basic?.name,failSave});
     if (slug === 'runner-fixture' && failSave) throw Error('受控写入失败');
-    try {const saved=await originalSave(slug,doc);checks.saveTrace.push({saved:saved.basic.name});return saved;}
+    try {const saved=await originalSave(slug,doc,options);checks.saveTrace.push({saved:saved.basic.name});return saved;}
     catch(err){checks.saveTrace.push({error:err.message});throw err;}
   };
   await js('(()=>{const e=document.querySelector("#basic-field-name");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,"演示候选人（修改）");e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
@@ -114,6 +114,8 @@ async function run() {
   await click('采纳替换（可 Ctrl+Z）');
   await until('approved patch persisted', async () => (await main.store.getResume('runner-fixture')).education[0].description.includes('30%'));
   checks.approvedPatchApplied = true;
+  if(await bodyHas('受控快照失败')) throw Error('recovered snapshot error remains visible');
+  checks.recoveredErrorCleared=true;
   await capture('06-ai-applied');
   const saved = await main.store.getResume('runner-fixture');
   const pdf = await main.renderDocumentToPdf(saved);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { cleanResumeRichText } from '../lib/htmlToMarkdown';
 import { useHistoryState } from '../lib/useHistoryState';
-import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
+import { resumeRevision, type ResumeDocument, type ResumeSummary } from '../schema/resumeSchema';
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -23,6 +23,7 @@ export function useResumePersistence(options?: {
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveSeqRef = useRef(0);
+  const revisionsRef = useRef(new Map<string, Pick<ResumeDocument, 'id' | 'updatedAt'>>());
   const activeDocRef = useRef<ResumeDocument | null>(null);
   activeDocRef.current = activeDoc;
   const pendingSaveRef = useRef<{ slug: string; doc: ResumeDocument } | null>(null);
@@ -35,7 +36,10 @@ export function useResumePersistence(options?: {
     setSaveState('saving');
     setSaveError(null);
     try {
-      const saved = await apiClient.saveResume(slug, docToSave);
+      const revision = revisionsRef.current.get(slug);
+      if (!revision || revision.id !== docToSave.id) throw new Error('当前编辑缺少有效版本基线，请重新打开简历。');
+      const saved = await apiClient.saveResume(slug, { ...docToSave, updatedAt: revision.updatedAt });
+      revisionsRef.current.set(slug, { id: saved.id, updatedAt: saved.updatedAt });
       if (seq === saveSeqRef.current && !pendingSaveRef.current) {
         setSaveState('saved');
       }
@@ -106,10 +110,12 @@ export function useResumePersistence(options?: {
         const list = await apiClient.listResumes();
         setMasterSummary(list.master);
         setSummaries(list.resumes);
+        revisionsRef.current = new Map([...(list.master ? [list.master] : []), ...list.resumes]
+          .map(item => [item.slug, { id: item.id, updatedAt: item.updatedAt }]));
 
         const targetSlug =
           preferredSlug ??
-          list.resumes.find((r) => r.slug === 'physics-teacher-yunnan')?.slug ??
+          list.resumes.find((r) => r.slug === 'synthetic-job')?.slug ??
           list.resumes[0]?.slug ??
           (list.master ? 'master' : '');
 
@@ -121,6 +127,7 @@ export function useResumePersistence(options?: {
 
         const rawDoc = await apiClient.getResume(targetSlug);
         const doc = cleanResumeRichText(rawDoc);
+        revisionsRef.current.set(targetSlug, { id: rawDoc.id, updatedAt: rawDoc.updatedAt });
         setActiveSlug(targetSlug);
         activeDocRef.current = doc;
         resetHistory(doc);
@@ -180,6 +187,7 @@ export function useResumePersistence(options?: {
       await flushPendingSave();
       const rawDoc = await apiClient.getResume(targetSlug);
       const doc = cleanResumeRichText(rawDoc);
+      revisionsRef.current.set(targetSlug, { id: rawDoc.id, updatedAt: rawDoc.updatedAt });
       setActiveSlug(targetSlug);
       activeDocRef.current = doc;
       resetHistory(doc);
@@ -205,7 +213,9 @@ export function useResumePersistence(options?: {
   const handleDeleteVersion = useCallback(
     async (slug: string) => {
       await flushPendingSave();
-      await apiClient.deleteResume(slug);
+      const revision = revisionsRef.current.get(slug);
+      if (!revision) throw new Error('缺少删除版本基线，请刷新版本列表。');
+      await apiClient.deleteResume(slug, resumeRevision(revision));
       await refreshListAndLoad();
     },
     [flushPendingSave, refreshListAndLoad],
@@ -233,13 +243,20 @@ export function useResumePersistence(options?: {
   const markSavedFromSnapshot = useCallback(
     (restoredDoc: ResumeDocument) => {
       const cleaned = cleanResumeRichText(restoredDoc);
+      revisionsRef.current.set(activeSlug, { id: restoredDoc.id, updatedAt: restoredDoc.updatedAt });
       activeDocRef.current = cleaned;
       pendingSaveRef.current = null;
       resetHistory(cleaned);
       setSaveState('saved');
     },
-    [resetHistory],
+    [activeSlug, resetHistory],
   );
+
+  const getCurrentRevision = useCallback(() => {
+    const revision = revisionsRef.current.get(activeSlug);
+    if (!revision) throw new Error('当前简历缺少版本基线。');
+    return resumeRevision(revision);
+  }, [activeSlug]);
 
   const ensureCurrentQueued = useCallback(() => {
     const latest = activeDocRef.current;
@@ -269,6 +286,7 @@ export function useResumePersistence(options?: {
     handleDeleteVersion,
     handleImportJson,
     markSavedFromSnapshot,
+    getCurrentRevision,
     ensureCurrentQueued,
   };
 }

@@ -99,12 +99,13 @@ export const apiClient = {
     return handleJsonResponse<{ slug: string; document: ResumeDocument }>(res);
   },
 
-  async deleteResume(slug: string): Promise<{ deleted: boolean }> {
+  async deleteResume(slug: string, expectedRevision: string): Promise<{ deleted: boolean }> {
     if (window.resumeDesktop) {
-      return window.resumeDesktop.resumes.delete(slug);
+      return window.resumeDesktop.resumes.delete(slug, expectedRevision);
     }
     const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`, {
       method: 'DELETE',
+      headers: { 'If-Match': encodeURIComponent(expectedRevision) },
     });
     return handleJsonResponse<{ deleted: boolean }>(res);
   },
@@ -129,14 +130,14 @@ export const apiClient = {
     return handleJsonResponse<ResumeSnapshotMeta>(res);
   },
 
-  async restoreSnapshot(slug: string, snapshotId: string): Promise<ResumeDocument> {
+  async restoreSnapshot(slug: string, snapshotId: string, expectedRevision: string): Promise<ResumeDocument> {
     if (window.resumeDesktop?.snapshots) {
-      return window.resumeDesktop.snapshots.restore(slug, snapshotId);
+      return window.resumeDesktop.snapshots.restore(slug, snapshotId, expectedRevision);
     }
     const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshots/restore`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ snapshotId }),
+      body: JSON.stringify({ snapshotId, expectedRevision }),
     });
     return handleJsonResponse<ResumeDocument>(res);
   },

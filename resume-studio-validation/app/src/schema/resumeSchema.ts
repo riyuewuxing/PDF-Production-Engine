@@ -266,6 +266,11 @@ export const ResumeDocumentSchema = z.object({
 
 export type ResumeDocument = z.infer<typeof ResumeDocumentSchema>;
 
+/** Existing documents already carry these fields. No on-disk schema migration required. */
+export function resumeRevision(doc: Pick<ResumeDocument, 'id' | 'updatedAt'>): string {
+  return JSON.stringify([doc.id, doc.updatedAt]);
+}
+
 export interface ResumeSummary {
   slug: string;
   id: string;

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SAMPLE_PREVIEW_DOCUMENT } from '../lib/sampleResumeData';
 import { LocalResumeStore } from '../server/localFsApi';
+import { resumeRevision } from '../schema/resumeSchema';
 import { createMcpDispatcher, MCP_PROTOCOL_VERSION } from './mcpHandlers';
 
 let tempDir = '';
@@ -201,6 +202,7 @@ describe('MCP Dispatcher handlers and write guards', () => {
         arguments: {
           slug: 'synthetic-job',
           document: { ...SAMPLE_PREVIEW_DOCUMENT, title: '示例物理教师 · MCP 精修版' },
+          expectedRevision: resumeRevision(await store.getResume('synthetic-job')),
           reason: 'MCP 客户端优化前备份',
         },
       },
@@ -215,5 +217,14 @@ describe('MCP Dispatcher handlers and write guards', () => {
     expect(snaps.length).toBe(1);
     expect(snaps[0]!.reason).toBe('MCP 客户端优化前备份');
     expect((await store.getResume('synthetic-job')).title).toBe('示例物理教师 · MCP 精修版');
+    const stale = await dispatcher.handleMessage({
+      jsonrpc: '2.0', id: 24, method: 'tools/call',
+      params: { name: 'upsert_resume_version', arguments: {
+        slug: 'synthetic-job', document: SAMPLE_PREVIEW_DOCUMENT,
+        expectedRevision: resumeRevision(SAMPLE_PREVIEW_DOCUMENT),
+      }},
+    });
+    expect((stale?.result as {isError?: boolean}).isError).toBe(true);
+    expect(await store.listSnapshots('synthetic-job')).toHaveLength(1);
   });
 });
