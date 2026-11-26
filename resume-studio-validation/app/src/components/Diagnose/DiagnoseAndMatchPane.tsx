@@ -41,14 +41,17 @@ import {
 } from '../../lib/byokAiClient';
 import { matchResumeWithJd } from '../../lib/jdMatcher';
 import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from '../../lib/aiContext';
-import { applyBlockUpdates, collectEditableBlocks } from '../../lib/resumeBlocks';
+import { collectEditableBlocks } from '../../lib/resumeBlocks';
+import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
+import {AI_SKILL_VERSION} from '../../lib/aiSkills';
+import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
 import { analyzeResumeDiagnostics } from '../../lib/resumeDiagnostics';
 import type { ResumeDocument } from '../../schema/resumeSchema';
 
 type DiagnoseSubTab = 'hr' | 'jd' | 'ats' | 'ai';
-type AiSubMode = 'single' | 'tailor';
-type PolishBasis = { document: ResumeDocument; slug: string; blockKey: string; text: string };
-type TailorBasis = { document: ResumeDocument; slug: string; jdText: string };
+type AiSubMode = 'single' | 'tailor' | 'assistant';
+type PolishBasis = { document: ResumeDocument; slug: string; blockKey: string; text: string;requestId:string };
+type TailorBasis = { document: ResumeDocument; slug: string; jdText: string;requestId:string };
 type PendingAiRequest =
   | { mode: 'single'; basis: PolishBasis; settings: ByokAiSettings; options: ByokCompletionOptions; polishMode: PolishMode }
   | { mode: 'tailor'; basis: TailorBasis; settings: ByokAiSettings; prepared: PreparedTailorRequest; masterRef: boolean };
@@ -107,8 +110,8 @@ export function DiagnoseAndMatchPane({
   const [applying, setApplying] = useState(false);
   const applyingRef = useRef(false);
   const polishAbortRef = useRef<AbortController | null>(null);
-  const polishBasisRef = useRef<{ document: ResumeDocument; slug: string; blockKey: string; text: string } | null>(null);
-  const tailorBasisRef = useRef<{ document: ResumeDocument; slug: string; jdText: string } | null>(null);
+  const polishBasisRef = useRef<PolishBasis | null>(null);
+  const tailorBasisRef = useRef<TailorBasis | null>(null);
   const mountedRef = useRef(false);
 
   // Tailor whole-resume state
@@ -247,6 +250,7 @@ export function DiagnoseAndMatchPane({
     finally{setProfileBusy(false);}
   };
   const assertPreviewSettings = (settings: ByokAiSettings,options?:ByokCompletionOptions) => {
+    if(profileBusy)throw new Error('模型配置操作尚未完成。');
     assertAiPreviewSettings(settings,options);
     const saved=catalog?.profiles.find(p=>p.profileId===settings.profileId);
     if(window.resumeDesktop&&(!saved||JSON.stringify(saved)!==JSON.stringify(settings)))throw new Error('配置已编辑，请先保存或重新读取。');
@@ -259,7 +263,7 @@ export function DiagnoseAndMatchPane({
     try {
       assertPreviewSettings(aiSettings);
       const sanitize = createAiTextSanitizer([document]);
-      const basis: PolishBasis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text };
+      const basis: PolishBasis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text,requestId:crypto.randomUUID() };
       const options = preparePolishRequest({
         mode: polishMode, targetTitle: sanitize(selectedBlock.label),
         content: sanitize(selectedBlock.text), jobTitle: sanitize(document.basic.title),
@@ -311,14 +315,19 @@ export function DiagnoseAndMatchPane({
       return;
     }
     if (!activeSlug) { setPolishError('未找到当前简历版本，无法安全应用。'); return; }
+    if(activeSlug==='master'&&!window.confirm('当前目标是母库。确认创建快照后应用已核对的 AI 正文修改？'))return;
     applyingRef.current = true;
     setApplying(true);
     try {
       await onFlushBeforeApply();
       if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
-      await apiClient.createSnapshot(activeSlug, 'AI 单段润色前快照', getCurrentRevision());
-      if (!isCurrent(basis)) throw new Error('简历已变化，请重新生成润色建议。');
-      onImmediateChange(applyBlockUpdates(document, { [basis.blockKey]: suggestedText }));
+      const revision=getCurrentRevision();
+      const envelope=await buildTextPatchEnvelope({document,slug:activeSlug,baseRevision:revision,sourceRequestId:basis.requestId,candidates:[{blockKey:basis.blockKey,originalText:basis.text,suggestedText,reason:'单段精修（人工核对）',factIds:(currentSources[basis.blockKey]??[]).map(s=>s.id)}]});
+      const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
+      if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
+      await apiClient.createSnapshot(activeSlug,'AI 单段润色前快照',revision);
+      if (!isCurrent(basis)||getCurrentRevision()!==revision) throw new Error('简历已变化，请重新生成润色建议。');
+      onImmediateChange(next);
       setPolishError(null);
       setSuggestedText(null);
     } catch (err) {
@@ -334,7 +343,7 @@ export function DiagnoseAndMatchPane({
     tailorAbortRef.current?.abort();
     const controller = new AbortController();
     tailorAbortRef.current = controller;
-    const basis: TailorBasis = { document, slug: activeSlug, jdText };
+    const basis: TailorBasis = { document, slug: activeSlug, jdText,requestId:crypto.randomUUID() };
     const settings = aiSettings;
     const masterRef = tailorUseMasterRef;
     setTailoring(true);
@@ -406,7 +415,6 @@ export function DiagnoseAndMatchPane({
       setTailorError('简历版本或岗位要求已变化，请重新生成提案。');
       return;
     }
-    const updates: Record<string, string> = {};
     for (const item of selected) {
       const block = editableBlocks.find((b) => b.key === item.blockKey);
       const warnings = scanScopedProposalWarnings(item.suggestedText, item.blockKey, tailorSources, item.factIds);
@@ -416,16 +424,20 @@ export function DiagnoseAndMatchPane({
         setTailorError('提案已变化、超出字数上限或事实风险未重新确认，未应用修改。');
         return;
       }
-      updates[item.blockKey] = item.suggestedText;
     }
+    if(activeSlug==='master'&&!window.confirm('当前目标是母库。确认创建快照后应用已核对的 AI 正文修改？'))return;
     applyingRef.current = true;
     setApplying(true);
     try {
       await onFlushBeforeApply();
       if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
-      await apiClient.createSnapshot(activeSlug, 'AI 整卷定向改写前快照', getCurrentRevision());
-      if (!isCurrent(basis)) throw new Error('简历已变化，未应用修改。');
-      onImmediateChange(applyBlockUpdates(document, updates));
+      const revision=getCurrentRevision();
+      const envelope=await buildTextPatchEnvelope({document,slug:activeSlug,baseRevision:revision,sourceRequestId:basis.requestId,candidates:selected});
+      const next=await previewTextPatch({document,slug:activeSlug,revision,envelope});
+      if(!isCurrent(basis)||getCurrentRevision()!==revision)throw new Error('简历版本已变化，未应用修改。');
+      await apiClient.createSnapshot(activeSlug,'AI 整卷定向改写前快照',revision);
+      if (!isCurrent(basis)||getCurrentRevision()!==revision) throw new Error('简历已变化，未应用修改。');
+      onImmediateChange(next);
       setTailorError(null);
       setTailorProposals([]);
       setTailorNotice(`已一次性应用 ${selected.length} 条整卷改写（按 Ctrl+Z 可 1 步完整撤回）。`);
@@ -780,7 +792,7 @@ export function DiagnoseAndMatchPane({
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-slate-500">
-                默认关闭。桌面端密钥由系统加密保护，已保存密钥不再回传界面；模型请求由主进程发送。浏览器模式不持久化密钥。
+                默认关闭。桌面端密钥由系统加密保护，已保存密钥不再回传界面；模型请求由主进程发送。浏览器模式不持久化密钥。技能版本：{AI_SKILL_VERSION}。
               </p>
 
               {settingsError && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700">{settingsError}</div>}
@@ -885,9 +897,10 @@ export function DiagnoseAndMatchPane({
             </div>
 
             {/* Mode Switch: Single-Block vs Whole-Resume JD Tailor */}
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium">
+            <div className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium">
               <button
                 type="button"
+                disabled={polishing||tailoring||applying}
                 onClick={() => setAiSubMode('single')}
                 className={`rounded py-1.5 transition ${
                   aiSubMode === 'single' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
@@ -897,15 +910,18 @@ export function DiagnoseAndMatchPane({
               </button>
               <button
                 type="button"
+                disabled={polishing||tailoring||applying}
                 onClick={() => setAiSubMode('tailor')}
                 className={`rounded py-1.5 transition ${
                   aiSubMode === 'tailor' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                整卷 JD 定向改写（Tailor）
+                整卷 JD 改写
               </button>
+              <button type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('assistant')} className={'rounded py-1.5 '+(aiSubMode==='assistant'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:bg-slate-100')}>AI 自由任务</button>
             </div>
 
+            {aiSubMode==='assistant'&&<ResumeAiAssistantPane document={document} slug={activeSlug} settings={aiSettings} jdText={jdText} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>}
             {pendingRequest && (
               <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800">
                 <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>

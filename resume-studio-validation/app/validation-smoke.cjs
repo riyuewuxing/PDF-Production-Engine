@@ -108,16 +108,34 @@ async function run() {
 
   let providerCalls = 0;
   let approvedMessages;
+  let lastAiRequest=null;
   server = http.createServer((req,res) => {
     res.setHeader('Access-Control-Allow-Origin','*');
     res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');
     if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
-    if(req.method!=='POST'||req.url!=='/v1/chat/completions'){res.writeHead(404);res.end();return;}
-    if(req.headers.authorization !== 'Bearer synthetic-test-key'){res.writeHead(401);res.end();return;}
+    if(req.method!=='POST'||!['/v1/chat/completions','/second/chat/completions'].includes(req.url)){res.writeHead(404);res.end();return;}
+    const second=req.url.startsWith('/second/');
+    if(req.headers.authorization !== 'Bearer '+(second?'synthetic-second-key':'synthetic-test-key')){res.writeHead(401);res.end();return;}
     checks.mainProcessCredentialUsed = true;
     let raw=''; req.on('data',chunk=>raw+=String(chunk));
-    req.on('end',()=>{providerCalls++; const body=JSON.parse(raw); checks.exactPreviewMatched=JSON.stringify(body.messages)===JSON.stringify(approvedMessages);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:'- 学生达标率提高30%。'}}]}));});
+    req.on('end',()=>{
+      providerCalls++; const body=JSON.parse(raw);
+      lastAiRequest={second,body};
+      if(!second)checks.exactPreviewMatched=JSON.stringify(body.messages)===JSON.stringify(approvedMessages);
+      let content='- 学生达标率提高30%。';
+      if(second){
+        const user=JSON.parse(body.messages[1].content);
+        if(typeof user.draftText==='string')content='感谢审阅。\n'+user.draftText+'\n我获得了30%的提升。';
+        else if(user.mode==='ask')content='仅供参考：当前可见正文可以更简洁。';
+        else if(user.mode==='plan')content='建议先核对经历，再精简表达，不增加事实。';
+        else if(user.mode==='co-create'){
+          const b=user.toolResults.list_visible_blocks[0],f=user.toolResults.inspect_block_facts[0].sources[0];
+          content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 整理实验记录。',reason:'合成改写',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改'}]);
+        }else content='OK';
+      }
+      res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content},finish_reason:'stop'}]}));
+    });
   });
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
   const settings={enabled:true,providerLabel:'Isolated mock',baseUrl:'http://127.0.0.1:'+server.address().port+'/v1',apiKey:'synthetic-test-key',model:'synthetic'};
@@ -296,6 +314,87 @@ async function run() {
   await until('quick log modal closed',()=>js('!document.querySelector("[role=dialog][aria-label=\\\"记入投递并锁定永久快照\\\"]")'));
   checks.quickLogArchived=true;
   await capture('15-quick-log-archived');
+  // Multi-profile center: independent encrypted credentials and stale revision protection.
+  await click('诊断优化');await click('AI 润色 Diff');
+  await until('active profile loaded',()=>bodyHas('已启用 · 修改'));
+  const firstProfile=await js('window.resumeDesktop.ai.getSettings()');
+  await click('已启用 · 修改');
+  await until('catalog controls visible',()=>bodyHas('新建模型档案'));
+  await click('新建模型档案');
+  await until('new disabled profile',()=>js('document.querySelector("input[aria-label=\\\"模型档案名称\\\"]")?.value==="新模型档案"'));
+  const setValue=async(selector,value)=>{if(!await setInput(selector,value))throw Error('missing input '+selector)};
+  await setValue('input[aria-label="模型档案名称"]','第二合成模型');
+  await setValue('input[placeholder="OpenAI 兼容 Base URL"]','http://127.0.0.1:'+server.address().port+'/second');
+  await setValue('input[type=password]','synthetic-second-key');
+  await setValue('input[placeholder="模型名（如 deepseek-chat）"]','second-model');
+  await js('(()=>{const label=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("启用 AI 原地润色接口"));const b=label?.querySelector("input");if(b&&!b.checked)b.click();return !!b})()');
+  await click('保存本地配置');
+  await until('profile saved',()=>bodyHas('配置已保存；密钥由系统加密保护'));
+  const catalog=await js('window.resumeDesktop.ai.listProfiles()');
+  if(catalog.profiles.length!==2||catalog.profiles.some(p=>p.apiKey!==''||!p.hasApiKey)||catalog.activeProfileId===firstProfile.profileId||JSON.stringify(catalog).includes('synthetic-second-key'))throw Error('profile isolation failed');
+  const secondProfile=catalog.profiles.find(p=>p.profileId===catalog.activeProfileId);
+  const encrypted=JSON.parse(fs.readFileSync(path.join(main.dataDir,'.ai-settings.json'),'utf8'));
+  if(encrypted.profiles.length!==2||encrypted.profiles.some(p=>!p.encryptedApiKey||p.apiKey!==undefined)||JSON.stringify(encrypted).includes('synthetic-second-key'))throw Error('profile credentials not encrypted');
+  checks.multiProfileEncrypted=true;
+  await capture('16-ai-model-center');
+  const beforeStale=providerCalls;
+  const refused=await js('window.resumeDesktop.ai.requestCompletion('+JSON.stringify({requestId:'53ad1c68-6b20-4b94-a267-601d633fcf3c',profile:{profileId:secondProfile.profileId,revision:'old-revision',baseUrl:secondProfile.baseUrl,model:secondProfile.model},systemPrompt:'synthetic',userPrompt:'synthetic'})+').then(()=>false,()=>true)');
+  if(!refused||providerCalls!==beforeStale)throw Error('stale model request reached provider');
+  checks.staleModelRequestRejected=true;
+  await click('收起设置');
+  // Read-only ask and plan; co-create through local patch approval and snapshot.
+  await click('AI 自由任务');
+  await setValue('textarea[aria-label="AI 自由任务目标"]','检查合成教育经历');
+  await click('预览 AI 自由任务');
+  await until('assistant preview',()=>bodyHas('自由任务发送前确认'));
+  if(providerCalls!==beforeStale)throw Error('assistant sent before approval');
+  await capture('17-ai-assistant-preview');
+  await click('确认发送自由任务');
+  await until('assistant answer',()=>bodyHas('当前可见正文可以更简洁'));
+  const baseline=await main.store.getResume('master');
+  if(lastAiRequest.body.model!=='second-model'||!lastAiRequest.second)throw Error('assistant route incorrect');
+  await click('制定计划');
+  await click('预览 AI 自由任务');
+  await click('确认发送自由任务');
+  await until('assistant plan',()=>bodyHas('建议先核对经历'));
+  if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(baseline))throw Error('read-only mode modified resume');
+  checks.assistantReadOnly=true;
+  await capture('18-ai-assistant-plan');
+  await click('协作改写');
+  await click('预览 AI 自由任务');await click('确认发送自由任务');
+  await until('assistant proposal',()=>bodyHas('合成改写'));
+  const applyDisabled=await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("应用已核对提案"))?.disabled===true');
+  if(!applyDisabled)throw Error('assistant applies without approval');
+  if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(baseline))throw Error('assistant modified before approval');
+  await capture('19-ai-assistant-proposal');
+  await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("已核对本条原文"));l?.querySelector("input")?.click();return !!l})()');
+  await click('应用已核对提案（1）');
+  await until('assistant applied',async()=>(await main.store.getResume('master')).education[0].description.includes('整理实验记录'));
+  const patched=await main.store.getResume('master');
+  if(patched.basic.name!==baseline.basic.name||patched.education[0].school!==baseline.education[0].school)throw Error('assistant changed protected field');
+  checks.assistantPatchApproved=true;
+  await capture('20-ai-assistant-applied');
+  // Actual career text UI with exact preview and reversible local placeholders.
+  await click('求职面试');await click('自荐信 / 话术');
+  await until('career AI visible',()=>bodyHas('预览文案精修请求'));
+  const callsBeforeCareer=providerCalls;
+  await click('预览文案精修请求');
+  await until('career preview',()=>bodyHas('文案发送前确认'));
+  if(providerCalls!==callsBeforeCareer)throw Error('career request sent before preview approval');
+  const careerMessages=await js('Array.from(document.querySelectorAll("section[aria-label=\\\"文案 AI 数据发送预览\\\"] pre")).map((e,i)=>({role:i===0?"system":"user",content:e.textContent}))');
+  if(JSON.stringify(careerMessages).includes('演示候选人')||JSON.stringify(careerMessages).includes('demo@example.invalid'))throw Error('identity leaked into career preview');
+  await capture('21-career-ai-preview');
+  await click('确认发送文案给模型');
+  await until('career proposed',()=>bodyHas('候选文案（本地还原）'));
+  if(!lastAiRequest.second||JSON.stringify(lastAiRequest.body.messages)!==JSON.stringify(careerMessages))throw Error('career exact preview or route mismatch');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="采纳文案草稿")?.disabled===true'))throw Error('career apply not gated');
+  await capture('22-career-ai-review');
+  await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("我已核对候选文案"));l?.querySelector("input")?.click();return !!l})()');
+  await click('采纳文案草稿');
+  await until('career proposal adopted',()=>js('[...document.querySelectorAll("textarea")].some(e=>e.value.includes("感谢审阅。")&&e.value.includes("演示候选人"))'));
+  checks.careerSharedGateway=true;checks.careerLocalIdentityRestored=true;
+  await capture('23-career-ai-applied');
+
 
 
 
