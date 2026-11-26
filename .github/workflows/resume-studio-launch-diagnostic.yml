@@ -1,0 +1,46 @@
+name: Resume Studio independent launch diagnosis
+on:
+  push:
+    branches: ['resume-studio/v6-launch-diagnostic-t16']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-launch-diagnostic-t16
+  cancel-in-progress: true
+jobs:
+  quick-launch:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual application
+        run: pnpm desktop:build
+      - name: Diagnose production child entry and readiness
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'launch-diagnostic-evidence'
+          pnpm exec tsx scripts/qa-quick-launch.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: launch-diagnostic
+          path: launch-diagnostic-evidence/
+          if-no-files-found: ignore
+          retention-days: 3

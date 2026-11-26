@@ -5,7 +5,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,inspectRestoredWorkspace} from '../src/server/workspaceBackup';
 import {RESTORE_PREFIX} from '../src/schema/workspaceBackupSchema';
-import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace} from './workspaceLaunch';
+import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace,recordLaunchStage} from './workspaceLaunch';
 import { promisify } from 'node:util';
 import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
 import { z } from 'zod';
@@ -58,11 +58,12 @@ const dataDir = resolvedPaths.dataDir;
 const exportsDir = resolvedPaths.exportsDir;
 const restoredWorkspace=path.basename(rootDir).startsWith(RESTORE_PREFIX);
 const launchHandoff=readLaunchHandoff(process.env);
+recordLaunchStage(launchHandoff,'module-loaded');
 let launchReceiptSent=false,launchReceiptTask:Promise<void>|null=null;
 async function reportLaunch(status:'ready'|'failed',message?:string){
   if(!launchHandoff||launchReceiptSent)return;
   if(launchReceiptTask)return launchReceiptTask;
-  const task=writeLaunchReceipt(launchHandoff,{folder:rootDir,status,pid:process.pid,message}).then(()=>{launchReceiptSent=true;});
+  const task=writeLaunchReceipt(launchHandoff,{folder:rootDir,status,pid:process.pid,message}).then(()=>{launchReceiptSent=true;recordLaunchStage(launchHandoff,'receipt-written');});
   launchReceiptTask=task;
   try{await task;}finally{if(launchReceiptTask===task)launchReceiptTask=null;}
 }
@@ -528,6 +529,7 @@ function registerIpcHandlers(): void {
     if(actual.id!==id)throw new Error('独立窗口尚未确认加载目标简历。');
     const owner=mainWindow;if(!owner||owner.isDestroyed())throw new Error('独立窗口尚未创建。');
     if(!owner.isVisible())owner.show();
+    recordLaunchStage(launchHandoff,'renderer-document-ready');
     await reportLaunch('ready');
   });
   trustedEditorHandle('workspaceBackup:prepareLaunch',(_event,mode:unknown)=>runBackupOperation(async signal=>{
@@ -1027,6 +1029,7 @@ export async function registerAssetProtocol(): Promise<void> {
 }
 
 if (require.main === module) {
+  recordLaunchStage(launchHandoff,'entry-main');
   if (process.env.RESUME_STUDIO_DATA_DIR?.trim()) {
     const profile=path.join(rootDir,'.electron-userdata');
     if(restoredWorkspace){
@@ -1039,10 +1042,12 @@ if (require.main === module) {
     app.setPath('userData',profile);
   }
 
+  recordLaunchStage(launchHandoff,'profile-ready');
   const gotSingleInstanceLock = app.requestSingleInstanceLock();
   if (!gotSingleInstanceLock) {
     void reportLaunch('failed','目标工作区已有运行实例，请查看现有窗口。').catch(()=>{}).finally(()=>app.quit());
   } else {
+    recordLaunchStage(launchHandoff,'instance-lock-acquired');
     app.on('second-instance', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         if (mainWindow.isMinimized()) {
@@ -1054,14 +1059,17 @@ if (require.main === module) {
     });
 
     app.whenReady().then(async () => {
+      recordLaunchStage(launchHandoff,'app-ready');
       if(restoredWorkspace){
         const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),120000);
         try{const checked=await inspectRestoredWorkspace(rootDir,ctl.signal);if(launchHandoff&&checked.basis!==launchHandoff.basis)throw new Error('独立工作区启动前数据已变化，拒绝加载。');}
         finally{clearTimeout(timer);}
       }else{if(launchHandoff)throw new Error('独立启动目标不是恢复工作区。');await ensureInitialDataFromLegacy({ rootDir, force: false });}
+      recordLaunchStage(launchHandoff,'workspace-verified');
       await registerAssetProtocol();
       registerIpcHandlers();
       await createMainWindow();
+      recordLaunchStage(launchHandoff,'window-loaded');
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
