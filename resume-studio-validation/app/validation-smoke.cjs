@@ -17,7 +17,7 @@ const fixture = require('./runner-fixture.json');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const checks = {};
 let server;
-const deadline = setTimeout(() => { console.error('application smoke deadline exceeded'); app.exit(2); }, 270000);
+const deadline = setTimeout(() => { console.error('application smoke deadline exceeded'); app.exit(2); }, 330000);
 async function until(label, fn, timeout = 20000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) { if (await fn()) return; await sleep(150); }
@@ -128,11 +128,12 @@ async function run() {
         const user=JSON.parse(body.messages[1].content);
         if(typeof user.draftText==='string')content='感谢审阅。\n'+user.draftText+'\n我获得了30%的提升。';
         else if(typeof user.originalText==='string')content=user.originalText+'\n- 核对合成资料。';
+        else if(user.mode==='workflow')content=JSON.stringify({steps:[{action:'clarify',blockKeys:['B1'],reason:'合成计划第一步：核对教育表达'},{action:'concise',blockKeys:['B2'],reason:'DISPLAY_ONLY_PLAN_REASON'}]});
         else if(user.mode==='ask')content='仅供参考：当前可见正文可以更简洁。';
         else if(user.mode==='plan')content='建议先核对经历，再精简表达，不增加事实。';
         else if(user.mode==='co-create'){
           const b=user.toolResults.list_visible_blocks[0],f=user.toolResults.inspect_block_facts[0].sources[0];
-          content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 整理实验记录。',reason:'合成改写',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改'}]);
+          content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- '+(user.goal.includes('本步骤：')?'核对分步合成内容。':'整理实验记录。'),reason:'合成改写',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改'}]);
         }else if(Array.isArray(user.blocks)){
           const b=user.blocks[0];
           content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 复核合成实验数据。',reason:'整卷合成候选',factIds:[b.sources[0].id]}]);
@@ -605,12 +606,14 @@ async function run() {
   await click('试渲染单段提案');
   await until('single scoped PDF',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
   if(!await approveWhole())throw Error('single fact PDF approval failed');
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\"真实 PDF 前后对照\\"]");e?.scrollIntoView({block:"start"});return true})()');
   await capture('36-single-fact-review');
   await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:unified.id,bankRevision:unifiedBank.revision,confirmation:'REVOKE_FACT'})+')');
   await click('采纳替换（可 Ctrl+Z）');
   await until('single fact apply blocked',()=>bodyHas('本地事实库已变化'));
   if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(unifiedBefore))throw Error('revoked single evidence modified resume');
   checks.singleFactScoped=true;checks.singleFactRevokedAfterPdf=true;
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("采纳替换"))?.disabled===true'))throw Error('revoked single PDF approval still active');
   await capture('37-single-fact-revoked');
   unifiedBank=await js('window.resumeDesktop.facts.get()');
   const tailorFact={...newFact,bankRevision:unifiedBank.revision,fact:{...newFact.fact,assertion:'核对 13 份合成资料'}};
@@ -639,7 +642,50 @@ async function run() {
   await click('应用已勾选的 1 条修改');await until('whole fact apply blocked',()=>bodyHas('本地事实库已变化'));
   if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(unifiedBefore))throw Error('revoked whole evidence modified resume');
   checks.wholeFactScoped=true;checks.wholeFactRevokedAfterPdf=true;
+  if(!await isTailorDisabled())throw Error('revoked whole PDF approval still active');
   await capture('39-whole-fact-revoked');
+  // Real two-step workflow: plan, explicit per-step preview/approval, save verification, skip.
+  const workflowBefore=await main.store.getResume('master'),workflowCalls=providerCalls;
+  await click('AI 自由任务');await click('分步工作');
+  await setValue('textarea[aria-label="AI 自由任务目标"]','逐步检查并改善合成简历');
+  await click('全选可见段落');
+  await click('预览 AI 自由任务');await until('workflow plan preview',()=>bodyHas('自由任务发送前确认'));
+  if(providerCalls!==workflowCalls)throw Error('workflow plan auto-sent');
+  await click('确认发送自由任务');
+  await until('structured workflow',()=>bodyHas('受控分步工作 · 0/2 步已处理'));
+  if(providerCalls!==workflowCalls+1||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(workflowBefore))throw Error('workflow plan changed resume or auto-ran next step');
+  const scrollWorkflow=()=>js('(()=>{const e=document.querySelector("section[aria-label=\\"受控分步工作\\"]");e?.scrollIntoView({block:"start"});return !!e})()');
+  await scrollWorkflow();await capture('40-workflow-plan');
+  await click('准备第 1 步');
+  await until('first workflow step ready',()=>bodyHas('当前步骤'));
+  if(providerCalls!==workflowCalls+1)throw Error('step preparation auto-sent');
+  await click('预览 AI 自由任务');await until('workflow step preview',()=>bodyHas('自由任务发送前确认'));
+  const workflowPreview=await getFactPreview();
+  if(!workflowPreview.includes('本步骤：')||workflowPreview.includes('DISPLAY_ONLY_PLAN_REASON')||workflowPreview.includes('record-1'))throw Error('workflow copied unapproved evidence or plan instructions');
+  await click('确认发送自由任务');await until('workflow step proposal',()=>bodyHas('核对分步合成内容'));
+  const actualStep=JSON.parse(lastAiRequest.body.messages[1].content);
+  if(actualStep.toolResults.list_visible_blocks.length!==1||!actualStep.toolResults.list_visible_blocks[0].label.includes('教育经历'))throw Error('workflow widened target');
+  if(!await checkLabel('已核对本条原文'))throw Error('workflow proposal approval unavailable');
+  await click('试渲染已选正文提案');await until('workflow native PDF',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(!await checkLabel('已检查正文修改后的真实 PDF 页面'))throw Error('workflow PDF approval unavailable');
+  await js('(()=>{const e=document.querySelector("section[aria-label=\\"真实 PDF 前后对照\\"]");e?.scrollIntoView({block:"start"});return true})()');
+  await capture('41-workflow-step-pdf');
+  await click('应用已核对提案（1）');
+  await until('workflow first step saved',async()=>(await main.store.getResume('master')).education[0].description.includes('核对分步合成内容'));
+  await until('workflow one step handled',()=>bodyHas('受控分步工作 · 1/2 步已处理'));
+  const workflowAfter=await main.store.getResume('master');
+  if(workflowAfter.experience[0].description!==workflowBefore.experience[0].description||providerCalls!==workflowCalls+2)throw Error('workflow changed unrelated block or auto-ran');
+  await click('准备第 2 步');
+  await until('second step active',()=>js('document.querySelector("section[aria-label=\\"受控分步工作\\"]")?.innerText.includes("当前步骤")'));
+  await click('跳过当前步骤');
+  await until('workflow both steps handled',()=>bodyHas('受控分步工作 · 2/2 步已处理'));
+  await click('核对保存并结束分步任务');
+  await until('workflow disk verified',()=>bodyHas('已核对磁盘保存'));
+  if(providerCalls!==workflowCalls+2||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(workflowAfter))throw Error('skip or completion performed an unauthorized action');
+  checks.workflowExplicitSteps=true;checks.workflowDiskVerified=true;
+  await scrollWorkflow();await capture('42-workflow-completed');
+  await click('关闭分步记录');
+
 
   // Actual career text UI with exact preview and reversible local placeholders.
   await click('求职面试');await click('自荐信 / 话术');

@@ -14,6 +14,7 @@ import {assertFreshFactSelection,loadLocalFactBank,prepareFactSelection} from '.
 import {FactBankPane} from './FactBankPane';
 import {renderAiComparison,type AiPdfComparison} from '../../lib/aiPdfComparison';
 import {AiPdfComparisonView} from './AiPdfComparisonView';
+import {WORKFLOW_ACTIONS,createWorkflowSession,isWorkflowCurrent,workflowDocumentContent,workflowStepGoal,beginWorkflowStep,finishWorkflowStep,completeWorkflow,type WorkflowSession} from '../../lib/aiWorkflow';
 type Props={document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void;assertSettings:(settings:ByokAiSettings)=>void};
 type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string;records:FactRecord[];bankRevision:string|null};
 type Pending={basis:Basis;prepared:PreparedAssistantTask};
@@ -21,6 +22,10 @@ type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>};
 export function ResumeAiAssistantPane(props:Props){
   const blocks=useMemo(()=>collectEditableBlocks(props.document),[props.document]);
   const [mode,setMode]=useState<AssistantMode>('ask');
+  const [workflow,setWorkflow]=useState<WorkflowSession|null>(null);
+  const [workflowBusy,setWorkflowBusy]=useState(false);
+  const workflowMoveRef=useRef(false);
+  const workflowRef=useRef<WorkflowSession|null>(null);workflowRef.current=workflow;
   const [goal,setGoal]=useState('');
   const [keys,setKeys]=useState<string[]>(()=>blocks.slice(0,1).map(b=>b.key));
   const [includeJd,setIncludeJd]=useState(false);
@@ -41,7 +46,7 @@ export function ResumeAiAssistantPane(props:Props){
   const abortRef=useRef<AbortController|null>(null);
   const applyRef=useRef(false);
   const mounted=useRef(false);
-  const current=useRef({props,mode,goal,keys,includeJd,bank,factIds});current.current={props,mode,goal,keys,includeJd,bank,factIds};
+  const current=useRef({props,mode,goal,keys,includeJd,bank,factIds,workflow});current.current={props,mode,goal,keys,includeJd,bank,factIds,workflow};
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;abortRef.current?.abort();renderAbort.current?.abort();};},[]);
   useEffect(()=>{setKeys(prev=>prev.filter(k=>blocks.some(b=>b.key===k)));},[blocks]);
   useEffect(()=>{setFactIds(prev=>prev.filter(id=>bank?.records.some(r=>r.id===id&&keys.includes(r.blockKey)&&isShareableFact(props.document,r))));},[bank,keys,props.document]);
@@ -55,8 +60,34 @@ export function ResumeAiAssistantPane(props:Props){
     if(!isCurrent(b))throw new Error('事实选择或简历已变化。');
   };
   const reset=()=>{setPending(null);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice(null);setError(null);};
+  const workflowCurrent=workflow?isWorkflowCurrent(workflow,props.document,props.slug,props.settings,props.jdText):false;
+  const canPrepare=(!workflow||workflow.stage==='active')&&(!workflow||workflowCurrent);
+  const moveWorkflow=async()=>{
+    const session=workflowRef.current;
+    if(!session||workflowMoveRef.current||workflowBusy||busy||applying||rendering||factsBusy||session.stage!=='ready')return;
+    workflowMoveRef.current=true;setWorkflowBusy(true);setError(null);
+    try{
+      const p=current.current.props;
+      if(!isWorkflowCurrent(session,p.document,p.slug,p.settings,p.jdText))throw new Error('简历、岗位或模型已变化，分步计划已过期。');
+      await p.onFlushBeforeApply();
+      const disk=await apiClient.getResume(session.slug),latest=current.current.props;
+      if(!mounted.current||workflowRef.current!==session||!isWorkflowCurrent(session,latest.document,latest.slug,latest.settings,latest.jdText)||workflowDocumentContent(disk)!==session.expectedContent)
+        throw new Error('磁盘简历与已批准的步骤结果不一致，停止分步任务。');
+      reset();setFactIds([]);
+      if(session.index===session.steps.length){
+        setWorkflow(completeWorkflow(session));setNotice('已核对本地保存，分步任务结束。');return;
+      }
+      const step=session.steps[session.index]!;
+      setWorkflow(beginWorkflowStep(session));setMode('co-create');setGoal(workflowStepGoal(session));setKeys([...step.keys]);setIncludeJd(session.jdText!==undefined);
+    }catch(err){if(mounted.current)setError(localErrorMessage(err,'无法进入下一步'));}
+    finally{workflowMoveRef.current=false;if(mounted.current)setWorkflowBusy(false);}
+  };
+  const skipWorkflow=()=>{
+    if(!workflow||workflow.stage!=='active'||!workflowCurrent||!window.confirm('跳过此步骤，不修改简历，继续下一步？'))return;
+    setWorkflow(finishWorkflowStep(workflow,props.document,'skipped'));setFactIds([]);reset();
+  };
   const prepare=()=>{
-    if(busy||applying||factsBusy)return;reset();
+    if(busy||applying||factsBusy||workflowBusy||!canPrepare)return;reset();
     try{
       props.assertSettings(props.settings);
       const selection=prepareFactSelection(props.document,props.slug,keys,bank,factIds);
@@ -81,6 +112,7 @@ export function ResumeAiAssistantPane(props:Props){
       await assertFactsFresh(req.basis);
       if(ctrl.signal.aborted)return;
       const reply=parseAssistantReply(text,req.prepared);setResult({request:req,reply});setAccepted([]);
+      if(reply.kind==='workflow')setWorkflow(createWorkflowSession({document:req.basis.document,slug:req.basis.slug,settings:req.basis.settings,goal:req.basis.goal,jdText:req.basis.jdText,steps:reply.steps}));
       if(reply.kind==='proposals'&&!reply.proposals.length)setNotice('未返回可用正文提案；不代表简历已达到目标。');
     }catch(err){if(mounted.current)setError(localErrorMessage(err,'AI 任务失败'));}
     finally{if(abortRef.current===ctrl){abortRef.current=null;if(mounted.current)setBusy(false);}}
@@ -116,6 +148,8 @@ export function ResumeAiAssistantPane(props:Props){
     if(!isCurrent(request.basis)){setError('简历或任务范围已变化，禁止应用旧提案。');return;}
     if(props.slug==='master'&&!window.confirm('当前目标是母库。确认在创建本地快照后应用已逐项核对的正文修改？'))return;
     const selected=reply.proposals.filter(p=>accepted.includes(p.id));
+    const session=workflowRef.current;
+    if(session&&(!isWorkflowCurrent(session,props.document,props.slug,props.settings,props.jdText)||session.stage!=='active')){setError('分步计划已过期。');return;}
     applyRef.current=true;setApplying(true);setError(null);
     try{
       await assertFactsFresh(request.basis);
@@ -133,24 +167,42 @@ export function ResumeAiAssistantPane(props:Props){
       await apiClient.createSnapshot(props.slug,'AI 协作任务前快照',revision);
       await assertFactsFresh(request.basis);
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
-      props.onImmediateChange(next);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');
-    }catch(err){if(mounted.current)setError(localErrorMessage(err,'提案应用失败'));}
+      props.onImmediateChange(next);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setFactIds([]);
+      if(session)setWorkflow(finishWorkflowStep(session,next,'applied'));
+      setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');
+    }catch(err){if(mounted.current){setReview(null);setPdfConfirmed(false);setError(localErrorMessage(err,'提案应用失败'));}}
     finally{applyRef.current=false;if(mounted.current)setApplying(false);}
   };
-  const locked=busy||applying||rendering||factsBusy;
+  const locked=busy||applying||rendering||factsBusy||workflowBusy;
+  const taskControlsLocked=locked||!!workflow;
   return <section aria-label="简历 AI 自由任务" className="space-y-3 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800">
     <div className="flex items-center gap-1.5 font-bold text-teal-900"><Sparkles size={14}/>AI 协作任务 · {AI_SKILL_VERSION}</div>
     <p>从实际可见段落、事实来源和当前排版测量构建上下文。模型没有磁盘写入权限。问答和计划永远不修改简历。</p>
-    <div className="grid grid-cols-3 gap-1">{Object.entries(ASSISTANT_MODES).map(([id,label])=><button key={id} type="button" disabled={locked} onClick={()=>{setMode(id as AssistantMode);setFactIds([]);reset();}} className={'rounded border px-1.5 py-1.5 '+(mode===id?'border-teal-700 bg-teal-700 text-white':'bg-slate-50 text-slate-700')}>{label}</button>)}</div>
-    <label className="block font-semibold">任务目标<textarea aria-label="AI 自由任务目标" rows={3} disabled={locked} value={goal} onChange={e=>{setGoal(e.target.value);setFactIds([]);reset();}} className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" placeholder="例如：保留科研事实，精简冗余语言；检查教师岗位表达是否明确。"/></label>
+    <div className="grid grid-cols-2 gap-1">{Object.entries(ASSISTANT_MODES).map(([id,label])=><button key={id} type="button" disabled={taskControlsLocked} onClick={()=>{setMode(id as AssistantMode);setFactIds([]);reset();}} className={'rounded border px-1.5 py-1.5 '+(mode===id?'border-teal-700 bg-teal-700 text-white':'bg-slate-50 text-slate-700')}>{label}</button>)}</div>
+    <label className="block font-semibold">任务目标<textarea aria-label="AI 自由任务目标" rows={3} disabled={taskControlsLocked} value={goal} onChange={e=>{setGoal(e.target.value);setFactIds([]);reset();}} className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" placeholder="例如：保留科研事实，精简冗余语言；检查教师岗位表达是否明确。"/></label>
     <div className="rounded border border-slate-200 bg-slate-50 p-2 space-y-1">
-      <div className="flex items-center justify-between gap-1"><span className="font-semibold">发送段落（{keys.length}/{blocks.length}）</span><button type="button" disabled={locked} onClick={()=>{setKeys(blocks.map(b=>b.key));reset();}} className="text-teal-700">全选可见段落</button><button type="button" disabled={locked} onClick={()=>{setKeys([]);reset();}} className="text-slate-600">清空</button></div>
-      <div className="max-h-36 overflow-auto space-y-1">{blocks.map(b=><label key={b.key} className="flex items-start gap-1"><input type="checkbox" disabled={locked} checked={keys.includes(b.key)} onChange={e=>{setKeys(prev=>e.target.checked?[...prev,b.key]:prev.filter(k=>k!==b.key));reset();}}/><span>{b.label}</span></label>)}</div>
-      <label className="flex items-center gap-1"><input type="checkbox" disabled={locked} checked={includeJd} onChange={e=>{setIncludeJd(e.target.checked);setFactIds([]);reset();}}/>同时发送当前岗位 JD（默认关闭）</label>
+      <div className="flex items-center justify-between gap-1"><span className="font-semibold">发送段落（{keys.length}/{blocks.length}）</span><button type="button" disabled={taskControlsLocked} onClick={()=>{setKeys(blocks.map(b=>b.key));reset();}} className="text-teal-700">全选可见段落</button><button type="button" disabled={taskControlsLocked} onClick={()=>{setKeys([]);reset();}} className="text-slate-600">清空</button></div>
+      <div className="max-h-36 overflow-auto space-y-1">{blocks.map(b=><label key={b.key} className="flex items-start gap-1"><input type="checkbox" disabled={taskControlsLocked} checked={keys.includes(b.key)} onChange={e=>{setKeys(prev=>e.target.checked?[...prev,b.key]:prev.filter(k=>k!==b.key));reset();}}/><span>{b.label}</span></label>)}</div>
+      <label className="flex items-center gap-1"><input type="checkbox" disabled={taskControlsLocked} checked={includeJd} onChange={e=>{setIncludeJd(e.target.checked);setFactIds([]);reset();}}/>同时发送当前岗位 JD（默认关闭）</label>
     </div>
+    {workflow&&<section aria-label="受控分步工作" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2">
+      <div className="font-bold">受控分步工作 · {workflow.index}/{workflow.steps.length} 步已处理</div>
+      <p>每一步重新读取本地简历，事实需重新选择，发送、正文核对与 PDF 审批均单独确认。模型不会自动进入下一步。</p>
+      {workflow.steps.map((s,i)=><div key={s.id} className="rounded border bg-white p-1.5 break-words">
+        <div className="font-semibold">{i+1}. {WORKFLOW_ACTIONS[s.action]} · {workflow.outcomes[i]==='applied'?'已采纳':workflow.outcomes[i]==='skipped'?'已跳过':i===workflow.index&&workflow.stage==='active'?'当前步骤':'待处理'}</div>
+        <div>{s.keys.map(k=>blocks.find(b=>b.key===k)?.label||'已失效段落').join('、')}</div><div className="text-slate-600">{s.reason}</div>
+      </div>)}
+      {!workflowCurrent&&workflow.stage!=='done'&&<p className="text-amber-800">当前内容或配置尚未匹配计划基线；不可继续旧步骤。</p>}
+      <div className="flex flex-wrap gap-2">
+        {workflow.stage==='ready'&&<button type="button" disabled={locked||!workflowCurrent} onClick={()=>void moveWorkflow()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50">{workflow.index===workflow.steps.length?'核对保存并结束分步任务':'准备第 '+(workflow.index+1)+' 步'}</button>}
+        {workflow.stage==='active'&&<button type="button" disabled={locked||!workflowCurrent} onClick={skipWorkflow} className="rounded border px-2 py-1">跳过当前步骤</button>}
+        {workflow.stage==='done'&&<span className="font-semibold text-teal-800">已核对磁盘保存</span>}
+        <button type="button" disabled={locked} onClick={()=>{setWorkflow(null);setFactIds([]);setMode('ask');setGoal(workflow.originalGoal);reset();}} className="rounded border px-2 py-1">{workflow.stage==='done'?'关闭分步记录':'结束本次分步工作'}</button>
+      </div>
+    </section>}
     <FactBankPane key={props.slug+':'+props.document.id} document={props.document} slug={props.slug} blocks={blocks} keys={keys} bank={bank} selected={factIds} locked={locked} onBank={b=>{setBank(b);setFactIds([]);reset();}} onSelected={ids=>{setFactIds(ids);reset();}} onBusy={setFactsBusy} onFlush={props.onFlushBeforeApply} getRevision={props.getCurrentRevision}/>
     <details className="rounded border border-slate-200 p-2"><summary className="cursor-pointer font-semibold"><BookOpen size={12} className="inline"/> 本地工具权限说明</summary>{AI_TOOL_CATALOG.map(tool=><div key={tool.name} className="mt-1"><span className="font-mono text-teal-800">{tool.name}</span> · {tool.description}</div>)}</details>
-    <button type="button" disabled={locked||!goal.trim()} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">预览 AI 自由任务</button>
+    <button type="button" disabled={locked||!goal.trim()||!canPrepare} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">预览 AI 自由任务</button>
     {busy&&<div className="flex items-center justify-between"><span>正在运行模型任务…</span><button type="button" onClick={()=>abortRef.current?.abort()} className="rounded border px-2 py-1">取消自由任务</button></div>}
     {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800">{error}</div>}
     {notice&&<div role="status" className="rounded bg-teal-50 p-2 text-teal-800">{notice}</div>}

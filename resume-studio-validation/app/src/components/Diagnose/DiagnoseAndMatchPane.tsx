@@ -118,6 +118,7 @@ export function DiagnoseAndMatchPane({
   const [polishMode, setPolishMode] = useState<PolishMode>('star');
   const [polishing, setPolishing] = useState(false);
   const [polishError, setPolishError] = useState<string | null>(null);
+  const polishErrorElement=useRef<HTMLDivElement|null>(null);
   const [suggestedText, setSuggestedText] = useState<string | null>(null);
   const [polishRiskConfirmed, setPolishRiskConfirmed] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -131,6 +132,9 @@ export function DiagnoseAndMatchPane({
   const [tailorUseMasterRef, setTailorUseMasterRef] = useState(false);
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
+  const tailorErrorElement=useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{if(polishError&&aiSubMode==='single')polishErrorElement.current?.scrollIntoView({block:'nearest'});},[polishError,aiSubMode]);
+  useEffect(()=>{if(tailorError&&aiSubMode==='tailor')tailorErrorElement.current?.scrollIntoView({block:'nearest'});},[tailorError,aiSubMode]);
   const [tailorProposals, setTailorProposals] = useState<TailorBlockProposal[]>([]);
   const [tailorSources, setTailorSources] = useState<AiFactSourceMap>({});
   const [tailorEditingKey, setTailorEditingKey] = useState<string | null>(null);
@@ -384,7 +388,7 @@ export function DiagnoseAndMatchPane({
       setPolishError(null);
       setSuggestedText(null);setFactIds([]);
     } catch (err) {
-      if (mountedRef.current) setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
+      if (mountedRef.current){singleReview.invalidate();setPolishError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');}
     } finally {
       applyingRef.current = false;
       if (mountedRef.current) setApplying(false);
@@ -504,7 +508,7 @@ export function DiagnoseAndMatchPane({
       setTailorProposals([]);setFactIds([]);
       setTailorNotice(`已一次性应用 ${selected.length} 条整卷改写（按 Ctrl+Z 可 1 步完整撤回）。`);
     } catch (err) {
-      if (mountedRef.current) setTailorError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');
+      if (mountedRef.current){wholeReview.invalidate();setTailorError(err instanceof Error ? err.message : '保存或快照失败，未应用修改。');}
     } finally {
       applyingRef.current = false;
       if (mountedRef.current) setApplying(false);
@@ -1059,7 +1063,7 @@ export function DiagnoseAndMatchPane({
                 </div>
 
                 {tailorError && (
-                  <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                  <div role="alert" ref={tailorErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
                     {tailorError}
                   </div>
                 )}
@@ -1288,7 +1292,7 @@ export function DiagnoseAndMatchPane({
               </button>
 
               {polishError && (
-                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                <div role="alert" ref={polishErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
                   {polishError}
                 </div>
               )}

@@ -34,5 +34,6 @@ export function useTextPdfReview(input:Input){
     finally{if(controller.current===ctrl){controller.current=null;if(mounted.current)setBusy(false);}}
   };
   return {review:valid?review:null,busy,error,confirmed,canApply,render,cancel:()=>controller.current?.abort(),setConfirmed,
+    invalidate:()=>{controller.current?.abort();setReview(null);setConfirmed(false);},
     matches:(next:ResumeDocument)=>Boolean(canApply&&review&&latest.current.document===document&&latest.current.fingerprint===fingerprint&&latest.current.enabled&&latest.current.confirmed&&JSON.stringify(next)===JSON.stringify(review.next))};
 }
