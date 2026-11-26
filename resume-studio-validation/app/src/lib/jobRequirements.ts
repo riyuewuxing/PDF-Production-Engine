@@ -1,5 +1,6 @@
 import type {ResumeDocument} from '../schema/resumeSchema';
 import type {JobReviewArchive} from '../schema/applicationSchema';
+import {validJobPdfOrigin,type JobPdfOrigin} from '../schema/jobPdfSourceSchema';
 import {cleanResumeRichText} from './htmlToMarkdown';
 import type {FactBank} from '../schema/factBankSchema';
 import {factEntityId,visibleBasicValue} from './aiContext';
@@ -108,10 +109,13 @@ function jobReviewDocumentContent(doc:ResumeDocument):string{
 export function sameJobReviewDocument(a:ResumeDocument,b:ResumeDocument):boolean{
   return jobReviewDocumentContent(a)===jobReviewDocumentContent(b);
 }
-export async function jobReviewBasisHash(doc:ResumeDocument,bank:FactBank|null,source:string):Promise<string>{
+export async function jobReviewBasisHash(doc:ResumeDocument,bank:FactBank|null,source:string,pdfOrigin?:JobPdfOrigin):Promise<string>{
   if(!globalThis.crypto?.subtle)throw new Error('当前环境无法校验岗位核对内容。');
   const normalized=cleanResumeRichText(doc);
-  const value=canonicalReviewValue([source,{...normalized,updatedAt:''},collectLocalJobEvidence(normalized,bank)]);
+  if(pdfOrigin&&!validJobPdfOrigin(source,pdfOrigin))throw new Error('PDF 页码与确认文本不一致。');
+  const basis:unknown[]=[source,{...normalized,updatedAt:''},collectLocalJobEvidence(normalized,bank)];
+  if(pdfOrigin)basis.push(pdfOrigin);
+  const value=canonicalReviewValue(basis);
   const digest=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
 }
@@ -121,7 +125,7 @@ export async function restoreArchivedJobReview(archive:JobReviewArchive,doc:Resu
     throw new Error('简历版本已变化，历史核对档案不能恢复为当前结果。');
   if(archive.factRevision!==(bank?.revision??null))
     throw new Error('事实库版本已变化，历史核对档案不能恢复为当前结果。');
-  if(archive.basisHash!==await jobReviewBasisHash(doc,bank,archive.source))throw new Error('核对依据内容已变化，须重新核对。');
+  if(archive.basisHash!==await jobReviewBasisHash(doc,bank,archive.source,archive.pdfOrigin))throw new Error('核对依据内容已变化，须重新核对。');
   const clauses=splitJobRequirements(archive.source),evidence=collectLocalJobEvidence(cleanResumeRichText(doc),bank);
   const result:Record<string,RequirementReview>={};
   for(const row of archive.rows){

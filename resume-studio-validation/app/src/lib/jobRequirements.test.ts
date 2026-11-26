@@ -62,3 +62,46 @@ it('binds saved review to exact source, full content and current evidence revisi
   expect(sameJobReviewDocument(doc,{...doc,title:'different'})).toBe(false);
   expect(()=>JobReviewArchiveSchema.parse({...archive,applicationId:'app'})).toThrow();
 });
+
+import {prepareJobPdfSource,type JobPdfDraft} from './jobPdfSource';
+import {jobPdfPageForRange,validJobPdfOrigin,MAX_JOB_PDF_TEXT} from '../schema/jobPdfSourceSchema';
+const pdfDraft:JobPdfDraft={fileName:'synthetic-notice.pdf',sha256:'a'.repeat(64),pages:[
+  {page:1,text:'须持合成证书；\n硕士优先。',hasColumns:false},
+  {page:2,text:'',hasColumns:false},
+  {page:3,text:'必须具备实验教学经历。',hasColumns:true},
+]};
+describe('confirmed local PDF notice source',()=>{
+  it('preserves actual page numbers and exact clause offsets with explicit omissions',()=>{
+    const {source,origin}=prepareJobPdfSource(pdfDraft,[3,1]);
+    expect(source).toBe('须持合成证书；\n硕士优先。\n必须具备实验教学经历。');
+    expect(origin.pages.map(p=>p.page)).toEqual([1,3]);
+    expect(origin.totalPages).toBe(3);
+    expect(validJobPdfOrigin(source,origin)).toBe(true);
+    const clauses=splitJobRequirements(source);
+    expect(clauses.map(c=>jobPdfPageForRange(origin,c.start,c.end))).toEqual([1,1,3]);
+    expect(jobPdfPageForRange(origin,0,source.length)).toBeUndefined();
+    expect(validJobPdfOrigin(source+'变化',origin)).toBe(false);
+    expect(validJobPdfOrigin(source,{...origin,pages:[...origin.pages].reverse()})).toBe(false);
+    expect(validJobPdfOrigin(source,{...origin,pages:[{...origin.pages[0]!,end:1},origin.pages[1]!]})).toBe(false);
+  });
+  it('rejects scan-only, replacement-character, invalid and over-limit selections without truncating',()=>{
+    expect(()=>prepareJobPdfSource(pdfDraft,[1,2,3])).toThrow('第 2 页无可靠文本层');
+    expect(()=>prepareJobPdfSource(pdfDraft,[])).toThrow('请选择');
+    expect(()=>prepareJobPdfSource(pdfDraft,[1,1])).toThrow('请选择');
+    expect(()=>prepareJobPdfSource(pdfDraft,[4])).toThrow('请选择');
+    expect(()=>prepareJobPdfSource({...pdfDraft,pages:[{page:1,text:'甲\uFFFD乙',hasColumns:false}]},[1])).toThrow('无可靠文本');
+    expect(()=>prepareJobPdfSource({...pdfDraft,pages:[{page:1,text:'甲'.repeat(MAX_JOB_PDF_TEXT+1),hasColumns:false}]},[1])).toThrow('没有截断');
+    expect(()=>prepareJobPdfSource({...pdfDraft,fileName:'C:\\private\\notice.pdf'},[1])).toThrow();
+  });
+  it('binds page map and file digest to archived review while preserving legacy digest behavior',async()=>{
+    const {source,origin}=prepareJobPdfSource(pdfDraft,[1,3]);
+    const clause=splitJobRequirements(source)[0]!;
+    const archive=JobReviewArchiveSchema.parse({reviewVersion:1,id:crypto.randomUUID(),slug:'demo',docId:doc.id,documentRevision:resumeRevision(doc),factRevision:null,basisHash:await jobReviewBasisHash(doc,null,source,origin),source,pdfOrigin:origin,createdAt:'2026-11-26T00:00:00Z',applicationId:null,snapshotId:null,rows:[{clauseId:clause.id,review:{priority:'mandatory',outcome:'gap',evidenceIds:[],note:'合成缺口'}}]});
+    expect((await restoreArchivedJobReview(archive,doc,null,resumeRevision(doc)))[clause.id]?.outcome).toBe('gap');
+    expect(await jobReviewBasisHash(doc,null,source,undefined)).toBe(await jobReviewBasisHash(doc,null,source));
+    expect(archive.basisHash).not.toBe(await jobReviewBasisHash(doc,null,source));
+    await expect(restoreArchivedJobReview({...archive,pdfOrigin:{...origin,sha256:'b'.repeat(64)}},doc,null,resumeRevision(doc))).rejects.toThrow('内容已变化');
+    await expect(restoreArchivedJobReview({...archive,pdfOrigin:undefined},doc,null,resumeRevision(doc))).rejects.toThrow('内容已变化');
+    expect(()=>JobReviewArchiveSchema.parse({...archive,pdfOrigin:{...origin,totalPages:2}})).toThrow('PDF 页码');
+  });
+});

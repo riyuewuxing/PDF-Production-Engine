@@ -421,11 +421,12 @@ export async function extractTokensFromPdfArrayBuffer(
   buffer: ArrayBuffer | Uint8Array,
   maxPages=Infinity,
   signal?:AbortSignal,
+  limits?:{maxPageTokens:number;maxTotalChars:number},
 ): Promise<ExtractedPdfPageTokens[]> {
   ensurePdfWorkerConfigured();
   // pdfjs 会接管并可能 detach 传入的 buffer，必须复制一份再交给它
   const source = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  const loadingTask = getDocument({ data: new Uint8Array(source) });
+  const loadingTask = getDocument({ data: new Uint8Array(source), ...(limits?{isEvalSupported:false}: {}) });
   const abort=()=>{void loadingTask.destroy().catch(()=>{});};
   signal?.addEventListener('abort',abort,{once:true});
   try {
@@ -433,14 +434,17 @@ export async function extractTokensFromPdfArrayBuffer(
     const pdf=await loadingTask.promise;
     if(pdf.numPages>maxPages)throw new Error('PDF 页数超出对照上限。');
     const pages: ExtractedPdfPageTokens[] = [];
+    let totalChars=0;
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
       if(signal?.aborted)throw new Error('PDF 抽取已取消。');
       const page = await pdf.getPage(pageNo);
       const viewport = page.getViewport({ scale: 1 });
+      if(limits&&(!Number.isFinite(viewport.width)||!Number.isFinite(viewport.height)||viewport.width<=0||viewport.height<=0||viewport.width>4000||viewport.height>4000))throw new Error('PDF 页面尺寸超出本地公告处理上限。');
       const content = await page.getTextContent();
       const tokens: PdfTextToken[] = [];
       for (const item of content.items) {
         if (!('str' in item) || typeof item.str !== 'string') continue;
+        if(limits){totalChars+=item.str.length;if(tokens.length>=limits.maxPageTokens||totalChars>limits.maxTotalChars)throw new Error('PDF 文本层超过本地安全上限；没有截断。');}
         const transform = Array.isArray(item.transform) ? item.transform : [];
         const rawHeight =
           typeof item.height === 'number' && Number.isFinite(item.height)
@@ -510,4 +514,28 @@ export async function renderPdfPageImages(buffer:Uint8Array,maxPages:number,sign
     }
     return images;
   }finally{signal.removeEventListener('abort',abort);await loadingTask.destroy().catch(()=>{});}
+}
+
+/** Render one original notice page, bounded by pixel dimensions and cancellable. */
+export async function renderJobNoticePdfPage(bytes:Uint8Array,pageNo:number,maxPages:number,signal:AbortSignal):Promise<string>{
+  ensurePdfWorkerConfigured();
+  const loadingTask=getDocument({data:new Uint8Array(bytes),isEvalSupported:false});
+  const abort=()=>{void loadingTask.destroy().catch(()=>{});};
+  signal.addEventListener('abort',abort,{once:true});
+  let canvas:HTMLCanvasElement|undefined;
+  try{
+    if(signal.aborted)throw new Error('已取消公告预览。');
+    const pdf=await loadingTask.promise;
+    if(pdf.numPages>maxPages||!Number.isInteger(pageNo)||pageNo<1||pageNo>pdf.numPages)throw new Error('公告预览页码无效。');
+    const page=await pdf.getPage(pageNo),v=page.getViewport({scale:1});
+    if(!Number.isFinite(v.width)||!Number.isFinite(v.height)||v.width<=0||v.height<=0||v.width>4000||v.height>4000)throw new Error('PDF 页面尺寸超出预览上限。');
+    const viewport=page.getViewport({scale:Math.min(1.5,1600/Math.max(v.width,v.height))});
+    canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    const context=canvas.getContext('2d');if(!context)throw new Error('无法建立公告预览画布。');
+    const task=page.render({canvas,canvasContext:context,viewport});
+    const cancel=()=>task.cancel();signal.addEventListener('abort',cancel,{once:true});
+    try{if(signal.aborted)task.cancel();await task.promise;}finally{signal.removeEventListener('abort',cancel);}
+    if(signal.aborted)throw new Error('已取消公告预览。');
+    return canvas.toDataURL('image/png');
+  }finally{if(canvas){canvas.width=0;canvas.height=0;}signal.removeEventListener('abort',abort);await loadingTask.destroy().catch(()=>{});}
 }

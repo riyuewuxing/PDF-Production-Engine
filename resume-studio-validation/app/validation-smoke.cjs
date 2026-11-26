@@ -1116,6 +1116,88 @@ async function run() {
 
 
 
+
+  // Real local PDF bytes, text pages with a graphic-only middle page.
+  const noticeBefore=jobSource+'\n合成附加条件',noticeCalls=providerCalls;
+  const noticeInput='input[aria-label="选择本地招聘公告 PDF"]';
+  const sendNotice=async(name,buf)=>js('(()=>{const f=document.querySelector('+JSON.stringify(noticeInput)+');if(!f||f.disabled)return false;const dt=new DataTransfer();dt.items.add(new File([new Uint8Array('+JSON.stringify([...buf])+')],'+JSON.stringify(name)+',{type:"application/pdf"}));f.files=dt.files;f.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  if(!await sendNotice('synthetic-invalid.pdf',Buffer.from('not a PDF')))throw Error('notice input unavailable');
+  await until('invalid PDF refused',()=>bodyHas('文件没有有效 PDF 文件头'));
+  const noticeJd=()=>js('document.querySelector(\'textarea[placeholder^="例如：招聘高中物理教师"]\')?.value');
+  if(await noticeJd()!==noticeBefore)throw Error('invalid file changed existing JD');
+  checks.jobPdfInvalidPreservesJd=true;
+  const stream=s=>'<< /Length '+Buffer.byteLength(s)+' >>\nstream\n'+s+'\nendstream';
+  const objects=[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Count 3 /Kids [3 0 R 4 0 R 5 0 R] >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 9 0 R >> >> /Contents 6 0 R >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << >> /Contents 7 0 R >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 9 0 R >> >> /Contents 8 0 R >>',
+    stream('BT /F1 22 Tf 55 760 Td (Synthetic recruitment notice) Tj 0 -40 Td (Physics degree required;) Tj ET'),
+    stream('0.2 0.4 0.6 rg 55 500 480 200 re f'),
+    stream('BT /F1 22 Tf 55 760 Td (Teaching certificate required;) Tj ET'),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
+  ];
+  let noticePdf='%PDF-1.4\n',offsets=[0];
+  objects.forEach((o,i)=>{offsets.push(Buffer.byteLength(noticePdf));noticePdf+=(i+1)+' 0 obj\n'+o+'\nendobj\n';});
+  const xref=Buffer.byteLength(noticePdf);
+  noticePdf+='xref\n0 '+offsets.length+'\n0000000000 65535 f \n'+offsets.slice(1).map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size '+offsets.length+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF\n';
+  const noticeBytes=Buffer.from(noticePdf),noticeHash=require('node:crypto').createHash('sha256').update(noticeBytes).digest('hex');
+  if(!await sendNotice('synthetic-notice.pdf',noticeBytes))throw Error('notice upload unavailable');
+  await until('three PDF pages extracted',async()=>await bodyHas('synthetic-notice.pdf · 共 3 页')&&await bodyHas('第 2 页无可靠文本层'));
+  if(await noticeJd()!==noticeBefore)throw Error('PDF extraction replaced JD without approval');
+  const namedCheck=(label)=>js('(()=>{const e=document.querySelector("input[aria-label="+JSON.stringify('+JSON.stringify(label)+')+"]");if(!e||e.disabled)return false;e.click();return true})()');
+  const buttonEnabled=label=>js('[...document.querySelectorAll("button")].some(b=>b.innerText.trim()==='+JSON.stringify(label)+'&&!b.disabled)');
+  if(await buttonEnabled('确认导入所选公告页'))throw Error('unreviewed PDF could be imported');
+  await js('document.querySelector("[aria-label=\\"招聘公告 PDF 本地导入\\"]")?.scrollIntoView({block:"start"})');
+  await capture('75-job-pdf-scan-warning');
+  if(!await namedCheck('导入 PDF 第 2 页'))throw Error('could not explicitly exclude graphic page');
+  await until('omission warning',()=>bodyHas('其余页不参与核对'));
+  await click('渲染本页 PDF 原件');
+  await until('actual PDF page one rendered',()=>js('(()=>{const i=document.querySelector("img[alt=\\"公告 PDF 第 1 页实际渲染\\"]");return !!i&&i.complete&&i.naturalWidth>100})()'));
+  await js('document.querySelector("img[alt=\\"公告 PDF 第 1 页实际渲染\\"]")?.scrollIntoView({block:"center"})');
+  await capture('76-job-pdf-original-page');
+  if(!await namedCheck('确认已对照 PDF 第 1 页'))throw Error('review page one unavailable');
+  if(!await jobSelect('公告原件对照页','3'))throw Error('page selector unavailable');
+  await click('渲染本页 PDF 原件');
+  await until('actual PDF page three rendered',()=>js('(()=>{const i=document.querySelector("img[alt=\\"公告 PDF 第 3 页实际渲染\\"]");return !!i&&i.complete&&i.naturalWidth>100})()'));
+  if(!await namedCheck('确认已对照 PDF 第 3 页'))throw Error('review page three unavailable');
+  if(await buttonEnabled('确认导入所选公告页'))throw Error('import allowed without final approval');
+  if(!await namedCheck('确认公告所选页和替换 JD'))throw Error('final PDF confirmation missing');
+  await waitJobButton('确认导入所选公告页');await click('确认导入所选公告页');
+  await until('confirmed PDF source visible',()=>bodyHas('当前来源：synthetic-notice.pdf · 第 1、3 页 / 共 3 页'));
+  const confirmedPdfJd=await noticeJd();
+  if(!confirmedPdfJd.includes('Physics degree required;')||!confirmedPdfJd.includes('Teaching certificate required;')||confirmedPdfJd.includes(noticeBefore))throw Error('confirmed PDF source is wrong');
+  await click('分析岗位原文');await until('PDF clauses split',()=>bodyHas('候选 3 条'));
+  const certQuote='Teaching certificate required;',certStart=confirmedPdfJd.indexOf(certQuote);
+  if(!await jobSelect('岗位候选条款',certStart+':'+(certStart+certQuote.length)))throw Error('PDF page three clause unavailable');
+  await until('actual page number retained',()=>js('document.querySelector("[aria-label=\\"公告 PDF 页码\\"]")?.innerText.includes("PDF 第 3 页")'));
+  await js('document.querySelector("[aria-label=\\"岗位条款原文\\"]")?.scrollIntoView({block:"center"})');
+  await capture('77-job-pdf-page-provenance');
+  await jobSelect('岗位核对结果','gap');await click('记录本条人工核对');await until('PDF clause reviewed',()=>bodyHas('已记录 1 条'));
+  await waitJobButton('保存本次核对到本地');await click('保存本次核对到本地');
+  await until('PDF review archive saved',async()=>await bodyHas('已确认保存本地岗位核对档案')&&(await main.store.getApplications()).jobReviews?.length===2);
+  const pdfArchive=(await main.store.getApplications()).jobReviews.find(a=>a.pdfOrigin);
+  if(!pdfArchive||pdfArchive.pdfOrigin.sha256!==noticeHash||pdfArchive.pdfOrigin.totalPages!==3||JSON.stringify(pdfArchive.pdfOrigin.pages.map(p=>p.page))!=='[1,3]'||pdfArchive.source!==confirmedPdfJd||pdfArchive.rows[0].clauseId!==certStart+':'+(certStart+certQuote.length))throw Error('PDF archive metadata or source mismatch');
+  checks.jobPdfSelectedPagesExplicit=true;checks.jobPdfExactPageOrigin=true;checks.jobPdfArchivePersisted=true;
+  await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',confirmedPdfJd+'\nEdited');
+  await until('manual edit invalidates provenance and review',()=>js('!document.querySelector("[aria-label=\\"当前公告来源\\"]")&&!document.querySelector("[aria-label=\\"公告 PDF 页码\\"]")&&!document.querySelector("select[aria-label=\\"岗位候选条款\\"]")'));
+  checks.jobPdfManualEditClearsOrigin=true;
+  win.webContents.reload();
+  await until('PDF archive renderer reloaded',async()=>{try{return await js('!!document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")&&!!document.querySelector("#basic-field-name")')}catch{return false}});
+  await js('(()=>{const e=document.querySelector("select[aria-label=\\"快速切换简历版本\\"]");if(e.value!=="master"){e.value="master";e.dispatchEvent(new Event("change",{bubbles:true}))}return true})()');
+  await until('master selected for PDF archive',()=>js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value==="master"&&document.body.innerText.includes("合成母库")'));
+  await click('诊断优化');await click('JD 雷达');
+  const pdfArchiveButton=label=>js('(()=>{const e=[...document.querySelectorAll("[aria-label=\\"本地岗位核对档案\\"] button")].find(b=>b.innerText.trim()==='+JSON.stringify(label)+'&&!b.disabled&&b.parentElement?.parentElement?.innerText.includes("synthetic-notice.pdf"));if(!e)return false;e.click();return true})()');
+  await until('load PDF archive original',()=>pdfArchiveButton('载入档案原文'));
+  await until('archive provenance restored before review',()=>bodyHas('当前来源：synthetic-notice.pdf · 第 1、3 页 / 共 3 页'));
+  await until('restore PDF archive review',()=>pdfArchiveButton('恢复档案核对'));
+  await until('PDF archive review restored',async()=>await bodyHas('已重新校验版本、原文与依据并恢复本地核对档案')&&await js('document.querySelector("[aria-label=\\"公告 PDF 页码\\"]")?.innerText.includes("PDF 第 3 页")'));
+  await js('document.querySelector("[aria-label=\\"岗位条款原文\\"]")?.scrollIntoView({block:"center"})');
+  await capture('78-job-pdf-archive-restored');
+  if(await noticeJd()!==confirmedPdfJd||providerCalls!==noticeCalls||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(reviewDoc))throw Error('PDF import called provider, modified resume or lost exact JD');
+  checks.jobPdfArchiveReload=true;checks.jobPdfOfflineReadOnly=true;
+
   // At the very end, mutate only the isolated synthetic disk to simulate another process.
   await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');await click('分步工作');
   await setValue('textarea[aria-label="AI 自由任务目标"]','测试磁盘版本变化');

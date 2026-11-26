@@ -47,6 +47,8 @@ import {AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
 import {AiLayoutPane} from './AiLayoutPane';
 import {FactBankPane} from './FactBankPane';
+import type {JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
+import {JobNoticePdfPane} from './JobNoticePdfPane';
 import {JobRequirementsPane} from './JobRequirementsPane';
 import type {FactBank} from '../../schema/factBankSchema';
 import {prepareFactSelection,assertFreshFactSelection,loadLocalFactBank,type FactSelection} from '../../lib/factSelection';
@@ -69,6 +71,7 @@ export function DiagnoseAndMatchPane({
   activeSlug = '',
   overflowPx,
   jdText: controlledJdText,
+  jdPdfOrigin,
   onJdTextChange,
   onAtsScoreChange,
   onJumpToSection,
@@ -80,7 +83,8 @@ export function DiagnoseAndMatchPane({
   activeSlug?: string;
   overflowPx: number;
   jdText?: string;
-  onJdTextChange?: (next: string) => void;
+  jdPdfOrigin?:JobPdfOrigin;
+  onJdTextChange?: (next: string,pdfOrigin?:JobPdfOrigin) => void;
   onAtsScoreChange?: (score: number) => void;
   onJumpToSection: (sectionId: string) => void;
   onImmediateChange: (next: ResumeDocument) => void;
@@ -88,9 +92,10 @@ export function DiagnoseAndMatchPane({
   getCurrentRevision: () => string;
 }) {
   const [subTab, setSubTab] = useState<DiagnoseSubTab>('hr');
-  const [internalJdText, setInternalJdText] = useState('');
-  const jdText = controlledJdText ?? internalJdText;
-  const setJdText = onJdTextChange ?? setInternalJdText;
+  const [internalJobSource,setInternalJobSource]=useState<{text:string;pdfOrigin?:JobPdfOrigin}>({text:''});
+  const jdText=controlledJdText??internalJobSource.text;
+  const pdfOrigin=controlledJdText===undefined?internalJobSource.pdfOrigin:jdPdfOrigin;
+  const setJdText=onJdTextChange??((next:string,origin?:JobPdfOrigin)=>setInternalJobSource({text:next,pdfOrigin:origin}));
 
   // 真 ATS 逆向体检 state
   const [atsResult, setAtsResult] = useState<AtsInspectionResult | null>(null);
@@ -649,7 +654,8 @@ export function DiagnoseAndMatchPane({
               />
             </label>
 
-            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision}/>
+            <JobNoticePdfPane jdText={jdText} origin={pdfOrigin} onConfirm={setJdText}/>
+            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} pdfOrigin={pdfOrigin} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision}/>
             {jdResult.totalKeywords > 0 ? (
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex items-center justify-between">

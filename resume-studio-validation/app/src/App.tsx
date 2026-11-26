@@ -33,6 +33,7 @@ import { fitResumeToSinglePage } from './lib/pageFit';
 import { parseCustomRedactionTerms, redactResumeDocument } from './lib/privacyRedactor';
 import { switchDocumentLocale } from './lib/resumeLocale';
 import type { GlobalSettings, ResumeDocument, TemplateId } from './schema/resumeSchema';
+import type {JobPdfOrigin} from './schema/jobPdfSourceSchema';
 import { TEMPLATE_REGISTRY } from './templates/registry';
 
 function buildDefaultGlobalSettings(doc: ResumeDocument): GlobalSettings {
@@ -71,7 +72,9 @@ export default function App() {
   const [isRedacted, setIsRedacted] = useState(false);
   const [isRedactionPopoverOpen, setIsRedactionPopoverOpen] = useState(false);
   const [redactionTermsInput, setRedactionTermsInput] = useState('');
-  const [jdText, setJdText] = useState('');
+  const [jobSource,setJobSource]=useState<{text:string;pdfOrigin?:JobPdfOrigin}>({text:''});
+  const jdText=jobSource.text;
+  const setJdText=useCallback((next:string,pdfOrigin?:JobPdfOrigin)=>setJobSource({text:next,pdfOrigin}),[]);
   const [lastAtsScore, setLastAtsScore] = useState<number | null>(null);
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false);
   const [applicationsRefreshKey, setApplicationsRefreshKey] = useState(0);
@@ -508,6 +511,7 @@ export default function App() {
                   activeSlug={activeSlug}
                   overflowPx={overflowPx}
                   jdText={jdText}
+                  jdPdfOrigin={jobSource.pdfOrigin}
                   onJdTextChange={setJdText}
                   onAtsScoreChange={setLastAtsScore}
                   onJumpToSection={handlePreviewSelectSection}

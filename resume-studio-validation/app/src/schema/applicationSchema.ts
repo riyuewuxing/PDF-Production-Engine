@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {JobPdfOriginSchema,validJobPdfOrigin} from './jobPdfSourceSchema';
 import type { ResumeDocument, TemplateId } from './resumeSchema';
 
 export const APPLICATION_STATUSES = [
@@ -77,6 +78,7 @@ export const JobReviewArchiveSchema = z.object({
   factRevision:z.string().min(1).max(64).nullable(),
   basisHash:z.string().regex(/^[a-f0-9]{64}$/),
   source:z.string().min(1).max(20000).refine(s=>!!s.trim()),
+  pdfOrigin:JobPdfOriginSchema.optional(),
   createdAt:z.string().datetime(),
   applicationId:z.string().min(1).max(200).nullable(),
   snapshotId:z.string().min(1).max(120).nullable(),
@@ -90,6 +92,7 @@ export const JobReviewArchiveSchema = z.object({
     }),
   })).min(1).max(80),
 }).superRefine((a,ctx)=>{
+  if(a.pdfOrigin&&!validJobPdfOrigin(a.source,a.pdfOrigin))ctx.addIssue({code:'custom',message:'PDF 页码与确认文本区间不一致'});
   if((a.applicationId===null)!==(a.snapshotId===null))ctx.addIssue({code:'custom',message:'投递关联与快照标识须同时存在或同时为空'});
   if(new Set(a.rows.map(r=>r.clauseId)).size!==a.rows.length)ctx.addIssue({code:'custom',message:'岗位条款标识重复'});
 });
