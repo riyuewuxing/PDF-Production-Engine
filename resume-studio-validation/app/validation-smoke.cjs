@@ -159,11 +159,11 @@ async function run() {
   if(draft.basic.name!=='本地未保存草稿')throw Error('backup contains wrong draft');
   dialog.showSaveDialog=originalSaveDialog;
   checks.unsavedDraftBackedUp=true;
-  await js('window.confirm=()=>false');
+  await js('(()=>{window.confirm=()=>false;return true})()');
   await click('重载磁盘版本');
   if(await js('document.querySelector("#basic-field-name").value')!=='本地未保存草稿')throw Error('cancelled reload discarded draft');
   checks.cancelledReloadPreservedDraft=true;
-  await js('window.confirm=()=>true');
+  await js('(()=>{window.confirm=()=>true;return true})()');
   await click('重载磁盘版本');
   await until('latest disk version opened',()=>js('document.querySelector("#basic-field-name")?.value==="外部写入的新版本"'));
   if(await bodyHas('简历已被其他窗口或进程修改'))throw Error('stale conflict banner after reload');
