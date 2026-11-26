@@ -31,7 +31,7 @@ describe('independent local fact bank',()=>{
     expect(await bank.get()).toEqual({schemaVersion:1,revision:'empty-v1',records:[]});
     await expect(fs.access(path.join(root,'.fact-bank-v1.json'))).rejects.toThrow();
     const result=await bank.add(input),record=result.records[0]!;
-    expect(record).toMatchObject({docId:doc.id,blockKey:input.blockKey,verifiedStatus:'user-confirmed',sourceScope:'manual'});
+    expect(record).toMatchObject({docId:doc.id,blockKey:input.blockKey,verifiedStatus:'user-confirmed',sourceScope:'manual',documentTitle:doc.title,blockLabel:'工作经历 · 示例机构'});
     expect(record.id).toMatch(/^[0-9a-f-]{36}$/);expect(result.revision).not.toBe('empty-v1');
     expect(await new FactBankStore(new LocalResumeStore(root)).get()).toEqual(result);
     expect(await store.getResume('synthetic')).toEqual(doc);

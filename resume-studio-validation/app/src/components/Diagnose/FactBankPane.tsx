@@ -16,10 +16,13 @@ export function FactBankPane(props:Props){
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [showOther,setShowOther]=useState(false);
+  const [query,setQuery]=useState('');
   const busy=useRef(false);
   const latest=useRef(props);latest.current=props;
   const bridge=window.resumeDesktop?.facts;
-  const records=props.bank?.records.filter(r=>showOther||r.docId===props.document.id)??[];
+  const records=(props.bank?.records.filter(r=>showOther||r.docId===props.document.id)??[]).sort((a,b)=>Number(a.verifiedStatus==='revoked')-Number(b.verifiedStatus==='revoked')||b.modifiedAt.localeCompare(a.modifiedAt));
+  const normalizedQuery=query.trim().toLocaleLowerCase();
+  const visibleRecords=records.filter(r=>!normalizedQuery||[r.assertion,r.value,r.unit,r.timeframe,r.evidenceRef,r.documentTitle,r.blockLabel].filter(Boolean).join(' ').toLocaleLowerCase().includes(normalizedQuery));
   const edit=<K extends keyof FactInput>(key:K,value:FactInput[K])=>{setDraft(d=>({...d,[key]:value}));setConfirmedEntity(null);};
   const task=async(work:()=>Promise<FactBank>,success:string)=>{
     if(busy.current||props.locked)return;
@@ -61,11 +64,14 @@ export function FactBankPane(props:Props){
     {notice&&<div role="status" className="text-teal-800">{notice}</div>}
     {props.bank&&<>
       <label className="flex items-start gap-1"><input type="checkbox" disabled={props.locked} checked={showOther} onChange={e=>setShowOther(e.target.checked)}/>显示其他版本及孤立记录（仅本地管理，不可直接外发）</label>
-      <div className="max-h-52 space-y-2 overflow-auto">{records.length===0&&<p>当前简历没有记录。请从下方手动添加。</p>}{records.map(r=>{
+      <label className="block">本地搜索<input aria-label="搜索本地事实" value={query} onChange={e=>setQuery(e.target.value)} placeholder="陈述、来源、时间或段落" className="mt-1 w-full rounded border p-1.5"/></label>
+      <div className="text-slate-600">有效 {records.filter(r=>r.verifiedStatus==='user-confirmed').length} 条 · 历史 {records.filter(r=>r.verifiedStatus==='revoked').length} 条 · 显示 {visibleRecords.length} 条</div>
+      <div aria-label="本地事实记录列表" className="max-h-56 space-y-2 overflow-auto">{records.length===0&&<p>当前简历没有记录。请从下方手动添加。</p>}{records.length>0&&visibleRecords.length===0&&<p>没有匹配的事实。</p>}{visibleRecords.map(r=>{
         const matches=r.docId===props.document.id&&factEntityId(props.document,r.blockKey)===r.entityId;
         const eligible=isShareableFact(props.document,r)&&props.keys.includes(r.blockKey);
         return <article key={r.id} className="rounded border p-2 space-y-1 break-words">
           <div className="font-semibold">{r.assertion}</div>
+          <div className="text-slate-600">关联：{r.documentTitle||'当前 / 历史简历'} · {r.blockLabel||props.blocks.find(b=>b.key===r.blockKey)?.label||'原关联段落'}</div>
           <div>{[r.value,r.unit,r.timeframe].filter(Boolean).join(' · ')}</div>
           <div className="text-slate-600">本地证据位置：{r.evidenceRef}</div>
           {r.supersedesId&&<div className="text-slate-600">修订自：{props.bank?.records.find(s=>s.id===r.supersedesId)?.assertion||'旧记录'}</div>}

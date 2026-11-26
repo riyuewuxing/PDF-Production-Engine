@@ -10,6 +10,7 @@ export const FactInputSchema=z.object({
 export const FactRecordSchema=FactInputSchema.extend({
   id:z.string().uuid(),docId:z.string().min(1).max(500),
   blockKey:z.string().min(1).max(500),entityId:z.string().min(1).max(8000),
+  documentTitle:text(500).optional(),blockLabel:text(1000).optional(),
   sourceScope:z.literal('manual'),supersedesId:z.string().uuid().optional(),
   verifiedStatus:z.enum(['user-confirmed','revoked']),
   modifiedAt:z.string().datetime(),

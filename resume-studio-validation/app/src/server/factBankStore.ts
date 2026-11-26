@@ -3,6 +3,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {AddFactSchema,FactBankSchema,RevokeFactSchema,FactRequestBindingSchema,type FactBank,type FactRecord} from '../schema/factBankSchema';
 import {resumeRevision} from '../schema/resumeSchema';
+import {collectEditableBlocks} from '../lib/resumeBlocks';
 import {factEntityId,isShareableFact} from '../lib/aiContext';
 import {assertBoundFactPrompt} from '../lib/factPromptGate';
 import {LocalFsApiError,withResumeWriteLock,type LocalResumeStore} from './localFsApi';
@@ -65,7 +66,9 @@ export class FactBankStore {
       if(input.supersedesId&&(!old||old.verifiedStatus!=='user-confirmed'||old.docId!==doc.id||old.blockKey!==input.blockKey||old.entityId!==entityId))
         throw new LocalFsApiError(409,'FACT_CORRECTION_CONFLICT','原事实已撤销或关联主体已变化，不能直接更正。');
       const modifiedAt=new Date().toISOString();
+      const block=collectEditableBlocks(doc).find(b=>b.key===input.blockKey);
       const record:FactRecord={...input.fact,id:randomUUID(),docId:doc.id,blockKey:input.blockKey,entityId,
+        documentTitle:doc.title.slice(0,500),blockLabel:block?.label.slice(0,1000),
         sourceScope:'manual',verifiedStatus:'user-confirmed',modifiedAt,...(old?{supersedesId:old.id}:{})};
       return this.write([...bank.records.map(r=>old&&r.id===old.id?{...r,verifiedStatus:'revoked' as const,modifiedAt}:r),record]);
     });

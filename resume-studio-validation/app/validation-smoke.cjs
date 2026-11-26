@@ -493,6 +493,14 @@ async function run() {
   if(afterCorrection.records.length!==3||afterCorrection.records.find(r=>r.id===old.id)?.verifiedStatus!=='revoked'||!corrected||corrected.sensitivity!=='local-only'||corrected.assertion!=='核对 6 份合成练习材料')throw Error('fact correction not atomic or historical record lost');
   if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(beforeFacts)||providerCalls!==callsBeforeFacts+1)throw Error('fact correction modified resume or contacted provider');
   checks.factCorrectionHistory=true;
+  const factList=()=>js('document.querySelector("[aria-label=\\"本地事实记录列表\\"]")?.innerText||""');
+  const firstFact=await js('document.querySelector("[aria-label=\\"本地事实记录列表\\"] article")?.innerText||""');
+  if(!firstFact.includes('核对 6 份合成练习材料')||!firstFact.includes('修订自：核对 5 份合成练习材料')||!firstFact.includes('教育经历'))throw Error('active fact origin or order missing');
+  await setValue('input[aria-label="搜索本地事实"]','SYNTHETIC_SOURCE_SECOND');
+  if(!(await factList()).includes('核对 6 份合成练习材料')||(await factList()).includes('整理 12 份合成实验记录'))throw Error('local fact search failed');
+  await setValue('input[aria-label="搜索本地事实"]','');
+  checks.factSearchAndOrigin=true;
+
   await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.textContent.includes("本地事实资料库"));e?.scrollIntoView({block:"start"});return true})()');
   await capture('34-fact-corrected');
 
