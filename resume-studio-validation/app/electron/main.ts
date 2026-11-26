@@ -684,6 +684,17 @@ function registerIpcHandlers(): void {
       explicitPath = true;
     }
 
+    // These four formats can contain the visible portrait. Markdown does
+    // not. Check only managed local references; never read a hidden portrait.
+    let contentWarning:string|undefined;
+    const photo=targetDoc.basic.photo.trim();
+    if(spec.ext!=='md'&&targetDoc.basic.photoConfig.visible&&targetDoc.menuSections.some(s=>s.id==='basic'&&s.enabled)&&photo.startsWith('/api/assets/')){
+      try{
+        await store.readAsset(decodeURIComponent(photo.slice('/api/assets/'.length)));
+      }catch{
+        contentWarning='可见的本地头像资源无法读取，导出成品可能缺少照片。请检查成品、恢复头像或明确隐藏照片后再投递。';
+      }
+    }
     const content = await spec.produce(targetDoc);
     const writtenPath = explicitPath ? await writeFileSafely(targetPath, content) : await writeUniqueExportFile(targetPath, content);
     await rememberOutput(writtenPath);
@@ -711,6 +722,7 @@ function registerIpcHandlers(): void {
       filePath: writtenPath,
       fileName: path.basename(writtenPath),
       ...(snapshotWarning?{snapshotWarning}:{}),
+      ...(contentWarning?{contentWarning}:{}),
     };
   }
 

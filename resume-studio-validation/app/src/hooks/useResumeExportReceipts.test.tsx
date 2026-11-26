@@ -43,6 +43,16 @@ describe('export receipts remain bound to the selected document',()=>{
     expect(result.current.exportStatus?.text).toContain('历史目录不安全');
     expect(result.current.lastExportedPdfSnapshot).toBeNull();
   });
+  it('surfaces content and history warnings together, without offering an unchecked PDF for quick-log',async()=>{
+    const ref={current:doc('first-id','First')};
+    vi.spyOn(apiClient,'exportPdf').mockResolvedValue({canceled:false,filePath:'written.pdf',snapshotWarning:'历史目录不安全',contentWarning:'可见的本地头像资源无法读取'});
+    const {result}=renderHook(()=>useResumeExport(options(ref)));
+    await act(async()=>{await result.current.handleExportFormat('pdf')});
+    expect(result.current.exportStatus).toMatchObject({type:'warn',filePath:'written.pdf'});
+    expect(result.current.exportStatus?.text).toContain('历史目录不安全');
+    expect(result.current.exportStatus?.text).toContain('可见的本地头像资源无法读取');
+    expect(result.current.lastExportedPdfSnapshot).toBeNull();
+  });
   it('clears the preceding quick-log receipt even if a new export is cancelled',async()=>{
     const ref={current:doc('first-id','First')};
     const ipc=vi.spyOn(apiClient,'exportPdf').mockResolvedValueOnce({canceled:false,filePath:'first.pdf'}).mockResolvedValueOnce({canceled:true});

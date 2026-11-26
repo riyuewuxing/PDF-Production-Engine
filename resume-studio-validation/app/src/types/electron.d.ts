@@ -37,6 +37,8 @@ export interface PdfExportResult {
   fileName?: string;
   /** Artifact exists; its automatic history operation did not complete. */
   snapshotWarning?: string;
+  /** A requested visible content resource could not be confirmed readable. */
+  contentWarning?: string;
 }
 
 export interface SaveTextFileOptions {

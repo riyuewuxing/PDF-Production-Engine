@@ -155,11 +155,11 @@ export function useResumeExport({
                     : 'Markdown 文档 (.md)';
 
         if (result.filePath) {
-          if(!sameVersion()||result.snapshotWarning){
+          if(!sameVersion()||result.snapshotWarning||result.contentWarning){
             setLastExportedPdfSnapshot(null);
             setExportStatus({
               type:'warn',filePath:result.filePath,
-              text:`已导出${formatLabel}：${result.filePath}。${!sameVersion()?'文件属于此前版本，未关联当前简历。':''}${result.snapshotWarning?'自动历史快照未确认完成：'+result.snapshotWarning:''}`,
+              text:`已导出${formatLabel}：${result.filePath}。${!sameVersion()?'文件属于此前版本，未关联当前简历。':''}${result.snapshotWarning?'自动历史快照未确认完成：'+result.snapshotWarning+'。':''}${result.contentWarning??''}`,
             });
             return;
           }
