@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
 import {FactBankStore} from '../src/server/factBankStore';
 import {EvidenceStore} from '../src/server/evidenceStore';
+import {RecoveryDraftStore} from '../src/server/recoveryDraftStore';
 import {AttachEvidenceSchema} from '../src/schema/evidenceSchema';
 import {FactRequestBindingSchema} from '../src/schema/factBankSchema';
 import {hasRecordFactSources} from '../src/lib/factPromptGate';
@@ -68,6 +69,7 @@ async function reportLaunch(status:'ready'|'failed',message?:string){
   try{await task;}finally{if(launchReceiptTask===task)launchReceiptTask=null;}
 }
 const store = new LocalResumeStore(dataDir);
+const recoveryDrafts=new RecoveryDraftStore(rootDir,store);
 const facts=new FactBankStore(store);
 const evidence=new EvidenceStore(store,facts);
 let evidencePickerBusy=false;
@@ -499,6 +501,10 @@ async function pickBackupFolder(title:string){
   return result.canceled||result.filePaths.length!==1?null:result.filePaths[0]!;
 }
 function registerIpcHandlers(): void {
+  trustedEditorHandle('recoveryDrafts:checkpoint',(_event,input:unknown)=>recoveryDrafts.checkpoint(input));
+  trustedEditorHandle('recoveryDrafts:clear',(_event,receipt,confirmation)=>recoveryDrafts.clear(receipt,confirmation));
+  trustedEditorHandle('recoveryDrafts:list',()=>recoveryDrafts.list());
+  trustedEditorHandle('recoveryDrafts:get',(_event,id:string,token:string)=>recoveryDrafts.get(id,token));
   trustedEditorHandle('workspaceBackup:create',()=>runBackupOperation(async signal=>{
     inspectedLaunch=null;inspectedBackup=null;
     const parent=await pickBackupFolder('选择备份保存位置（将新建文件夹，不覆盖原数据）');

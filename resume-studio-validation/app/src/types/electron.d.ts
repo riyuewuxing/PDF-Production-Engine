@@ -58,7 +58,9 @@ export interface SaveApplicationSnapshotInput {
 
 import type {BackupInspection,BackupResult} from '../schema/workspaceBackupSchema';
 
+import type {DraftInput,DraftReceipt,DraftList,DraftRecord} from '../schema/recoveryDraftSchema';
 export interface ResumeDesktopBridge {
+  recoveryDrafts?:{checkpoint:(input:DraftInput)=>Promise<DraftReceipt>;clear:(receipt:DraftReceipt,confirmation:'SAVED_OR_DISCARDED'|'DISCARD_RECOVERY')=>Promise<boolean>;list:()=>Promise<DraftList>;get:(id:string,token:string)=>Promise<DraftRecord>};
   workspaceBackup?:{create:()=>Promise<BackupResult|null>;inspect:()=>Promise<BackupInspection|null>;restore:(token:string,confirmation:'RESTORE_TO_NEW_WORKSPACE')=>Promise<BackupResult|null>;context?:()=>Promise<{folder:string;restored:boolean}>;editorReady?:(slug:string,id:string)=>Promise<void>;prepareLaunch?:(mode:'last'|'choose')=>Promise<BackupInspection|null>;launch?:(token:string,confirmation:'OPEN_INDEPENDENT_WORKSPACE')=>Promise<{folder:string;pid:number;ready:true}>};
   readonly isDesktop: true;
   resumes: {

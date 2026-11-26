@@ -44,7 +44,7 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
   return <section aria-label="工作区备份与安全恢复" className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/50 p-3 text-xs break-words">
     <div className="font-bold text-teal-900">工作区备份与安全恢复</div>
     <p>备份已落盘的母库、简历、资源、历史快照、回收站、求职台账、事实库与附件。逐文件 SHA-256 校验（用于检查内容一致性，不代表来源鉴真）；恢复仅创建独立新工作区，不覆盖当前数据。</p>
-    <p className="rounded bg-amber-50 p-2 text-amber-900">备份文件夹含未加密私人资料，请保存在可信本地磁盘。不会备份 AI 密钥/模型配置、已导出成品、外部原件或临时锁；未保存的编辑不属于备份。</p>
+    <p className="rounded bg-amber-50 p-2 text-amber-900">备份文件夹含未加密私人资料，请保存在可信本地磁盘。不会备份 AI 密钥/模型配置、已导出成品、外部原件或临时锁；未保存的编辑及独立自动恢复草稿不属于备份。</p>
     {(busy||error||notice||openedWorkspace)&&<div ref={feedbackRef} aria-label="工作区操作反馈" className="sticky top-0 z-10 max-h-40 overflow-y-auto rounded border border-teal-200 bg-white p-2 shadow-sm">
       {busy&&<p role="status" className="font-medium text-slate-800">{busy}…</p>}
       {error&&<p role="alert" className="rounded bg-red-50 p-1.5 font-medium text-red-800">{error}</p>}

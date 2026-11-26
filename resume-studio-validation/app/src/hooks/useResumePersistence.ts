@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { careerLedger } from '../lib/careerLedgerSession';
+import {checkpointRecovery,clearRecovery,type Checkpoint} from '../lib/recoveryCheckpoint';
 import { cleanResumeRichText } from '../lib/htmlToMarkdown';
 import { useHistoryState } from '../lib/useHistoryState';
 import { resumeRevision, type ResumeDocument, type ResumeSummary } from '../schema/resumeSchema';
@@ -22,6 +23,7 @@ export function useResumePersistence(options?: {
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [versionTransitioning,setVersionTransitioning]=useState(false);
+  const [recoveryError,setRecoveryError]=useState<string|null>(null);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveSeqRef = useRef(0);
@@ -29,7 +31,7 @@ export function useResumePersistence(options?: {
   const revisionsRef = useRef(new Map<string, Pick<ResumeDocument, 'id' | 'updatedAt'>>());
   const activeDocRef = useRef<ResumeDocument | null>(null);
   activeDocRef.current = activeDoc;
-  const pendingSaveRef = useRef<{ slug: string; doc: ResumeDocument } | null>(null);
+  const pendingSaveRef = useRef<{ slug: string; doc: ResumeDocument; checkpoint?:Checkpoint } | null>(null);
   const inFlightSaveRef = useRef<Promise<void> | null>(null);
   const onVersionChangedRef = useRef(options?.onVersionChanged);
   onVersionChangedRef.current = options?.onVersionChanged;
@@ -89,7 +91,7 @@ export function useResumePersistence(options?: {
       const batch = pendingSaveRef.current;
       if (!batch) return;
       pendingSaveRef.current = null;
-      const promise = persistDocument(batch.slug, batch.doc);
+      const promise = persistDocument(batch.slug, batch.doc).then(()=>clearRecovery(batch.checkpoint,setRecoveryError));
       inFlightSaveRef.current = promise;
       try {
         await promise;
@@ -169,7 +171,9 @@ export function useResumePersistence(options?: {
   const scheduleAutoSave = useCallback(
     (nextDoc: ResumeDocument) => {
       if (!activeSlug) return;
-      pendingSaveRef.current = { slug: activeSlug, doc: nextDoc };
+      const basis=revisionsRef.current.get(activeSlug);
+      const checkpoint=basis&&basis.id===nextDoc.id?checkpointRecovery({kind:'resume',slug:activeSlug,baseRevision:resumeRevision(basis),data:nextDoc},setRecoveryError):undefined;
+      pendingSaveRef.current = { slug: activeSlug, doc: nextDoc,checkpoint };
       setSaveState('dirty');
       setSaveError(null);
       if (saveTimerRef.current) {
@@ -232,6 +236,7 @@ export function useResumePersistence(options?: {
       setSummaries(prev=>prev.map(item=>item.slug===activeSlug?{...item,id:raw.id,title:raw.title,templateId:raw.templateId,updatedAt:raw.updatedAt}:item));
       if(activeSlug==='master')setMasterSummary(prev=>prev?{...prev,id:raw.id,title:raw.title,templateId:raw.templateId,updatedAt:raw.updatedAt}:prev);
       // Caller has explicitly confirmed discard. Only discard after successful read.
+      await clearRecovery(pendingSaveRef.current?.checkpoint,setRecoveryError);
       pendingSaveRef.current=null;
       activeDocRef.current=doc;
       resetHistory(doc);
@@ -345,7 +350,8 @@ export function useResumePersistence(options?: {
     const latest = activeDocRef.current;
     if (!latest || !activeSlug || versionTransitionRef.current) return false;
     if (!pendingSaveRef.current) {
-      pendingSaveRef.current = { slug: activeSlug, doc: latest };
+      const basis=revisionsRef.current.get(activeSlug);
+      pendingSaveRef.current = { slug: activeSlug, doc: latest,checkpoint:basis&&basis.id===latest.id?checkpointRecovery({kind:'resume',slug:activeSlug,baseRevision:resumeRevision(basis),data:latest},setRecoveryError):undefined };
     }
     return true;
   }, [activeSlug]);
@@ -361,6 +367,7 @@ export function useResumePersistence(options?: {
     loadError,
     saveState,
     saveError,
+    recoveryError,
     refreshListAndLoad,
     flushPendingSave,
     scheduleAutoSave,

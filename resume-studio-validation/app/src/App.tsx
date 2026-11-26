@@ -25,6 +25,7 @@ import { MasterMergeModal } from './components/Versions/MasterMergeModal';
 import { VersionAndMasterPane } from './components/Versions/VersionAndMasterPane';
 import { RecycleBinPanel } from './components/Versions/RecycleBinPanel';
 import { WriteLockPanel } from './components/Versions/WriteLockPanel';
+import { RecoveryDraftPanel } from './components/Versions/RecoveryDraftPanel';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useResumeExport } from './hooks/useResumeExport';
 import { useResumePersistence } from './hooks/useResumePersistence';
@@ -109,6 +110,7 @@ export default function App() {
     loadError,
     saveState,
     saveError,
+    recoveryError,
     refreshListAndLoad,
     flushPendingSave,
     scheduleAutoSave,
@@ -374,7 +376,7 @@ export default function App() {
           >
             重试加载
           </button>
-          <div className="mt-4 space-y-2"><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/></div>
+          <div className="mt-4 space-y-2"><RecoveryDraftPanel onImport={handleImportJson}/><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/></div>
         </div>
       </div>
     );
@@ -427,6 +429,8 @@ export default function App() {
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
       {workspaceContext?.restored&&<div aria-label="独立恢复工作区标识" className="no-print flex shrink-0 flex-wrap items-center gap-x-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"><strong className="shrink-0">独立恢复工作区</strong><span className="min-w-0 break-all">{workspaceContext.folder}</span><span>编辑仅写入此副本；原工作区不受影响。</span></div>}
+      <RecoveryDraftPanel onImport={handleImportJson}/>
+      {recoveryError&&<div role="alert" className="no-print shrink-0 bg-amber-50 px-3 py-1 text-xs text-amber-900">{recoveryError}</div>}
       {saveState==='error' && (
         <div role="alert" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-300 bg-red-50 px-4 py-2 text-xs text-red-900">
           <div className="min-w-0 flex-1 break-words">{saveError || '保存失败。'} 当前编辑仍在内存中；可以先另存草稿，不会覆盖原简历。</div>
