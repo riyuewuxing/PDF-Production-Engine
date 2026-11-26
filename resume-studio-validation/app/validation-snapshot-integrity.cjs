@@ -36,6 +36,13 @@ async function run(){
   const js=code=>win.webContents.executeJavaScript(code),has=t=>js('document.body.innerText.includes('+JSON.stringify(t)+')');
   const click=async label=>assert(await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==='+JSON.stringify(label)+');if(!b||b.disabled)return false;b.scrollIntoView({block:"center"});b.click();return true})()'),'button unavailable '+label);
   const capture=async name=>{await js('document.fonts.ready.then(()=>true)');await sleep(350);const shot=await win.webContents.capturePage();assert(!shot.isEmpty(),'empty screenshot');fs.writeFileSync(path.join(out,name+'.png'),shot.toPNG())};
+  const switchTo=async slug=>{
+    const ok=await js('(()=>{const e=document.querySelector("select[aria-label=\\"快速切换简历版本\\"]");if(!e)return false;Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(e,'+JSON.stringify(slug)+');e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+    assert(ok,'version selector absent');
+    await until('selected '+slug,()=>js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value==='+JSON.stringify(slug)));
+  };
+  await until('any initial editor',()=>js('!!document.querySelector("#basic-field-name")'));
+  if(await js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value')!=='runner-fixture')await switchTo('runner-fixture');
   await until('normal editor',()=>js('document.querySelector("#basic-field-name")?.value==="合成当前候选人"'));
   await click('版本母库');await until('history list',()=>has('历史快照回滚 (15/15)'));
   await until('verified newest visible',()=>has('合成最新有效历史'));
@@ -78,11 +85,6 @@ async function run(){
   const originalInventory=main.store.listSnapshotInventory.bind(main.store);let started=false,release;
   const gate=new Promise(r=>release=r);
   main.store.listSnapshotInventory=async slug=>{if(slug==='runner-fixture'&&!started){started=true;await gate;}return originalInventory(slug);};
-  const switchTo=async slug=>{
-    const ok=await js('(()=>{const e=document.querySelector("select[aria-label=\\"快速切换简历版本\\"]");if(!e)return false;Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(e,'+JSON.stringify(slug)+');e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
-    assert(ok,'version selector absent');
-    await until('selected '+slug,()=>js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value==='+JSON.stringify(slug)));
-  };
   try{
     await click('内容编辑');await click('版本母库');await until('delayed inventory entered',()=>started);
     await switchTo('alternate');
@@ -101,7 +103,9 @@ async function run(){
   fs.mkdirSync(outside);fs.writeFileSync(path.join(outside,'keep.txt'),'PRESERVE');
   fs.renameSync(dir,held);fs.symlinkSync(outside,dir,'junction');
   try{
-    win.webContents.reload();await until('editor loaded after redirect',()=>js('document.querySelector("#basic-field-name")?.value==="合成历史候选人"'));
+    win.webContents.reload();await until('any editor after redirect',()=>js('!!document.querySelector("#basic-field-name")'));
+    if(await js('document.querySelector("select[aria-label=\\"快速切换简历版本\\"]")?.value')!=='runner-fixture')await switchTo('runner-fixture');
+    await until('editor loaded after redirect',()=>js('document.querySelector("#basic-field-name")?.value==="合成历史候选人"'));
     await click('版本母库');await until('explicit history inspection error',()=>has('历史快照检查失败'));
     assert(await has('历史快照目录不安全')&&!await has('暂无磁盘快照'),'failed directory appeared as empty');
     await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("历史快照回滚"));e?.scrollIntoView({block:"start"});return true})()');
