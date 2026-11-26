@@ -23,6 +23,8 @@ import {
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 import type { ResumeSnapshotMeta } from '../../server/localFsApi';
 import { PdfImportModal } from './PdfImportModal';
+import { RecycleBinPanel } from './RecycleBinPanel';
+import { isJsonResumeFormat } from '../../lib/jsonResumeAdapter';
 
 interface VersionAndMasterPaneProps {
   activeSlug: string;
@@ -35,7 +37,8 @@ interface VersionAndMasterPaneProps {
   onDeleteVersion: (slug: string) => Promise<void>;
   onImportJson: (rawJson: unknown, fallbackTitle: string) => Promise<void>;
   onOpenMasterMerge: () => void;
-  onSnapshotRestored?: (doc: ResumeDocument) => void;
+  onRestoreSnapshot: (snapshotId:string) => Promise<void>;
+  onRestoreTrash: (id:string,revision:string,asCopy:boolean) => Promise<void>;
   onFlushBeforeMutation: () => Promise<void>;
   getCurrentRevision: () => string;
 }
@@ -58,7 +61,8 @@ export function VersionAndMasterPane({
   onDeleteVersion,
   onImportJson,
   onOpenMasterMerge,
-  onSnapshotRestored,
+  onRestoreSnapshot,
+  onRestoreTrash,
   onFlushBeforeMutation,
   getCurrentRevision,
 }: VersionAndMasterPaneProps) {
@@ -119,9 +123,7 @@ export function VersionAndMasterPane({
     setBusy(true);
     setError(null);
     try {
-      await onFlushBeforeMutation();
-      const restored = await apiClient.restoreSnapshot(activeSlug, snapshot.id, getCurrentRevision());
-      onSnapshotRestored?.(restored);
+      await onRestoreSnapshot(snapshot.id);
       await refreshSnapshots();
       setSnapshotStatus('已回滚至选定历史快照（同时保留回滚前备份）');
       setTimeout(() => setSnapshotStatus(null), 3200);
@@ -166,6 +168,7 @@ export function VersionAndMasterPane({
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as unknown;
+      if(isJsonResumeFormat(parsed)&&!window.confirm('标准 JSON Resume 仅交换内容；样式、隐藏内容及附件不是完整备份，未知栏目可能位于扩展元数据中。是否导入为新版本？'))return;
       const baseTitle = file.name.replace(/\.json$/i, '') || '导入简历';
       await onImportJson(parsed, baseTitle);
     } catch (err) {
@@ -199,7 +202,7 @@ export function VersionAndMasterPane({
 
   const handleDelete = async (slug: string, title: string) => {
     if (slug === 'master') return;
-    if (!window.confirm(`确定删除简历版本“${title}”吗？此操作会移除本地 JSON 文件。`)) {
+    if (!window.confirm(`将简历版本“${title}”移入本地回收站？可在回收站恢复，已投递记录不受影响。`)) {
       return;
     }
     setBusy(true);
@@ -322,7 +325,7 @@ export function VersionAndMasterPane({
                       data/resumes/{item.slug}.json
                     </div>
                   </button>
-                  {summaries.length > 1 && (
+                  {(summaries.length > 1 || masterSummary) && (
                     <button
                       type="button"
                       disabled={busy}
@@ -359,6 +362,8 @@ export function VersionAndMasterPane({
             )}
           </div>
         </section>
+
+        <RecycleBinPanel onRestore={onRestoreTrash} refreshKey={summaries.length} />
 
         {/* Local Disk Time Machine Snapshots */}
         <section className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 space-y-2.5">

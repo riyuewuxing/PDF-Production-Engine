@@ -5,7 +5,7 @@ import { ResumeDocumentSchema } from '../schema/resumeSchema';
 import type { ResumeDesktopBridge } from '../types/electron';
 
 const mocks = vi.hoisted(() => ({
-  listResumes: vi.fn(), getResume: vi.fn(), saveResume: vi.fn(),
+  listResumes: vi.fn(), getResume: vi.fn(), saveResume: vi.fn(), createResume:vi.fn(), deleteResume:vi.fn(), restoreTrash:vi.fn(), restoreSnapshot:vi.fn(),
 }));
 vi.mock('../lib/apiClient', () => ({ apiClient: mocks }));
 
@@ -26,6 +26,7 @@ describe('resume persistence failure safety', () => {
     const doc = fixture();
     closeHandler = undefined;
     closeReady.mockReset();
+    mocks.createResume.mockReset();mocks.deleteResume.mockReset();mocks.restoreTrash.mockReset();mocks.restoreSnapshot.mockReset();
     mocks.listResumes.mockReset().mockResolvedValue({ master: null, resumes: [
       { slug: 'fixture', id: doc.id, title: doc.title, templateId: doc.templateId, updatedAt: doc.updatedAt },
     ] });
@@ -102,4 +103,37 @@ describe('resume persistence failure safety', () => {
     await waitFor(() => expect(closeReady).toHaveBeenCalledWith(13, true));
     expect(mocks.saveResume).toHaveBeenLastCalledWith('fixture', next);
   });
+  it('serializes creation and switching, flushes late edits before adopting the new version',async()=>{
+    const {result}=renderHook(()=>useResumePersistence());
+    await waitFor(()=>expect(result.current.activeSlug).toBe('fixture'));
+    const original=result.current.activeDoc!;
+    const created={...fixture(),id:'new-document',title:'New version'};
+    let resolveCreate!:(value:{slug:string;document:typeof created})=>void;
+    mocks.createResume.mockImplementationOnce(()=>new Promise(resolve=>{resolveCreate=resolve;}));
+    let creation!:Promise<void>;
+    act(()=>{creation=result.current.handleCreateVersion('New version');});
+    await waitFor(()=>expect(mocks.createResume).toHaveBeenCalled());
+    expect(result.current.versionTransitioning).toBe(true);
+    expect(result.current.canEditCurrent()).toBe(false);
+    await act(async()=>{await expect(result.current.handleSwitchVersion('another')).rejects.toThrow('另一项版本操作');});
+    const late={...original,title:'Late edit'};
+    act(()=>result.current.scheduleAutoSave(late));
+    await act(async()=>{resolveCreate({slug:'new-version',document:created});await creation;});
+    expect(mocks.saveResume).toHaveBeenCalledWith('fixture',late);
+    expect(result.current.activeSlug).toBe('new-version');
+    expect(result.current.activeDoc?.id).toBe('new-document');
+    expect(result.current.versionTransitioning).toBe(false);
+  });
+
+  it('restores archived versions into the list without replacing the currently edited document',async()=>{
+    const {result}=renderHook(()=>useResumePersistence());
+    await waitFor(()=>expect(result.current.activeSlug).toBe('fixture'));
+    const restored={...fixture(),id:'archived-id',title:'Restored'};
+    mocks.restoreTrash.mockResolvedValueOnce({slug:'restored',document:restored});
+    await act(async()=>{await result.current.handleRestoreTrash('archive','revision',false);});
+    expect(result.current.activeSlug).toBe('fixture');
+    expect(result.current.activeDoc?.id).toBe('synthetic-doc');
+    expect(result.current.summaries.map(x=>x.slug)).toContain('restored');
+  });
+
 });

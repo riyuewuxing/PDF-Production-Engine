@@ -8,7 +8,7 @@ import type {
   ApplicationsStoreData,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
-import type { ResumeSnapshotMeta } from '../server/localFsApi';
+import type { ResumeSnapshotMeta, ResumeTrashList } from '../server/localFsApi';
 import type {
   CoverLetterExportOptions,
   PdfExportOptions,
@@ -99,7 +99,7 @@ export const apiClient = {
     return handleJsonResponse<{ slug: string; document: ResumeDocument }>(res);
   },
 
-  async deleteResume(slug: string, expectedRevision: string): Promise<{ deleted: boolean }> {
+  async deleteResume(slug: string, expectedRevision: string): Promise<{ deleted: boolean; trashId?: string }> {
     if (window.resumeDesktop) {
       return window.resumeDesktop.resumes.delete(slug, expectedRevision);
     }
@@ -107,7 +107,20 @@ export const apiClient = {
       method: 'DELETE',
       headers: { 'If-Match': encodeURIComponent(expectedRevision) },
     });
-    return handleJsonResponse<{ deleted: boolean }>(res);
+    return handleJsonResponse<{ deleted: boolean; trashId?: string }>(res);
+  },
+
+  async listTrash(): Promise<ResumeTrashList> {
+    if(window.resumeDesktop){if(!window.resumeDesktop.trash)throw new Error('当前桌面桥接版本不支持回收站，请升级工作台。');return window.resumeDesktop.trash.list();}
+    return handleJsonResponse<ResumeTrashList>(await fetch('/api/trash'));
+  },
+  async restoreTrash(id:string,expectedRevision:string,asCopy=false):Promise<{slug:string;document:ResumeDocument}>{
+    if(window.resumeDesktop){if(!window.resumeDesktop.trash)throw new Error('当前桌面桥接版本不支持回收站。');return window.resumeDesktop.trash.restore(id,expectedRevision,asCopy);}
+    return handleJsonResponse<{slug:string;document:ResumeDocument}>(await fetch('/api/trash/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,expectedRevision,asCopy})}));
+  },
+  async purgeTrash(id:string,expectedRevision:string):Promise<{deleted:boolean}>{
+    if(window.resumeDesktop){if(!window.resumeDesktop.trash)throw new Error('当前桌面桥接版本不支持回收站。');return window.resumeDesktop.trash.purge(id,expectedRevision,'PERMANENT_DELETE');}
+    return handleJsonResponse<{deleted:boolean}>(await fetch('/api/trash/purge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,expectedRevision,confirmation:'PERMANENT_DELETE'})}));
   },
 
   async listSnapshots(slug: string): Promise<ResumeSnapshotMeta[]> {

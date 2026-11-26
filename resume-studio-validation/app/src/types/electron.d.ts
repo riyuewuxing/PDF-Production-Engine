@@ -6,7 +6,7 @@ import type {
   CoverLetterPdfPayload,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
-import type { ResumeSnapshotMeta } from '../server/localFsApi';
+import type { ResumeSnapshotMeta, ResumeTrashList } from '../server/localFsApi';
 
 export interface SystemFontResult {
   fonts: string[];
@@ -64,7 +64,12 @@ export interface ResumeDesktopBridge {
       cloneFromSlug?: string;
       document?: unknown;
     }) => Promise<{ slug: string; document: ResumeDocument }>;
-    delete: (slug: string, expectedRevision: string) => Promise<{ deleted: boolean }>;
+    delete: (slug: string, expectedRevision: string) => Promise<{ deleted: boolean; trashId?: string }>;
+  };
+  trash?: {
+    list: () => Promise<ResumeTrashList>;
+    restore: (id:string,expectedRevision:string,asCopy:boolean) => Promise<{slug:string;document:ResumeDocument}>;
+    purge: (id:string,expectedRevision:string,confirmation:'PERMANENT_DELETE') => Promise<{deleted:boolean}>;
   };
   snapshots: {
     list: (slug: string) => Promise<ResumeSnapshotMeta[]>;

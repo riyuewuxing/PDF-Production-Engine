@@ -200,6 +200,30 @@ async function run() {
   if(await bodyHas('简历已被其他窗口或进程修改'))throw Error('stale conflict banner after reload');
   checks.diskReloadRecovered=true;
   await capture('08-conflict-recovered');
+  // Real UI: archive a synthetic version while retaining the master and recover through recycle bin.
+  const beforeTrash=await main.store.getResume('runner-fixture');
+  const originalRevision=JSON.stringify([beforeTrash.id,beforeTrash.updatedAt]);
+  await click('版本母库');
+  await until('versions pane',()=>bodyHas('版本与母库管理'));
+  await js('(()=>{window.confirm=()=>true;return true})()');
+  const deleted=await js('(()=>{const b=[...document.querySelectorAll("button[aria-label]")].find(e=>e.getAttribute("aria-label").startsWith("删除"));if(!b)return false;b.click();return true})()');
+  if(!deleted)throw Error('missing archive action');
+  await until('archived to trash',async()=>{try{await main.store.getResume('runner-fixture');return false;}catch{return (await main.store.listTrash()).items.length===1;}});
+  await until('version transition settled',()=>js('document.querySelector(".studio-shell")?.getAttribute("aria-busy")==="false"'));
+  const opened=await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.includes("本地版本回收站"));if(!b)return false;b.click();return true})()');
+  if(!opened)throw Error('missing recycle bin');
+  await until('archive visible',()=>bodyHas('恢复原版本'));
+  await capture('09-recycle-bin');
+  checks.recycleBinVisible=true;
+  await click('恢复原版本');
+  await until('archived original restored',async()=>{try{return (await main.store.getResume('runner-fixture')).id===beforeTrash.id&&(await main.store.listTrash()).items.length===0;}catch{return false;}});
+  const recovered=await main.store.getResume('runner-fixture');
+  if(JSON.stringify([recovered.id,recovered.updatedAt])===originalRevision)throw Error('restore reused stale revision');
+  if(recovered.basic.name!==beforeTrash.basic.name)throw Error('restore lost content');
+  checks.recycleBinRestored=true;
+  await until('restored version listed',()=>bodyHas('runner-fixture.json'));
+  await capture('10-recycle-restored');
+
 
   fs.writeFileSync(path.join(out,'application-evidence.json'),JSON.stringify({sourceSha:source.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,electron:process.versions.electron,checks},null,2));
 }

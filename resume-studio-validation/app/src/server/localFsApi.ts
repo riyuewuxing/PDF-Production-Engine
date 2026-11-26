@@ -113,6 +113,24 @@ async function fileExists(targetPath: string): Promise<boolean> {
   }
 }
 
+export interface ResumeTrashMeta {
+  id: string;
+  slug: string;
+  title: string;
+  deletedAt: string;
+  templateId: TemplateId;
+  revision: string;
+}
+export interface ResumeTrashList { items: ResumeTrashMeta[]; unreadableCount: number; }
+
+const TRASH_ID_REGEX = /^([a-zA-Z0-9][a-zA-Z0-9_-]{0,79})\.(\d{13})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+function parseTrashId(raw: string): {id:string;slug:string;deletedAt:string} {
+  if(typeof raw!=='string')throw new LocalFsApiError(400,'INVALID_TRASH_ID','非法的回收站记录标识。');
+  const match=TRASH_ID_REGEX.exec(raw);
+  if(!match||match[1]==='master')throw new LocalFsApiError(400,'INVALID_TRASH_ID','非法的回收站记录标识。');
+  return {id:raw,slug:assertSafeSlug(match[1]!),deletedAt:new Date(Number(match[2])).toISOString()};
+}
+
 export interface ResumeSnapshotMeta {
   id: string;
   slug: string;
@@ -194,6 +212,7 @@ export class LocalResumeStore {
   readonly resumesDir: string;
   readonly assetsDir: string;
   readonly backupsDir: string;
+  readonly trashDir: string;
   readonly appSnapshotsDir: string;
   readonly applicationsPath: string;
 
@@ -203,6 +222,7 @@ export class LocalResumeStore {
     this.resumesDir = path.join(this.dataDir, 'resumes');
     this.assetsDir = path.join(this.dataDir, 'assets');
     this.backupsDir = path.join(this.dataDir, '.backups');
+    this.trashDir = path.join(this.dataDir, '.trash');
     this.appSnapshotsDir = path.join(this.dataDir, '.application-snapshots');
     this.applicationsPath = path.join(this.dataDir, 'applications.json');
   }
@@ -312,6 +332,7 @@ export class LocalResumeStore {
         : current || options?.requireExisting ? resumeRevision(validated) : null;
       assertExpectedRevision(current, expected);
       if (options?.requireExisting && !current) throw new LocalFsApiError(409, 'REVISION_CONFLICT', '简历已不存在，未重新创建。');
+      if (!current && (await this.reservedTrashSlugs()).has(slug.toLowerCase())) throw new LocalFsApiError(409,'SLUG_RESERVED','该版本标识在回收站中保留，请恢复或创建其他版本。');
       if (current && current.id !== validated.id) throw new LocalFsApiError(409, 'DOCUMENT_ID_CONFLICT', '不能用另一份简历的身份标识覆盖当前版本。');
       if (current && options?.snapshotReason) {
         const snapshot = await this.createSnapshot(slug, options.snapshotReason, current);
@@ -370,48 +391,124 @@ export class LocalResumeStore {
     }
 
     return withResumeWriteLock(this.dataDir, async () => {
-    let targetPath = resolveContainedPath(this.resumesDir, `${candidateSlug}.json`);
-    if (input.slug) {
-      if (await fileExists(targetPath)) {
-        throw new LocalFsApiError(409, 'SLUG_EXISTS', `版本标识 "${candidateSlug}" 已存在。`);
+      const reserved=await this.reservedTrashSlugs();
+      const baseSlug=candidateSlug;
+      const occupied=async(slug:string)=>reserved.has(slug.toLowerCase())||await fileExists(this.resolveResumePath(slug).filePath);
+      if(input.slug&&await occupied(candidateSlug)){
+        throw new LocalFsApiError(409,reserved.has(candidateSlug.toLowerCase())?'SLUG_RESERVED':'SLUG_EXISTS','版本标识已存在或在回收站中保留。');
       }
-    } else {
-      let suffix = 2;
-      while (await fileExists(targetPath)) {
-        const nextSlug = `${candidateSlug}-${suffix}`;
-        targetPath = resolveContainedPath(this.resumesDir, `${nextSlug}.json`);
-        if (!(await fileExists(targetPath))) {
-          candidateSlug = nextSlug;
-          break;
+      if(!input.slug){
+        let suffix=2;
+        while(await occupied(candidateSlug)){
+          const tail='-'+suffix++;
+          candidateSlug=baseSlug.slice(0,80-tail.length)+tail;
         }
-        suffix += 1;
       }
-    }
-
-    const nextDoc: ResumeDocument = {
-      ...baseDoc,
-      id: crypto.randomUUID(),
-      title: finalTitle,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
-
-    const validated = ResumeDocumentSchema.parse(nextDoc);
-    await atomicWriteFile(targetPath, `${JSON.stringify(validated, null, 2)}\n`);
-    return { slug: candidateSlug, document: validated };
+      const nextDoc:ResumeDocument={...baseDoc,id:crypto.randomUUID(),title:finalTitle,createdAt:nowIso,updatedAt:nowIso};
+      const validated=ResumeDocumentSchema.parse(nextDoc);
+      await atomicWriteFile(this.resolveResumePath(candidateSlug).filePath,`${JSON.stringify(validated,null,2)}\n`);
+      return {slug:candidateSlug,document:validated};
     });
   }
 
-  async deleteResume(rawSlug: string, expectedRevision?: string): Promise<void> {
-    const { slug, filePath, isMaster } = this.resolveResumePath(rawSlug);
-    if (isMaster) {
-      throw new LocalFsApiError(400, 'MASTER_PROTECTED', '母库 master.json 受保护，不允许删除。');
+  private async trashEntries() {
+    try {return await fs.readdir(this.trashDir,{withFileTypes:true});}
+    catch(err){if((err as NodeJS.ErrnoException).code==='ENOENT')return [];throw err;}
+  }
+
+  private async reservedTrashSlugs():Promise<Set<string>> {
+    const result=new Set<string>();
+    for(const entry of await this.trashEntries()){
+      if(!entry.name.endsWith('.json'))continue;
+      try {result.add(parseTrashId(entry.name.slice(0,-5)).slug.toLowerCase());}catch{/* unrelated file, not managed */}
     }
-    await withResumeWriteLock(this.dataDir, async () => {
-      const current = await this.readOptionalResume(filePath);
-      if (!current) throw new LocalFsApiError(404, 'NOT_FOUND', `简历版本 "${slug}" 不存在。`);
-      if (expectedRevision !== undefined) assertExpectedRevision(current, expectedRevision);
-      await fs.unlink(filePath);
+    return result;
+  }
+
+  async listTrash():Promise<ResumeTrashList>{
+    const items:ResumeTrashMeta[]=[];
+    let unreadableCount=0;
+    for(const entry of await this.trashEntries()){
+      if(!entry.name.endsWith('.json'))continue;
+      let parsed:ReturnType<typeof parseTrashId>;
+      try {parsed=parseTrashId(entry.name.slice(0,-5));}catch{unreadableCount++;continue;}
+      try {
+        if(!entry.isFile())throw new Error('not a regular file');
+        const doc=await this.readAndValidateFile(resolveContainedPath(this.trashDir,entry.name));
+        items.push({...parsed,title:doc.title,templateId:doc.templateId,revision:resumeRevision(doc)});
+      } catch(err) {
+        // A simultaneous completed restore removes this entry. Corruption is not silently hidden.
+        if((err as NodeJS.ErrnoException).code!=='ENOENT')unreadableCount++;
+      }
+    }
+    items.sort((a,b)=>b.deletedAt.localeCompare(a.deletedAt));
+    return {items,unreadableCount};
+  }
+
+  async deleteResume(rawSlug:string,expectedRevision?:string):Promise<{deleted:true;trashId:string}> {
+    const {slug,filePath,isMaster}=this.resolveResumePath(rawSlug);
+    if(isMaster)throw new LocalFsApiError(400,'MASTER_PROTECTED','母库 master.json 受保护，不允许删除。');
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.readOptionalResume(filePath);
+      if(!current)throw new LocalFsApiError(404,'NOT_FOUND','简历版本不存在。');
+      if(expectedRevision!==undefined)assertExpectedRevision(current,expectedRevision);
+      await fs.mkdir(this.trashDir,{recursive:true});
+      const trashId=`${slug}.${Date.now()}.${crypto.randomUUID()}`;
+      // A single atomic rename; the document never exists in a partially archived state.
+      await fs.rename(filePath,resolveContainedPath(this.trashDir,trashId+'.json'));
+      return {deleted:true,trashId};
+    });
+  }
+
+  private async readTrash(rawId:string) {
+    const record=parseTrashId(rawId);
+    const filePath=resolveContainedPath(this.trashDir,record.id+'.json');
+    let info;
+    try{info=await fs.lstat(filePath);}catch(err){
+      if((err as NodeJS.ErrnoException).code==='ENOENT')throw new LocalFsApiError(404,'TRASH_NOT_FOUND','回收站记录不存在或已恢复。');
+      throw err;
+    }
+    if(!info.isFile())throw new LocalFsApiError(422,'TRASH_INVALID','回收站记录不是普通文件。');
+    return {...record,filePath,document:await this.readAndValidateFile(filePath)};
+  }
+
+  async restoreTrash(rawId:string,expectedRevision:string,asCopy=false):Promise<{slug:string;document:ResumeDocument}> {
+    if(typeof expectedRevision!=='string')throw new LocalFsApiError(428,'REVISION_REQUIRED','恢复前必须提供回收站记录版本。');
+    await this.ensureDirs();
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const archived=await this.readTrash(rawId);
+      assertExpectedRevision(archived.document,expectedRevision);
+      let slug=archived.slug;
+      if(asCopy){
+        const reserved=await this.reservedTrashSlugs();
+        const base=slug.slice(0,60)+'-restored';
+        slug=base;
+        let i=2;
+        while(reserved.has(slug.toLowerCase())||await fileExists(this.resolveResumePath(slug).filePath)){
+          const tail='-'+i++;slug=base.slice(0,80-tail.length)+tail;
+        }
+        const now=new Date().toISOString();
+        const doc=ResumeDocumentSchema.parse({...archived.document,id:crypto.randomUUID(),title:archived.document.title+'（恢复副本）',createdAt:now,updatedAt:now});
+        await atomicWriteFile(this.resolveResumePath(slug).filePath,`${JSON.stringify(doc,null,2)}\n`);
+        return {slug,document:doc};
+      }
+      const target=this.resolveResumePath(slug).filePath;
+      if(await fileExists(target))throw new LocalFsApiError(409,'RESTORE_CONFLICT','原版本标识已被占用，未覆盖现有文件。可另存恢复副本。');
+      // Advance revision before moving back so old open editors cannot write using a pre-delete revision.
+      const doc=await this.writeResume(archived.filePath,archived.document,archived.document);
+      await fs.rename(archived.filePath,target);
+      return {slug,document:doc};
+    });
+  }
+
+  async purgeTrash(rawId:string,expectedRevision:string,confirmation:unknown):Promise<{deleted:true}> {
+    if(confirmation!=='PERMANENT_DELETE'||typeof expectedRevision!=='string')throw new LocalFsApiError(400,'CONFIRMATION_REQUIRED','永久删除需要明确确认与记录版本。');
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const archived=await this.readTrash(rawId);
+      assertExpectedRevision(archived.document,expectedRevision);
+      await fs.unlink(archived.filePath);
+      // History, application snapshots and assets have independent lifetimes. Never purge them here.
+      return {deleted:true};
     });
   }
 
@@ -581,8 +678,10 @@ export class LocalResumeStore {
     const { filePath: targetPath } = this.resolveResumePath(slug);
     return withResumeWriteLock(this.dataDir, async () => {
       const current = await this.readOptionalResume(targetPath);
+      if (!current) throw new LocalFsApiError(404,'NOT_FOUND','当前简历不存在，请通过回收站恢复原版本。');
       if (expectedRevision !== undefined) assertExpectedRevision(current, expectedRevision);
-      if (current) await this.createSnapshot(slug, '回滚前自动备份', current);
+      if (current.id !== restoredDoc.id) throw new LocalFsApiError(409,'DOCUMENT_ID_CONFLICT','该历史快照属于另一份简历，未覆盖当前版本。');
+      await this.createSnapshot(slug, '回滚前自动备份', current);
       return this.writeResume(targetPath, restoredDoc, current);
     });
   }
@@ -761,6 +860,18 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         return;
       }
 
+      if(method==='GET'&&pathname==='/api/trash'){
+        sendJson(res,200,await store.listTrash());return;
+      }
+      if(method==='POST'&&pathname==='/api/trash/restore'){
+        const body=(await readJsonBody(req)) as {id:string;expectedRevision:string;asCopy?:boolean};
+        sendJson(res,200,await store.restoreTrash(body.id,body.expectedRevision,body.asCopy===true));return;
+      }
+      if(method==='POST'&&pathname==='/api/trash/purge'){
+        const body=(await readJsonBody(req)) as {id:string;expectedRevision:string;confirmation?:string};
+        sendJson(res,200,await store.purgeTrash(body.id,body.expectedRevision,body.confirmation));return;
+      }
+
       if (method === 'GET' && pathname === '/api/applications') {
         const data = await store.getApplications();
         sendJson(res, 200, data);
@@ -843,8 +954,8 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         if (method === 'DELETE') {
           const expected = req.headers['if-match'];
           if (typeof expected !== 'string') throw new LocalFsApiError(428, 'REVISION_REQUIRED', '删除前必须提供已读取的版本标识。');
-          await store.deleteResume(rawSlug, decodeURIComponent(expected));
-          sendJson(res, 200, { deleted: true });
+          const result=await store.deleteResume(rawSlug, decodeURIComponent(expected));
+          sendJson(res, 200, result);
           return;
         }
       }

@@ -471,6 +471,10 @@ function registerIpcHandlers(): void {
     (_event, payload: { filename?: string; dataUrl: string }) => store.saveAsset(payload),
   );
 
+  trustedEditorHandle('trash:list',()=>store.listTrash());
+  trustedEditorHandle('trash:restore',(_event,id:string,expectedRevision:string,asCopy:boolean)=>store.restoreTrash(id,expectedRevision,asCopy===true));
+  trustedEditorHandle('trash:purge',(_event,id:string,expectedRevision:string,confirmation:unknown)=>store.purgeTrash(id,expectedRevision,confirmation));
+
   trustedEditorHandle('snapshots:list', (_event, slug: string) => store.listSnapshots(slug));
   trustedEditorHandle('snapshots:create', (_event, slug: string, reason: string, expectedRevision: string) => {
     if (typeof expectedRevision !== 'string') throw new Error('快照前必须提供版本标识。');

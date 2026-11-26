@@ -17,6 +17,11 @@ const bridge: ResumeDesktopBridge = {
     create: (input) => ipcRenderer.invoke('resumes:create', input),
     delete: (slug, expectedRevision) => ipcRenderer.invoke('resumes:delete', slug, expectedRevision),
   },
+  trash: {
+    list:()=>ipcRenderer.invoke('trash:list'),
+    restore:(id,expectedRevision,asCopy)=>ipcRenderer.invoke('trash:restore',id,expectedRevision,asCopy),
+    purge:(id,expectedRevision,confirmation)=>ipcRenderer.invoke('trash:purge',id,expectedRevision,confirmation),
+  },
   snapshots: {
     list: (slug: string) => ipcRenderer.invoke('snapshots:list', slug),
     create: (slug, reason, expectedRevision) => ipcRenderer.invoke('snapshots:create', slug, reason, expectedRevision),

@@ -23,6 +23,7 @@ import { StyleAndColorPane } from './components/Style/StyleAndColorPane';
 import { TemplateGallery } from './components/Templates/TemplateGallery';
 import { MasterMergeModal } from './components/Versions/MasterMergeModal';
 import { VersionAndMasterPane } from './components/Versions/VersionAndMasterPane';
+import { RecycleBinPanel } from './components/Versions/RecycleBinPanel';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useResumeExport } from './hooks/useResumeExport';
 import { useResumePersistence } from './hooks/useResumePersistence';
@@ -109,7 +110,10 @@ export default function App() {
     handleCreateVersion,
     handleDeleteVersion,
     handleImportJson,
-    markSavedFromSnapshot,
+    handleRestoreSnapshot,
+    handleRestoreTrash,
+    versionTransitioning,
+    canEditCurrent,
     getCurrentRevision,
     reloadActiveFromDisk,
     ensureCurrentQueued,
@@ -144,11 +148,12 @@ export default function App() {
 
   const handleDocumentChange = useCallback(
     (nextDoc: ResumeDocument, options?: { immediate?: boolean }) => {
+      if(!canEditCurrent()||!activeDocRef.current||activeDocRef.current.id!==nextDoc.id)throw new Error('当前版本已变化或正在处理版本操作，未应用旧编辑。');
       activeDocRef.current = nextDoc;
       setHistoryDoc(nextDoc, options);
       scheduleAutoSave(nextDoc);
     },
-    [activeDocRef, scheduleAutoSave, setHistoryDoc],
+    [activeDocRef, canEditCurrent, scheduleAutoSave, setHistoryDoc],
   );
 
   const handleImmediateChange = useCallback(
@@ -157,20 +162,22 @@ export default function App() {
   );
 
   const handleUndo = useCallback(() => {
+    if(!canEditCurrent())return;
     const restored = undoHistoryDoc();
     if (!restored) return;
     activeDocRef.current = restored;
     setFitFeedback(null);
     scheduleAutoSave(restored);
-  }, [activeDocRef, scheduleAutoSave, undoHistoryDoc]);
+  }, [activeDocRef, canEditCurrent, scheduleAutoSave, undoHistoryDoc]);
 
   const handleRedo = useCallback(() => {
+    if(!canEditCurrent())return;
     const restored = redoHistoryDoc();
     if (!restored) return;
     activeDocRef.current = restored;
     setFitFeedback(null);
     scheduleAutoSave(restored);
-  }, [activeDocRef, redoHistoryDoc, scheduleAutoSave]);
+  }, [activeDocRef, canEditCurrent, redoHistoryDoc, scheduleAutoSave]);
 
   const handleManualSave = useCallback(async () => {
     if (!ensureCurrentQueued()) return;
@@ -221,7 +228,7 @@ export default function App() {
   }, []);
 
   useGlobalShortcuts({
-    hasActiveDoc: Boolean(activeDoc) && !loading,
+    hasActiveDoc: Boolean(activeDoc) && !loading && !versionTransitioning && !isFitting,
     onManualSave: handleManualSave,
     onUndo: handleUndo,
     onRedo: handleRedo,
@@ -266,7 +273,7 @@ export default function App() {
 
   const handleFitOnePage = useCallback(async () => {
     const beforeDoc = activeDocRef.current;
-    if (!beforeDoc || isFitting || !measureOverflowRef.current) return;
+    if (!beforeDoc || isFitting || !canEditCurrent() || !measureOverflowRef.current) return;
     setIsFitting(true);
     setFitFeedback(null);
     try {
@@ -292,20 +299,12 @@ export default function App() {
     } finally {
       setIsFitting(false);
     }
-  }, [activeDocRef, commitBatch, isFitting, previewSilent, scheduleAutoSave]);
+  }, [activeDocRef, canEditCurrent, commitBatch, isFitting, previewSilent, scheduleAutoSave]);
 
   const handlePreviewSelectSection = useCallback((sectionId: string) => {
     setActiveTab('edit');
     setFocusSectionRequest((prev) => ({ id: sectionId, seq: (prev?.seq ?? 0) + 1 }));
   }, []);
-
-  const handleSnapshotRestored = useCallback(
-    (restoredDoc: ResumeDocument) => {
-      markSavedFromSnapshot(restoredDoc);
-      setFitFeedback(null);
-    },
-    [markSavedFromSnapshot],
-  );
 
   const handleMasterMergeCommit = useCallback(
     async (mergedDoc: ResumeDocument) => {
@@ -364,6 +363,7 @@ export default function App() {
           >
             重试加载
           </button>
+          <div className="mt-4"><RecycleBinPanel onRestore={handleRestoreTrash}/></div>
         </div>
       </div>
     );
@@ -380,7 +380,8 @@ export default function App() {
   ];
 
   return (
-    <div className="studio-shell flex h-screen flex-col overflow-hidden bg-[#11161f] text-slate-900">
+    <div className="studio-shell relative flex h-screen flex-col overflow-hidden bg-[#11161f] text-slate-900" inert={versionTransitioning||isFitting} aria-busy={versionTransitioning||isFitting}>
+      {(versionTransitioning||isFitting)&&<div className="no-print absolute inset-0 z-[100] flex items-center justify-center bg-slate-900/35"><div className="rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg">{versionTransitioning?'正在安全处理版本，请稍候…':'正在测量页面排版…'}</div></div>}
       <StudioHeader
         activeSlug={activeSlug}
         activeTab={activeTab}
@@ -492,7 +493,8 @@ export default function App() {
                   onDeleteVersion={handleDeleteVersion}
                   onImportJson={handleImportJson}
                   onOpenMasterMerge={() => setIsMasterMergeOpen(true)}
-                  onSnapshotRestored={handleSnapshotRestored}
+                  onRestoreSnapshot={handleRestoreSnapshot}
+                  onRestoreTrash={handleRestoreTrash}
                   onFlushBeforeMutation={flushPendingSave}
                   getCurrentRevision={getCurrentRevision}
                 />
