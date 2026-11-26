@@ -116,7 +116,14 @@ async function run(){
     finally{main.store.createSnapshot=originalCreate;}
     assert(JSON.stringify(fs.readdirSync(outside))===JSON.stringify(['keep.txt'])&&fs.readFileSync(path.join(outside,'keep.txt'),'utf8')==='PRESERVE','redirected directory modified');
     checks.unsafeDirectoryIsVisibleAndNeverWritten=true;
-  }finally{fs.rmSync(dir,{recursive:false});fs.renameSync(held,dir);}
+  }finally{
+    // On Windows a junction is a directory reparse point. Remove only the
+    // junction, non-recursively, and verify the actual external sentinel.
+    assert(fs.lstatSync(dir).isSymbolicLink(),'expected synthetic junction');
+    fs.rmdirSync(dir);
+    assert(fs.readFileSync(path.join(outside,'keep.txt'),'utf8')==='PRESERVE','junction cleanup changed external data');
+    fs.renameSync(held,dir);
+  }
   preserve();
   observations.invalidRecordHashes={alias:digest(aliasBytes),invalid:digest(invalidBytes)};observations.newestSha256=digest(newestBytes);observations.validCount=after.length;observations.allFiles=fs.readdirSync(dir).length;
   report();
