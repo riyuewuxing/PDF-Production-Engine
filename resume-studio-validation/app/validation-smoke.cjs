@@ -224,6 +224,60 @@ async function run() {
   checks.recycleBinRestored=true;
   await until('restored version listed',()=>bodyHas('runner-fixture.json'));
   await capture('10-recycle-restored');
+  // Real process interruption, explicit owner check and UI recovery.
+  const {spawn}=require('node:child_process');
+  const child=spawn('node',['--import','tsx',path.join(__dirname,'src/server/lockCrashWorker.ts'),main.dataDir],{cwd:__dirname,stdio:['ignore','pipe','pipe']});
+  const code=await new Promise((resolve,reject)=>{
+    let stderr='';child.stderr.on('data',c=>stderr+=String(c));
+    const timer=setTimeout(()=>{child.kill();reject(Error('lock worker watchdog expired'))},12000);
+    child.once('error',err=>{clearTimeout(timer);reject(err)});
+    child.once('close',code=>{clearTimeout(timer);if(code!==7)reject(Error('lock worker failed: '+stderr.slice(0,300)));else resolve(code)});
+  });
+  if(code!==7)throw Error('crash fixture did not exit');
+  await click('检查写入锁');
+  await until('lock owner confirmed exited',()=>bodyHas('可安全归档的遗留锁'));
+  await js('(()=>{document.querySelector("[aria-label=\\\"本地写入锁检查\\\"]")?.scrollIntoView({block:"center"});return true})()');
+  await capture('11-dead-lock-inspected');
+  await click('确认恢复遗留锁');
+  await until('old lock archived',()=>bodyHas('当前没有写入锁'));
+  if(fs.existsSync(path.join(main.dataDir,'.resume-write-lock')))throw Error('old lock remained');
+  if(fs.readdirSync(path.join(main.dataDir,'.lock-recovery-history')).length!==1)throw Error('recovery evidence missing');
+  checks.crashedLockRecovered=true;
+  await capture('12-dead-lock-recovered');
+
+  // Real career UI: multiple inputs, external update, retained draft, explicit backup and reload.
+  await click('求职面试');
+  await until('ledger loaded',()=>bodyHas('已读取本地台账'));
+  const setInput=async(selector,value)=>js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const proto=e.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,"value").set.call(e,'+JSON.stringify(value)+');e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  if(!await setInput('input[placeholder="单位/学校名称（必填）"]','虚构招聘单位'))throw Error('career input missing');
+  await click('记一笔');
+  await until('application created',async()=>(await main.store.getApplications()).applications.some(a=>a.company==='虚构招聘单位'));
+  await until('career row visible',()=>bodyHas('虚构招聘单位'));
+  const before=await main.store.getApplications();
+  await main.store.saveApplications({...before,applications:before.applications.map(a=>({...a,notes:'外部已保存备注'}))},before.revision);
+  const notes='textarea[placeholder="记录笔试真题、试讲课题或面试复盘..."]';
+  if(!await setInput(notes,'本地未保存台账草稿'))throw Error('notes input missing');
+  await until('career conflict visible',()=>bodyHas('投递台账已被其他操作更新'));
+  if((await main.store.getApplications()).applications[0].notes!=='外部已保存备注')throw Error('stale ledger overwritten');
+  checks.careerConflictRejected=true;
+  await capture('13-ledger-conflict');
+  const saveDialog=dialog.showSaveDialog;
+  const careerDraftPath=path.join(out,'synthetic-ledger-draft.json');
+  dialog.showSaveDialog=async()=>({canceled:false,filePath:careerDraftPath});
+  await click('另存台账草稿');
+  await until('ledger draft file',()=>fs.existsSync(careerDraftPath));
+  if(JSON.parse(fs.readFileSync(careerDraftPath,'utf8')).applications[0].notes!=='本地未保存台账草稿')throw Error('wrong career draft');
+  dialog.showSaveDialog=saveDialog;
+  checks.careerDraftBackedUp=true;
+  // Navigate away and back: draft must survive panel unmount.
+  await click('版本母库');await click('求职面试');
+  await until('ledger draft survives unmount',()=>js('document.querySelector('+JSON.stringify(notes)+')?.value==="本地未保存台账草稿"'));
+  checks.careerDraftSurvivedUnmount=true;
+  await click('重载磁盘台账');
+  await until('latest ledger read',()=>js('document.querySelector('+JSON.stringify(notes)+')?.value==="外部已保存备注"'));
+  checks.careerReloadRecovered=true;
+  await capture('14-ledger-reloaded');
+
 
 
   fs.writeFileSync(path.join(out,'application-evidence.json'),JSON.stringify({sourceSha:source.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,electron:process.versions.electron,checks},null,2));

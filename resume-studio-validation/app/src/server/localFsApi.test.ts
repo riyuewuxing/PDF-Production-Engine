@@ -253,6 +253,9 @@ describe('localFsApi security and persistence', () => {
     expect(reloaded.coverLetters[0]?.headerVariant).toBe('wave-banner');
     expect(reloaded.interviewAnswers['fixture-teacher:q-edu-foundation']).toBe('强化实验探究');
 
+    await expect(store.deleteApplicationSnapshot(lockedSnap.id)).rejects.toMatchObject({code:'SNAPSHOT_REFERENCED'});
+    await store.saveApplications({...reloaded,applications:[]},reloaded.revision);
+    expect((await store.getApplicationSnapshot(lockedSnap.id)).document.basic.name).toBe('永久封存原稿');
     expect(await store.deleteApplicationSnapshot(lockedSnap.id)).toEqual({ deleted: true });
     await expect(store.getApplicationSnapshot(lockedSnap.id)).rejects.toThrow(LocalFsApiError);
   });
