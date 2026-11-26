@@ -122,15 +122,6 @@ async function atomicWriteFile(targetPath: string, data: string | Buffer): Promi
   }
 }
 
-async function fileExists(targetPath: string): Promise<boolean> {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // Occupancy is not readability: an inaccessible or dangling entry must not be
 // treated as free space for initialization, import, or recovery.
 async function pathEntryExists(targetPath: string): Promise<boolean> {
