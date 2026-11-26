@@ -202,7 +202,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       <button type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1">加载 / 刷新岗位事实依据</button>
       <div className="text-slate-600">{bank?'本地事实版本已读取：'+checkedAt:'尚未加载独立事实库，仅显示简历自述。'} 事实库变化后请刷新；保存核对结果时再次校验已加载的版本。</div>
       <label className="block">选择候选条款<select aria-label="岗位候选条款" disabled={busy} value={active} onChange={e=>select(e.target.value)} className="mt-1 w-full rounded border bg-white p-1.5">
-        {session.clauses.map((c,i)=><option key={c.id} value={c.id}>{i+1}. 第 {c.line} 行 · {c.quote.slice(0,68)}{reviews[c.id]?' · 已记录':''}</option>)}
+        {session.clauses.map((c,i)=>{const page=jobPdfPageForRange(pdfOrigin,c.start,c.end);return <option key={c.id} value={c.id}>{i+1}. {page!==undefined?'PDF 第 '+page+' 页 · 提取文本':''}第 {c.line} 行 · {c.quote.slice(0,68)}{reviews[c.id]?' · 已记录':''}</option>})}
       </select></label>
       {clause&&<div className="space-y-2 rounded border border-indigo-200 bg-white p-2">
         <div className="font-semibold">原文定位：{jobPdfPageForRange(pdfOrigin,clause.start,clause.end)!==undefined&&<span aria-label="公告 PDF 页码">PDF 第 {jobPdfPageForRange(pdfOrigin,clause.start,clause.end)} 页 · 确认提取文本</span>}第 {clause.line} 行 · 字符区间 [{clause.start}, {clause.end})</div>

@@ -1145,7 +1145,25 @@ async function run() {
   const xref=Buffer.byteLength(noticePdf);
   noticePdf+='xref\n0 '+offsets.length+'\n0000000000 65535 f \n'+offsets.slice(1).map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size '+offsets.length+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF\n';
   const noticeBytes=Buffer.from(noticePdf),noticeHash=require('node:crypto').createHash('sha256').update(noticeBytes).digest('hex');
-  if(!await sendNotice('synthetic-notice.pdf',noticeBytes))throw Error('notice upload unavailable');
+  // Drive the actual file picker control with Chromium's intercepted native file chooser.
+  const noticePath=path.join(root,'synthetic-notice.pdf');fs.writeFileSync(noticePath,noticeBytes);
+  const picker=win.webContents.debugger;
+  let chooserListener,chooserTimer;
+  try{
+    picker.attach('1.3');await picker.sendCommand('Page.enable');await picker.sendCommand('Page.setInterceptFileChooserDialog',{enabled:true});
+    const opened=new Promise((resolve,reject)=>{
+      chooserTimer=setTimeout(()=>reject(Error('PDF picker event watchdog expired')),8000);
+      chooserListener=(_event,method,params)=>{if(method==='Page.fileChooserOpened'){clearTimeout(chooserTimer);resolve(params);}};
+      picker.on('message',chooserListener);
+    });
+    const [chosen,clicked]=await Promise.all([opened,win.webContents.executeJavaScript('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==="选择本地招聘公告 PDF");if(!b||b.disabled)return false;b.click();return true})()',true)]);
+    if(!clicked||!chosen.backendNodeId)throw Error('actual PDF picker button did not open file input');
+    await picker.sendCommand('DOM.setFileInputFiles',{files:[noticePath],backendNodeId:chosen.backendNodeId});
+  }finally{
+    clearTimeout(chooserTimer);if(chooserListener)picker.removeListener('message',chooserListener);
+    if(picker.isAttached()){await picker.sendCommand('Page.setInterceptFileChooserDialog',{enabled:false}).catch(()=>{});picker.detach();}
+  }
+  checks.jobPdfActualPicker=true;
   await until('three PDF pages extracted',async()=>await bodyHas('synthetic-notice.pdf · 共 3 页')&&await bodyHas('第 2 页无可靠文本层'));
   if(await noticeJd()!==noticeBefore)throw Error('PDF extraction replaced JD without approval');
   const namedCheck=(label)=>js('(()=>{const e=document.querySelector("input[aria-label="+JSON.stringify('+JSON.stringify(label)+')+"]");if(!e||e.disabled)return false;e.click();return true})()');
@@ -1181,6 +1199,8 @@ async function run() {
   const certQuote='Teaching certificate required;',certStart=confirmedPdfJd.indexOf(certQuote);
   if(!await jobSelect('岗位候选条款',certStart+':'+(certStart+certQuote.length)))throw Error('PDF page three clause unavailable');
   await until('actual page number retained',()=>js('document.querySelector("[aria-label=\\"公告 PDF 页码\\"]")?.innerText.includes("PDF 第 3 页")'));
+  if(!await js('document.querySelector("select[aria-label=\\"岗位候选条款\\"]")?.selectedOptions[0]?.textContent.includes("PDF 第 3 页")'))throw Error('clause selector lost page provenance');
+  checks.jobPdfPageSelector=true;
   await js('document.querySelector("[aria-label=\\"岗位条款原文\\"]")?.scrollIntoView({block:"center"})');
   await capture('77-job-pdf-page-provenance');
   await jobSelect('岗位核对结果','gap');await click('记录本条人工核对');await until('PDF clause reviewed',()=>bodyHas('已记录 1 条'));

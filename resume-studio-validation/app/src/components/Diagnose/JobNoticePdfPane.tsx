@@ -19,6 +19,7 @@ export function JobNoticePdfPane({jdText,origin,onConfirm}:Props){
   const confirmed=confirmedFor?.text===jdText&&confirmedFor?.origin===origin;
   const setConfirmed=(value:boolean)=>setConfirmedFor(value?{text:jdText,origin}:null);
   const bytes=useRef<Uint8Array|null>(null),task=useRef<AbortController|null>(null),alive=useRef(false);
+  const fileInput=useRef<HTMLInputElement>(null);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;task.current?.abort();bytes.current=null;};},[]);
   const run=async(work:(signal:AbortSignal)=>Promise<void>)=>{
     if(task.current)return;
@@ -60,7 +61,11 @@ export function JobNoticePdfPane({jdText,origin,onConfirm}:Props){
     <div className="font-bold text-teal-900">招聘公告 PDF 本地导入</div>
     <p>离线提取可选文本，按实际 PDF 页序对照原件；表格、分栏、乱码、图片中的文字可能遗漏或错序。无 OCR，不联网，不自动判断资格。</p>
     {origin&&<p aria-label="当前公告来源" className="rounded bg-white p-2 text-teal-900">当前来源：{origin.fileName} · 第 {origin.pages.map(p=>p.page).join('、')} 页 / 共 {origin.totalPages} 页。页码映射对应确认后的提取文本，手工编辑 JD 会取消来源绑定。</p>}
-    <input type="file" accept=".pdf,application/pdf" aria-label="选择本地招聘公告 PDF" disabled={busy} onChange={e=>{pick(e.target.files?.[0]);e.target.value='';}} className="w-full rounded border bg-white p-1"/>
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" disabled={busy} onClick={()=>fileInput.current?.click()} className="rounded border border-teal-300 bg-white px-2.5 py-1.5 font-medium text-teal-900 disabled:opacity-50">选择本地招聘公告 PDF</button>
+      <span className="text-slate-600">最多 10 MB / 40 页</span>
+      <input ref={fileInput} type="file" accept=".pdf,application/pdf" aria-label="选择本地招聘公告 PDF" disabled={busy} onChange={e=>{pick(e.target.files?.[0]);e.target.value='';}} className="hidden"/>
+    </div>
     {busy&&<div role="status">正在本地处理公告… <button type="button" onClick={()=>task.current?.abort()} className="rounded border bg-white px-2 py-1">取消公告处理</button></div>}
     {error&&<p role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</p>}
     {draft&&<>
