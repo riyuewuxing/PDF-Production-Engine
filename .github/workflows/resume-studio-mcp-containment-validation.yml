@@ -1,0 +1,52 @@
+name: Resume Studio V6 MCP managed-path containment
+on:
+  push:
+    branches: ['resume-studio/v6-mcp-containment-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-mcp-containment-validation
+  cancel-in-progress: true
+jobs:
+  mcp-containment:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual MCP bundle
+        timeout-minutes: 2
+        run: node scripts/build-electron.mjs
+      - name: Actual authorized MCP child processes cannot access linked files
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-mcp-containment-evidence'
+          node validation-mcp-entry-containment.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual process evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-mcp-containment-${{ matrix.os }}
+          path: resume-studio-mcp-containment-evidence/
+          if-no-files-found: error
+          retention-days: 3
