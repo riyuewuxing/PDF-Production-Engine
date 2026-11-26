@@ -213,6 +213,41 @@ describe('portable workspace backup',()=>{
     const restored=await restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,f.dest,f.signal);
     expect(await fs.readFile(path.join(restored.folder,'data',relative),'utf8')).toBe('合成附件');
   });
+  it('restores photo assets, recycle bin documents and ordinary historical snapshots',async()=>{
+    const f=await backupFixture();
+    const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR7sAAAAASUVORK5CYII=';
+    const asset=await f.store.saveAsset({filename:'synthetic-photo.png',dataUrl:'data:image/png;base64,'+png});
+    const photoDoc=doc();
+    await f.store.saveResume('photo-sample',{...photoDoc,basic:{...photoDoc.basic,photo:asset.url}});
+    await f.store.deleteResume('sample',resumeRevision(await f.store.getResume('sample')));
+    const originalTrash=await f.store.listTrash(),originalSnapshots=await f.store.listSnapshots('sample');
+    expect(originalTrash.items.length).toBe(1);
+    expect(originalSnapshots.length).toBeGreaterThan(0);
+    const b=await createWorkspaceBackup(f.root,f.dest,f.signal),checked=await inspectWorkspaceBackup(b.folder,f.signal);
+    expect(checked.manifest.files.some(row=>row.path==='assets/'+asset.filename)).toBe(true);
+    expect(checked.manifest.files.some(row=>row.path.startsWith('.trash/'))).toBe(true);
+    const restored=await restoreWorkspaceBackup(f.root,b.folder,checked.manifestHash,f.dest,f.signal);
+    const newStore=new LocalResumeStore(path.join(restored.folder,'data'));
+    expect((await newStore.getResume('photo-sample')).basic.photo).toBe(asset.url);
+    expect((await newStore.readAsset(asset.filename)).buffer).toEqual(Buffer.from(png,'base64'));
+    expect(await newStore.listTrash()).toEqual(originalTrash);
+    expect(await newStore.listSnapshots('sample')).toEqual(originalSnapshots);
+  });
+  it('coordinates asset and explicit snapshot writers with the workspace write lock',async()=>{
+    const f=await backupFixture();
+    let assetWrite:ReturnType<LocalResumeStore['saveAsset']>|undefined,snapshotWrite:ReturnType<LocalResumeStore['createSnapshot']>|undefined;
+    const before=await f.store.listSnapshots('sample');
+    await withResumeWriteLock(f.data,async()=>{
+      assetWrite=f.store.saveAsset({filename:'synthetic-lock-photo.png',dataUrl:'data:image/png;base64,aGVsbG8='});
+      snapshotWrite=f.store.createSnapshot('sample','锁释放后创建');
+      await new Promise(resolve=>setTimeout(resolve,120));
+      expect(await fs.readdir(path.join(f.data,'assets'))).toEqual([]);
+      expect(await f.store.listSnapshots('sample')).toEqual(before);
+    });
+    expect(await assetWrite).toBeDefined();
+    expect(await snapshotWrite).toBeDefined();
+    expect((await f.store.listSnapshots('sample')).length).toBe(before.length+1);
+  });
   it('does not publish on cancellation or corrupted source',async()=>{
     const f=await backupFixture();const ctl=new AbortController();ctl.abort();
     await expect(createWorkspaceBackup(f.root,f.dest,ctl.signal)).rejects.toThrow('取消');
