@@ -50,6 +50,14 @@ jobs:
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence\import-visibility'
           & .\node_modules\.bin\electron.cmd .\validation-import-visibility.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual editor template, discrete history and cross-version undo isolation
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('editor-history-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-evidence\editor-history'
+          & .\node_modules\.bin\electron.cmd .\validation-editor-history.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Force terminate and restart real Electron with unsaved synthetic drafts
         timeout-minutes: 3
         run: |

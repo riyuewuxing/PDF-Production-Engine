@@ -7,6 +7,7 @@ import { type CropOutputPayload, PhotoCropModal } from './PhotoCropModal';
 interface BasicInfoEditorProps {
   basic: BasicInfo;
   onChange: (next: BasicInfo) => void;
+  onImmediateChange?: (next: BasicInfo) => void;
 }
 
 const CORE_FIELD_KEYS = new Set([
@@ -19,7 +20,8 @@ const CORE_FIELD_KEYS = new Set([
   'location',
 ]);
 
-export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
+export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInfoEditorProps) {
+  const emitDiscrete = onImmediateChange ?? onChange;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
   };
 
   const toggleFieldVisible = (fieldId: string) => {
-    onChange({
+    emitDiscrete({
       ...basic,
       fieldOrder: basic.fieldOrder.map((f) =>
         f.id === fieldId ? { ...f, visible: !f.visible } : f,
@@ -69,21 +71,22 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
       value: '',
       visible: true,
     };
-    onChange({
+    emitDiscrete({
       ...basic,
       customFields: [...basic.customFields, nextField],
     });
   };
 
   const updateCustomField = (id: string, patch: Partial<CustomField>) => {
-    onChange({
+    const emit = typeof patch.visible === 'boolean' ? emitDiscrete : onChange;
+    emit({
       ...basic,
       customFields: basic.customFields.map((f) => (f.id === id ? { ...f, ...patch } : f)),
     });
   };
 
   const removeCustomField = (id: string) => {
-    onChange({
+    emitDiscrete({
       ...basic,
       customFields: basic.customFields.filter((f) => f.id !== id),
     });
@@ -118,7 +121,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
 
   const handleCropConfirm = async (result: CropOutputPayload) => {
     const uploaded = await apiClient.uploadAsset(result.fileName, result.dataUrl);
-    onChange({
+    emitDiscrete({
       ...basic,
       photo: uploaded.url,
       photoConfig: {
@@ -229,7 +232,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
           <button
             type="button"
             onClick={() =>
-              onChange({
+              emitDiscrete({
                 ...basic,
                 photoConfig: { ...basic.photoConfig, visible: !basic.photoConfig.visible },
               })
@@ -283,7 +286,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
               {basic.photo && (
                 <button
                   type="button"
-                  onClick={() => onChange({ ...basic, photo: '' })}
+                  onClick={() => emitDiscrete({ ...basic, photo: '' })}
                   className="rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-600 hover:bg-red-50 hover:text-red-600"
                 >
                   清除
@@ -335,7 +338,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
                 <select
                   value={basic.photoConfig.borderRadius}
                   onChange={(e) =>
-                    onChange({
+                    emitDiscrete({
                       ...basic,
                       photoConfig: {
                         ...basic.photoConfig,
@@ -359,7 +362,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
                   aria-label="头像相框样式"
                   value={basic.photoConfig.frameStyle ?? 'none'}
                   onChange={(e) =>
-                    onChange({
+                    emitDiscrete({
                       ...basic,
                       photoConfig: {
                         ...basic.photoConfig,
@@ -381,7 +384,7 @@ export function BasicInfoEditor({ basic, onChange }: BasicInfoEditorProps) {
                   aria-label="照片底衬色"
                   value={basic.photoConfig.bgBackdrop ?? ''}
                   onChange={(e) =>
-                    onChange({
+                    emitDiscrete({
                       ...basic,
                       photoConfig: {
                         ...basic.photoConfig,

@@ -441,6 +441,7 @@ export function ResumeEditorPane({
                     <BasicInfoEditor
                       basic={document.basic}
                       onChange={(nextBasic) => onChange({ ...document, basic: nextBasic })}
+                      onImmediateChange={(nextBasic) => emitDiscrete({ ...document, basic: nextBasic })}
                     />
                   ) : (
                     <SectionItemsEditor
