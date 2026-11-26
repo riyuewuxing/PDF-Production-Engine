@@ -28,7 +28,7 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
     finally{guard.current=false;setBusy('');}
   };
   const prepareLaunch=(mode:'last'|'choose')=>void run('正在检查独立工作区',async()=>{
-    setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
+    setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);setInspection(null);setConfirmed(false);
     const checked=await bridge.prepareLaunch?.(mode);if(checked){setLaunchInspection(checked);setNotice('独立工作区当前数据检查完成，尚未启动。');}
   });
   return <section aria-label="工作区备份与安全恢复" className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/50 p-3 text-xs break-words">
@@ -38,13 +38,13 @@ export function WorkspaceBackupPane({onFlush}:{onFlush:()=>Promise<void>}){
     {busy&&<p role="status">{busy}…</p>}{error&&<p role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</p>}{notice&&<p role="status" className="text-teal-800">{notice}</p>}
     <div className="flex flex-wrap gap-1">
       <button type="button" disabled={!!busy} className="rounded bg-teal-700 px-2 py-1.5 text-white disabled:opacity-50" onClick={()=>void run('正在创建备份',async()=>{
-        setResult(null);setInspection(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);
+        setResult(null);setInspection(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
         await onFlush();await careerLedger.flush();
         if(careerLedger.getSnapshot().dirty||careerLedger.getSnapshot().saving)throw new Error('投递台账还有未确认写入，请先保存。');
         const saved=await bridge.create();if(saved){setResultKind('backup');setResult(saved);setNotice('已创建并校验工作区备份。');}
       })}>创建本地工作区备份</button>
       <button type="button" disabled={!!busy} className="rounded border bg-white px-2 py-1.5" onClick={()=>void run('正在检查备份',async()=>{
-        setInspection(null);setResult(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);
+        setInspection(null);setResult(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
         const checked=await bridge.inspect();if(checked){setInspection(checked);setNotice('备份文件清单及内容校验完成，当前工作区未改动。');}
       })}>检查已有备份</button>
       {bridge.prepareLaunch&&bridge.launch&&<button type="button" disabled={!!busy} className="rounded border bg-white px-2 py-1.5" onClick={()=>prepareLaunch('choose')}>检查并打开已有恢复工作区</button>}

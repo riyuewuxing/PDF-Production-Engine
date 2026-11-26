@@ -1348,6 +1348,12 @@ async function run() {
     await click('确认打开独立工作区');await until('stale launch refused',()=>bodyHas('恢复工作区数据已变化'));
     await capture('86-workspace-launch-stale');
     checks.workspaceLaunchStaleRejected=true;
+    const staleToken=await js('window.resumeDesktop.workspaceBackup.prepareLaunch("last")');
+    dialog.showOpenDialog=async()=>({canceled:true,filePaths:[]});
+    await js('window.resumeDesktop.workspaceBackup.inspect()');
+    const superseded=await js('window.resumeDesktop.workspaceBackup.launch('+JSON.stringify(staleToken.token)+',"OPEN_INDEPENDENT_WORKSPACE").then(()=>false,e=>String(e).includes("打开前必须检查"))');
+    if(!superseded)throw Error('superseded launch approval was accepted');
+    checks.workspaceLaunchSupersededRefused=true;
     fs.writeFileSync(restoredMaster,currentMaster);
     await click('检查并打开刚恢复的工作区');await until('launch rechecked',()=>bodyHas('独立工作区当前数据检查完成'));
     if(!await namedCheck('确认打开独立恢复工作区'))throw Error('missing fresh launch checkbox');

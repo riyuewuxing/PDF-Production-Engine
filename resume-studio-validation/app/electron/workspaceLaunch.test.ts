@@ -8,10 +8,10 @@ const handoff={dir,token:'2e18a861-5562-48ec-8191-d0bf92b6d0e3',basis:'a'.repeat
 const exePath=path.resolve('program','electron.exe'),appDir=path.resolve('program');
 describe('isolated workspace process launch',()=>{
   it('uses only fixed app entry and strips unsafe inherited runtime overrides',()=>{
-    const plan=buildWorkspaceLaunch({isPackaged:false,exePath,appDir,root,handoff,env:{ELECTRON_RUN_AS_NODE:'1',NODE_OPTIONS:'--require=wrong',VITE_DEV_SERVER_URL:'http://127.0.0.1:1',NODE_CHANNEL_FD:'5',RESUME_STUDIO_DATA_DIR:'wrong',PATH:'kept'}});
+    const plan=buildWorkspaceLaunch({isPackaged:false,exePath,appDir,root,handoff,env:{ELECTRON_RUN_AS_NODE:'1',NODE_OPTIONS:'--require=wrong',VITE_DEV_SERVER_URL:'http://127.0.0.1:1',NODE_CHANNEL_FD:'5',NODE_PATH:'wrong',ELECTRON_NO_ASAR:'1',RESUME_STUDIO_DATA_DIR:'wrong',PATH:'kept'}});
     expect(plan.executable).toBe(exePath);expect(plan.args).toEqual([appDir]);
     expect(plan.env.RESUME_STUDIO_DATA_DIR).toBe(root);
-    expect(plan.env.PATH).toBe('kept');expect(plan.env.ELECTRON_RUN_AS_NODE).toBeUndefined();expect(plan.env.NODE_OPTIONS).toBeUndefined();expect(plan.env.VITE_DEV_SERVER_URL).toBeUndefined();
+    expect(plan.env.PATH).toBe('kept');expect(plan.env.ELECTRON_RUN_AS_NODE).toBeUndefined();expect(plan.env.NODE_OPTIONS).toBeUndefined();expect(plan.env.VITE_DEV_SERVER_URL).toBeUndefined();expect(plan.env.NODE_PATH).toBeUndefined();expect(plan.env.ELECTRON_NO_ASAR).toBeUndefined();
     const copy={...plan.env};expect(readLaunchHandoff(copy)).toEqual(handoff);
     expect(copy.RESUME_STUDIO_LAUNCH_TOKEN).toBeUndefined();
   });

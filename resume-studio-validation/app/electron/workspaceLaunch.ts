@@ -22,7 +22,7 @@ export function buildWorkspaceLaunch(input:{isPackaged:boolean;exePath:string;ap
   if(!executable||!path.isAbsolute(executable)||(!input.isPackaged&&!path.isAbsolute(input.appDir)))throw new Error('无法确定当前程序的可信启动位置。');
   if(portable&&(!input.env.PORTABLE_EXECUTABLE_DIR||path.relative(input.env.PORTABLE_EXECUTABLE_DIR,path.dirname(executable))!==''||path.extname(executable).toLowerCase()!=='.exe'))throw new Error('便携版启动位置无效，请使用手动启动方式。');
   const env={...input.env};
-  for(const key of Object.keys(env))if(['ELECTRON_RUN_AS_NODE','NODE_OPTIONS','NODE_CHANNEL_FD','NODE_CHANNEL_SERIALIZATION_MODE','VITE_DEV_SERVER_URL','PORTABLE_EXECUTABLE_DIR','PORTABLE_EXECUTABLE_FILE','PORTABLE_EXECUTABLE_APP_FILENAME','RESUME_STUDIO_LAUNCH_DIR','RESUME_STUDIO_LAUNCH_TOKEN','RESUME_STUDIO_LAUNCH_BASIS'].includes(key.toUpperCase()))delete env[key];
+  for(const key of Object.keys(env))if(['ELECTRON_RUN_AS_NODE','NODE_OPTIONS','NODE_PATH','NODE_CHANNEL_FD','NODE_CHANNEL_SERIALIZATION_MODE','ELECTRON_NO_ASAR','ELECTRON_OVERRIDE_DIST_PATH','VITE_DEV_SERVER_URL','RESUME_STUDIO_DATA_DIR','PORTABLE_EXECUTABLE_DIR','PORTABLE_EXECUTABLE_FILE','PORTABLE_EXECUTABLE_APP_FILENAME','RESUME_STUDIO_LAUNCH_DIR','RESUME_STUDIO_LAUNCH_TOKEN','RESUME_STUDIO_LAUNCH_BASIS'].includes(key.toUpperCase()))delete env[key];
   Object.assign(env,{RESUME_STUDIO_DATA_DIR:input.root,RESUME_STUDIO_LAUNCH_DIR:input.handoff.dir,RESUME_STUDIO_LAUNCH_TOKEN:input.handoff.token,RESUME_STUDIO_LAUNCH_BASIS:input.handoff.basis});
   // NSIS portable launches delete/re-extract their fixed unpack path. Give each
   // child a separate TEMP/TMP so the parent and child cannot remove each other's app.

@@ -499,11 +499,12 @@ async function pickBackupFolder(title:string){
 }
 function registerIpcHandlers(): void {
   trustedEditorHandle('workspaceBackup:create',()=>runBackupOperation(async signal=>{
+    inspectedLaunch=null;inspectedBackup=null;
     const parent=await pickBackupFolder('选择备份保存位置（将新建文件夹，不覆盖原数据）');
     return parent?await createWorkspaceBackup(rootDir,parent,signal):null;
   }));
   trustedEditorHandle('workspaceBackup:inspect',()=>runBackupOperation(async signal=>{
-    inspectedBackup=null;
+    inspectedBackup=null;inspectedLaunch=null;
     const folder=await pickBackupFolder('选择待检查的完整工作区备份文件夹');
     if(!folder)return null;
     const checked=await inspectWorkspaceBackup(folder,signal),token=randomUUID();
@@ -513,7 +514,7 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('workspaceBackup:restore',(_event,token:unknown,confirmation:unknown)=>runBackupOperation(async signal=>{
     const basis=inspectedBackup;
     if(!basis||token!==basis.token||confirmation!=='RESTORE_TO_NEW_WORKSPACE')throw new Error('恢复前必须检查备份并明确确认创建新工作区。');
-    inspectedBackup=null;
+    inspectedBackup=null;inspectedLaunch=null;
     const parent=await pickBackupFolder('选择恢复位置（仅新建独立工作区）');
     if(!parent)return null;
     const result=await restoreWorkspaceBackup(rootDir,basis.folder,basis.manifestHash,parent,signal);
@@ -530,7 +531,7 @@ function registerIpcHandlers(): void {
     await reportLaunch('ready');
   });
   trustedEditorHandle('workspaceBackup:prepareLaunch',(_event,mode:unknown)=>runBackupOperation(async signal=>{
-    inspectedLaunch=null;
+    inspectedLaunch=null;inspectedBackup=null;
     if(mode!=='last'&&mode!=='choose')throw new Error('未知的工作区打开方式。');
     const folder=mode==='last'?lastRestoredFolder:await pickBackupFolder('选择已恢复的独立工作区（不是备份文件夹）');
     if(!folder)return null;
@@ -926,6 +927,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
   });
 
   hardenWindow(win);
+  if(restoredWorkspace){win.on('page-title-updated',event=>event.preventDefault());win.setTitle('Resume Studio - 独立恢复工作区');}
   mainWindow = win;
 
   let shown = false;
