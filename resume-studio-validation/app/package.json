@@ -17,7 +17,7 @@
     "desktop:build": "vite build && node scripts/build-electron.mjs",
     "desktop:start": "pnpm desktop:build && node scripts/start-desktop.mjs",
     "desktop:dev": "node scripts/dev-desktop.mjs",
-    "desktop:pack": "pnpm desktop:build && electron-builder --win && node scripts/postpack-win.mjs",
+    "desktop:pack": "pnpm desktop:build && electron-builder --win --publish never && node scripts/postpack-win.mjs",
     "mcp:start": "tsx scripts/mcp-server.ts",
     "context:pack": "node scripts/pack-context.mjs",
     "context:delta": "node scripts/pack-context.mjs --delta-only"

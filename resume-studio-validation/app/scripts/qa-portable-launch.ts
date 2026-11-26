@@ -31,7 +31,7 @@ try{
   const b=await createWorkspaceBackup(root,dest,ctl.signal),checked=await inspectWorkspaceBackup(b.folder,ctl.signal);
   const a=await restoreWorkspaceBackup(root,b.folder,checked.manifestHash,dest,ctl.signal);
   const c=await restoreWorkspaceBackup(root,b.folder,checked.manifestHash,dest,ctl.signal);
-  const wrapper=path.resolve('release','Resume Studio.exe');
+  const wrapper=path.resolve(process.env.RESUME_STUDIO_PORTABLE_WRAPPER||path.join('release','Resume Studio.exe'));
   await fs.access(wrapper);
   const launch=async(folder:string)=>{
     const verified=await inspectRestoredWorkspace(folder,ctl.signal,root);
