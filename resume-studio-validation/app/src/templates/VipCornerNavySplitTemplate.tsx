@@ -13,6 +13,7 @@ import { FloatingAvatar, SvgWaveBanner } from './visualPrimitives';
 
 export function VipCornerNavySplitTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#1e3a8a';
   const sideBg = mixWithWhite(accent, 0.93);
   const metaItems = getBasicMetaItems(document);
@@ -97,7 +98,7 @@ export function VipCornerNavySplitTemplate({ document }: ResumeTemplateProps) {
               style={{ borderColor: mixWithWhite(accent, 0.72) }}
             >
               <div className="mb-2 text-[0.95em] font-bold" style={{ color: accent }}>
-                个人档案
+                {isEnglish ? 'Profile' : '个人档案'}
               </div>
               <div className="space-y-1.5 text-[0.85em] text-slate-700">
                 {metaItems.map((item) => (

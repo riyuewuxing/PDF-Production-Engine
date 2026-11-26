@@ -14,6 +14,7 @@ import type { ResumeTemplateProps } from './types';
 
 export function RxChikoritaTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#166534';
   const fill = getSurfaceFill(accent, globalSettings.surfaceStyle);
   const metaItems = getBasicMetaItems(document);
@@ -111,7 +112,7 @@ export function RxChikoritaTemplate({ document }: ResumeTemplateProps) {
                 className="border-b pb-1 font-bold"
                 style={{ borderColor: fill.borderColor, color: fill.textColor }}
               >
-                个人档案
+                {isEnglish ? 'Profile' : '个人档案'}
               </div>
               {metaItems.map((item) => (
                 <div key={item.key} className="flex items-start gap-1.5">

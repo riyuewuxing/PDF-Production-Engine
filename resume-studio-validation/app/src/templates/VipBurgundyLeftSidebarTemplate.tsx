@@ -13,6 +13,7 @@ import { FloatingAvatar } from './visualPrimitives';
 
 export function VipBurgundyLeftSidebarTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#9f1239';
   const fill = getSurfaceFill(accent, globalSettings.surfaceStyle);
   const metaItems = getBasicMetaItems(document);
@@ -80,7 +81,7 @@ export function VipBurgundyLeftSidebarTemplate({ document }: ResumeTemplateProps
 
           {profileItems.length > 0 && (
             <div className="mt-5 border-t pt-3.5" style={{ borderColor: fill.borderColor }}>
-              <div className="mb-2 text-[0.95em] font-bold tracking-wide">个人档案</div>
+              <div className="mb-2 text-[0.95em] font-bold tracking-wide">{isEnglish ? 'Profile' : '个人档案'}</div>
               <div className="space-y-1.5 text-[0.86em]" style={{ color: fill.mutedColor }}>
                 {profileItems.map((item) => (
                   <div key={item.key} className="[overflow-wrap:anywhere]">
@@ -94,7 +95,7 @@ export function VipBurgundyLeftSidebarTemplate({ document }: ResumeTemplateProps
 
           {contactItems.length > 0 && (
             <div className="mt-4 border-t pt-3.5" style={{ borderColor: fill.borderColor }}>
-              <div className="mb-2 text-[0.95em] font-bold tracking-wide">联系方式</div>
+              <div className="mb-2 text-[0.95em] font-bold tracking-wide">{isEnglish ? 'Contact' : '联系方式'}</div>
               <div className="space-y-1.5 text-[0.86em]" style={{ color: fill.mutedColor }}>
                 {contactItems.map((item) => (
                   <div key={item.key} className="[overflow-wrap:anywhere]">

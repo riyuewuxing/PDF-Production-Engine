@@ -13,6 +13,7 @@ import { FloatingAvatar } from './visualPrimitives';
 
 export function VipClassicTopPhotoProTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#1e40af';
   const metaItems = getBasicMetaItems(document);
   const sections = getOrderedVisibleSections(document);
@@ -48,7 +49,7 @@ export function VipClassicTopPhotoProTemplate({ document }: ResumeTemplateProps)
                     className="font-semibold"
                     style={{ color: accent, fontSize: `${globalSettings.subheaderSize}px` }}
                   >
-                    求职岗位：{basic.title}
+                    {isEnglish ? 'Target Role: ' : '求职岗位：'}{basic.title}
                   </span>
                 )}
               </div>

@@ -48,6 +48,7 @@ function makeFixture(mode){
     : 'qa-'+(zh?'zh':'en')+'@example.invalid';
   const phone=contacts?t('+86 000 0000 0000','+1 202 555 0107'):'';
   const location=contacts?t('虚构科学研究示范校区，示例城市','Example Research Campus, Synthetic City'):t('示例城市','Example City');
+  const status=contacts?t('可入职','Available for work'):'';
   const expected=[t('演示候选人','Demo Candidate'),t('示例大学','Example University'),t('示例机构','Example Laboratory'),t('示例课程工具','Sample Course Tool'),t('实验设计能力','Synthetic analysis skill'),t('合成总结甲','Synthetic summary text'),t('虚构奖项甲','Synthetic award entry'),email];
   const hidden=['HIDDENBIRTHMARKER','HIDDENEDUCATIONMARKER','HIDDENCUSTOMMARKER','DISABLEDSECTIONMARKER'];
   const labels=[['name',t('姓名','Name')],['title',t('职位','Role')],['email',t('邮箱','Email')],['phone',t('电话','Phone')],['location',t('所在地','Location')],['birthDate',t('生日','Birth')],['employmentStatus',t('状态','Status')]];
@@ -57,7 +58,7 @@ function makeFixture(mode){
   const doc={
     schemaVersion:1,id:'qa-'+locale+'-'+mode,title:t('合成测试简历','Synthetic resume'),
     templateId:ids[0],createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z',activeSection:'basic',
-    basic:{name:expected[0],title:t('示例教师','Sample Instructor'),email:expected[7],phone,location,birthDate:hidden[0],employmentStatus:'',photo:long||contacts?avatar():'',
+    basic:{name:expected[0],title:t('示例教师','Sample Instructor'),email:expected[7],phone,location,birthDate:hidden[0],employmentStatus:status,photo:long||contacts?avatar():'',
       fieldOrder:labels.map(([key,label],i)=>({id:'field-'+i,key,label,visible:key!=='birthDate'}))},
     menuSections:sections.map(([id,title],order)=>({id,title,order,enabled:id!=='custom-disabled',pageBreakBefore:mode==='extended'&&id==='projects'})),
     education:[{id:'edu-1',school:expected[1],major:t('科学教育','Science Education'),degree:t('硕士','Master'),startDate:'2022.09',endDate:'2025.06',description:t('- 实验设计与数据记录。','- Designed experiments and recorded results.')},{id:'edu-hidden',school:hidden[1],visible:false}],
@@ -68,7 +69,7 @@ function makeFixture(mode){
     globalSettings:{locale,themeColor:'#167883',baseFontSize:13,sectionSpacing:15,paragraphSpacing:8,pagePadding:28,lineHeight:1.25}
   };
   if(contacts){
-    expected.push(phone,location);
+    expected.push(phone,location,status);
     doc.globalSettings={...doc.globalSettings,baseFontSize:15,lineHeight:1.35,pagePadding:32};
   }
   if(long){

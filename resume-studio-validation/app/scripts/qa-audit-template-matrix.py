@@ -64,6 +64,9 @@ def audit(root, locale, modes, source_sha, runner_sha):
                     row["issues"].append("hidden markers leaked: " + repr(hidden))
                 if normalize(email[0]) not in normalize(pdf[0].get_text("text")):
                     row["issues"].append("first-page email incomplete")
+                # This fixture is deliberately English-only; real bilingual user content is allowed.
+                if locale == "en-US" and re.search(r"[\u4e00-\u9fff]", text):
+                    row["issues"].append("unlocalized Chinese text in English synthetic fixture")
                 if "\ufffd" in text or re.search(r"[\u2e80-\u2fdf\uf900-\ufaff\ufe30-\ufe4f]", text):
                     row["issues"].append("replacement/compatibility characters")
             if mode == "compact" and len(pdf) != 1:

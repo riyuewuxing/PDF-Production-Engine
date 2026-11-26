@@ -15,6 +15,7 @@ import { FloatingAvatar } from './visualPrimitives';
 
 export function VipRoseBannerSplitTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#be123c';
   const fill = getSurfaceFill(accent, globalSettings.surfaceStyle);
   const metaItems = getBasicMetaItems(document);
@@ -122,7 +123,7 @@ export function VipRoseBannerSplitTemplate({ document }: ResumeTemplateProps) {
               className="mb-2 border-b pb-1 text-[0.95em] font-bold"
               style={{ borderColor: `${accent}45`, color: accent }}
             >
-              个人档案
+              {isEnglish ? 'Profile' : '个人档案'}
             </div>
             <div className="space-y-1.5 text-[0.85em] text-slate-700">
               {metaItems.map((item) => (

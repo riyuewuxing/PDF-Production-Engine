@@ -12,6 +12,7 @@ import type { ResumeTemplateProps } from './types';
 
 export function TeacherTableClassicTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#1e3a5f';
   const metaItems = getBasicMetaItems(document);
   const sections = getOrderedVisibleSections(document);
@@ -21,8 +22,8 @@ export function TeacherTableClassicTemplate({ document }: ResumeTemplateProps) {
   const pad = globalSettings.pagePadding;
 
   const cellEntries: Array<{ label: string; value: string }> = [
-    ...(nameVisible ? [{ label: '姓名', value: basic.name || '[姓名]' }] : []),
-    ...(titleVisible && basic.title ? [{ label: '求职岗位', value: basic.title }] : []),
+    ...(nameVisible ? [{ label: isEnglish ? 'Name' : '姓名', value: basic.name || (isEnglish ? '[Name]' : '[姓名]') }] : []),
+    ...(titleVisible && basic.title ? [{ label: isEnglish ? 'Target Role' : '求职岗位', value: basic.title }] : []),
     ...metaItems.map((m) => ({ label: m.label, value: m.value })),
   ];
 
@@ -49,7 +50,7 @@ export function TeacherTableClassicTemplate({ document }: ResumeTemplateProps) {
             fontSize: `${Math.round(globalSettings.headerSize * 1.32)}px`,
           }}
         >
-          个人简历
+          {isEnglish ? 'Resume' : '个人简历'}
         </div>
 
         <table className="w-full border-collapse border-[1.5px] text-[0.9em]" style={{ borderColor: accent }}>

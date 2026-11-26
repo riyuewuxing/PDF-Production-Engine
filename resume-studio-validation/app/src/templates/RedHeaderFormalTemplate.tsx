@@ -12,6 +12,7 @@ import type { ResumeTemplateProps } from './types';
 
 export function RedHeaderFormalTemplate({ document }: ResumeTemplateProps) {
   const { basic, globalSettings } = document;
+  const isEnglish = globalSettings.locale === 'en-US';
   const accent = globalSettings.themeColor || '#881337';
   const metaItems = getBasicMetaItems(document);
   const sections = getOrderedVisibleSections(document);
@@ -47,7 +48,7 @@ export function RedHeaderFormalTemplate({ document }: ResumeTemplateProps) {
                 )}
                 {titleVisible && basic.title && (
                   <span className="font-semibold text-slate-800" style={{ fontSize: `${globalSettings.subheaderSize}px` }}>
-                    求职岗位：{basic.title}
+                    {isEnglish ? 'Target Role: ' : '求职岗位：'}{basic.title}
                   </span>
                 )}
               </div>
