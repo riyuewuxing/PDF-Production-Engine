@@ -677,14 +677,39 @@ async function run() {
   if(workflowAfter.experience[0].description!==workflowBefore.experience[0].description||providerCalls!==workflowCalls+2)throw Error('workflow changed unrelated block or auto-ran');
   await click('准备第 2 步');
   await until('second step active',()=>js('document.querySelector("section[aria-label=\\"受控分步工作\\"]")?.innerText.includes("当前步骤")'));
-  await click('跳过当前步骤');
+  if(providerCalls!==workflowCalls+2)throw Error('second step auto-sent');
+  await click('预览 AI 自由任务');await until('second step preview',()=>bodyHas('自由任务发送前确认'));
+  const secondPreview=await getFactPreview();
+  if(secondPreview.includes('DISPLAY_ONLY_PLAN_REASON')||secondPreview.includes('record-1'))throw Error('second step copied plan text or evidence');
+  await click('确认发送自由任务');await until('second step proposal',()=>bodyHas('合成改写'));
+  const secondStepPayload=JSON.parse(lastAiRequest.body.messages[1].content);
+  if(secondStepPayload.toolResults.list_visible_blocks.length!==1||!secondStepPayload.toolResults.list_visible_blocks[0].label.includes('工作经历'))throw Error('second step widened target');
+  if(!await checkLabel('已核对本条原文'))throw Error('second step proposal approval missing');
+  await click('试渲染已选正文提案');await until('second step native PDF',()=>bodyHas('真实 PDF 前后对照（本地试渲染）'),45000);
+  if(!await checkLabel('已检查正文修改后的真实 PDF 页面'))throw Error('second step PDF approval missing');
+  await click('应用已核对提案（1）');
+  await until('workflow second step saved',async()=>(await main.store.getResume('master')).experience[0].description.includes('核对分步合成内容'));
   await until('workflow both steps handled',()=>bodyHas('受控分步工作 · 2/2 步已处理'));
+  const workflowFinal=await main.store.getResume('master');
+  if(workflowFinal.education[0].description!==workflowAfter.education[0].description||providerCalls!==workflowCalls+3)throw Error('second step changed first step or auto-ran');
   await click('核对保存并结束分步任务');
   await until('workflow disk verified',()=>bodyHas('已核对磁盘保存'));
-  if(providerCalls!==workflowCalls+2||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(workflowAfter))throw Error('skip or completion performed an unauthorized action');
-  checks.workflowExplicitSteps=true;checks.workflowDiskVerified=true;
+  if(providerCalls!==workflowCalls+3||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(workflowFinal))throw Error('completion performed an unauthorized action');
+  checks.workflowExplicitSteps=true;checks.workflowDiskVerified=true;checks.workflowTwoAppliedSteps=true;
   await scrollWorkflow();await capture('42-workflow-completed');
   await click('关闭分步记录');
+  // A separate plan confirms the user can skip without sending or editing.
+  const skipBaseline=await main.store.getResume('master'),skipCalls=providerCalls;
+  await click('分步工作');await click('全选可见段落');
+  await click('预览 AI 自由任务');await click('确认发送自由任务');
+  await until('skip plan ready',()=>bodyHas('受控分步工作 · 0/2 步已处理'));
+  await click('准备第 1 步');await until('skip step ready',()=>bodyHas('当前步骤'));
+  await click('跳过当前步骤');await until('skip outcome',()=>bodyHas('受控分步工作 · 1/2 步已处理'));
+  if(providerCalls!==skipCalls+1||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(skipBaseline))throw Error('skip sent data or edited resume');
+  checks.workflowSkipNoNetwork=true;
+  await scrollWorkflow();await capture('43-workflow-skipped');
+  await click('结束本次分步工作');
+
 
 
   // Actual career text UI with exact preview and reversible local placeholders.
@@ -708,6 +733,21 @@ async function run() {
   await until('career proposal adopted',()=>js('[...document.querySelectorAll("textarea")].some(e=>e.value.includes("感谢审阅。")&&e.value.includes("演示候选人"))'));
   checks.careerSharedGateway=true;checks.careerLocalIdentityRestored=true;
   await capture('23-career-ai-applied');
+  // At the very end, mutate only the isolated synthetic disk to simulate another process.
+  await click('诊断优化');await click('AI 润色 Diff');await click('AI 自由任务');await click('分步工作');
+  await setValue('textarea[aria-label="AI 自由任务目标"]','测试磁盘版本变化');
+  await click('全选可见段落');await click('预览 AI 自由任务');await click('确认发送自由任务');
+  await until('stale workflow plan ready',()=>bodyHas('受控分步工作 · 0/2 步已处理'));
+  const staleWorkflowCalls=providerCalls;
+  const oldDisk=await main.store.getResume('master');
+  const changedDisk=await main.store.saveResume('master',{...oldDisk,skillContent:oldDisk.skillContent+'\nSYNTHETIC_EXTERNAL_EDIT'});
+  await click('准备第 1 步');
+  await until('stale workflow refused',()=>bodyHas('磁盘简历与已批准的步骤结果不一致'));
+  if(providerCalls!==staleWorkflowCalls||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(changedDisk))throw Error('stale workflow contacted provider or overwrote disk');
+  checks.workflowStaleDiskBlocked=true;
+  await js('(()=>{const e=[...document.querySelectorAll("[role=alert]")].find(e=>e.innerText.includes("磁盘简历"));e?.scrollIntoView({block:"center"});return !!e})()');
+  await capture('44-workflow-stale-disk');
+
 
 
 
