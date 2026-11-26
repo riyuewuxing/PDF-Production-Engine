@@ -24,6 +24,7 @@ import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 import type { ResumeSnapshotMeta } from '../../server/localFsApi';
 import { PdfImportModal } from './PdfImportModal';
 import { RecycleBinPanel } from './RecycleBinPanel';
+import { WriteLockPanel } from './WriteLockPanel';
 import { isJsonResumeFormat } from '../../lib/jsonResumeAdapter';
 
 interface VersionAndMasterPaneProps {
@@ -364,6 +365,7 @@ export function VersionAndMasterPane({
         </section>
 
         <RecycleBinPanel onRestore={onRestoreTrash} refreshKey={summaries.length} />
+        <WriteLockPanel/>
 
         {/* Local Disk Time Machine Snapshots */}
         <section className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 space-y-2.5">

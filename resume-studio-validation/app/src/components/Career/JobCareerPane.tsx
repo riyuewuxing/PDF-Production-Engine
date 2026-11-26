@@ -19,8 +19,9 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiClient, isDesktopMode } from '../../lib/apiClient';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { apiClient, isDesktopMode, localErrorMessage } from '../../lib/apiClient';
+import { careerLedger } from '../../lib/careerLedgerSession';
 import { type ByokAiSettings, DEFAULT_BYOK_SETTINGS } from '../../lib/byokAiClient';
 import {
   COVER_LETTER_VARIANT_LABELS,
@@ -38,7 +39,6 @@ import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_META,
   type ApplicationStatus,
-  type ApplicationsStoreData,
   COVER_LETTER_HEADER_VARIANTS,
   type CoverLetterHeaderVariant,
   type JobApplication,
@@ -68,14 +68,10 @@ export function JobCareerPane({
   onExportStatus,
 }: JobCareerPaneProps) {
   const [subTab, setSubTab] = useState<CareerSubTab>('tracker');
-  const [storeData, setStoreData] = useState<ApplicationsStoreData>({
-    schemaVersion: 1,
-    applications: [],
-    coverLetters: [],
-    interviewAnswers: {},
-  });
-  const [loading, setLoading] = useState(true);
-  const [saveTip, setSaveTip] = useState<string | null>(null);
+  const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
+  const storeData=ledger.data;
+  const loading=ledger.loading||!ledger.ready;
+  const saveTip=ledger.saving?'正在保存…':ledger.dirty?'存在未保存草稿':ledger.ready?'已读取本地台账':null;
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Tracker draft form
@@ -107,44 +103,23 @@ export function JobCareerPane({
     if (!letterRole) setLetterRole(activeDoc.basic.title || '');
   }, [activeDoc.basic.title, activeSlug, letterRole]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([apiClient.getApplications(), apiClient.getAiSettings()])
-      .then(([apps, ai]) => {
-        if (cancelled) return;
-        setStoreData({
-          ...apps,
-          coverLetters: apps.coverLetters ?? [],
-        });
-        setAiSettings(ai);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setErrorMsg(err instanceof Error ? err.message : '读取求职追踪数据失败');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-
-  const persistStore = useCallback(async (next: ApplicationsStoreData) => {
-    setStoreData(next);
-    setErrorMsg(null);
-    try {
-      const saved = await apiClient.saveApplications(next);
-      setStoreData(saved);
-      setSaveTip('已保存至 data/applications.json');
-      setTimeout(() => setSaveTip(null), 2000);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : '保存求职记录失败');
-    }
-  }, []);
-
+  useEffect(()=>{
+    let cancelled=false;
+    void careerLedger.load().catch(()=>{});
+    void apiClient.getAiSettings().then(ai=>{if(!cancelled)setAiSettings(ai);}).catch(err=>{if(!cancelled)setErrorMsg(localErrorMessage(err,'读取 AI 设置失败'));});
+    return ()=>{cancelled=true;};
+  },[refreshKey]);
+  const backupLedger=async()=>{
+    try{
+      const result=await apiClient.saveTextFile({defaultFileName:'投递台账-未保存草稿-'+Date.now()+'.json',content:JSON.stringify(careerLedger.getSnapshot().data,null,2)+'\n',extension:'json',dialogTitle:'另存投递台账草稿',saveAs:true});
+      if(!result.canceled)setErrorMsg('台账草稿已另存；原磁盘台账未覆盖。');
+    }catch(err){setErrorMsg(localErrorMessage(err,'台账草稿备份失败'));}
+  };
+  const reloadLedger=async()=>{
+    if(ledger.dirty&&!window.confirm('重新读取磁盘台账将放弃当前内存草稿。请先另存草稿。确定继续？'))return;
+    try{await careerLedger.load(true);setErrorMsg(null);}
+    catch(err){setErrorMsg(localErrorMessage(err,'重载失败，草稿仍保留。'));}
+  };
   const handleAddApplication = () => {
     if (!companyDraft.trim()) return;
     const now = new Date().toISOString();
@@ -167,34 +142,17 @@ export function JobCareerPane({
       atsScore: null,
       updatedAt: now,
     };
-    setCompanyDraft('');
-    setRoleDraft('');
-    setSalaryDraft('');
-    void persistStore({
-      ...storeData,
-      applications: [entry, ...storeData.applications],
-    });
-  };
-
-  const updateApplication = (id: string, patch: Partial<JobApplication>) => {
-    const nextList = storeData.applications.map((item) =>
-      item.id === id ? { ...item, ...patch, updatedAt: new Date().toISOString() } : item,
-    );
-    void persistStore({ ...storeData, applications: nextList });
-  };
-
-  const deleteApplication = async (item: JobApplication) => {
-    if (item.snapshotId) {
-      try {
-        await apiClient.deleteApplicationSnapshot(item.snapshotId);
-      } catch {
-        // Snapshot file may already be gone; still delete the application row cleanly
-      }
+    if(careerLedger.update(current=>({...current,applications:[entry,...current.applications]}))){
+      setCompanyDraft('');setRoleDraft('');setSalaryDraft('');
     }
-    await persistStore({
-      ...storeData,
-      applications: storeData.applications.filter((entry) => entry.id !== item.id),
-    });
+  };
+
+  const updateApplication=(id:string,patch:Partial<JobApplication>)=>{
+    careerLedger.update(current=>({...current,applications:current.applications.map(item=>item.id===id?{...item,...patch,updatedAt:new Date().toISOString()}:item)}));
+  };
+  const deleteApplication=(item:JobApplication)=>{
+    if(!window.confirm('移除投递台账记录「'+item.company+'」？已封存的永久快照会保留，不随台账删除。'))return;
+    careerLedger.update(current=>({...current,applications:current.applications.filter(entry=>entry.id!==item.id)}));
   };
 
   const handleCloneSnapshotToWorkspace = async (item: JobApplication) => {
@@ -349,11 +307,7 @@ export function JobCareerPane({
       resumeSlug: activeSlug,
       updatedAt: new Date().toISOString(),
     };
-    setLetterTitleDraft('');
-    void persistStore({
-      ...storeData,
-      coverLetters: [entry, ...(storeData.coverLetters ?? [])],
-    });
+    if(careerLedger.update(current=>({...current,coverLetters:[entry,...current.coverLetters]})))setLetterTitleDraft('');
   };
 
   const handleLoadCoverLetterVersion = (saved: SavedCoverLetter) => {
@@ -364,10 +318,7 @@ export function JobCareerPane({
   };
 
   const handleDeleteCoverLetterVersion = (id: string) => {
-    void persistStore({
-      ...storeData,
-      coverLetters: (storeData.coverLetters ?? []).filter((item) => item.id !== id),
-    });
+    careerLedger.update(current=>({...current,coverLetters:current.coverLetters.filter(item=>item.id!==id)}));
   };
 
   const handleByokRefine = async (kind: 'coverLetter' | 'email' | 'boss') => {
@@ -417,7 +368,7 @@ export function JobCareerPane({
             <BriefcaseBusiness size={14} className="text-teal-700" />
             <span>求职与面试全周期工作台</span>
           </div>
-          {saveTip && <span className="text-[10px] text-emerald-600">{saveTip}</span>}
+          {saveTip && <span className={'text-[10px] '+(ledger.dirty?'text-amber-700':'text-emerald-600')}>{saveTip}</span>}
         </div>
         <div className="mt-2 grid grid-cols-3 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium">
           <button
@@ -457,9 +408,16 @@ export function JobCareerPane({
           </div>
         )}
 
+        {(ledger.error||ledger.dirty)&&<div role="alert" className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-2">
+          <div className="font-semibold">{ledger.error||'台账草稿等待保存'}</div>
+          <div className="flex flex-wrap gap-2">
+            {ledger.dirty&&<><button type="button" disabled={ledger.saving} onClick={()=>void careerLedger.flush().catch(()=>{})} className="rounded border px-2 py-1">重试保存台账</button><button type="button" onClick={()=>void backupLedger()} className="rounded border px-2 py-1">另存台账草稿</button></>}
+            <button type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1">重载磁盘台账</button>
+          </div>
+        </div>}
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
-            <Loader2 size={16} className="mr-2 animate-spin" /> 正在加载本地求职数据...
+            <Loader2 size={16} className="mr-2 animate-spin" /> {ledger.error&&!ledger.loading?'台账尚未成功读取，请先重载。':'正在加载本地求职数据…'}
           </div>
         ) : (
           <>
@@ -538,7 +496,7 @@ export function JobCareerPane({
                       data-native-undo="true"
                       value={cityDraft}
                       onChange={(e) => setCityDraft(e.target.value)}
-                      placeholder="城市（如：昆明）"
+                      placeholder="城市（如：示例城市）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
                     />
                     <input
@@ -783,7 +741,7 @@ export function JobCareerPane({
                         setEmailBodyOverride(null);
                         setBossOverride(null);
                       }}
-                      placeholder="目标单位（如：示例学校）"
+                      placeholder="目标单位（如：示例城市一中）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
                     />
                     <input
@@ -1022,13 +980,7 @@ export function JobCareerPane({
                         value={storeData.interviewAnswers[answerKey] ?? ''}
                         onChange={(e) => {
                           const val = e.target.value;
-                          void persistStore({
-                            ...storeData,
-                            interviewAnswers: {
-                              ...storeData.interviewAnswers,
-                              [answerKey]: val,
-                            },
-                          });
+                          careerLedger.update(current=>({...current,interviewAnswers:{...current.interviewAnswers,[answerKey]:val}}));
                         }}
                         placeholder="在此记录你的 STAR 逐字稿或核心关键词..."
                         className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-900 focus:bg-white focus:outline-none"

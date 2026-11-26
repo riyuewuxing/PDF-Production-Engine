@@ -24,6 +24,7 @@ import { TemplateGallery } from './components/Templates/TemplateGallery';
 import { MasterMergeModal } from './components/Versions/MasterMergeModal';
 import { VersionAndMasterPane } from './components/Versions/VersionAndMasterPane';
 import { RecycleBinPanel } from './components/Versions/RecycleBinPanel';
+import { WriteLockPanel } from './components/Versions/WriteLockPanel';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useResumeExport } from './hooks/useResumeExport';
 import { useResumePersistence } from './hooks/useResumePersistence';
@@ -364,7 +365,7 @@ export default function App() {
           >
             重试加载
           </button>
-          <div className="mt-4"><RecycleBinPanel onRestore={handleRestoreTrash}/></div>
+          <div className="mt-4 space-y-2"><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/></div>
         </div>
       </div>
     );

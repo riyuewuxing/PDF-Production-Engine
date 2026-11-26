@@ -1,6 +1,7 @@
 import { BookmarkCheck, Loader2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { apiClient } from '../../lib/apiClient';
+import { useEffect, useRef, useState } from 'react';
+import { localErrorMessage } from '../../lib/apiClient';
+import { careerLedger } from '../../lib/careerLedgerSession';
 import {
   APPLICATION_STATUSES,
   APPLICATION_STATUS_META,
@@ -41,10 +42,13 @@ export function QuickLogApplicationModal({
   const [jdText, setJdText] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const requestId=useRef<string|null>(null);
+  const submitting=useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !snapshot) return;
+    requestId.current=null;
     setCompany('');
     setRole(snapshot.document.basic.title || '');
     setCity(snapshot.document.basic.location || '');
@@ -59,51 +63,43 @@ export function QuickLogApplicationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(submitting.current)return;
     if (!company.trim()) {
       setErrorMsg('请填写投递单位或学校名称。');
       return;
     }
+    submitting.current=true;
     setSaving(true);
     setErrorMsg(null);
     try {
       const now = new Date().toISOString();
-      const appId = crypto.randomUUID();
-      const snapMeta = await apiClient.saveApplicationSnapshot({
-        applicationId: appId,
-        resumeSlug: snapshot.slug || 'resume',
-        exportedFilePath: snapshot.filePath,
-        atsScore: defaultAtsScore,
-        document: snapshot.document,
-      });
-
-      const store = await apiClient.getApplications();
+      const appId=requestId.current??crypto.randomUUID();
+      requestId.current=appId;
       const entry: JobApplication = {
         id: appId,
         company: company.trim(),
         role: role.trim() || snapshot.document.basic.title || '目标岗位',
         city: city.trim(),
         salary: salary.trim(),
-        resumeSlug: snapshot.slug,
+        resumeSlug: snapshot.slug || 'resume',
         status,
         appliedDate: now.slice(0, 10),
         notes: notes.trim(),
         jdText: jdText.trim(),
-        snapshotId: snapMeta.id,
+        snapshotId: '',
         exportedFilePath: snapshot.filePath,
         interviewAt: '',
         interviewLocation: '',
         atsScore: defaultAtsScore,
         updatedAt: now,
       };
-      await apiClient.saveApplications({
-        ...store,
-        applications: [entry, ...store.applications],
-      });
-      onLogged(entry);
+      const saved=await careerLedger.log({entry,document:snapshot.document});
+      onLogged(saved);
       onClose();
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : '保存投递快照失败');
+      setErrorMsg(localErrorMessage(err,'保存投递快照失败'));
     } finally {
+      submitting.current=false;
       setSaving(false);
     }
   };
@@ -126,7 +122,7 @@ export function QuickLogApplicationModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onClose} disabled={saving}
             aria-label="关闭记入投递弹窗"
             className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
           >
@@ -158,7 +154,7 @@ export function QuickLogApplicationModal({
               data-native-undo="true"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              placeholder="如：昆明市第一中学"
+              placeholder="如：示例第一中学"
               className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
             />
           </label>
@@ -180,7 +176,7 @@ export function QuickLogApplicationModal({
               data-native-undo="true"
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="如：昆明"
+              placeholder="如：示例城市"
               className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
             />
           </label>
@@ -238,7 +234,7 @@ export function QuickLogApplicationModal({
         <div className="flex items-center justify-end gap-2 pt-1">
           <button
             type="button"
-            onClick={onClose}
+            onClick={onClose} disabled={saving}
             className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800"
           >
             取消

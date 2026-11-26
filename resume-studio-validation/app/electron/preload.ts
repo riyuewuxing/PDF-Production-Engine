@@ -17,6 +17,7 @@ const bridge: ResumeDesktopBridge = {
     create: (input) => ipcRenderer.invoke('resumes:create', input),
     delete: (slug, expectedRevision) => ipcRenderer.invoke('resumes:delete', slug, expectedRevision),
   },
+  writeLock:{inspect:()=>ipcRenderer.invoke('writeLock:inspect'),recover:(token,confirmation)=>ipcRenderer.invoke('writeLock:recover',token,confirmation)},
   trash: {
     list:()=>ipcRenderer.invoke('trash:list'),
     restore:(id,expectedRevision,asCopy)=>ipcRenderer.invoke('trash:restore',id,expectedRevision,asCopy),
@@ -30,7 +31,8 @@ const bridge: ResumeDesktopBridge = {
   },
   applications: {
     get: () => ipcRenderer.invoke('applications:get'),
-    save: (data) => ipcRenderer.invoke('applications:save', data),
+    save: (data,revision) => ipcRenderer.invoke('applications:save', data,revision),
+    log: input=>ipcRenderer.invoke('applications:log',input),
     saveSnapshot: (input: SaveApplicationSnapshotInput) =>
       ipcRenderer.invoke('applications:saveSnapshot', input),
     getSnapshot: (snapshotId: string) => ipcRenderer.invoke('applications:getSnapshot', snapshotId),

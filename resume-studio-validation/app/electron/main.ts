@@ -9,9 +9,9 @@ import { AiSettingsStore } from './aiSettingsStore';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
-import type { CoverLetterPdfPayload } from '../src/schema/applicationSchema';
+import type { CoverLetterPdfPayload, ApplicationLogInput } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
-import { LocalResumeStore, ensureInitialDataFromLegacy } from '../src/server/localFsApi';
+import { LocalResumeStore, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
 import type {
   PdfExportOptions,
   SaveApplicationSnapshotInput,
@@ -486,7 +486,10 @@ function registerIpcHandlers(): void {
   });
 
   trustedEditorHandle('applications:get', () => store.getApplications());
-  trustedEditorHandle('applications:save', (_event, data: unknown) => store.saveApplications(data));
+  trustedEditorHandle('applications:save', (_event, data: unknown,revision:string) => store.saveApplications(data,revision));
+  trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>store.logApplication(input));
+  trustedEditorHandle('writeLock:inspect',()=>inspectResumeWriteLock(store.dataDir));
+  trustedEditorHandle('writeLock:recover',(_event,token:string,confirmation:unknown)=>recoverResumeWriteLock(store.dataDir,token,confirmation));
   trustedEditorHandle(
     'applications:saveSnapshot',
     (_event, input: SaveApplicationSnapshotInput) => store.saveApplicationSnapshot(input),

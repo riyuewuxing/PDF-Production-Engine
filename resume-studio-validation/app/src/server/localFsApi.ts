@@ -1,6 +1,8 @@
 import { promises as fs } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
+import os from 'node:os';
+import { randomUUID, createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 import { ZodError } from 'zod';
 import { adaptResumeOrLegacy } from '../schema/legacyAdapter';
@@ -8,6 +10,9 @@ import {
   type ApplicationSnapshotMeta,
   type ApplicationSnapshotRecord,
   ApplicationsStoreSchema,
+  JobApplicationSchema,
+  type JobApplication,
+  type ApplicationLogInput,
   type ApplicationsStoreData,
 } from '../schema/applicationSchema';
 import {
@@ -165,32 +170,89 @@ function countDocumentChars(doc: ResumeDocument): number {
   return chunks.join('').replace(/\s+/g, '').length;
 }
 
-/**
- * Cross-process lock for resume mutations. Never steal an old lock based solely on age:
- * a paused process could resume writing. A crashed owner's lock requires explicit recovery.
- */
-export async function withResumeWriteLock<T>(dataDir: string, work: () => Promise<T>): Promise<T> {
-  await fs.mkdir(dataDir, { recursive: true });
-  const lock = path.join(dataDir, '.resume-write-lock');
-  const deadline = Date.now() + 4000;
-  while (true) {
-    try {
-      await fs.mkdir(lock);
-      break;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-      if (Date.now() >= deadline) {
-        throw new LocalFsApiError(423, 'RESUME_WRITE_LOCKED',
-          '简历写入被占用。请稍后重试；若程序异常退出，请关闭所有工作台/MCP 后检查 data/.resume-write-lock。');
-      }
-      await new Promise(resolve => setTimeout(resolve, 50));
+export interface ResumeWriteLockStatus {
+  state:'unlocked'|'active'|'recoverable'|'unknown';
+  pid?:number;
+  acquiredAt?:string;
+  token?:string;
+  reason:string;
+}
+type LockOwner={version:1;pid:number;hostname:string;platform:string;acquiredAt:string;token:string};
+const LOCK_DIR='.resume-write-lock';
+const RECOVERY_DIR='.resume-lock-recovery';
+function isMissing(err:unknown):boolean{return (err as NodeJS.ErrnoException)?.code==='ENOENT';}
+async function readLockOwner(lock:string):Promise<LockOwner|null>{
+  try{
+    const entry=await fs.lstat(lock);
+    if(!entry.isDirectory()||entry.isSymbolicLink())return null;
+    const marker=path.join(lock,'owner.json');
+    const file=await fs.lstat(marker);
+    if(!file.isFile()||file.isSymbolicLink()||file.size>4096)return null;
+    const raw=JSON.parse(await fs.readFile(marker,'utf8')) as Partial<LockOwner>;
+    if(raw.version!==1||!Number.isSafeInteger(raw.pid)||raw.pid!<1||raw.pid!>2147483647||
+      typeof raw.hostname!=='string'||typeof raw.platform!=='string'||typeof raw.acquiredAt!=='string'||
+      !Number.isFinite(Date.parse(raw.acquiredAt))||typeof raw.token!=='string'||!/^[0-9a-f-]{36}$/i.test(raw.token))return null;
+    return raw as LockOwner;
+  }catch{return null;}
+}
+function processState(pid:number):'alive'|'dead'|'unknown'{
+  try{process.kill(pid,0);return 'alive';}
+  catch(err){
+    const code=(err as NodeJS.ErrnoException)?.code;
+    return code==='ESRCH'?'dead':code==='EPERM'?'alive':'unknown';
+  }
+}
+/** An old timestamp alone is never evidence that a process is dead. */
+export async function inspectResumeWriteLock(dataDir:string):Promise<ResumeWriteLockStatus>{
+  const lock=path.join(dataDir,LOCK_DIR);
+  try{await fs.lstat(lock);}catch(err){if(isMissing(err))return {state:'unlocked',reason:'当前没有写入锁。'};return {state:'unknown',reason:'无法读取锁目录。'};}
+  const owner=await readLockOwner(lock);
+  if(!owner)return {state:'unknown',reason:'锁缺少可验证的新格式所有者信息。不能自动恢复；请关闭所有工作台及 MCP 后人工检查。'};
+  const base={pid:owner.pid,acquiredAt:owner.acquiredAt,token:owner.token};
+  if(owner.hostname!==os.hostname()||owner.platform!==process.platform)return {...base,state:'unknown',reason:'锁来自不同主机或平台，不允许在线恢复。'};
+  const state=processState(owner.pid);
+  if(state==='alive')return {...base,state:'active',reason:'锁所有者进程仍在运行（或 PID 已被复用），不允许抢占。'};
+  if(state==='unknown')return {...base,state:'unknown',reason:'无法可靠确认锁所有者已退出。'};
+  return {...base,state:'recoverable',reason:'同一主机上的锁所有者进程已不存在。可以确认后归档旧锁。'};
+}
+/** Recovery is explicit, serialized and token-bound. Retain the old lock as evidence. */
+export async function recoverResumeWriteLock(dataDir:string,expectedToken:string,confirmation:unknown):Promise<{recovered:true}>{
+  if(confirmation!=='RECOVER_DEAD_LOCK'||typeof expectedToken!=='string')throw new LocalFsApiError(400,'CONFIRMATION_REQUIRED','恢复锁需要明确确认。');
+  const guard=path.join(dataDir,RECOVERY_DIR);
+  try{await fs.mkdir(guard);}catch(err){
+    if((err as NodeJS.ErrnoException).code==='EEXIST')throw new LocalFsApiError(423,'LOCK_RECOVERY_BUSY','另一个锁恢复操作正在运行或曾中断，不能抢占。');
+    throw err;
+  }
+  try{
+    const status=await inspectResumeWriteLock(dataDir);
+    if(status.state!=='recoverable'||status.token!==expectedToken)throw new LocalFsApiError(409,'LOCK_RECOVERY_UNSAFE','锁状态已变化或无法安全恢复。请重新检查。');
+    const archive=path.join(dataDir,'.lock-recovery-history');
+    await fs.mkdir(archive,{recursive:true});
+    // Only this recovery owner can move a dead lock. New acquisition is possible only after rename.
+    await fs.rename(path.join(dataDir,LOCK_DIR),path.join(archive,Date.now()+'-'+randomUUID()));
+    return {recovered:true};
+  }finally{await fs.rmdir(guard);}
+}
+export async function withResumeWriteLock<T>(dataDir:string,work:()=>Promise<T>):Promise<T>{
+  await fs.mkdir(dataDir,{recursive:true});
+  const lock=path.join(dataDir,LOCK_DIR);
+  const deadline=Date.now()+4000;
+  while(true){
+    try{await fs.mkdir(lock);break;}
+    catch(err){
+      if((err as NodeJS.ErrnoException).code!=='EEXIST')throw err;
+      if(Date.now()>=deadline)throw new LocalFsApiError(423,'RESUME_WRITE_LOCKED','本地写入被占用。请稍后重试，或在版本母库中检查写入锁。');
+      await new Promise(resolve=>setTimeout(resolve,50));
     }
   }
-  try {
-    await fs.writeFile(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }));
+  const owner:LockOwner={version:1,pid:process.pid,hostname:os.hostname(),platform:process.platform,acquiredAt:new Date().toISOString(),token:randomUUID()};
+  try{
+    await atomicWriteFile(path.join(lock,'owner.json'),JSON.stringify(owner));
     return await work();
-  } finally {
-    await fs.rm(lock, { recursive: true, force: true });
+  }finally{
+    // Never delete another owner\'s lock if an external tool replaced our directory.
+    const current=await readLockOwner(lock);
+    if(current?.token===owner.token)await fs.rm(lock,{recursive:true,force:true});
   }
 }
 
@@ -686,12 +748,25 @@ export class LocalResumeStore {
     });
   }
 
+  private applicationRevision(data:ApplicationsStoreData):string {
+    const content={schemaVersion:data.schemaVersion,applications:data.applications,coverLetters:data.coverLetters,interviewAnswers:Object.fromEntries(Object.entries(data.interviewAnswers).sort(([a],[b])=>a.localeCompare(b)))};
+    return createHash('sha256').update(JSON.stringify(content)).digest('hex');
+  }
+  private async writeApplications(data:ApplicationsStoreData):Promise<ApplicationsStoreData>{
+    const validated=ApplicationsStoreSchema.parse(data);
+    const next={...validated,revision:this.applicationRevision(validated)};
+    await atomicWriteFile(this.applicationsPath,JSON.stringify(next,null,2)+'\n');
+    return next;
+  }
   async getApplications(): Promise<ApplicationsStoreData> {
     await this.ensureDirs();
-    if (!(await fileExists(this.applicationsPath))) {
-      return { schemaVersion: 1, applications: [], coverLetters: [], interviewAnswers: {} };
+    let text:string;
+    try{text=await fs.readFile(this.applicationsPath,'utf8');}
+    catch(err){
+      if(!isMissing(err))throw err;
+      const empty:ApplicationsStoreData={schemaVersion:1,applications:[],coverLetters:[],interviewAnswers:{}};
+      return {...empty,revision:this.applicationRevision(empty)};
     }
-    const text = await fs.readFile(this.applicationsPath, 'utf-8');
     let raw: unknown;
     try {
       raw = JSON.parse(text);
@@ -699,7 +774,8 @@ export class LocalResumeStore {
       throw new LocalFsApiError(500, 'CORRUPTED_JSON', 'applications.json 解析失败。');
     }
     try {
-      return ApplicationsStoreSchema.parse(raw);
+      const data=ApplicationsStoreSchema.parse(raw);
+      return {...data,revision:this.applicationRevision(data)};
     } catch (err) {
       const detail = err instanceof ZodError ? err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') : '';
       throw new LocalFsApiError(422, 'VALIDATION_ERROR', `投递记录数据格式校验失败: ${detail}`);
@@ -735,8 +811,46 @@ export class LocalResumeStore {
     };
     const record: ApplicationSnapshotRecord = { meta, document: parsedDoc };
     const targetPath = resolveContainedPath(this.appSnapshotsDir, `${id}.json`);
-    await atomicWriteFile(targetPath, `${JSON.stringify(record, null, 2)}\n`);
-    return meta;
+    return withResumeWriteLock(this.dataDir,()=>this.writeImmutableApplicationSnapshot(targetPath,record));
+  }
+
+  private async writeImmutableApplicationSnapshot(targetPath:string,record:ApplicationSnapshotRecord):Promise<ApplicationSnapshotMeta>{
+    try{await fs.lstat(targetPath);throw new LocalFsApiError(409,'SNAPSHOT_EXISTS','永久投递快照已存在，不允许覆盖。');}catch(err){if(!isMissing(err))throw err;}
+    await atomicWriteFile(targetPath,JSON.stringify(record,null,2)+'\n');
+    return record.meta;
+  }
+
+  /** Snapshot first, then ledger: a crash may leave an orphan, never a ledger pointing to a half-written snapshot.
+   * Stable request/application id allows safe retries without duplicating snapshots or ledger entries.
+   */
+  async logApplication(input:ApplicationLogInput):Promise<{entry:JobApplication;store:ApplicationsStoreData}>{
+    const entry=JobApplicationSchema.parse(input.entry);
+    const doc=ResumeDocumentSchema.parse(input.document);
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.id)||!entry.company.trim())throw new LocalFsApiError(400,'INVALID_APPLICATION','投递记录标识或单位无效。');
+    const snapshotId='app-'+entry.id;
+    const candidate={...entry,snapshotId};
+    const resumeSlug=assertSafeSlug(entry.resumeSlug);
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.getApplications();
+      const existing=current.applications.find(a=>a.id===entry.id);
+      if(existing){
+        if(existing.snapshotId!==snapshotId)throw new LocalFsApiError(409,'APPLICATION_EXISTS','投递标识已被其他记录使用。');
+        const previous=await this.getApplicationSnapshot(snapshotId);
+        if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.resumeSlug!==resumeSlug||previous.meta.atsScore!==entry.atsScore)
+          throw new LocalFsApiError(409,'APPLICATION_EXISTS','该请求已记入不同投递资料，不会重复写入。');
+        return {entry:existing,store:current};
+      }
+      await fs.mkdir(this.appSnapshotsDir,{recursive:true});
+      const target=resolveContainedPath(this.appSnapshotsDir,snapshotId+'.json');
+      const meta:ApplicationSnapshotMeta={id:snapshotId,applicationId:entry.id,resumeSlug,exportedFilePath:entry.exportedFilePath,createdAt:entry.updatedAt||new Date().toISOString(),title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore};
+      if(await fileExists(target)){
+        const previous=await this.getApplicationSnapshot(snapshotId);
+        if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.resumeSlug!==resumeSlug||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.atsScore!==entry.atsScore)
+          throw new LocalFsApiError(409,'SNAPSHOT_EXISTS','重试请求与已有永久快照不一致，未覆盖原快照。');
+      }else await this.writeImmutableApplicationSnapshot(target,{meta,document:doc});
+      const store=await this.writeApplications({...current,applications:[candidate,...current.applications]});
+      return {entry:candidate,store};
+    });
   }
 
   async getApplicationSnapshot(rawSnapshotId: string): Promise<ApplicationSnapshotRecord> {
@@ -768,14 +882,15 @@ export class LocalResumeStore {
   async deleteApplicationSnapshot(rawSnapshotId: string): Promise<{ deleted: boolean }> {
     const id = assertSafeSnapshotId(rawSnapshotId);
     const targetPath = resolveContainedPath(this.appSnapshotsDir, `${id}.json`);
-    if (!(await fileExists(targetPath))) {
-      return { deleted: false };
-    }
-    await fs.unlink(targetPath);
-    return { deleted: true };
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.getApplications();
+      if(current.applications.some(a=>a.snapshotId===id))throw new LocalFsApiError(409,'SNAPSHOT_REFERENCED','永久快照仍被投递记录引用，不允许删除。');
+      if(!(await fileExists(targetPath)))return {deleted:false};
+      await fs.unlink(targetPath);return {deleted:true};
+    });
   }
 
-  async saveApplications(payload: unknown): Promise<ApplicationsStoreData> {
+  async saveApplications(payload: unknown,expectedRevision?:string): Promise<ApplicationsStoreData> {
     await this.ensureDirs();
     let validated: ApplicationsStoreData;
     try {
@@ -784,8 +899,21 @@ export class LocalResumeStore {
       const detail = err instanceof ZodError ? err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') : '格式非法';
       throw new LocalFsApiError(422, 'VALIDATION_ERROR', `投递记录校验失败: ${detail}`);
     }
-    await atomicWriteFile(this.applicationsPath, `${JSON.stringify(validated, null, 2)}\n`);
-    return validated;
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.getApplications();
+      if(typeof expectedRevision!=='string')throw new LocalFsApiError(428,'APPLICATION_REVISION_REQUIRED','投递台账保存需要已读取的版本标识。');
+      if(current.revision!==expectedRevision)throw new LocalFsApiError(409,'APPLICATION_CONFLICT','投递台账已被其他操作更新；未覆盖磁盘。请备份草稿并重载。');
+      const ids=new Set<string>();
+      const letters=new Set<string>();
+      for(const l of validated.coverLetters){if(letters.has(l.id))throw new LocalFsApiError(422,'DUPLICATE_LETTER','自荐信标识重复。');letters.add(l.id);}
+      for(const a of validated.applications){
+        if(ids.has(a.id))throw new LocalFsApiError(422,'DUPLICATE_APPLICATION','投递标识重复。');ids.add(a.id);
+        const old=current.applications.find(x=>x.id===a.id);
+        if(old&&(a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联及原导出信息不能通过整表保存修改。');
+        if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
+      }
+      return this.writeApplications(validated);
+    });
   }
 }
 
@@ -860,6 +988,11 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         return;
       }
 
+      if(method==='GET'&&pathname==='/api/write-lock'){sendJson(res,200,await inspectResumeWriteLock(store.dataDir));return;}
+      if(method==='POST'&&pathname==='/api/write-lock/recover'){
+        const body=await readJsonBody(req) as {token:string;confirmation?:string};
+        sendJson(res,200,await recoverResumeWriteLock(store.dataDir,body.token,body.confirmation));return;
+      }
       if(method==='GET'&&pathname==='/api/trash'){
         sendJson(res,200,await store.listTrash());return;
       }
@@ -872,6 +1005,7 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         sendJson(res,200,await store.purgeTrash(body.id,body.expectedRevision,body.confirmation));return;
       }
 
+      if(method==='POST'&&pathname==='/api/applications/log'){sendJson(res,201,await store.logApplication(await readJsonBody(req) as ApplicationLogInput));return;}
       if (method === 'GET' && pathname === '/api/applications') {
         const data = await store.getApplications();
         sendJson(res, 200, data);
@@ -880,7 +1014,8 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
 
       if (method === 'PUT' && pathname === '/api/applications') {
         const body = await readJsonBody(req);
-        const saved = await store.saveApplications(body);
+        const revision=req.headers['if-match'];
+        const saved = await store.saveApplications(body,typeof revision==='string'?revision:undefined);
         sendJson(res, 200, saved);
         return;
       }

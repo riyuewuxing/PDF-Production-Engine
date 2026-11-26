@@ -69,6 +69,7 @@ export type SavedCoverLetter = z.infer<typeof SavedCoverLetterSchema>;
 
 export const ApplicationsStoreSchema = z.object({
   schemaVersion: z.literal(1).default(1),
+  revision: z.string().optional(),
   applications: z.array(JobApplicationSchema).default([]),
   coverLetters: z.array(SavedCoverLetterSchema).default([]),
   interviewAnswers: z.record(z.string(), z.string()).default({}),
@@ -106,3 +107,5 @@ export interface ApplicationSnapshotRecord {
   meta: ApplicationSnapshotMeta;
   document: ResumeDocument;
 }
+
+export interface ApplicationLogInput { entry:JobApplication; document:ResumeDocument; }

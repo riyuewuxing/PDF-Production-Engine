@@ -244,7 +244,7 @@ describe('localFsApi security and persistence', () => {
         },
       ],
       interviewAnswers: { 'fixture-teacher:q-edu-foundation': '强化实验探究' },
-    });
+    }, initialApps.revision);
     expect(savedApps.applications).toHaveLength(1);
     expect(savedApps.coverLetters).toHaveLength(1);
     const reloaded = await store.getApplications();

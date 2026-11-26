@@ -6,9 +6,11 @@ import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
   ApplicationsStoreData,
+  ApplicationLogInput,
+  JobApplication,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
-import type { ResumeSnapshotMeta, ResumeTrashList } from '../server/localFsApi';
+import type { ResumeSnapshotMeta, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
 import type {
   CoverLetterExportOptions,
   PdfExportOptions,
@@ -168,16 +170,29 @@ export const apiClient = {
     return handleJsonResponse<ApplicationsStoreData>(res);
   },
 
-  async saveApplications(data: ApplicationsStoreData): Promise<ApplicationsStoreData> {
+  async saveApplications(data: ApplicationsStoreData,revision:string): Promise<ApplicationsStoreData> {
     if (window.resumeDesktop?.applications) {
-      return window.resumeDesktop.applications.save(data);
+      return window.resumeDesktop.applications.save(data,revision);
     }
     const res = await fetch('/api/applications', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json','If-Match':revision },
       body: JSON.stringify(data),
     });
     return handleJsonResponse<ApplicationsStoreData>(res);
+  },
+
+  async logApplication(input:ApplicationLogInput):Promise<{entry:JobApplication;store:ApplicationsStoreData}>{
+    if(window.resumeDesktop){if(!window.resumeDesktop.applications.log)throw new Error('桌面桥接版本过旧。');return window.resumeDesktop.applications.log(input);}
+    return handleJsonResponse<{entry:JobApplication;store:ApplicationsStoreData}>(await fetch('/api/applications/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)}));
+  },
+  async inspectWriteLock():Promise<ResumeWriteLockStatus>{
+    if(window.resumeDesktop){if(!window.resumeDesktop.writeLock)throw new Error('桌面桥接版本过旧。');return window.resumeDesktop.writeLock.inspect();}
+    return handleJsonResponse<ResumeWriteLockStatus>(await fetch('/api/write-lock'));
+  },
+  async recoverWriteLock(token:string):Promise<{recovered:true}>{
+    if(window.resumeDesktop){if(!window.resumeDesktop.writeLock)throw new Error('桌面桥接版本过旧。');return window.resumeDesktop.writeLock.recover(token,'RECOVER_DEAD_LOCK');}
+    return handleJsonResponse<{recovered:true}>(await fetch('/api/write-lock/recover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,confirmation:'RECOVER_DEAD_LOCK'})}));
   },
 
   async saveApplicationSnapshot(

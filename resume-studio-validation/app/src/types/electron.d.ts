@@ -3,10 +3,12 @@ import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
   ApplicationsStoreData,
+  ApplicationLogInput,
+  JobApplication,
   CoverLetterPdfPayload,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../schema/resumeSchema';
-import type { ResumeSnapshotMeta, ResumeTrashList } from '../server/localFsApi';
+import type { ResumeSnapshotMeta, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
 
 export interface SystemFontResult {
   fonts: string[];
@@ -66,6 +68,7 @@ export interface ResumeDesktopBridge {
     }) => Promise<{ slug: string; document: ResumeDocument }>;
     delete: (slug: string, expectedRevision: string) => Promise<{ deleted: boolean; trashId?: string }>;
   };
+  writeLock?: {inspect:()=>Promise<ResumeWriteLockStatus>;recover:(token:string,confirmation:'RECOVER_DEAD_LOCK')=>Promise<{recovered:true}>};
   trash?: {
     list: () => Promise<ResumeTrashList>;
     restore: (id:string,expectedRevision:string,asCopy:boolean) => Promise<{slug:string;document:ResumeDocument}>;
@@ -78,7 +81,8 @@ export interface ResumeDesktopBridge {
   };
   applications: {
     get: () => Promise<ApplicationsStoreData>;
-    save: (data: ApplicationsStoreData) => Promise<ApplicationsStoreData>;
+    save: (data: ApplicationsStoreData,revision:string) => Promise<ApplicationsStoreData>;
+    log?: (input:ApplicationLogInput)=>Promise<{entry:JobApplication;store:ApplicationsStoreData}>;
     saveSnapshot: (input: SaveApplicationSnapshotInput) => Promise<ApplicationSnapshotMeta>;
     getSnapshot: (snapshotId: string) => Promise<ApplicationSnapshotRecord>;
     deleteSnapshot: (snapshotId: string) => Promise<{ deleted: boolean }>;

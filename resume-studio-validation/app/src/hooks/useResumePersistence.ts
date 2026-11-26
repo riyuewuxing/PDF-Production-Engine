@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
+import { careerLedger } from '../lib/careerLedgerSession';
 import { cleanResumeRichText } from '../lib/htmlToMarkdown';
 import { useHistoryState } from '../lib/useHistoryState';
 import { resumeRevision, type ResumeDocument, type ResumeSummary } from '../schema/resumeSchema';
@@ -157,7 +158,7 @@ export function useResumePersistence(options?: {
     const lifecycle = window.resumeDesktop?.lifecycle;
     if (!lifecycle) return;
     const unsubscribe = lifecycle.onBeforeClose((requestId) => {
-      void flushPendingSave().then(
+      void Promise.all([flushPendingSave(),careerLedger.flush()]).then(
         () => lifecycle.confirmCloseReady(requestId, true),
         () => lifecycle.confirmCloseReady(requestId, false),
       );
