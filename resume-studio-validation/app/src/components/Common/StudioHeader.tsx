@@ -93,7 +93,7 @@ export function StudioHeader({
     <header aria-label="工作台顶栏" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-800 bg-[#11161f] px-3 py-1.5 text-slate-100 2xl:flex-nowrap">
       <div aria-label="版本与保存状态" className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1 2xl:flex-1 2xl:flex-nowrap">
         <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold tracking-tight text-white">
-          <HardDrive size={15} className="text-teal-400" />
+          <HardDrive size={15} className="text-teal-400 shrink-0" />
           Resume Studio
         </span>
         <span className="h-4 w-px bg-slate-700" />
@@ -172,7 +172,7 @@ export function StudioHeader({
           title="全局命令面板 (Ctrl+K)"
           className="inline-flex items-center gap-1.5 rounded border border-slate-700/80 bg-slate-900/90 px-2 py-1 text-[11px] text-slate-300 hover:border-teal-500/50 hover:text-white"
         >
-          <Command size={11} className="text-teal-400" />
+          <Command size={11} className="text-teal-400 shrink-0" />
           <span>快捷搜索</span>
           <kbd className="hidden rounded bg-slate-800 px-1 font-mono text-[10px] text-slate-400 xl:inline">Ctrl+K</kbd>
         </button>
@@ -218,7 +218,7 @@ export function StudioHeader({
               </button>
 
               {isRedactionPopoverOpen && (
-                <div className="absolute top-full left-0 z-50 mt-1.5 w-64 rounded-lg border border-slate-700 bg-[#19202c] p-3 text-xs text-slate-100 shadow-2xl">
+                <div aria-label="脱敏敏感词设置" className="absolute top-full left-0 z-50 mt-1.5 w-64 whitespace-normal break-words rounded-lg border border-slate-700 bg-[#19202c] p-3 text-xs text-slate-100 shadow-2xl">
                   <div className="font-semibold text-white">自定义脱敏敏感词</div>
                   <p className="mt-1 text-[10px] text-slate-400">
                     自动打码姓名/手机/邮箱并隐藏证件照；下方填写需替换为{' '}
@@ -290,7 +290,7 @@ export function StudioHeader({
           {isExportMenuOpen && (
             <div
               role="menu"
-              className="absolute top-full right-0 z-50 mt-1.5 w-52 overflow-hidden rounded-lg border border-slate-700 bg-[#19202c] py-1 text-xs text-slate-100 shadow-2xl"
+              className="absolute top-full right-0 z-50 mt-1.5 w-60 whitespace-normal break-words overflow-hidden rounded-lg border border-slate-700 bg-[#19202c] py-1 text-xs text-slate-100 shadow-2xl"
             >
               <button
                 type="button"
@@ -298,7 +298,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('png', false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileImage size={13} className="text-sky-400" /> 高清 2x PNG 长图
+                <FileImage size={13} className="text-sky-400 shrink-0" /> 高清 2x PNG 长图
               </button>
               <button
                 type="button"
@@ -306,7 +306,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('docx', false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileText size={13} className="text-blue-400" /> Word 可编辑 (.docx)
+                <FileText size={13} className="text-blue-400 shrink-0" /> Word 可编辑 (.docx)
               </button>
               <button
                 type="button"
@@ -314,7 +314,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('markdown', false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileCode2 size={13} className="text-amber-400" /> Markdown (.md)
+                <FileCode2 size={13} className="text-amber-400 shrink-0" /> Markdown (.md)
               </button>
               <button
                 type="button"
@@ -322,7 +322,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('html', false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileCode2 size={13} className="text-emerald-400" /> 单文件网页主页 (.html)
+                <FileCode2 size={13} className="text-emerald-400 shrink-0" /> 单文件网页主页 (.html)
               </button>
               <button
                 type="button"
@@ -330,7 +330,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('jsonResume', false)}
                 className="flex w-full items-center gap-2 border-t border-slate-800 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileDown size={13} className="text-indigo-400" /> 标准 JSON Resume（仅可见内容）
+                <FileDown size={13} className="text-indigo-400 shrink-0" /> 标准 JSON Resume（仅可见内容）
               </button>
               <button
                 type="button"
@@ -338,7 +338,7 @@ export function StudioHeader({
                 onClick={() => onExportFormat('json', false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-800"
               >
-                <FileDown size={13} className="text-slate-400" /> 本地 JSON 备份（含隐藏内容）
+                <FileDown size={13} className="text-slate-400 shrink-0" /> 本地 JSON 备份（含隐藏内容）
               </button>
             </div>
           )}

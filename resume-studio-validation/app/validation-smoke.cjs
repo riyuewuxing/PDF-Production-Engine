@@ -57,11 +57,14 @@ async function run() {
   const headerAction=label=>js('(()=>{const e=document.querySelector("[aria-label="+JSON.stringify('+JSON.stringify(label)+')+"]");if(!e||e.disabled)return false;e.click();return true})()');
   const popupInView=selector=>js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&r.width>100})()');
   if(!await headerAction('设置自定义脱敏敏感词'))throw Error('privacy popup unavailable');
-  await until('privacy popup within narrow window',()=>popupInView('header textarea'));
+  await until('privacy popup within narrow window',()=>popupInView('header [aria-label="脱敏敏感词设置"]'));
+  const popupContentFits=selector=>js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;return e.scrollWidth<=e.clientWidth+1&&[...e.querySelectorAll("p,button,label")].every(n=>n.scrollWidth<=n.clientWidth+1)})()');
+  if(!await popupContentFits('header [aria-label="脱敏敏感词设置"]'))throw Error('privacy popup internal text overflow');
   await capture('64-header-narrow-privacy-popup');
   await click('完成');
   if(!await headerAction('更多导出格式'))throw Error('export popup unavailable');
   await until('export popup within narrow window',()=>popupInView('header [role=menu]'));
+  if(!await popupContentFits('header [role=menu]'))throw Error('export popup internal text overflow');
   await capture('65-header-narrow-export-menu');
   await headerAction('更多导出格式');
   checks.headerPopupsVisible=true;
