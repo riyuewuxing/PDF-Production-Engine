@@ -1,0 +1,133 @@
+const assert=require('node:assert/strict');
+const {app}=require('electron');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
+if(!root||!out||fs.existsSync(root))throw Error('fresh isolated fixture required');
+fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});
+const userData=path.join(root,'userData');fs.mkdirSync(userData,{recursive:true});app.setPath('userData',userData);app.disableHardwareAcceleration();
+const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json'),manifest=require('./runner-manifest.json');
+const checks={},observations={};const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const timer=setTimeout(()=>{console.error('editor history global watchdog');app.exit(2)},150000);
+async function until(label,fn,timeout=12000){const end=Date.now()+timeout;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timed out: '+label);}
+async function run(){
+  const other={...fixture,id:'editor-history-other',title:'合成独立版本',basic:{...fixture.basic,name:'OTHER_EDITOR_23'}};
+  await main.store.saveResume('master',{...fixture,id:'editor-history-master',title:'合成母库'});
+  await main.store.saveResume('runner-fixture',fixture);
+  await main.store.saveResume('zz-other',other);
+  await main.registerAssetProtocol();main.registerIpcHandlers();
+  const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
+  const js=code=>win.webContents.executeJavaScript(code);
+  const click=async label=>{const ok=await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==='+JSON.stringify(label)+');if(!b||b.disabled)return false;b.click();return true})()');if(!ok)throw Error('button unavailable: '+label);};
+  const aria=async label=>{const ok=await js('(()=>{const b=[...document.querySelectorAll("button[aria-label]")].find(e=>e.getAttribute("aria-label")==='+JSON.stringify(label)+');if(!b||b.disabled)return false;b.click();return true})()');if(!ok)throw Error('aria button unavailable: '+label);};
+  const enabled=label=>js('(()=>{const b=[...document.querySelectorAll("button[aria-label]")].find(e=>e.getAttribute("aria-label")==='+JSON.stringify(label)+');return !!b&&!b.disabled})()');
+  const setValue=async (selector,value)=>{const ok=await js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const proto=e.tagName==="SELECT"?HTMLSelectElement.prototype:e.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,"value").set.call(e,'+JSON.stringify(value)+');e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');if(!ok)throw Error('missing input '+selector);};
+  const active=()=>js('document.querySelector("[aria-label=\\"快速切换简历版本\\"]")?.value');
+  const value=key=>js('document.querySelector("#basic-field-'+key+'")?.value');
+  const preview=()=>js('[...document.querySelectorAll(".a4-sheet")].map(e=>e.innerText).join("\\n")');
+  const read=slug=>main.store.getResume(slug||'runner-fixture');
+  const settled=async (label,predicate,slug)=>until(label,async()=>predicate(await read(slug))&&await js('document.body.innerText.includes("已保存至本地硬盘")'));
+  const screenshot=async name=>{await js('document.fonts.ready.then(()=>true)');await sleep(250);const im=await win.webContents.capturePage();if(im.isEmpty())throw Error('empty screenshot');fs.writeFileSync(path.join(out,name+'.png'),im.toPNG());};
+  const content=doc=>{const {updatedAt,...rest}=doc;return rest;};
+  const equal=(a,b)=>JSON.stringify(content(a))===JSON.stringify(content(b));
+  const switchTo=async slug=>{await setValue('[aria-label="快速切换简历版本"]',slug);await until('switch '+slug,async()=>await active()===slug&&await value('name')===(await read(slug)).basic.name);};
+  await until('editor ready',()=>js('!!document.querySelector("#basic-field-name")'));
+  if(await active()!=='runner-fixture')await switchTo('runner-fixture');
+  const baseline=await read(),otherBefore=await read('zz-other');
+  assert.equal(await enabled('撤销'),false);
+  assert.equal(await enabled('重做'),false);
+  await screenshot('01-editor-initial');
+
+  // Real renderer input events, followed by native Electron keyboard events.
+  await setValue('#basic-field-name','合成编辑甲23');
+  await sleep(90);
+  await setValue('#basic-field-name','合成编辑甲乙23');
+  await settled('rapid text persisted',d=>d.basic.name==='合成编辑甲乙23');
+  await until('preview updated',async()=> (await preview()).includes('合成编辑甲乙23'));
+  await aria('撤销');
+  await settled('merged text undo persisted',d=>d.basic.name===baseline.basic.name);
+  assert.equal(await enabled('撤销'),false);
+  await aria('重做');
+  await settled('merged text redo persisted',d=>d.basic.name==='合成编辑甲乙23');
+  checks.rapidTextCoalescedUndoRedo=true;
+  await js('document.querySelector("#basic-field-name").blur();document.body.focus();true');
+  win.focus();
+  const key=async (keyCode,mods)=>{win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers:mods});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers:mods});await sleep(150);};
+  await key('Z',['control']);
+  await settled('keyboard undo persisted',d=>d.basic.name===baseline.basic.name);
+  await key('Y',['control']);
+  await settled('keyboard redo persisted',d=>d.basic.name==='合成编辑甲乙23');
+  await key('Z',['control']);
+  await settled('keyboard undo restored',d=>d.basic.name===baseline.basic.name);
+  await setValue('#basic-field-name','新分支编辑23');
+  await settled('new edit persisted',d=>d.basic.name==='新分支编辑23');
+  assert.equal(await enabled('重做'),false);
+  checks.keyboardUndoRedoAndNewBranch=true;
+  await screenshot('02-edited-preview');
+
+  // Independent template choice + trial color + exact document persistence.
+  const beforeTemplate=await read();
+  await click('模板库(51)');
+  await until('gallery ready',()=>js('!!document.querySelector("[aria-label=\\"搜索模板\\"]")'));
+  await setValue('[aria-label="搜索模板"]','vip-sky-notch-hero');
+  await until('one gallery search hit',()=>js('[...document.querySelectorAll("button")].filter(b=>b.innerText.trim()==="大图放大对比").length===1'));
+  await click('大图放大对比');
+  await until('gallery lightbox',()=>js('!!document.querySelector("[role=\\"dialog\\"][aria-label^=\\"模板大图对比\\"]")'));
+  await aria('试色 #9f1239');
+  assert.ok(equal(await read(),beforeTemplate),'trial color unexpectedly persisted');
+  await screenshot('03-template-trial');
+  await click('应用此模板并开始编辑');
+  await settled('applied template and color',d=>d.templateId==='vip-sky-notch-hero'&&d.globalSettings.themeColor==='#9f1239');
+  const afterTemplate=await read();
+  assert.ok(equal(afterTemplate,{...beforeTemplate,templateId:'vip-sky-notch-hero',globalSettings:{...beforeTemplate.globalSettings,themeColor:'#9f1239'}}),'template application changed unrelated fields');
+  await screenshot('04-template-applied');
+  await aria('撤销');
+  await settled('template atomic undo',d=>equal(d,beforeTemplate));
+  await screenshot('05-template-undone');
+  await aria('重做');
+  await settled('template atomic redo',d=>equal(d,afterTemplate));
+  checks.templateApplyUndoRedoAtomic=true;
+
+  // New version must reset history and never write the old document.
+  await switchTo('zz-other');
+  assert.equal(await enabled('撤销'),false);assert.equal(await enabled('重做'),false);
+  assert.ok(equal(await read('zz-other'),otherBefore));
+  await setValue('#basic-field-name','OTHER_EDITED_23');
+  await settled('other version saved',d=>d.basic.name==='OTHER_EDITED_23','zz-other');
+  await aria('撤销');
+  await settled('other undo saved',d=>equal(d,otherBefore),'zz-other');
+  assert.ok(equal(await read(),afterTemplate));
+  await switchTo('runner-fixture');
+  assert.equal(await enabled('撤销'),false);assert.equal(await enabled('重做'),false);
+  assert.ok(equal(await read(),afterTemplate));
+  checks.crossVersionHistoryIsolation=true;
+
+  // Regression probe: independent visibility actions must not coalesce with typing.
+  const beforeDiscrete=await read();
+  await setValue('#basic-field-name','DISCRETE_EDIT_23');
+  await sleep(80);
+  await aria('隐藏姓名');
+  await settled('typing and visibility saved',d=>d.basic.name==='DISCRETE_EDIT_23'&&!d.basic.fieldOrder.find(f=>f.key==='name').visible);
+  await screenshot('06-rapid-hide');
+  await aria('撤销');
+  await until('undo save settled',()=>js('document.body.innerText.includes("已保存至本地硬盘")'));
+  const afterUndo=await read();
+  observations.discreteUndo={name:afterUndo.basic.name,nameVisible:afterUndo.basic.fieldOrder.find(f=>f.key==='name').visible,expectedName:'DISCRETE_EDIT_23',expectedVisible:true};
+  await screenshot('07-rapid-hide-undo');
+  assert.equal(afterUndo.basic.name,'DISCRETE_EDIT_23','undoing visibility also discarded distinct text edit');
+  assert.equal(afterUndo.basic.fieldOrder.find(f=>f.key==='name').visible,true);
+  await aria('撤销');
+  await settled('independent second undo',d=>equal(d,beforeDiscrete));
+  checks.discreteVisibilityUndoIndependent=true;
+  await aria('重做');
+  await settled('independent text redo',d=>d.basic.name==='DISCRETE_EDIT_23'&&d.basic.fieldOrder.find(f=>f.key==='name').visible);
+  await aria('重做');
+  await settled('independent visibility redo',d=>d.basic.name==='DISCRETE_EDIT_23'&&!d.basic.fieldOrder.find(f=>f.key==='name').visible);
+  checks.discreteVisibilityRedoIndependent=true;
+  await win.webContents.reload();
+  await until('reload retained last edit',async()=>await value('name')==='DISCRETE_EDIT_23'&&!(await preview()).includes('DISCRETE_EDIT_23'));
+  assert.equal(await enabled('撤销'),false);
+  checks.reloadPersistedLastHistoryResult=true;
+}
+function evidence(error){fs.writeFileSync(path.join(out,'editor-history-evidence.json'),JSON.stringify({sourceSha:manifest.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,checks,observations,...(error?{error:String(error)}:{})},null,2));}
+app.whenReady().then(run).then(()=>{clearTimeout(timer);evidence();app.exit(0)}).catch(e=>{clearTimeout(timer);console.error(e);evidence(e);app.exit(1)});

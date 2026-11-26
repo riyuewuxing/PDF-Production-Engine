@@ -1,0 +1,52 @@
+name: Resume Studio V6 isolated editing validation
+on:
+  push:
+    branches: ['resume-studio/v6-editor-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-editor-validation
+  cancel-in-progress: true
+jobs:
+  windows-editor:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck audited runtime
+        run: pnpm typecheck
+      - name: All audited synthetic tests
+        run: pnpm test
+      - name: Build actual Electron application
+        run: pnpm desktop:build
+      - name: Actual editor template and undo history
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('editor-history-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-editor-evidence'
+          & .\node_modules\.bin\electron.cmd .\validation-editor-history.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-editor-evidence
+          path: resume-studio-editor-evidence/
+          if-no-files-found: ignore
+          retention-days: 3
