@@ -1178,6 +1178,7 @@ async function run() {
   await js('document.querySelector("img[alt=\\"公告 PDF 第 1 页实际渲染\\"]")?.scrollIntoView({block:"center"})');
   if(!await jobSelect('公告原件显示比例','200'))throw Error('PDF zoom control unavailable');
   await until('original zoom is scrollable',()=>js('(()=>{const e=document.querySelector("[aria-label=\\"公告原件滚动预览\\"]");return !!e&&e.scrollWidth>e.clientWidth&&e.scrollHeight>e.clientHeight})()'));
+  await js('(()=>{const e=document.querySelector("[aria-label=\\"公告原件滚动预览\\"]");e.scrollIntoView({block:"center"});e.scrollTop=0;e.scrollLeft=0;return true})()');
   await capture('76-job-pdf-original-page');checks.jobPdfOriginalZoom=true;
   if(!await namedCheck('确认已对照 PDF 第 1 页'))throw Error('review page one unavailable');
   if(!await jobSelect('公告原件对照页','3'))throw Error('page selector unavailable');
