@@ -104,7 +104,17 @@ async function atomicWriteFile(targetPath: string, data: string | Buffer): Promi
   const tempPath = `${targetPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   try {
     await fs.writeFile(tempPath, data, { flag: 'wx' });
-    await fs.rename(tempPath, targetPath);
+    // Windows antivirus/readers can transiently hold the destination open. Keep
+    // the same temp file and write lock; never unlink the live destination.
+    const delays=[25,50,100,200,400,400];
+    for(let attempt=0;;attempt++){
+      try{await fs.rename(tempPath,targetPath);break;}
+      catch(err){
+        const code=(err as NodeJS.ErrnoException).code;
+        if(process.platform!=='win32'||!['EPERM','EACCES','EBUSY'].includes(code??'')||attempt>=delays.length)throw err;
+        await new Promise(resolve=>setTimeout(resolve,delays[attempt]));
+      }
+    }
   } finally {
     await fs.rm(tempPath, { force: true }).catch(() => {});
   }

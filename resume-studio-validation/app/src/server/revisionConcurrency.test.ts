@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LocalResumeStore, withResumeWriteLock } from './localFsApi';
 import { ResumeDocumentSchema, resumeRevision } from '../schema/resumeSchema';
 
@@ -20,6 +20,7 @@ async function fixture() {
   return { dir, store, doc };
 }
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(dirs.splice(0).map(dir => fs.rm(dir, {recursive: true, force: true})));
 });
 describe('resume revision and cross-process locking', () => {
@@ -46,6 +47,36 @@ describe('resume revision and cross-process locking', () => {
     await expect(fs.access(path.join(dir,'.resume-write-lock'))).rejects.toThrow();
   }, 18000);
 
+  it.skipIf(process.platform!=='win32')('retries transient Windows rename errors without deleting the live document',async()=>{
+    const {dir,store,doc}=await fixture(),target=path.join(dir,'resumes','demo.json');
+    const original=await fs.readFile(target),rename=fs.rename.bind(fs);
+    let attempts=0;
+    vi.spyOn(fs,'rename').mockImplementation(async(from,to)=>{
+      if(String(to)===target&&++attempts<=2){
+        expect(await fs.readFile(target)).toEqual(original);
+        throw Object.assign(new Error('synthetic sharing violation'),{code:'EPERM'});
+      }
+      await rename(from,to);
+    });
+    const saved=await store.saveResume('demo',{...doc,title:'Retried'},{expectedRevision:resumeRevision(doc)});
+    expect(attempts).toBe(3);
+    expect(await store.getResume('demo')).toEqual(saved);
+    expect((await fs.readdir(path.dirname(target))).filter(n=>n.endsWith('.tmp'))).toEqual([]);
+  });
+  it.skipIf(process.platform!=='win32')('bounds persistent Windows rename failures and preserves the original document',async()=>{
+    const {dir,store,doc}=await fixture(),target=path.join(dir,'resumes','demo.json');
+    const original=await fs.readFile(target),rename=fs.rename.bind(fs);
+    let attempts=0;
+    vi.spyOn(fs,'rename').mockImplementation(async(from,to)=>{
+      if(String(to)===target){attempts++;throw Object.assign(new Error('persistent sharing violation'),{code:'EPERM'});}
+      await rename(from,to);
+    });
+    await expect(store.saveResume('demo',{...doc,title:'Must not overwrite'},{expectedRevision:resumeRevision(doc)})).rejects.toMatchObject({code:'EPERM'});
+    expect(attempts).toBe(7);
+    expect(await fs.readFile(target)).toEqual(original);
+    expect((await fs.readdir(path.dirname(target))).filter(n=>n.endsWith('.tmp'))).toEqual([]);
+    expect((await store.getResume('demo')).title).toBe('Initial');
+  });
   it('rejects stale delete, stale restore and stale save after deletion without recreating the file', async () => {
     const {store, doc} = await fixture();
     const snap = await store.createSnapshot('demo', 'before');
