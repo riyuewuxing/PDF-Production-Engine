@@ -7,8 +7,8 @@ import { buildStandaloneResumeHtml } from './htmlExporter';
 import { exportResumeToDocxBuffer } from './docxExporter';
 
 const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-const markers = ['SYNTH_NAME_19', 'SYNTH_ROLE_19', 'sample19@example.invalid', 'SYNTH_CUSTOM_19'];
-const photoBuffer = Buffer.from(image.split(',')[1], 'base64');
+const markers = ['SYNTH_NAME_19', 'SYNTH_ROLE_19', 'sample19@example.invalid', 'SYNTH_CUSTOM_19'] as const;
+const photoBuffer = Buffer.from(image.slice(image.indexOf(',') + 1), 'base64');
 function fixture() {
   return ResumeDocumentSchema.parse({
     id: 'synthetic-export-19', title: 'INTERNAL_DOCUMENT_TITLE_19',
