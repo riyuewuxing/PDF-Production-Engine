@@ -57,7 +57,7 @@ async function run(){
   const resume=rows.drafts.find(x=>x.kind==='resume'),ledger=rows.drafts.find(x=>x.kind==='ledger');
   if(resume?.state!=='changed'||ledger?.state!=='same-base')throw Error('wrong recovery basis classification');
   const master=await main.store.getResume('master');
-  await js('window.confirm=()=>true');
+  await js('(()=>{window.confirm=()=>true;return true})()');
   await click('恢复为新简历',panel);
   await until('recovered resume exists',async()=>(await main.store.listResumes()).resumes.some(x=>x.title.includes('恢复草稿')));
   const list=await main.store.listResumes(),copy=list.resumes.find(x=>x.title.includes('恢复草稿')),doc=await main.store.getResume(copy.slug);
