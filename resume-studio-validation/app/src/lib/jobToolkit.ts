@@ -1,4 +1,6 @@
 import type { ResumeDocument } from '../schema/resumeSchema';
+import {visibleBasicValue} from './aiContext';
+function enabled(doc:ResumeDocument,id:string):boolean{return doc.menuSections.some(s=>s.id===id&&s.enabled);}
 
 
 export interface CoverLetterBundle {
@@ -53,29 +55,29 @@ function extractHighlights(doc: ResumeDocument): {
   experienceHighlights: string[];
   skillHighlight: string;
   contactSummary: string;
+  employmentStatus:string;
 } {
-  const name =
-    doc.basic.name.trim() && doc.basic.name.trim() !== '[姓名]' ? doc.basic.name.trim() : '候选人';
-  const role = doc.basic.title.trim() || '目标岗位';
-  const visibleEdu = doc.education.filter((e) => e.visible);
+  const name=visibleBasicValue(doc,'name').trim().replace(/^\[姓名\]$/,'');
+  const role=visibleBasicValue(doc,'title').trim()||'目标岗位';
+  const visibleEdu=enabled(doc,'education')?doc.education.filter(e=>e.visible):[];
   const topEdu = visibleEdu[0];
-  const topSchool = topEdu?.school.trim() || '相关院校';
-  const topMajor = topEdu?.major.trim() || '相关专业';
+  const topSchool = topEdu?.school.trim() || '';
+  const topMajor = topEdu?.major.trim() || '';
   const topDegree = topEdu?.degree.trim() || '';
   const eduSummary = topEdu
     ? `${topSchool}${topMajor ? `「${topMajor}」` : ''}${topDegree ? `${topDegree}` : ''}${topEdu.gpa ? `（成绩 ${topEdu.gpa}）` : ''}`
-    : '具备扎实的专业学术训练与独立研究能力';
+    : '';
 
   const projectHighlights = doc.projects
-    .filter((p) => p.visible && p.name.trim())
+    .filter((p) => enabled(doc,'projects') && p.visible && p.name.trim())
     .slice(0, 2)
     .map((p) => {
       const desc = trimAtSentenceBoundary(stripMarkdownTokens(p.description), 88);
-      return `「${p.name.trim()}」${desc ? `（${desc}）` : ''}`;
+      return `「${p.name.trim()}」${p.role.trim()?`（${p.role.trim()}）`:''}${desc ? `：${desc}` : ''}`;
     });
 
   const experienceHighlights = doc.experience
-    .filter((e) => e.visible && (e.company.trim() || e.position.trim()))
+    .filter((e) => enabled(doc,'experience') && e.visible && (e.company.trim() || e.position.trim()))
     .slice(0, 2)
     .map((e) => {
       const desc = trimAtSentenceBoundary(stripMarkdownTokens(e.description), 88);
@@ -83,7 +85,7 @@ function extractHighlights(doc: ResumeDocument): {
     });
 
   const skillHighlight = trimAtSentenceBoundary(
-    doc.skillContent
+    (enabled(doc,'skills')?doc.skillContent:'')
       .split(/\r?\n/)
       .map((line) => stripMarkdownTokens(line))
       .filter(Boolean)
@@ -91,9 +93,9 @@ function extractHighlights(doc: ResumeDocument): {
     140,
   );
   const contacts = [
-    doc.basic.phone ? `电话：${doc.basic.phone}` : '',
-    doc.basic.email ? `邮箱：${doc.basic.email}` : '',
-    doc.basic.location ? `所在地：${doc.basic.location}` : '',
+    visibleBasicValue(doc,'phone') ? `电话：${doc.basic.phone}` : '',
+    visibleBasicValue(doc,'email') ? `邮箱：${doc.basic.email}` : '',
+    visibleBasicValue(doc,'location') ? `所在地：${doc.basic.location}` : '',
   ].filter(Boolean);
 
   return {
@@ -107,6 +109,7 @@ function extractHighlights(doc: ResumeDocument): {
     experienceHighlights,
     skillHighlight,
     contactSummary: contacts.join(' | '),
+    employmentStatus:visibleBasicValue(doc,'employmentStatus'),
   };
 }
 
@@ -117,55 +120,21 @@ export function generateCoverLetterBundle(
   const h = extractHighlights(doc);
   const targetCompany = target.company?.trim() || '贵单位';
   const targetRole = target.role?.trim() || h.role;
-  const practiceLine =
-    h.experienceHighlights.length > 0
-      ? `在实践经历方面，我曾参与 ${h.experienceHighlights.join('；')}，锻炼了扎实的一线执行与协作能力。`
-      : h.projectHighlights.length > 0
-        ? `在项目与教研实践中，我主导/参与了 ${h.projectHighlights.join('；')}，沉淀了可复用的方法与量化成果。`
-        : '在过往学习与科研训练中，我保持了严谨的问题拆解与快速交付习惯。';
-
-  const skillLine = h.skillHighlight
-    ? `此外，我已具备 ${h.skillHighlight} 等资质与专项技能，能够在到岗后快速胜任核心职责。`
-    : '具备良好的专业迁移能力与抗压沟通素质，期待能够快速融入团队贡献价值。';
-
-  const coverLetterText = [
-    `尊敬的${targetCompany}招聘负责老师/HR：`,
-    '',
-    `您好！获悉${targetCompany}正在招聘「${targetRole}」，我非常期待能够申请该岗位。我是${h.name}，毕业于${h.eduSummary}，目前求职状态为「${doc.basic.employmentStatus || '可尽快到岗'}」。`,
-    '',
-    practiceLine,
-    skillLine,
-    '',
-    `随信附上我的个人简历，诚盼能获得与您进一步沟通或面试试讲的机会。感谢您的宝贵时间！`,
-    '',
-    `此致`,
-    `敬礼！`,
-    `申请人：${h.name}`,
-    ...(h.contactSummary ? [h.contactSummary] : []),
+  const intro=[h.name?'我是'+h.name+'。':'',h.eduSummary?'我的教育背景为'+h.eduSummary+'。':'',h.employmentStatus?'目前求职状态：'+h.employmentStatus+'。':''].filter(Boolean).join('');
+  const practiceLine=[...h.experienceHighlights,...h.projectHighlights].length?'相关实践与项目经历包括：'+[...h.experienceHighlights,...h.projectHighlights].join('；')+'。':'';
+  const skillLine=h.skillHighlight?'简历中列有以下专业技能：'+h.skillHighlight+'。':'';
+  const coverLetterText=[
+    `尊敬的${targetCompany}招聘负责人：`,'',
+    `您好！我希望申请${targetCompany}的「${targetRole}」岗位。${intro}`,'',
+    ...[practiceLine,skillLine].filter(Boolean),'',
+    '随信附上我的个人简历，期待有机会进一步沟通。感谢您的审阅！','','此致','敬礼！',
+    ...(h.name?['申请人：'+h.name]:[]),...(h.contactSummary?[h.contactSummary]:[]),
   ].join('\n');
-
-  const emailSubject = `应聘${targetRole}-${h.topSchool}${h.topMajor}${h.topDegree ? `(${h.topDegree})` : ''}-${h.name}`;
-  const emailBody = [
-    `尊敬的${targetCompany}招聘老师您好：`,
-    '',
-    `我在招聘信息中了解到贵单位正在招聘「${targetRole}」岗位，现特附上个人简历予以自荐。`,
-    `我毕业于${h.eduSummary}，${h.projectHighlights[0] ? `重点开展过${h.projectHighlights[0]}` : '具备扎实专业功底'}${h.skillHighlight ? `，持有/掌握：${h.skillHighlight}` : ''}。`,
-    '',
-    `附件为我的 PDF 个人简历，期待有机会参加后续面试或试讲考察！`,
-    '',
-    `${h.name}`,
-    h.contactSummary,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const coreProof =
-    h.projectHighlights[0] ||
-    h.experienceHighlights[0] ||
-    (h.skillHighlight ? `掌握 ${h.skillHighlight.slice(0, 42)}` : h.eduSummary);
-
-  const bossGreeting = `老师/HR您好！我是毕业于${h.topSchool}${h.topMajor}${h.topDegree}的${h.name}，关注到${targetCompany}的「${targetRole}」岗位。过往有${coreProof}等实践积累，目前${doc.basic.employmentStatus || '可随时到岗'}，方便发一份简历给您参考吗？`;
-
+  const academic=[h.topSchool,h.topMajor,h.topDegree?'('+h.topDegree+')':''].join('');
+  const emailSubject=['应聘'+targetRole,academic,h.name].filter(Boolean).join('-');
+  const emailBody=[`尊敬的${targetCompany}招聘负责人您好：`,`我希望申请「${targetRole}」岗位，现附上个人简历供您参考。`,intro,practiceLine,skillLine,'期待进一步沟通，感谢您的审阅！',h.name,h.contactSummary].filter(Boolean).join('\n');
+  const coreProof=h.projectHighlights[0]||h.experienceHighlights[0]||h.skillHighlight;
+  const bossGreeting=[`老师/HR您好！我希望申请${targetCompany}的「${targetRole}」岗位。`,intro,coreProof?'我的相关经历或技能：'+coreProof+'。':'','方便发一份简历给您参考吗？'].filter(Boolean).join('');
   return {
     coverLetterText,
     emailSubject,
@@ -182,12 +151,12 @@ export function generateInterviewQuestions(
   const role = targetRoleInput?.trim() || h.role;
   const fullText = JSON.stringify({
     title: role,
-    edu: doc.education,
-    exp: doc.experience,
-    proj: doc.projects,
-    skill: doc.skillContent,
-    eval: doc.selfEvaluationContent,
-    custom: doc.customData,
+    edu: enabled(doc,'education')?doc.education.filter(e=>e.visible):[],
+    exp: enabled(doc,'experience')?doc.experience.filter(e=>e.visible):[],
+    proj: enabled(doc,'projects')?doc.projects.filter(e=>e.visible):[],
+    skill: enabled(doc,'skills')?doc.skillContent:'',
+    eval: enabled(doc,'selfEvaluation')?doc.selfEvaluationContent:'',
+    custom: Object.fromEntries(Object.entries(doc.customData).filter(([id])=>enabled(doc,id)).map(([id,items])=>[id,items.filter(i=>i.visible)])),
   });
 
   const isTeacherRole = /教师|老师|物理|教研|中学|师范|教学/.test(fullText);
@@ -197,7 +166,7 @@ export function generateInterviewQuestions(
   questions.push({
     id: 'q-edu-foundation',
     category: '专业能力',
-    question: `请结合你在${h.topSchool}${h.topMajor ? `「${h.topMajor}」` : ''}的培养经历，谈谈这段学习背景对胜任「${role}」最大的帮助是什么？`,
+    question: h.topSchool?`请结合你在${h.topSchool}${h.topMajor ? `「${h.topMajor}」` : ''}的培养经历，谈谈这段学习背景对胜任「${role}」最大的帮助是什么？`:`请介绍与你申请「${role}」相关的教育或学习背景。`,
     intent: '考察学历专业与目标岗位的底层迁移度，区分“只会考试”与“会转化运用”。',
     starHints: [
       '用 1 句话点明专业核心训练（实验设计 / 数学建模 / 严密推理）',
@@ -207,7 +176,7 @@ export function generateInterviewQuestions(
   });
 
   // 2. Top projects probe (up to 2)
-  const visibleProjects = doc.projects.filter((p) => p.visible && p.name.trim()).slice(0, 2);
+  const visibleProjects = doc.projects.filter((p) => enabled(doc,'projects') && p.visible && p.name.trim()).slice(0, 2);
   visibleProjects.forEach((proj, idx) => {
     questions.push({
       id: `q-proj-${idx + 1}`,
@@ -223,12 +192,12 @@ export function generateInterviewQuestions(
   });
 
   // 3. Experience probe
-  const visibleExps = doc.experience.filter((e) => e.visible && e.company.trim()).slice(0, 2);
+  const visibleExps = doc.experience.filter((e) => enabled(doc,'experience') && e.visible && e.company.trim()).slice(0, 2);
   visibleExps.forEach((exp, idx) => {
     questions.push({
       id: `q-exp-${idx + 1}`,
       category: '项目深挖',
-      question: `在「${exp.company.trim()}」担任「${exp.position || role}」期间，哪一次具体任务或反馈让你成长最快？如果重做一次会怎么优化？`,
+      question: `在「${exp.company.trim()}」${exp.position?`担任「${exp.position}」`:'的经历'}中，哪一次具体任务或反馈让你成长最快？如果重做一次会怎么优化？`,
       intent: '考察一线工作成熟度、复盘习惯以及高压环境下的抗挫力。',
       starHints: ['先给具体事件场景，避免空泛总结', '诚恳说明当时的不足与改进措施'],
     });
@@ -244,7 +213,7 @@ export function generateInterviewQuestions(
         intent: '高频学科教法与学情转化能力考察，重点中学必问。',
         starHints: [
           '给出“现象直观感知 → 物理模型抽象 → 典型错因辨析”三步法',
-          '结合你做过的仿真课件或可视化实验说明如何降维',
+          '如实际做过仿真课件或可视化实验，可结合实例；否则说明拟采用的方法',
         ],
       },
       {
@@ -257,7 +226,7 @@ export function generateInterviewQuestions(
       {
         id: 'q-teach-lab',
         category: '专业能力',
-        question: '结合你的科研实验与课件开发背景，如何将数字化工具/AI 可视化融入常规 45 分钟课堂，同时不沦为“炫技”？',
+        question: '如何将数字化工具或可视化实验融入常规课堂，同时不沦为“炫技”？如有实际相关经历，可结合实例。',
         intent: '考察教研创新意识与课堂效率的平衡能力。',
         starHints: ['明确工具只服务于“传统器材难以演示的微观/瞬时过程”', '保留学生动手推导与板书主线'],
       },
@@ -282,13 +251,10 @@ export function generateInterviewQuestions(
   }
 
   // 5. Timeline gap / career pivot check
-  const hasGapHint = /2024|2025/.test(fullText) && visibleExps.length === 0;
   questions.push({
     id: 'q-timeline-motivation',
     category: '时间线与动机',
-    question: hasGapHint
-      ? `从你的经历时间线来看，近期主要以学术/备考准备为主（暂未全职在企业/学校长期任职），这段时间你有哪些主动输出或自我迭代？为什么坚定选择「${role}」？`
-      : `是什么契机促使你当前考虑「${role}」方向，相比同龄候选人你的核心差异化优势在哪里？`,
+    question: `请说明近期学习、工作或求职准备的时间线，以及选择「${role}」的原因。有哪些能够核实的具体积累？`,
     intent: '提前排雷空窗期、稳定性与岗位真实意愿度。',
     starHints: [
       '坦诚客观交代时间去向，强调持续自驱产出（作品/证书/备课积累）',
@@ -300,7 +266,7 @@ export function generateInterviewQuestions(
   questions.push({
     id: 'q-metric-verify',
     category: '综合素质',
-    question: `简历中写了${doc.selfEvaluationContent.trim() ? '自我评价中的个人优势' : '多项专业成果与奖项'}，请举一个“在没有外部明确标准下，你依然把标准做高”的例子。`,
+    question: '请举一个你实际经历过的、主动提高工作或学习质量的例子。如果没有量化数据，如何说明改进效果？',
     intent: '区分泛泛套话与真实高标准自驱力。',
     starHints: ['选取具体作品或教学材料从零到一打磨经历', '量化对比优化前后差异'],
   });
@@ -325,6 +291,8 @@ export function generateInterviewQuestions(
     });
   }
 
-  return questions.slice(0, 12);
+  if(questions.length<8)questions.push({id:'q-example-evidence',category:'综合素质',question:'请选一个你愿意提供证据的真实经历，说明个人职责、困难、行动与结果。',intent:'核对事实与表达一致性。',starHints:['区分个人贡献与团队贡献','无法量化时说明可核对的过程和产物']});
+  if(questions.length<8)questions.push({id:'q-learning',category:'专业能力',question:'面对陌生岗位任务，你如何识别知识缺口并完成一次可验证的学习？',intent:'考察学习与验证方法。',starHints:['明确缺口','说明如何检验学习成果']});
+  return questions.slice(0,12);
 }
 

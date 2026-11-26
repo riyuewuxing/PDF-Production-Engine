@@ -55,6 +55,7 @@ export class AiSettingsStore{
     }
     if(raw.schemaVersion!==undefined&&raw.schemaVersion!==1)throw new Error('不支持此 AI 配置版本；原文件未修改。');
     // Legacy singleton migration. Preserve existing encrypted material; encrypt plaintext before atomic replacement.
+    if(typeof raw.baseUrl!=='string'||typeof raw.model!=='string'||typeof raw.enabled!=='boolean'||(raw.encryptedApiKey!==undefined&&typeof raw.encryptedApiKey!=='string')||(raw.apiKey!==undefined&&typeof raw.apiKey!=='string'))throw new Error('旧模型配置格式无法确认，原文件未修改。');
     const metadata=metadataFrom(raw);
     let encryptedApiKey:string|undefined;
     if(typeof raw.encryptedApiKey==='string'&&raw.encryptedApiKey){
@@ -78,6 +79,7 @@ export class AiSettingsStore{
     return this.locked(async()=>{
       const raw=asRecord(input),c=await this.read(),previous=this.find(c,typeof raw.profileId==='string'?raw.profileId:undefined);
       if(raw.revision!==previous.revision)throw new Error('模型配置已变化，请重新读取后保存。');
+      if(typeof raw.model!=='string'||!raw.model.trim()||typeof raw.baseUrl!=='string'||!raw.baseUrl.trim())throw new Error('模型名与接口地址不能为空。');
       const metadata=metadataFrom(raw);
       const supplied=typeof raw.apiKey==='string'?raw.apiKey.trim():'';
       if(supplied.length>4096)throw new Error('API Key 长度超出许可范围。');

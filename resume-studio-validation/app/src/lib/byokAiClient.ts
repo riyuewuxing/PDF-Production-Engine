@@ -126,7 +126,10 @@ export async function requestByokCompletion(params: ByokCompletionOptions & {
   if (!settings.enabled) throw new Error('请先开启并保存 AI 配置。');
   if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
   const bridge = typeof window !== 'undefined' ? window.resumeDesktop?.ai : undefined;
-  if (!bridge) return requestByokCompletionDirect(params);
+  if(!bridge){
+    if(typeof window!=='undefined'&&window.resumeDesktop)throw new Error('桌面模型网关不可用，未绕过主进程。');
+    return requestByokCompletionDirect(params);
+  }
   if (settings.apiKey || settings.clearApiKey || !settings.profileId || !settings.revision) throw new Error('请先保存或重新读取 AI 配置。');
   const requestId = globalThis.crypto.randomUUID();
   const onAbort = () => { void bridge.cancelCompletion(requestId).catch(() => {}); };
@@ -157,6 +160,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
     throw new Error('请先在下方开启并保存 BYOK 大模型配置，再调用 AI 能力。');
   }
   const { baseUrl, isLoopback } = validateByokBaseUrl(settings.baseUrl);
+  if(!settings.model.trim())throw new Error('缺少模型名，未自动切换模型。');
   if (!isLoopback && !settings.apiKey.trim()) {
     throw new Error('缺少 API Key，请先保存凭据。');
   }
@@ -179,7 +183,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
 
   try {
     const bodyPayload: Record<string, unknown> = {
-      model: settings.model.trim() || 'deepseek-chat',
+      model: settings.model.trim(),
       temperature,
       messages: [
         { role: 'system', content: systemPrompt },

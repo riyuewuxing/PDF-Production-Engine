@@ -45,5 +45,6 @@ export async function previewTextPatch(input:{document:ResumeDocument;slug:strin
   const next=ResumeDocumentSchema.parse(applyBlockUpdates(document,updates));
   const after=collectEditableBlocks(next);
   for(const [key,value] of Object.entries(updates))if(after.filter(b=>b.key===key&&b.text===value).length!==1)throw new Error('AI 提案无法确定性映射至原段落。');
+  for(const b of blocks)if(!Object.hasOwn(updates,b.key)&&!after.some(a=>a.key===b.key&&a.text===b.text))throw new Error('AI 提案影响了未授权的其他段落。');
   return next;
 }

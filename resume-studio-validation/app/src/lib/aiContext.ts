@@ -4,21 +4,25 @@ import type { ResumeDocument } from '../schema/resumeSchema';
 export const PRIVACY_PLACEHOLDER = '【隐私已省略】';
 
 /** Known identifiers and common contact formats are removed from EVERY outbound text field. */
-export function createAiTextSanitizer(docs: readonly ResumeDocument[]): (text: string) => string {
-  const terms = [...new Set(docs.flatMap(doc => [
-    doc.basic.name, doc.basic.email, doc.basic.phone, doc.basic.birthDate, doc.basic.photo,
-  ]).map(s => s.trim()).filter(s => s.length >= 2))].sort((a,b)=>b.length-a.length);
-  return (text: string) => {
-    let result = text;
-    for (const term of terms) {
-      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      result = result.replace(new RegExp(escaped, 'gi'), PRIVACY_PLACEHOLDER);
-    }
-    return result
-      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, PRIVACY_PLACEHOLDER)
-      .replace(/(?<!\d)(?:\+?86[- ]?)?1[3-9]\d[- ]?\d{4}[- ]?\d{4}(?!\d)/g, PRIVACY_PLACEHOLDER)
-      .replace(/(?:resume-asset:\/\/|\/api\/assets\/)[^\s"'<>]+/gi, PRIVACY_PLACEHOLDER)
-      .replace(/data:[^\s"'<>]+/gi, PRIVACY_PLACEHOLDER);
+export function visibleBasicValue(doc:ResumeDocument,key:'name'|'title'|'email'|'phone'|'birthDate'|'location'|'employmentStatus'):string {
+  return doc.menuSections.some(s=>s.id==='basic'&&s.enabled)&&doc.basic.fieldOrder.some(f=>f.key===key&&f.visible)?doc.basic[key]:'';
+}
+export function createAiTextSanitizer(docs:readonly ResumeDocument[]):(text:string)=>string{
+  const terms=[...new Set(docs.flatMap(doc=>[
+    doc.basic.name,doc.basic.email,doc.basic.phone,doc.basic.birthDate,doc.basic.photo,doc.basic.location,
+    ...doc.basic.customFields.filter(f=>!f.visible).map(f=>f.value),
+    ...(!visibleBasicValue(doc,'title')?[doc.basic.title]:[]),
+    ...(!visibleBasicValue(doc,'employmentStatus')?[doc.basic.employmentStatus]:[]),
+  ]).map(s=>s.trim()).filter(s=>s.length>0&&s.length<=4096))].sort((a,b)=>b.length-a.length);
+  const escaped=terms.map(term=>term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  const pattern=escaped.length?new RegExp(escaped.join('|'),'gi'):null;
+  return (text:string)=>{
+    const value=pattern?text.replace(pattern,PRIVACY_PLACEHOLDER):text;
+    return value
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,PRIVACY_PLACEHOLDER)
+      .replace(/(?<!\d)(?:\+?86[- ]?)?1[3-9]\d[- ]?\d{4}[- ]?\d{4}(?!\d)/g,PRIVACY_PLACEHOLDER)
+      .replace(/(?:resume-asset:\/\/|\/api\/assets\/)[^\s"'<>]+/gi,PRIVACY_PLACEHOLDER)
+      .replace(/data:[^\s"'<>]+/gi,PRIVACY_PLACEHOLDER);
   };
 }
 

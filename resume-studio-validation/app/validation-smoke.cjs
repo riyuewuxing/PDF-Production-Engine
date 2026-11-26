@@ -337,6 +337,13 @@ async function run() {
   if(encrypted.profiles.length!==2||encrypted.profiles.some(p=>!p.encryptedApiKey||p.apiKey!==undefined)||JSON.stringify(encrypted).includes('synthetic-second-key'))throw Error('profile credentials not encrypted');
   checks.multiProfileEncrypted=true;
   await capture('16-ai-model-center');
+  const beforeProbe=providerCalls;
+  await click('测试模型连接');
+  await until('synthetic connectivity probe',()=>bodyHas('连接成功 · 合成探针返回 OK'));
+  if(providerCalls!==beforeProbe+1||!lastAiRequest.second||lastAiRequest.body.max_tokens!==64||JSON.parse(lastAiRequest.body.messages[1].content).task!=='connection-probe'||JSON.stringify(lastAiRequest.body.messages).includes('演示候选人'))throw Error('connection probe was not synthetic');
+  checks.syntheticConnectionProbe=true;
+  await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==="测试模型连接");b?.scrollIntoView({block:"center"});return true})()');
+  await capture('16b-ai-connectivity');
   const beforeStale=providerCalls;
   const refused=await js('window.resumeDesktop.ai.requestCompletion('+JSON.stringify({requestId:'53ad1c68-6b20-4b94-a267-601d633fcf3c',profile:{profileId:secondProfile.profileId,revision:'old-revision',baseUrl:secondProfile.baseUrl,model:secondProfile.model},systemPrompt:'synthetic',userPrompt:'synthetic'})+').then(()=>false,()=>true)');
   if(!refused||providerCalls!==beforeStale)throw Error('stale model request reached provider');
@@ -366,6 +373,7 @@ async function run() {
   const applyDisabled=await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("应用已核对提案"))?.disabled===true');
   if(!applyDisabled)throw Error('assistant applies without approval');
   if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(baseline))throw Error('assistant modified before approval');
+  await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.includes("应用已核对提案"));b?.scrollIntoView({block:"center"});return true})()');
   await capture('19-ai-assistant-proposal');
   await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("已核对本条原文"));l?.querySelector("input")?.click();return !!l})()');
   await click('应用已核对提案（1）');
@@ -388,6 +396,7 @@ async function run() {
   await until('career proposed',()=>bodyHas('候选文案（本地还原）'));
   if(!lastAiRequest.second||JSON.stringify(lastAiRequest.body.messages)!==JSON.stringify(careerMessages))throw Error('career exact preview or route mismatch');
   if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="采纳文案草稿")?.disabled===true'))throw Error('career apply not gated');
+  await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.includes("采纳文案草稿"));b?.scrollIntoView({block:"center"});return true})()');
   await capture('22-career-ai-review');
   await js('(()=>{const l=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("我已核对候选文案"));l?.querySelector("input")?.click();return !!l})()');
   await click('采纳文案草稿');

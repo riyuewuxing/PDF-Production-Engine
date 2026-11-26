@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { apiClient, isDesktopMode, localErrorMessage } from '../../lib/apiClient';
 import { careerLedger } from '../../lib/careerLedgerSession';
 import { CareerAiPanel } from './CareerAiPanel';
+import {visibleBasicValue} from '../../lib/aiContext';
 import {
   COVER_LETTER_VARIANT_LABELS,
   buildApplicationsCsv,
@@ -75,7 +76,7 @@ export function JobCareerPane({
   // Tracker draft form
   const [companyDraft, setCompanyDraft] = useState('');
   const [roleDraft, setRoleDraft] = useState('');
-  const [cityDraft, setCityDraft] = useState(activeDoc.basic.location || '');
+  const [cityDraft, setCityDraft] = useState(visibleBasicValue(activeDoc,'location') || '');
   const [salaryDraft, setSalaryDraft] = useState('');
   const [slugDraft, setSlugDraft] = useState(activeSlug);
   const [statusFilter, setStatusFilter] = useState<'all' | ApplicationStatus>('all');
@@ -84,7 +85,7 @@ export function JobCareerPane({
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');
-  const [letterRole, setLetterRole] = useState(activeDoc.basic.title || '');
+  const [letterRole, setLetterRole] = useState(visibleBasicValue(activeDoc,'title') || '');
   const [letterTitleDraft, setLetterTitleDraft] = useState('');
   const [headerVariantMode, setHeaderVariantMode] = useState<'auto' | CoverLetterHeaderVariant>('auto');
   const [jdOptional, setJdOptional] = useState('');
@@ -96,7 +97,7 @@ export function JobCareerPane({
 
   useEffect(() => {
     setSlugDraft(activeSlug);
-    if (!letterRole) setLetterRole(activeDoc.basic.title || '');
+    if (!letterRole) setLetterRole(visibleBasicValue(activeDoc,'title') || '');
   }, [activeDoc.basic.title, activeSlug, letterRole]);
 
   useEffect(()=>{
@@ -121,7 +122,7 @@ export function JobCareerPane({
     const entry: JobApplication = {
       id: crypto.randomUUID(),
       company: companyDraft.trim(),
-      role: roleDraft.trim() || activeDoc.basic.title || '目标岗位',
+      role: roleDraft.trim() || visibleBasicValue(activeDoc,'title') || '目标岗位',
       city: cityDraft.trim(),
       salary: salaryDraft.trim(),
       resumeSlug: slugDraft || activeSlug,
@@ -217,7 +218,7 @@ export function JobCareerPane({
     () =>
       generateCoverLetterBundle(activeDoc, {
         company: letterCompany,
-        role: letterRole || activeDoc.basic.title,
+        role: letterRole || visibleBasicValue(activeDoc,'title'),
       }),
     [activeDoc, letterCompany, letterRole],
   );
@@ -231,7 +232,7 @@ export function JobCareerPane({
       : headerVariantMode;
 
   const interviewQuestions = useMemo(
-    () => generateInterviewQuestions(activeDoc, letterRole || activeDoc.basic.title),
+    () => generateInterviewQuestions(activeDoc, letterRole || visibleBasicValue(activeDoc,'title')),
     [activeDoc, letterRole],
   );
 
@@ -250,9 +251,9 @@ export function JobCareerPane({
     setErrorMsg(null);
     try {
       const contactLine = [
-        activeDoc.basic.name || '',
-        activeDoc.basic.phone ? `电话：${activeDoc.basic.phone}` : '',
-        activeDoc.basic.email ? `邮箱：${activeDoc.basic.email}` : '',
+        visibleBasicValue(activeDoc,'name') || '',
+        visibleBasicValue(activeDoc,'phone') ? `电话：${activeDoc.basic.phone}` : '',
+        visibleBasicValue(activeDoc,'email') ? `邮箱：${activeDoc.basic.email}` : '',
       ]
         .filter(Boolean)
         .join(' | ');
@@ -260,9 +261,9 @@ export function JobCareerPane({
         payload: {
           title: '求职自荐信',
           company: letterCompany.trim() || '贵单位',
-          role: letterRole.trim() || activeDoc.basic.title || '目标岗位',
-          candidateName: activeDoc.basic.name || '求职者',
-          candidateTitle: activeDoc.basic.title || '',
+          role: letterRole.trim() || visibleBasicValue(activeDoc,'title') || '目标岗位',
+          candidateName: visibleBasicValue(activeDoc,'name') || '求职者',
+          candidateTitle: visibleBasicValue(activeDoc,'title') || '',
           contactLine,
           bodyText: effectiveCoverLetter,
           themeColor: activeDoc.globalSettings.themeColor || '#167883',
@@ -288,7 +289,7 @@ export function JobCareerPane({
 
   const handleSaveCoverLetterVersion = () => {
     const company = letterCompany.trim();
-    const role = letterRole.trim() || activeDoc.basic.title || '目标岗位';
+    const role = letterRole.trim() || visibleBasicValue(activeDoc,'title') || '目标岗位';
     const title =
       letterTitleDraft.trim() || `${company || '通用'}-${role}-${new Date().toISOString().slice(0, 10)}`;
     const entry: SavedCoverLetter = {
@@ -756,7 +757,7 @@ export function JobCareerPane({
                   />
                 </div>
 
-                <CareerAiPanel document={activeDoc} slug={activeSlug} company={letterCompany} role={letterRole||activeDoc.basic.title} jdText={jdOptional}
+                <CareerAiPanel document={activeDoc} slug={activeSlug} company={letterCompany} role={letterRole||visibleBasicValue(activeDoc,'title')} jdText={jdOptional}
                   drafts={{coverLetter:effectiveCoverLetter,email:effectiveEmailBody,boss:effectiveBossText}}
                   onApply={(kind,text)=>{if(kind==='coverLetter')setCoverLetterOverride(text);else if(kind==='email')setEmailBodyOverride(text);else setBossOverride(text);}}/>
                 {/* 1. Formal Cover Letter + Version Save */}

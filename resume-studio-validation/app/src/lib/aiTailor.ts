@@ -2,7 +2,7 @@ import { z } from 'zod';
 import {buildAiSkillGuide} from './aiSkills';
 import { type ByokAiSettings, type ByokCompletionOptions, requestByokCompletion } from './byokAiClient';
 import { extractJdKeywords } from './jdMatcher';
-import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, outboundFactSources, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from './aiContext';
+import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, outboundFactSources, visibleBasicValue, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from './aiContext';
 import { type EditableBlockOption, collectEditableBlocks } from './resumeBlocks';
 import type { ResumeDocument } from '../schema/resumeSchema';
 
@@ -237,7 +237,7 @@ export function prepareTailorRequest(input: {
     '只输出 JSON 数组，每项包含 blockKey、reason、suggestedText、factIds（引用本段所用 sources 的 id 数组）。',
     'suggestedText 保持 Markdown 列表或纯段落，遵守 maxCharsHint；不要猜测被隐去的私密信息。',
   ].join('\n');
-  const userPrompt=JSON.stringify({targetJob:sanitize(input.document.basic.title),jdText,jdMissingKeywords,blocks:compactBlocks},null,2);
+  const userPrompt=JSON.stringify({targetJob:sanitize(visibleBasicValue(input.document,'title')),jdText,jdMissingKeywords,blocks:compactBlocks},null,2);
   return { options:{systemPrompt,userPrompt,temperature:0.25,maxTokens:3200,timeoutMs:55000}, blocks, sourceMap, aliases, jdMissingKeywords };
 }
 

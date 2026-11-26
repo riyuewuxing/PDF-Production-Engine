@@ -40,7 +40,7 @@ import {
   type ByokCompletionOptions,
 } from '../../lib/byokAiClient';
 import { matchResumeWithJd } from '../../lib/jdMatcher';
-import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from '../../lib/aiContext';
+import { buildAiFactSources, createAiTextSanitizer, currentSourceCorpus, visibleBasicValue, PRIVACY_PLACEHOLDER, type AiFactSourceMap } from '../../lib/aiContext';
 import { collectEditableBlocks } from '../../lib/resumeBlocks';
 import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {AI_SKILL_VERSION} from '../../lib/aiSkills';
@@ -95,6 +95,9 @@ export function DiagnoseAndMatchPane({
   const [aiSettings, setAiSettings] = useState<ByokAiSettings>(DEFAULT_BYOK_SETTINGS);
   const [catalog,setCatalog]=useState<AiProfileCatalog|null>(null);
   const [profileBusy,setProfileBusy]=useState(false);
+  const [testingConnection,setTestingConnection]=useState(false);
+  const [connectionTip,setConnectionTip]=useState<string|null>(null);
+  const testAbort=useRef<AbortController|null>(null);
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
@@ -139,6 +142,7 @@ export function DiagnoseAndMatchPane({
       mountedRef.current = false;
       polishAbortRef.current?.abort();
       tailorAbortRef.current?.abort();
+      testAbort.current?.abort();
     };
   }, []);
 
@@ -226,7 +230,7 @@ export function DiagnoseAndMatchPane({
     if(profileBusy)return;
     setProfileBusy(true);
     setSettingsError(null);
-    setSettingsSavedMsg(null);
+    setSettingsSavedMsg(null);setConnectionTip(null);
     try {
       const saved = await apiClient.saveAiSettings(aiSettings);
       setAiSettings(saved);
@@ -239,10 +243,10 @@ export function DiagnoseAndMatchPane({
   };
 
   const changeProfile=async(action:()=>Promise<AiProfileCatalog>)=>{
-    if(profileBusy||polishing||tailoring||applyingRef.current)return;
+    if(profileBusy||testingConnection||polishing||tailoring||applyingRef.current)return;
     const old=catalog?.profiles.find(p=>p.profileId===aiSettings.profileId);
     if(old&&JSON.stringify(old)!==JSON.stringify(aiSettings)&&!window.confirm('当前档案有未保存的编辑。切换或管理档案将放弃这些编辑，继续吗？'))return;
-    setProfileBusy(true);setSettingsError(null);setSettingsSavedMsg(null);
+    setProfileBusy(true);setSettingsError(null);setSettingsSavedMsg(null);setConnectionTip(null);
     try{const c=await action();const active=c.profiles.find(p=>p.profileId===c.activeProfileId);
       if(!active)throw new Error('当前模型档案不存在。');
       setCatalog(c);setAiSettings(active);setPendingRequest(null);
@@ -256,6 +260,20 @@ export function DiagnoseAndMatchPane({
     if(window.resumeDesktop&&(!saved||JSON.stringify(saved)!==JSON.stringify(settings)))throw new Error('配置已编辑，请先保存或重新读取。');
   };
 
+  const testConnection=async()=>{
+    if(testAbort.current||profileBusy||polishing||tailoring)return;
+    setConnectionTip(null);setSettingsError(null);
+    let ctrl:AbortController|undefined;
+    const settings=aiSettings;
+    try{
+      const options:ByokCompletionOptions={systemPrompt:'Connectivity probe. Reply only OK.',userPrompt:JSON.stringify({task:'connection-probe',message:'synthetic data only'}),temperature:0,maxTokens:64,timeoutMs:25000};
+      assertPreviewSettings(settings,options);
+      ctrl=new AbortController();testAbort.current=ctrl;setTestingConnection(true);
+      const result=await requestByokCompletion({...options,settings,signal:ctrl.signal});
+      if(mountedRef.current&&contextRef.current.aiSettings===settings&&!ctrl.signal.aborted)setConnectionTip(result.trim()==='OK'?'连接成功 · 合成探针返回 OK':'连接成功 · 收到非空文本（尚未验证其他能力）');
+    }catch(err){if(mountedRef.current)setSettingsError(err instanceof Error?err.message:'连接测试失败。');}
+    finally{if(testAbort.current===ctrl){testAbort.current=null;if(mountedRef.current)setTestingConnection(false);}}
+  };
   const handlePreparePolish = () => {
     if (!selectedBlock || applyingRef.current || polishing) return;
     setPolishError(null);
@@ -266,7 +284,7 @@ export function DiagnoseAndMatchPane({
       const basis: PolishBasis = { document, slug: activeSlug, blockKey: selectedBlock.key, text: selectedBlock.text,requestId:crypto.randomUUID() };
       const options = preparePolishRequest({
         mode: polishMode, targetTitle: sanitize(selectedBlock.label),
-        content: sanitize(selectedBlock.text), jobTitle: sanitize(document.basic.title),
+        content: sanitize(selectedBlock.text), jobTitle: sanitize(visibleBasicValue(document,'title')),
       });
       assertPreviewSettings(aiSettings,options);
       setPendingRequest({ mode:'single', basis, settings:aiSettings, options, polishMode });
@@ -800,11 +818,11 @@ export function DiagnoseAndMatchPane({
                 <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
                   {catalog&&<div className="space-y-2 rounded border border-teal-200 bg-white p-2">
                     <label className="block font-semibold">当前模型档案</label>
-                    <select aria-label="当前模型档案" value={aiSettings.profileId} disabled={profileBusy||polishing||tailoring} onChange={e=>{const id=e.target.value;void changeProfile(()=>apiClient.activateAiProfile(id));}} className="w-full rounded border border-slate-300 p-1.5">
+                    <select aria-label="当前模型档案" value={aiSettings.profileId} disabled={profileBusy||testingConnection||polishing||tailoring} onChange={e=>{const id=e.target.value;void changeProfile(()=>apiClient.activateAiProfile(id));}} className="w-full rounded border border-slate-300 p-1.5">
                       {catalog.profiles.map(p=><option key={p.profileId} value={p.profileId}>{p.providerLabel} · {p.model}{p.enabled?'':'（未启用）'}</option>)}
                     </select>
-                    <button type="button" disabled={profileBusy||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1">新建模型档案</button>
-                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button type="button" disabled={profileBusy||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700">删除档案</button></div>)}</div>
+                    <button type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1">新建模型档案</button>
+                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700">删除档案</button></div>)}</div>
                     <p className="text-[10px] text-slate-500">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
                    </div>}
                    <input aria-label="模型档案名称" value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5" placeholder="档案名称"/>
@@ -886,11 +904,16 @@ export function DiagnoseAndMatchPane({
                     <button
                       type="button"
                       onClick={() => void handleSaveAiSettings()}
-                       disabled={profileBusy||polishing||tailoring}
+                       disabled={profileBusy||testingConnection||polishing||tailoring}
                       className="rounded bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-800"
                     >
                       保存本地配置
                     </button>
+                  </div>
+                  <div className="rounded border border-teal-200 bg-white p-2 space-y-1">
+                    <p className="text-[10px] text-slate-500">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），最多64输出 tokens。</p>
+                    <div className="flex items-center gap-2"><button type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50">测试模型连接</button>{testingConnection&&<button type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1">取消连接测试</button>}</div>
+                    {connectionTip&&<p role="status" className="text-emerald-700">{connectionTip}</p>}
                   </div>
                 </div>
               )}
