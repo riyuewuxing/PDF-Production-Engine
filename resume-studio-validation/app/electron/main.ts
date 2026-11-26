@@ -19,7 +19,7 @@ import {hasRecordFactSources} from '../src/lib/factPromptGate';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
-import { visibleBasicValue } from '../src/lib/aiContext';
+import { buildResumeExportFilename, formatLocalDate, sanitizeFilePart } from '../src/lib/resumeExportNaming';
 import type { CoverLetterPdfPayload, ApplicationLogInput } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
 import { LocalResumeStore, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
@@ -131,37 +131,9 @@ async function loadWindowEntry(win: BrowserWindow, query?: Record<string, string
   }
 }
 
-function sanitizeFilePart(value: string, fallback: string): string {
-  const cleaned = value
-    .trim()
-    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '_')
-    .replace(/\s+/g, '');
-  return cleaned || fallback;
-}
-
-function formatLocalDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}${m}${d}`;
-}
-
 function formatLocalTime(): string {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-}
-
-function buildDefaultExportFilename(
-  doc: ResumeDocument,
-  ext: 'pdf' | 'png' | 'docx' | 'md' | 'html',
-  suffix = '',
-): string {
-  const rawName = visibleBasicValue(doc, 'name').trim();
-  const namePart = rawName && rawName !== '[姓名]' ? sanitizeFilePart(rawName, '简历') : '个人简历';
-  const rolePart = sanitizeFilePart(visibleBasicValue(doc, 'title').trim(), '求职简历');
-  const cleanSuffix = suffix ? sanitizeFilePart(suffix, '') : '';
-  return `${namePart}-${rolePart}-${formatLocalDate()}${cleanSuffix}.${ext}`;
 }
 
 async function writeFileSafely(targetPath: string, data: Buffer | string): Promise<string> {
@@ -180,6 +152,22 @@ async function writeFileSafely(targetPath: string, data: Buffer | string): Promi
     }
     throw err;
   }
+}
+
+// Automatic exports must never overwrite an existing file, including a
+// file created by another request/process between name selection and writing.
+async function writeUniqueExportFile(targetPath: string, data: Buffer | string): Promise<string> {
+  await fs.mkdir(path.dirname(targetPath), {recursive: true});
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const candidate = resolveUniqueExportPath(targetPath);
+    try {
+      await fs.writeFile(candidate, data, {flag: 'wx'});
+      return candidate;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error('导出文件名冲突次数过多，请重新导出。');
 }
 
 async function withHiddenPrintWindow<T>(
@@ -674,13 +662,14 @@ function registerIpcHandlers(): void {
   ) {
     // The editor flushes before export. Export itself is read-only with respect to the original document.
     const targetDoc = ResumeDocumentSchema.parse(options.document);
-    const defaultFileName = buildDefaultExportFilename(
+    const defaultFileName = buildResumeExportFilename(
       targetDoc,
       spec.ext,
       options.fileNameSuffix ?? '',
     );
     await fs.mkdir(exportsDir, { recursive: true });
     let targetPath = path.join(exportsDir, defaultFileName);
+    let explicitPath = false;
 
     if (options.saveAs && mainWindow) {
       const result = await dialog.showSaveDialog(mainWindow, {
@@ -692,12 +681,11 @@ function registerIpcHandlers(): void {
         return { canceled: true };
       }
       targetPath = result.filePath;
-    } else {
-      targetPath = resolveUniqueExportPath(targetPath);
+      explicitPath = true;
     }
 
     const content = await spec.produce(targetDoc);
-    const writtenPath = await writeFileSafely(targetPath, content);
+    const writtenPath = explicitPath ? await writeFileSafely(targetPath, content) : await writeUniqueExportFile(targetPath, content);
     await rememberOutput(writtenPath);
 
     if ((spec.ext === 'pdf' || spec.ext === 'docx') && options.slug) {
@@ -881,6 +869,7 @@ function registerIpcHandlers(): void {
     const baseNameRaw = path.basename(options.defaultFileName, path.extname(options.defaultFileName));
     const safeName = `${sanitizeFilePart(baseNameRaw, 'export')}.${extRaw || 'txt'}`;
     let targetPath = path.join(exportsDir, safeName);
+    let explicitPath = false;
     if (options.saveAs && mainWindow) {
       const result = await dialog.showSaveDialog(mainWindow, {
         title: options.dialogTitle || '导出文件',
@@ -891,11 +880,10 @@ function registerIpcHandlers(): void {
         return { canceled: true };
       }
       targetPath = result.filePath;
-    } else {
-      targetPath = resolveUniqueExportPath(targetPath);
+      explicitPath = true;
     }
     if(path.extname(targetPath).toLowerCase()!=='.'+extRaw)throw new Error('另存文件扩展名与导出格式不一致。');
-    const writtenPath = await writeFileSafely(targetPath, options.content);
+    const writtenPath = explicitPath ? await writeFileSafely(targetPath, options.content) : await writeUniqueExportFile(targetPath, options.content);
     await rememberOutput(writtenPath);
     return {
       canceled: false,

@@ -42,6 +42,33 @@ describe('synthetic 51-template registry contract',()=>{
     expect(view.container.querySelector('img')).toBeNull();
     view.unmount();
   });
+  it.each([...TEMPLATE_IDS])('protects hidden basic fields in %s, including photo alt text and disabled module',id=>{
+    const doc=fixture();doc.templateId=id;
+    doc.basic.phone='19900000000';doc.basic.location='HIDDEN_CITY_20';doc.basic.birthDate='1991-01';doc.basic.employmentStatus='HIDDEN_STATUS_20';
+    doc.basic.photo=image;doc.basic.photoConfig.visible=true;
+    doc.basic.customFields=[{id:'synthetic-custom',label:'HIDDEN_LABEL_20',value:'HIDDEN_CUSTOM_20',visible:true}];
+    const Template=getTemplateMetadata(id).component;
+    const before=JSON.stringify(doc);
+    const view=render(<Template document={doc}/>);
+    expect(view.container.textContent).toContain('SYNTH_NAME_19');
+    expect(view.container.querySelector('img')).not.toBeNull();
+    const hidden={...doc,basic:{...doc.basic,fieldOrder:doc.basic.fieldOrder.filter(f=>f.key!=='name').map(f=>f.key==='title'?{...f,visible:false}:f)}};
+    const hiddenBefore=JSON.stringify(hidden);
+    view.rerender(<Template document={hidden}/>);
+    for(const marker of ['SYNTH_NAME_19','SYNTH_ROLE_19'])expect(view.container.innerHTML).not.toContain(marker);
+    expect(view.container.querySelector('img')).not.toBeNull();
+    expect(JSON.stringify(hidden)).toBe(hiddenBefore);
+    const disabled={...doc,menuSections:doc.menuSections.map(s=>s.id==='basic'?{...s,enabled:false}:s)};
+    const disabledBefore=JSON.stringify(disabled);
+    view.rerender(<Template document={disabled}/>);
+    for(const marker of ['SYNTH_NAME_19','SYNTH_ROLE_19','registry@example.invalid','19900000000','HIDDEN_CITY_20','1991-01','HIDDEN_STATUS_20','HIDDEN_LABEL_20','HIDDEN_CUSTOM_20',image])expect(view.container.innerHTML).not.toContain(marker);
+    expect(view.container.querySelector('img')).toBeNull();
+    expect(view.container.textContent).toContain('VISIBLE_SCHOOL_19');
+    expect(view.container.textContent).toContain('VISIBLE_PROJECT_19');
+    expect(JSON.stringify(disabled)).toBe(disabledBefore);
+    expect(JSON.stringify(doc)).toBe(before);
+    view.unmount();
+  });
   it.each(['trapezoid-flag','ribbon-fold','dot-accent','block-tag'] as const)('renders heading %s and preserves item-split setting',headingStyle=>{
     const doc=fixture();doc.globalSettings.headingStyle=headingStyle;doc.globalSettings.avoidItemSplit=headingStyle!=='dot-accent';
     const Template=getTemplateMetadata('wondercv-clean-pro').component;

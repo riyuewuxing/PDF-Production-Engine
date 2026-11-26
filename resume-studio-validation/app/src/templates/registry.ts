@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { projectVisibleResume } from '../lib/resumeVisibility';
 import type { TemplateId } from '../schema/resumeSchema';
 import { AwesomeCvModernTemplate } from './AwesomeCvModernTemplate';
 import { ChicvMinimalTemplate } from './ChicvMinimalTemplate';
@@ -50,9 +52,9 @@ import { WondercvMintCardTemplate } from './WondercvMintCardTemplate';
 import { WondercvRoyalBannerTemplate } from './WondercvRoyalBannerTemplate';
 import { WondercvSoftRightTemplate } from './WondercvSoftRightTemplate';
 import { WondercvTealSidebarTemplate } from './WondercvTealSidebarTemplate';
-import type { TemplateMetadata } from './types';
+import type { TemplateMetadata, ResumeTemplateProps } from './types';
 
-export const TEMPLATE_REGISTRY: TemplateMetadata[] = [
+const RAW_TEMPLATE_REGISTRY: TemplateMetadata[] = [
   // =========================================================================
   // 首屏置顶：19 套 VIP 商业旗舰（V4 晴蓝突出页眉 + V3 18 套 1:1 复刻）+ 2 套 WonderCV 经典旗舰
   // =========================================================================
@@ -622,6 +624,15 @@ export const TEMPLATE_REGISTRY: TemplateMetadata[] = [
     component: ModernDeedyTemplate,
   },
 ];
+
+// All registry consumers (preview, gallery and native PDF/PNG) get the same
+// non-mutating visibility boundary, including documents imported from JSON.
+export const TEMPLATE_REGISTRY: TemplateMetadata[] = RAW_TEMPLATE_REGISTRY.map(meta => {
+  const Template = meta.component;
+  return {...meta, component: function VisibleTemplate({document}: ResumeTemplateProps) {
+    return createElement(Template, {document: projectVisibleResume(document)});
+  }};
+});
 
 export function getTemplateMetadata(id: TemplateId): TemplateMetadata {
   return TEMPLATE_REGISTRY.find((t) => t.id === id) ?? TEMPLATE_REGISTRY[0]!;

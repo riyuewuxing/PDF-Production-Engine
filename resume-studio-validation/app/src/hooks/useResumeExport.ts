@@ -1,6 +1,7 @@
-import { useCallback, useState, type RefObject } from 'react';
+import { useCallback, useRef, useState, type RefObject } from 'react';
 import type { FrozenPdfExportSnapshot } from '../components/Career/QuickLogApplicationModal';
-import { apiClient, isDesktopMode } from '../lib/apiClient';
+import { apiClient } from '../lib/apiClient';
+import { buildResumeExportStem } from '../lib/resumeExportNaming';
 import { exportToJsonResume } from '../lib/jsonResumeAdapter';
 import { parseCustomRedactionTerms, redactResumeDocument } from '../lib/privacyRedactor';
 import type { ResumeDocument } from '../schema/resumeSchema';
@@ -20,12 +21,6 @@ export interface ExportStatusState {
   filePath?: string;
 }
 
-function buildPdfTitle(doc: ResumeDocument): string {
-  const cleanName = doc.basic.name.trim();
-  const hasRealName = cleanName && cleanName !== '[姓名]';
-  return hasRealName ? `${cleanName}-${doc.title}` : doc.title;
-}
-
 interface UseResumeExportOptions {
   activeSlug: string;
   activeDocRef: RefObject<ResumeDocument | null>;
@@ -43,6 +38,7 @@ export function useResumeExport({
 }: UseResumeExportOptions) {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const exportInFlight = useRef(false);
   const [exportStatus, setExportStatus] = useState<ExportStatusState | null>(null);
   const [lastExportedPdfSnapshot, setLastExportedPdfSnapshot] =
     useState<FrozenPdfExportSnapshot | null>(null);
@@ -50,7 +46,8 @@ export function useResumeExport({
   const handleExportFormat = useCallback(
     async (format: ExportFormat, saveAs = false) => {
       const latest = activeDocRef.current;
-      if (!latest || isExporting) return;
+      if (!latest || exportInFlight.current) return;
+      exportInFlight.current = true;
       setIsExportMenuOpen(false);
       setIsExporting(true);
       setExportStatus(null);
@@ -86,7 +83,7 @@ export function useResumeExport({
         if (format === 'jsonResume') {
           const jrText = `${JSON.stringify(exportToJsonResume(docToExport), null, 2)}\n`;
           const jrRes = await apiClient.saveTextFile({
-            defaultFileName: `${activeSlug || 'resume'}${suffix}-jsonresume.json`,
+            defaultFileName: `${buildResumeExportStem(docToExport, suffix)}-jsonresume.json`,
             content: jrText,
             extension: 'json',
             filterName: 'JSON Resume 文件',
@@ -102,19 +99,6 @@ export function useResumeExport({
               filePath: jrRes.filePath,
             });
           }
-          return;
-        }
-
-        if (format === 'pdf' && !isDesktopMode()) {
-          const prevTitle = window.document.title;
-          window.document.title = `${buildPdfTitle(docToExport)}${suffix}`;
-          const restore = () => {
-            window.document.title = prevTitle;
-            window.removeEventListener('afterprint', restore);
-          };
-          window.addEventListener('afterprint', restore);
-          window.print();
-          setTimeout(restore, 3000);
           return;
         }
 
@@ -188,10 +172,11 @@ export function useResumeExport({
           text: err instanceof Error ? err.message : '导出文件失败',
         });
       } finally {
+        exportInFlight.current = false;
         setIsExporting(false);
       }
     },
-    [activeDocRef, activeSlug, flushPendingSave, isExporting, isRedacted, redactionTermsInput],
+    [activeDocRef, activeSlug, flushPendingSave, isRedacted, redactionTermsInput],
   );
 
   return {

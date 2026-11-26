@@ -2,12 +2,12 @@ import type {FactRecord} from '../schema/factBankSchema';
 import { collectEditableBlocks, type EditableBlockOption } from './resumeBlocks';
 import type { ResumeDocument } from '../schema/resumeSchema';
 
+import { visibleBasicValue } from './resumeVisibility';
+
 export const PRIVACY_PLACEHOLDER = '【隐私已省略】';
+export { visibleBasicValue } from './resumeVisibility';
 
 /** Known identifiers and common contact formats are removed from EVERY outbound text field. */
-export function visibleBasicValue(doc:ResumeDocument,key:'name'|'title'|'email'|'phone'|'birthDate'|'location'|'employmentStatus'):string {
-  return doc.menuSections.some(s=>s.id==='basic'&&s.enabled)&&doc.basic.fieldOrder.some(f=>f.key===key&&f.visible)?doc.basic[key]:'';
-}
 export function createAiTextSanitizer(docs:readonly ResumeDocument[]):(text:string)=>string{
   const terms=[...new Set(docs.flatMap(doc=>[
     doc.basic.name,doc.basic.email,doc.basic.phone,doc.basic.birthDate,doc.basic.photo,doc.basic.location,

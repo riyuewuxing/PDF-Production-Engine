@@ -110,6 +110,68 @@ async function run() {
   await until('restored visibility save settled',()=>bodyHas('已保存至本地硬盘'),15000);
   checks.exportVisibilitySourceRestored=true;
 
+  // Cross-format visibility: real native print windows, file IPC and actual pixels.
+  const raw20=await main.store.getResume('runner-fixture');
+  const source20=JSON.stringify(raw20);
+  const photo20='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAA8CAIAAACb22+3AAAAN0lEQVR4nO3NMQEAAAgDILV/59nBxwcK0KnUh3lZxWKxWCwWi8VisVgsFovFYrFYLBaLxWLx0QJA6QJ2HpCnXwAAAABJRU5ErkJggg==';
+  const visible20={...raw20,title:'INTERNAL_TITLE_20',templateId:'minimal-ats',
+    basic:{...raw20.basic,name:'SYNTH_NAME_20',title:'SYNTH_ROLE_20',email:'hidden20@example.invalid',phone:'19900000000',location:'SYNTH_CITY_20',employmentStatus:'SYNTH_STATUS_20',birthDate:'1991-01',
+      photo:photo20,photoConfig:{...raw20.basic.photoConfig,visible:true},
+      customFields:[{id:'synthetic-cf20',label:'CUSTOM_LABEL_20',value:'CUSTOM_VALUE_20',visible:true}]},
+    projects:[{...raw20.projects[0],name:'VISIBLE_PROJECT_20'}]};
+  const exportOut20=path.join(out,'cross-format-visibility');fs.mkdirSync(exportOut20,{recursive:true});
+  const native20=require('electron').nativeImage;
+  const countMagenta20=bytes=>{
+    const img=native20.createFromBuffer(bytes);
+    if(img.isEmpty())throw Error('invalid native PNG');
+    const data=img.toBitmap();let count=0;
+    for(let i=0;i+3<data.length;i+=4){if(data[i]>240&&data[i+1]<12&&data[i+2]>240)count++;}
+    return count;
+  };
+  for(const [templateId,disabled] of [['minimal-ats',false],['minimal-ats',true],['vip-sky-notch-hero',true]]){
+    const doc={...visible20,templateId,menuSections:visible20.menuSections.map(s=>s.id==='basic'?{...s,enabled:!disabled}:s)};
+    const pdf=await js('window.resumeDesktop.pdf.export('+JSON.stringify({slug:'',document:doc})+')');
+    const png=await js('window.resumeDesktop.pdf.exportPng('+JSON.stringify({slug:'',document:doc})+')');
+    if(pdf.canceled||png.canceled||!pdf.filePath||!png.filePath)throw Error('native cross-format export missing');
+    const pdfBytes=fs.readFileSync(pdf.filePath),pngBytes=fs.readFileSync(png.filePath);
+    if(pdfBytes.subarray(0,5).toString()!=='%PDF-'||pngBytes.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw Error('native output invalid');
+    const markers=['SYNTH_NAME_20','SYNTH_ROLE_20','INTERNAL_TITLE_20'];
+    for(const item of [pdf,png]){
+      if(item.fileName.includes('INTERNAL_TITLE_20'))throw Error('internal title in file name');
+      if(disabled&&markers.some(m=>item.fileName.includes(m)))throw Error('hidden marker in native filename');
+      if(!disabled&&(!item.fileName.includes('SYNTH_NAME_20')||!item.fileName.includes('SYNTH_ROLE_20')))throw Error('visible name lost in filename');
+    }
+    const magenta=countMagenta20(pngBytes);
+    if(disabled?magenta!==0:magenta<100)throw Error('native portrait visibility pixels mismatch: '+magenta);
+    const label=templateId+'-'+(disabled?'hidden':'visible');
+    fs.writeFileSync(path.join(exportOut20,label+'.pdf'),pdfBytes);
+    fs.writeFileSync(path.join(exportOut20,label+'.png'),pngBytes);
+    checks['nativeCrossFormat-'+label]=true;
+    (checks.crossFormatMetrics??=[]).push({templateId,disabled,magenta,pdfName:pdf.fileName,pngName:png.fileName});
+  }
+  // Simultaneous automatic writes of different contents, same proposed name.
+  const disabled20={...visible20,menuSections:visible20.menuSections.map(s=>s.id==='basic'?{...s,enabled:false}:s)};
+  const a20={slug:'',document:{...disabled20,skillContent:'RACE_MARKER_A_20'}};
+  const b20={slug:'',document:{...disabled20,skillContent:'RACE_MARKER_B_20'}};
+  const pair20=await js('Promise.all([window.resumeDesktop.pdf.exportMarkdown('+JSON.stringify(a20)+'),window.resumeDesktop.pdf.exportMarkdown('+JSON.stringify(b20)+')])');
+  if(pair20[0].filePath===pair20[1].filePath||!fs.readFileSync(pair20[0].filePath,'utf8').includes('RACE_MARKER_A_20')||!fs.readFileSync(pair20[1].filePath,'utf8').includes('RACE_MARKER_B_20'))throw Error('concurrent native markdown exports collided');
+  checks.concurrentNativeExportNoOverwrite=true;
+  const textPair20=await js('Promise.all([window.resumeDesktop.shell.saveTextFile({defaultFileName:"synthetic-race-20.json",extension:"json",content:"A"}),window.resumeDesktop.shell.saveTextFile({defaultFileName:"synthetic-race-20.json",extension:"json",content:"B"})])');
+  if(textPair20[0].filePath===textPair20[1].filePath||fs.readFileSync(textPair20[0].filePath,'utf8')!=='A'||fs.readFileSync(textPair20[1].filePath,'utf8')!=='B')throw Error('concurrent text exports collided');
+  checks.concurrentTextExportNoOverwrite=true;
+  const countBefore20=fs.readdirSync(main.exportsDir).length;
+  const originalDialog20=dialog.showSaveDialog;
+  try{
+    dialog.showSaveDialog=async()=>({canceled:true});
+    const canceled=await js('window.resumeDesktop.pdf.export('+JSON.stringify({slug:'',document:disabled20,saveAs:true})+')');
+    const textCanceled=await js('window.resumeDesktop.shell.saveTextFile({defaultFileName:"synthetic-cancel-20.json",extension:"json",content:"no write",saveAs:true})');
+    if(!canceled.canceled||!textCanceled.canceled||fs.readdirSync(main.exportsDir).length!==countBefore20)throw Error('cancel created an export file');
+  }finally{dialog.showSaveDialog=originalDialog20;}
+  checks.exportCancellationReadOnly=true;
+  if(JSON.stringify(await main.store.getResume('runner-fixture'))!==source20)throw Error('cross-format export changed original document');
+  checks.nativeCrossFormatSourceUnchanged=true;
+
+
   // Inspect actual rendered header geometry, not screenshot existence alone.
   const headerGeometry=()=>js('(()=>{const h=document.querySelector("header[aria-label=\\"工作台顶栏\\"]");const rect=h.getBoundingClientRect();const nodes=[...h.querySelectorAll("button, select, [aria-label=\\"本地保存状态\\"]")].filter(e=>e.getClientRects().length);return {width:innerWidth,height:rect.height,overflow:nodes.filter(e=>{const r=e.getBoundingClientRect();return r.left<rect.left-1||r.right>rect.right+1||r.top<rect.top-1||r.bottom>rect.bottom+1||r.height<10;}).map(e=>e.innerText||e.getAttribute("aria-label")),saveHeight:h.querySelector("[aria-label=\\"本地保存状态\\"]").getBoundingClientRect().height,saveText:h.querySelector("[aria-label=\\"本地保存状态\\"]").innerText};})()');
   const resizeHeader=async width=>{win.setContentSize(width,860);await sleep(350);const g=await headerGeometry();if(g.overflow.length||g.saveHeight>32||!g.saveText.includes('已保存'))throw Error('header geometry failed '+JSON.stringify(g));return g;};

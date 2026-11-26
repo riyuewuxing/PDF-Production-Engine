@@ -2,6 +2,7 @@ import { type ByokAiSettings, type AiProfileCatalog, DEFAULT_BYOK_SETTINGS } fro
 import { exportResumeToDocxBlob } from './docxExporter';
 import { buildStandaloneResumeHtml } from './htmlExporter';
 import { resumeToMarkdown } from './markdownExporter';
+import { buildResumeExportFilename, printResumeInBrowser } from './resumeExportNaming';
 import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
@@ -243,7 +244,7 @@ export const apiClient = {
     if (window.resumeDesktop) {
       return window.resumeDesktop.pdf.export(options);
     }
-    window.print();
+    printResumeInBrowser(options.document, options.fileNameSuffix);
     return { canceled: false };
   },
 
@@ -262,7 +263,7 @@ export const apiClient = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${options.slug || 'resume'}${options.fileNameSuffix ?? ''}.docx`;
+    a.download = buildResumeExportFilename(options.document, 'docx', options.fileNameSuffix);
     a.click();
     URL.revokeObjectURL(url);
     return { canceled: false, fileName: a.download };
@@ -277,7 +278,7 @@ export const apiClient = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${options.slug || 'resume'}${options.fileNameSuffix ?? ''}.md`;
+    a.download = buildResumeExportFilename(options.document, 'md', options.fileNameSuffix);
     a.click();
     URL.revokeObjectURL(url);
     return { canceled: false, fileName: a.download };
@@ -292,7 +293,7 @@ export const apiClient = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${options.slug || 'resume'}${options.fileNameSuffix ?? ''}.html`;
+    a.download = buildResumeExportFilename(options.document, 'html', options.fileNameSuffix);
     a.click();
     URL.revokeObjectURL(url);
     return { canceled: false, fileName: a.download };
