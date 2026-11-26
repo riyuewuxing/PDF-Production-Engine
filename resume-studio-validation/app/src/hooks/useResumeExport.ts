@@ -73,7 +73,7 @@ export function useResumeExport({
           const url = URL.createObjectURL(blob);
           const a = window.document.createElement('a');
           a.href = url;
-          a.download = `${activeSlug || 'resume'}${suffix}.json`;
+          a.download = isRedacted ? `${buildResumeExportStem(docToExport,suffix)}.json` : `${activeSlug || 'resume'}.json`;
           a.click();
           URL.revokeObjectURL(url);
           setExportStatus({ type: 'ok', text: `已导出 JSON 备份：${a.download}` });

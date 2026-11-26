@@ -110,6 +110,70 @@ async function run() {
   await until('restored visibility save settled',()=>bodyHas('已保存至本地硬盘'),15000);
   checks.exportVisibilitySourceRestored=true;
 
+  // U09: actual UI redaction mode and export, in an isolated synthetic document.
+  const original21=await main.store.getResume('runner-fixture');
+  const fixture21=JSON.parse(JSON.stringify(original21));
+  const marker21='PRIVATE21_';
+  fixture21.basic.name=marker21+'NAME';
+  fixture21.basic.title=marker21+'ROLE';
+  fixture21.basic.email='private21@example.invalid';
+  fixture21.basic.phone='19900000000';
+  fixture21.basic.birthDate=marker21+'BIRTH';
+  fixture21.basic.fieldOrder=fixture21.basic.fieldOrder.map(f=>({...f,label:marker21+'LABEL_'+f.key}));
+  fixture21.basic.customFields=[{id:'cf21',label:marker21+'CF_LABEL',value:marker21+'CF_VALUE',visible:true}];
+  fixture21.education=fixture21.education.map(e=>({...e,school:'VISIBLE_SCHOOL_21',degree:marker21+'DEGREE',gpa:marker21+'GPA',startDate:marker21+'EDU_DATE',visible:true}));
+  fixture21.projects=fixture21.projects.map(e=>({...e,name:'VISIBLE_PROJECT_21',role:marker21+'PROJECT_ROLE',date:marker21+'PROJECT_DATE',linkLabel:marker21+'LINK_LABEL',visible:true}));
+  fixture21.menuSections=fixture21.menuSections.map(s=>({...s,title:marker21+s.id,enabled:true}));
+  fixture21.skillContent='VISIBLE_SKILL_21 '+marker21+'SKILL';
+  await main.store.saveResume('runner-fixture',fixture21);
+  // Reload the editor from the deliberately modified synthetic disk document.
+  await win.webContents.reload();
+  await until('redaction fixture loaded',()=>js('document.querySelector("#basic-field-name")?.value === "PRIVATE21_NAME"'));
+  await capture('97-redaction-before');
+  await clickAria19('设置自定义脱敏敏感词');
+  await until('redaction settings open',()=>js('!!document.querySelector("[aria-label=\"脱敏敏感词设置\"] textarea")'));
+  await js('(()=>{const e=document.querySelector("[aria-label=\"脱敏敏感词设置\"] textarea");Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(e,"PRIVATE21_, private21@example.invalid, 19900000000");e.dispatchEvent(new Event("input",{bubbles:true}));return true})()');
+  await js('(()=>{const e=document.querySelector("[aria-label=\"脱敏敏感词设置\"] input[type=checkbox]");if(!e.checked)e.click();return true})()');
+  await click('完成');
+  await until('redaction mode active',()=>bodyHas('脱敏模式中'));
+  await capture('98-redaction-preview');
+  const artifacts21=path.join(out,'redaction-u09');
+  fs.mkdirSync(artifacts21,{recursive:true});
+  for(const [label,ext,feedback] of [
+    ['导出 PDF','.pdf','已导出'],
+    ['高清 2x PNG 长图','.png','已导出'],
+    ['Word 可编辑 (.docx)','.docx','已导出Word 文档'],
+    ['Markdown (.md)','.md','已导出Markdown 文档'],
+    ['单文件网页主页 (.html)','.html','已导出离线网页主页'],
+    ['标准 JSON Resume（仅可见内容）','.json','已导出标准 JSON Resume']
+  ]){
+    const existing=new Set(fs.existsSync(main.exportsDir)?fs.readdirSync(main.exportsDir):[]);
+    if(ext!=='.pdf')await clickAria19('更多导出格式');
+    await click(label);
+    await until('redacted file created '+ext,()=>fs.readdirSync(main.exportsDir).some(n=>!existing.has(n)&&n.endsWith(ext)),20000);
+    await until('redacted export completed '+ext,()=>bodyHas(feedback),20000);
+    const added=fs.readdirSync(main.exportsDir).filter(n=>!existing.has(n)&&n.endsWith(ext));
+    if(added.length!==1)throw Error('expected one redacted '+ext);
+    const name=added[0],bytes=fs.readFileSync(path.join(main.exportsDir,name));
+    if(/private21_|private21@example\.invalid|19900000000/i.test(name))throw Error('sensitive filename');
+    if(['.md','.html','.json','.docx'].includes(ext)){
+      const content=ext==='.docx'?docxXml19(bytes):bytes.toString('utf8');
+      if(/private21_|private21@example\.invalid|19900000000/i.test(content))throw Error('redaction leak in '+ext);
+      if(!content.includes('VISIBLE_PROJECT_21'))throw Error('redaction removed project in '+ext);
+    }
+    fs.writeFileSync(path.join(artifacts21,'redacted'+ext),bytes);
+    checks['redaction'+ext]=true;
+  }
+  const after21=await main.store.getResume('runner-fixture');
+  if(after21.basic.name!==fixture21.basic.name||after21.basic.phone!==fixture21.basic.phone||after21.basic.birthDate!==fixture21.basic.birthDate)throw Error('redaction changed stored source');
+  checks.redactionSourcePreserved=true;
+  await click('脱敏模式中');
+  await main.store.saveResume('runner-fixture',original21);
+  await win.webContents.reload();
+  await until('original synthetic fixture restored',()=>js('document.querySelector("#basic-field-name")?.value === "演示候选人"'));
+  checks.redactionFixtureRestored=true;
+
+
   // Cross-format visibility: real native print windows, file IPC and actual pixels.
   const raw20=await main.store.getResume('runner-fixture');
   const source20=JSON.stringify(raw20);
