@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
 import {FactBankStore} from '../src/server/factBankStore';
 import {FactRequestBindingSchema} from '../src/schema/factBankSchema';
+import {hasRecordFactSources} from '../src/lib/factPromptGate';
 import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/docxExporter';
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
@@ -724,7 +725,8 @@ function registerIpcHandlers(): void {
       const settings = await aiSettings.getRequestSettings(profile.profileId,profile.revision);
       if (!settings.enabled || settings.baseUrl !== validateByokBaseUrl(profile.baseUrl).baseUrl ||
           settings.model !== profile.model) throw new Error('AI 配置已变化，请先保存并重试。');
-      if(factBinding)await facts.assertCurrentBinding(factBinding);
+      if(factBinding)await facts.assertCurrentBinding(factBinding,options.userPrompt);
+      else if(hasRecordFactSources(options.userPrompt))throw new Error('事实来源缺少本地授权绑定，拒绝发送。');
       if(controller.signal.aborted)throw new Error('请求已取消。');
       return await requestByokCompletionDirect({ ...options, settings, signal: controller.signal });
     } finally {

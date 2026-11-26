@@ -448,6 +448,16 @@ async function run() {
   await until('selected fact answer',()=>bodyHas('当前可见正文可以更简洁'));
   if(providerCalls!==callsBeforeFacts+1||!JSON.stringify(lastAiRequest.body.messages).includes('record-1')||JSON.stringify(lastAiRequest.body.messages).includes('SYNTHETIC_LOCAL_EVIDENCE_ONLY'))throw Error('fact request not scoped');
   checks.factSelectedPrivacy=true;
+  const actualFactPayload=lastAiRequest.body.messages[1].content;
+  if(JSON.stringify(lastAiRequest.body).includes('factBinding')||JSON.stringify(lastAiRequest.body).includes(bank.records[0].id))throw Error('internal fact binding leaked');
+  const binding={slug:'master',docId:bank.records[0].docId,bankRevision:bank.revision,ids:[bank.records[0].id],selectedKeys:[bank.records[0].blockKey]};
+  const direct={requestId:'c0752ca1-26df-4e63-ab03-23f1c966ac53',profile:{profileId:secondProfile.profileId,revision:secondProfile.revision,baseUrl:secondProfile.baseUrl,model:secondProfile.model},systemPrompt:'synthetic',userPrompt:actualFactPayload};
+  const unbound=await js('window.resumeDesktop.ai.requestCompletion('+JSON.stringify(direct)+').then(()=>false,e=>String(e.message).includes("缺少本地授权绑定"))');
+  const altered={...direct,requestId:'c0752ca2-26df-4e63-ab03-23f1c966ac53',factBinding:binding,userPrompt:actualFactPayload.replace('整理 12 份合成实验记录','虚构成果')};
+  const mismatched=await js('window.resumeDesktop.ai.requestCompletion('+JSON.stringify(altered)+').then(()=>false,e=>String(e.message).includes("事实外发清单"))');
+  if(!unbound||!mismatched||providerCalls!==callsBeforeFacts+1)throw Error('main process accepted unbound or altered facts');
+  checks.factExactPayloadGate=true;
+
   await click('预览 AI 自由任务');
   await until('fact revocation preview',()=>bodyHas('自由任务发送前确认'));
   await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:bank.records[0].id,bankRevision:bank.revision,confirmation:'REVOKE_FACT'})+')');
@@ -455,7 +465,7 @@ async function run() {
   await until('stale fact rejected',()=>bodyHas('本地事实库已变化'));
   if(providerCalls!==callsBeforeFacts+1)throw Error('revoked fact reached provider');
   checks.factRevocationBlocksOldPreview=true;
-  const staleBinding={slug:'master',docId:bank.records[0].docId,bankRevision:bank.revision,ids:[bank.records[0].id]};
+  const staleBinding={slug:'master',docId:bank.records[0].docId,bankRevision:bank.revision,ids:[bank.records[0].id],selectedKeys:[bank.records[0].blockKey]};
   const staleSend={requestId:'a6262ca1-26df-4e63-ab03-23f1c966ac53',profile:{profileId:secondProfile.profileId,revision:secondProfile.revision,baseUrl:secondProfile.baseUrl,model:secondProfile.model},systemPrompt:'synthetic',userPrompt:'{}',factBinding:staleBinding};
   const denied=await js('window.resumeDesktop.ai.requestCompletion('+JSON.stringify(staleSend)+').then(()=>false,e=>String(e.message).includes("事实库已被其他操作更新"))');
   if(!denied||providerCalls!==callsBeforeFacts+1)throw Error('main-process stale fact gate failed');

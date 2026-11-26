@@ -62,16 +62,22 @@ describe('independent local fact bank',()=>{
     expect(isShareableFact(doc,revoked.records[0]!)).toBe(false);
     await expect(bank.revoke({id:r.id,bankRevision:revoked.revision,confirmation:'REVOKE_FACT'})).rejects.toThrow();
   });
-  it('checks the actual persisted scope in the main-process send gate, not a renderer snapshot',async()=>{
+  it('checks persisted scope and exact outbound record payload at the main-process boundary',async()=>{
     const saved=await bank.add(input),r=saved.records[0]!;
-    const binding={slug:'synthetic',docId:doc.id,bankRevision:saved.revision,ids:[r.id]};
-    await expect(bank.assertCurrentBinding(binding)).resolves.toBeUndefined();
-    for(const bad of [{...binding,docId:'other'},{...binding,ids:[r.id,r.id]},{...binding,bankRevision:'empty-v1'}])await expect(bank.assertCurrentBinding(bad)).rejects.toThrow();
+    const binding={slug:'synthetic',docId:doc.id,bankRevision:saved.revision,ids:[r.id],selectedKeys:[r.blockKey]};
+    const args={document:doc,mode:'ask' as const,goal:'检查事实',keys:[r.blockKey],overflowPx:0,records:[r]};
+    const prompt=prepareAssistantTask(args).options.userPrompt;
+    await expect(bank.assertCurrentBinding(binding,prompt)).resolves.toBeUndefined();
+    for(const bad of [{...binding,docId:'other'},{...binding,ids:[r.id,r.id]},{...binding,bankRevision:'empty-v1'},{...binding,selectedKeys:[]}])await expect(bank.assertCurrentBinding(bad,prompt)).rejects.toThrow();
+    const missing=prepareAssistantTask({...args,records:[]}).options.userPrompt;
+    await expect(bank.assertCurrentBinding(binding,missing)).rejects.toThrow('事实外发清单');
+    await expect(bank.assertCurrentBinding(binding,prompt.replace('整理合成记录 12 份','虚构成果'))).rejects.toThrow('事实外发清单');
+    await expect(bank.assertCurrentBinding(binding,prompt.replace('"scope": "record"','"scope": "master"'))).rejects.toThrow('事实外发清单');
     await store.saveResume('synthetic',{...doc,experience:doc.experience.map(e=>({...e,company:'Changed entity'}))});
-    await expect(bank.assertCurrentBinding(binding)).rejects.toThrow('事实主体');
+    await expect(bank.assertCurrentBinding(binding,prompt)).rejects.toThrow('事实主体');
     const revoked=await bank.revoke({id:r.id,bankRevision:saved.revision,confirmation:'REVOKE_FACT'});
-    await expect(bank.assertCurrentBinding(binding)).rejects.toThrow('事实库已被其他操作更新');
-    await expect(bank.assertCurrentBinding({...binding,bankRevision:revoked.revision})).rejects.toThrow('事实主体');
+    await expect(bank.assertCurrentBinding(binding,prompt)).rejects.toThrow('事实库已被其他操作更新');
+    await expect(bank.assertCurrentBinding({...binding,bankRevision:revoked.revision},prompt)).rejects.toThrow('事实主体');
   });
   it('corrects a fact atomically, retains its original evidence and invalidates prior approvals',async()=>{
     const saved=await bank.add(input),old=saved.records[0]!;

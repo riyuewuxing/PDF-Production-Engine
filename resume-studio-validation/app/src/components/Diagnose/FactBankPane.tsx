@@ -69,7 +69,7 @@ export function FactBankPane(props:Props){
           <div>{[r.value,r.unit,r.timeframe].filter(Boolean).join(' · ')}</div>
           <div className="text-slate-600">本地证据位置：{r.evidenceRef}</div>
           {r.supersedesId&&<div className="text-slate-600">修订自：{props.bank?.records.find(s=>s.id===r.supersedesId)?.assertion||'旧记录'}</div>}
-          <div className="text-slate-600">{r.verifiedStatus==='revoked'?'已撤销':matches?'本人确认 · 非独立验证':'关联主体已变更 / 隐藏'} · {r.sensitivity==='shareable'?'可按次选择外发':'仅本地'}</div>
+          <div className="text-slate-600">{r.verifiedStatus==='revoked'?'已撤销':matches?'本人确认 · 非独立验证':r.docId!==props.document.id?'其他版本的本地记录':'关联主体已变更 / 隐藏'} · {r.sensitivity==='shareable'?'可按次选择外发':'仅本地'}</div>
           <label className="flex items-start gap-1"><input type="checkbox" aria-label={'选择事实 '+r.assertion} disabled={props.locked||!eligible} checked={eligible&&props.selected.includes(r.id)} onChange={e=>props.onSelected(e.target.checked?[...props.selected,r.id]:props.selected.filter(id=>id!==r.id))}/>加入本次 AI 任务</label>
           {r.verifiedStatus==='user-confirmed'&&matches&&<button type="button" disabled={props.locked} className="mr-3 text-teal-800" onClick={()=>beginCorrection(r)}>更正事实</button>}
           {r.verifiedStatus!=='revoked'&&<button type="button" disabled={props.locked} className="text-red-700" onClick={()=>revoke(r.id)}>撤销事实授权</button>}
