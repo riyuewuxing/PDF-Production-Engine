@@ -25,6 +25,14 @@ export function readLaunchHandoff(env:NodeJS.ProcessEnv):LaunchHandoff|null{
   if(!dir||!path.isAbsolute(dir)||!path.basename(dir).startsWith(PREFIX)||!token||!TOKEN.test(token)||!basis||!BASIS.test(basis))throw new Error('独立工作区启动凭据无效。');
   return {dir,token,basis};
 }
+/** Electron may import a CommonJS package entry via its ESM loader, leaving require.main unset.
+ * Recognize explicit launch handoffs or the exact app entry; do not auto-start imported test helpers. */
+export function shouldBootstrapWorkspace(input:{commonJsMain:boolean;hasHandoff:boolean;isPackaged:boolean;argvEntry?:string;appDir:string}):boolean{
+  if(input.commonJsMain||input.hasHandoff||input.isPackaged)return true;
+  if(!input.argvEntry)return false;
+  const candidate=path.resolve(input.argvEntry);
+  return path.relative(input.appDir,candidate)===''||path.relative(path.join(input.appDir,'dist-electron','main.cjs'),candidate)==='';
+}
 export function buildWorkspaceLaunch(input:{isPackaged:boolean;exePath:string;appDir:string;env:NodeJS.ProcessEnv;root:string;handoff:LaunchHandoff}){
   const portable=input.isPackaged&&Boolean(input.env.PORTABLE_EXECUTABLE_DIR||input.env.PORTABLE_EXECUTABLE_FILE);
   const executable=portable?input.env.PORTABLE_EXECUTABLE_FILE:input.exePath;

@@ -1,7 +1,7 @@
 import {promises as fs} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,inspectRestoredWorkspace} from '../src/server/workspaceBackup';
 import {LocalResumeStore} from '../src/server/localFsApi';
@@ -37,6 +37,13 @@ try{
   if(!windowTitle(opened.pid).includes('独立恢复工作区'))throw new Error('source native window title missing');
   checks.sourceTitle=true;
   close(opened.pid);
+  const cleanEnv={...process.env,RESUME_STUDIO_DATA_DIR:a.folder};delete cleanEnv.ELECTRON_RUN_AS_NODE;
+  const normal=spawn(exe,[process.cwd()],{cwd:process.cwd(),env:cleanEnv,detached:true,stdio:'ignore',shell:false});
+  normal.unref();const normalPid=normal.pid;if(!normalPid)throw new Error('normal source process failed to spawn');pids.push(normalPid);
+  const end=Date.now()+20000;let title='';
+  while(Date.now()<end){try{title=windowTitle(normalPid);}catch{}if(title.includes('独立恢复工作区'))break;await new Promise(resolve=>setTimeout(resolve,250));}
+  if(!title.includes('独立恢复工作区'))throw new Error('normal source entry without handoff failed');
+  checks.normalSourceEntry=true;close(normalPid);
   await fs.writeFile(path.join(out,'quick-launch-evidence.json'),JSON.stringify(result,null,2));
 }catch(err){
   await fs.writeFile(path.join(out,'portable-failure.json'),JSON.stringify({...result,error:err instanceof Error?err.message:String(err)},null,2));throw err;

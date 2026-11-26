@@ -5,7 +5,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,inspectRestoredWorkspace} from '../src/server/workspaceBackup';
 import {RESTORE_PREFIX} from '../src/schema/workspaceBackupSchema';
-import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace,recordLaunchStage} from './workspaceLaunch';
+import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace,recordLaunchStage,shouldBootstrapWorkspace} from './workspaceLaunch';
 import { promisify } from 'node:util';
 import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
 import { z } from 'zod';
@@ -1028,7 +1028,7 @@ export async function registerAssetProtocol(): Promise<void> {
   });
 }
 
-if (require.main === module) {
+if (shouldBootstrapWorkspace({commonJsMain:require.main===module,hasHandoff:launchHandoff!==null,isPackaged:app.isPackaged,argvEntry:process.argv[1],appDir:path.resolve(__dirname,'..')})) {
   recordLaunchStage(launchHandoff,'entry-main');
   if (process.env.RESUME_STUDIO_DATA_DIR?.trim()) {
     const profile=path.join(rootDir,'.electron-userdata');
