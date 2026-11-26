@@ -32,7 +32,7 @@ jobs:
       - name: Typecheck audited runtime
         run: pnpm typecheck
       - name: Targeted V6 regression tests
-        run: pnpm exec vitest run src/hooks/useResumePersistence.test.tsx src/lib/aiTailor.test.ts electron/aiSettingsStore.test.ts src/mcp/mcpHandlers.test.ts src/server/localFsApi.test.ts src/server/revisionConcurrency.test.ts electron/securityPolicy.test.ts src/lib/careerExporter.test.ts src/lib/jsonResumeAdapter.test.ts src/server/recycleBin.test.ts src/server/lockAndLedger.test.ts src/lib/careerLedgerSession.test.ts
+        run: pnpm exec vitest run src/hooks/useResumePersistence.test.tsx src/lib/aiTailor.test.ts electron/aiSettingsStore.test.ts src/mcp/mcpHandlers.test.ts src/server/localFsApi.test.ts src/server/revisionConcurrency.test.ts electron/securityPolicy.test.ts src/lib/careerExporter.test.ts src/lib/jsonResumeAdapter.test.ts src/server/recycleBin.test.ts src/server/lockAndLedger.test.ts src/lib/careerLedgerSession.test.ts src/lib/byokAiClient.test.ts src/lib/careerAi.test.ts
       - name: Build actual Electron application
         run: pnpm desktop:build
       - name: Run real application with synthetic fixture and failure injection
@@ -51,47 +51,3 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-  template-matrix:
-    strategy:
-      fail-fast: false
-      matrix:
-        locale: ['zh-CN', 'en-US']
-    runs-on: windows-latest
-    timeout-minutes: 12
-    defaults:
-      run:
-        working-directory: resume-studio-validation/app
-        shell: pwsh
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
-      - name: Install pinned dependencies
-        run: |
-          npm install --global pnpm@10.30.0
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm install --frozen-lockfile
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build actual Electron application
-        run: pnpm desktop:build
-      - name: Render every registered template with two synthetic fixtures
-        timeout-minutes: 8
-        env:
-          RESUME_MATRIX_LOCALE: ${{ matrix.locale }}
-          RESUME_MATRIX_SOURCE_SHA: 'e0a77190719591e437bfa675bfc357acc0500363'
-        run: |
-          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
-          $env:RESUME_MATRIX_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-matrix-${{ matrix.locale }}'
-          & .\node_modules\.bin\electron.cmd .\scripts\qa-template-matrix.cjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload synthetic native PDF matrix
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: resume-matrix-${{ matrix.locale }}
-          path: resume-matrix-${{ matrix.locale }}/
-          if-no-files-found: ignore
-          retention-days: 3

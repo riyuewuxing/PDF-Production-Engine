@@ -7,14 +7,22 @@ export interface ByokAiSettings {
   hasApiKey?: boolean;
   clearApiKey?: boolean;
   model: string;
+  profileId?: string;
+  revision?: string;
+  contextBudgetChars?: number;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
 }
 
+export interface AiProfileCatalog { activeProfileId:string; profiles:ByokAiSettings[] }
+export const DEFAULT_AI_LIMITS = { contextBudgetChars:60000,maxOutputTokens:4096,timeoutMs:60000 } as const;
 export const DEFAULT_BYOK_SETTINGS: ByokAiSettings = {
   enabled: false,
   providerLabel: 'DeepSeek (OpenAI 兼容)',
   baseUrl: 'https://api.deepseek.com/v1',
   apiKey: '',
   model: 'deepseek-chat',
+  ...DEFAULT_AI_LIMITS,
 };
 
 export const BYOK_PROVIDER_PRESETS: Array<{
@@ -47,6 +55,8 @@ export const BYOK_PROVIDER_PRESETS: Array<{
     defaultModel: 'gemini-2.5-flash',
     requiresKey: true,
   },
+  {label:'OpenAI',baseUrl:'https://api.openai.com/v1',defaultModel:'gpt-4.1-mini',requiresKey:true},
+  {label:'OpenRouter',baseUrl:'https://openrouter.ai/api/v1',defaultModel:'openai/gpt-4.1-mini',requiresKey:true},
   {
     label: '本地 Ollama',
     baseUrl: 'http://localhost:11434/v1',
@@ -94,7 +104,7 @@ export interface ByokCompletionOptions {
 }
 export interface ByokCompletionRequest extends ByokCompletionOptions {
   requestId: string;
-  profile: { baseUrl: string; model: string };
+  profile: { baseUrl: string; model: string; profileId?:string; revision?:string };
 }
 
 export function validateByokBaseUrl(raw: string): { baseUrl: string; isLoopback: boolean } {
@@ -117,14 +127,14 @@ export async function requestByokCompletion(params: ByokCompletionOptions & {
   if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
   const bridge = typeof window !== 'undefined' ? window.resumeDesktop?.ai : undefined;
   if (!bridge) return requestByokCompletionDirect(params);
-  if (settings.apiKey || settings.clearApiKey) throw new Error('请先保存修改后的 AI 密钥配置。');
+  if (settings.apiKey || settings.clearApiKey || !settings.profileId || !settings.revision) throw new Error('请先保存或重新读取 AI 配置。');
   const requestId = globalThis.crypto.randomUUID();
   const onAbort = () => { void bridge.cancelCompletion(requestId).catch(() => {}); };
   signal?.addEventListener('abort', onAbort, { once: true });
   try {
     const result = await bridge.requestCompletion({
       ...options, requestId,
-      profile: { baseUrl: validateByokBaseUrl(settings.baseUrl).baseUrl, model: settings.model.trim() },
+      profile: { baseUrl: validateByokBaseUrl(settings.baseUrl).baseUrl, model: settings.model.trim(), profileId:settings.profileId,revision:settings.revision },
     });
     if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
     return result;
@@ -138,8 +148,11 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
   settings: ByokAiSettings;
   signal?: AbortSignal;
 }): Promise<string> {
-  const { settings, systemPrompt, userPrompt, temperature = 0.35, maxTokens, timeoutMs = 45000, signal } =
-    params;
+  const { settings, systemPrompt, userPrompt, temperature = 0.35, maxTokens, timeoutMs = 45000, signal } = params;
+  const limits=resolveAiLimits(settings);
+  if(systemPrompt.length+userPrompt.length>limits.contextBudgetChars)throw new Error('发送内容超出此模型配置的字符预算；请缩小范围后重新确认。');
+  const outputBudget=Math.min(maxTokens??limits.maxOutputTokens,limits.maxOutputTokens);
+  const deadlineMs=Math.min(timeoutMs,limits.timeoutMs);
   if (!settings.enabled) {
     throw new Error('请先在下方开启并保存 BYOK 大模型配置，再调用 AI 能力。');
   }
@@ -159,7 +172,8 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut=false;
+  const timeout = setTimeout(() => {timedOut=true;controller.abort();}, deadlineMs);
   const onExternalAbort = () => controller.abort();
   signal?.addEventListener('abort', onExternalAbort, { once: true });
 
@@ -172,9 +186,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
         { role: 'user', content: userPrompt },
       ],
     };
-    if (typeof maxTokens === 'number' && maxTokens > 0) {
-      bodyPayload.max_tokens = maxTokens;
-    }
+    bodyPayload.max_tokens=outputBudget;
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -186,21 +198,59 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
 
     if (!response.ok) {
       // Provider bodies can echo private prompt or credential data. Never surface them.
-      throw new Error(`模型接口返回错误 (HTTP ${response.status})`);
+      const hint=response.status===401||response.status===403?'身份验证或权限失败':response.status===429?'请求频率或额度受限':response.status>=500?'模型服务暂不可用':'请求被模型服务拒绝';
+      throw new AiGatewayError('HTTP',hint+` (HTTP ${response.status})`);
     }
 
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const result = payload.choices?.[0]?.message?.content?.trim();
-    if (!result) {
-      throw new Error('模型未返回有效文本内容。');
-    }
+    let payload: {choices?:Array<{message?:{content?:unknown};finish_reason?:string}>};
+    try{payload=await readBoundedJson(response) as typeof payload;}
+    catch(err){if(controller.signal.aborted)throw err;throw new AiGatewayError('FORMAT','模型响应格式异常或超过安全大小限制。');}
+    const content=payload?.choices?.[0]?.message?.content;
+    const result=typeof content==='string'?content.trim():'';
+    if(payload?.choices?.[0]?.finish_reason==='length')throw new AiGatewayError('LIMIT','模型输出达到长度上限，未返回完整结果。');
+    if (!result) throw new AiGatewayError('FORMAT','模型未返回有效文本内容。');
+    if(controller.signal.aborted)throw new Error('aborted');
     return result;
+  } catch(err){
+    if(timedOut)throw new AiGatewayError('TIMEOUT','模型请求达到超时上限，已停止等待。');
+    if(signal?.aborted||controller.signal.aborted)throw new AiGatewayError('CANCELLED','模型请求已取消。');
+    if(err instanceof AiGatewayError)throw err;
+    throw new AiGatewayError('NETWORK','模型网络请求失败；未尝试其他模型或接口。');
   } finally {
     clearTimeout(timeout);
     signal?.removeEventListener('abort', onExternalAbort);
   }
+}
+
+export function resolveAiLimits(settings:ByokAiSettings){
+  const check=(value:number|undefined,fallback:number,min:number,max:number)=>{
+    const n=value??fallback;if(!Number.isInteger(n)||n<min||n>max)throw new Error('AI 请求预算配置不合法。');return n;
+  };
+  return {contextBudgetChars:check(settings.contextBudgetChars,DEFAULT_AI_LIMITS.contextBudgetChars,1000,100000),
+    maxOutputTokens:check(settings.maxOutputTokens,DEFAULT_AI_LIMITS.maxOutputTokens,64,8192),
+    timeoutMs:check(settings.timeoutMs,DEFAULT_AI_LIMITS.timeoutMs,1000,120000)};
+}
+export class AiGatewayError extends Error{
+  constructor(readonly code:'HTTP'|'FORMAT'|'LIMIT'|'TIMEOUT'|'CANCELLED'|'NETWORK',message:string){super(message);this.name='AiGatewayError';}
+}
+async function readBoundedJson(response:Response):Promise<unknown>{
+  // The stream limit applies to actual HTTP responses, including chunked bodies.
+  if(!response.body)return response.json();
+  const reader=response.body.getReader();const decoder=new TextDecoder();
+  let bytes=0,text='';
+  try{while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>2*1024*1024){await reader.cancel();throw new Error('response limit');}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();return JSON.parse(text);}
+  finally{reader.releaseLock();}
+}
+export function assertAiPreviewSettings(settings:ByokAiSettings,options?:ByokCompletionOptions){
+  if(!settings.enabled)throw new Error('请先启用并保存模型配置。');
+  const {isLoopback}=validateByokBaseUrl(settings.baseUrl);
+  if(!settings.model.trim())throw new Error('缺少模型名。');
+  if(typeof window!=='undefined'&&window.resumeDesktop){
+    if(settings.apiKey||settings.clearApiKey||!settings.profileId||!settings.revision)throw new Error('请先保存或重新读取模型配置。');
+    if(!isLoopback&&!settings.hasApiKey)throw new Error('此模型配置缺少已保存密钥。');
+  }else if(!isLoopback&&!settings.apiKey.trim())throw new Error('此模型配置缺少密钥。');
+  const limits=resolveAiLimits(settings);
+  if(options&&options.systemPrompt.length+options.userPrompt.length>limits.contextBudgetChars)throw new Error('发送内容超出此模型配置的字符预算；请缩小范围。');
 }
 
 export function preparePolishRequest(params: {

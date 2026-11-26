@@ -1,5 +1,5 @@
 import type { ResumeDocument } from '../schema/resumeSchema';
-import type { ByokAiSettings } from './byokAiClient';
+
 
 export interface CoverLetterBundle {
   coverLetterText: string;
@@ -328,69 +328,3 @@ export function generateInterviewQuestions(
   return questions.slice(0, 12);
 }
 
-export async function polishCareerTextWithByok(params: {
-  settings: ByokAiSettings;
-  kind: 'coverLetter' | 'email' | 'boss';
-  company: string;
-  role: string;
-  draftText: string;
-  jdText: string;
-}): Promise<string> {
-  const { settings, kind, company, role, draftText, jdText } = params;
-  if (!settings.enabled) {
-    throw new Error('请先在「诊断优化 -> AI 润色 Diff」中启用并保存 BYOK 大模型配置。');
-  }
-  const baseUrl = settings.baseUrl.trim().replace(/\/+$/, '');
-  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(baseUrl);
-  if (!isLocal && !settings.apiKey.trim()) {
-    throw new Error('缺少 API Key（请先在诊断中心配置并保存）。');
-  }
-
-  const label =
-    kind === 'coverLetter'
-      ? '正式自荐信'
-      : kind === 'email'
-        ? '规范投递邮件正文'
-        : 'BOSS直聘3句话高回复开场白';
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (settings.apiKey.trim()) {
-    headers.Authorization = `Bearer ${settings.apiKey.trim()}`;
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 35000);
-  try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers,
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: settings.model.trim() || 'deepseek-chat',
-        temperature: 0.4,
-        messages: [
-          {
-            role: 'system',
-            content:
-              '你是资深职场求职顾问。严格根据草稿中的客观背景结合目标岗位JD优化表达，严禁虚构经历、院校或证书，只输出润色后的纯文本结果。',
-          },
-          {
-            role: 'user',
-            content: `目标单位：${company || '未指定'}\n目标岗位：${role || '未指定'}\n输出体裁：${label}\n\nJD 重点要求：\n${jdText || '（用户未粘贴 JD，按通用高标准润色）'}\n\n现有草稿：\n${draftText}`,
-          },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`模型请求失败 (${res.status})`);
-    }
-    const payload = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const out = payload.choices?.[0]?.message?.content?.trim();
-    if (!out) throw new Error('模型未返回有效文本');
-    return out;
-  } finally {
-    clearTimeout(timer);
-  }
-}

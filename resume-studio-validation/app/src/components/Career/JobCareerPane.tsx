@@ -16,13 +16,12 @@ import {
   MessageSquareText,
   Plus,
   Save,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { apiClient, isDesktopMode, localErrorMessage } from '../../lib/apiClient';
 import { careerLedger } from '../../lib/careerLedgerSession';
-import { type ByokAiSettings, DEFAULT_BYOK_SETTINGS } from '../../lib/byokAiClient';
+import { CareerAiPanel } from './CareerAiPanel';
 import {
   COVER_LETTER_VARIANT_LABELS,
   buildApplicationsCsv,
@@ -33,7 +32,6 @@ import {
 import {
   generateCoverLetterBundle,
   generateInterviewQuestions,
-  polishCareerTextWithByok,
 } from '../../lib/jobToolkit';
 import {
   APPLICATION_STATUSES,
@@ -94,9 +92,7 @@ export function JobCareerPane({
   const [emailBodyOverride, setEmailBodyOverride] = useState<string | null>(null);
   const [bossOverride, setBossOverride] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
   const [exportingLetter, setExportingLetter] = useState(false);
-  const [aiSettings, setAiSettings] = useState<ByokAiSettings>(DEFAULT_BYOK_SETTINGS);
 
   useEffect(() => {
     setSlugDraft(activeSlug);
@@ -104,10 +100,7 @@ export function JobCareerPane({
   }, [activeDoc.basic.title, activeSlug, letterRole]);
 
   useEffect(()=>{
-    let cancelled=false;
     void careerLedger.load().catch(()=>{});
-    void apiClient.getAiSettings().then(ai=>{if(!cancelled)setAiSettings(ai);}).catch(err=>{if(!cancelled)setErrorMsg(localErrorMessage(err,'读取 AI 设置失败'));});
-    return ()=>{cancelled=true;};
   },[refreshKey]);
   const backupLedger=async()=>{
     try{
@@ -320,34 +313,6 @@ export function JobCareerPane({
 
   const handleDeleteCoverLetterVersion = (id: string) => {
     careerLedger.update(current=>({...current,coverLetters:current.coverLetters.filter(item=>item.id!==id)}));
-  };
-
-  const handleByokRefine = async (kind: 'coverLetter' | 'email' | 'boss') => {
-    setAiBusy(true);
-    setErrorMsg(null);
-    try {
-      const draft =
-        kind === 'coverLetter'
-          ? effectiveCoverLetter
-          : kind === 'email'
-            ? effectiveEmailBody
-            : effectiveBossText;
-      const out = await polishCareerTextWithByok({
-        settings: aiSettings,
-        kind,
-        company: letterCompany,
-        role: letterRole || activeDoc.basic.title,
-        draftText: draft,
-        jdText: jdOptional,
-      });
-      if (kind === 'coverLetter') setCoverLetterOverride(out);
-      else if (kind === 'email') setEmailBodyOverride(out);
-      else setBossOverride(out);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'BYOK 润色失败');
-    } finally {
-      setAiBusy(false);
-    }
   };
 
   const funnel = useMemo(
@@ -743,7 +708,7 @@ export function JobCareerPane({
                         setEmailBodyOverride(null);
                         setBossOverride(null);
                       }}
-                      placeholder="目标单位（如：示例城市一中）"
+                      placeholder="目标单位（如：示例一中）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
                     />
                     <input
@@ -791,21 +756,14 @@ export function JobCareerPane({
                   />
                 </div>
 
+                <CareerAiPanel document={activeDoc} slug={activeSlug} company={letterCompany} role={letterRole||activeDoc.basic.title} jdText={jdOptional}
+                  drafts={{coverLetter:effectiveCoverLetter,email:effectiveEmailBody,boss:effectiveBossText}}
+                  onApply={(kind,text)=>{if(kind==='coverLetter')setCoverLetterOverride(text);else if(kind==='email')setEmailBodyOverride(text);else setBossOverride(text);}}/>
                 {/* 1. Formal Cover Letter + Version Save */}
                 <div className="rounded-lg border border-slate-200 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-slate-900">1. 正式自荐信 / 求职信</span>
                     <div className="flex items-center gap-1.5">
-                      {aiSettings.enabled && (
-                        <button
-                          type="button"
-                          disabled={aiBusy}
-                          onClick={() => void handleByokRefine('coverLetter')}
-                          className="inline-flex items-center gap-1 rounded border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] text-purple-700 hover:bg-purple-100"
-                        >
-                          <Sparkles size={11} /> BYOK 精修
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => void copyText('cover', effectiveCoverLetter)}

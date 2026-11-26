@@ -1,4 +1,4 @@
-import { type ByokAiSettings, DEFAULT_BYOK_SETTINGS } from './byokAiClient';
+import { type ByokAiSettings, type AiProfileCatalog, DEFAULT_BYOK_SETTINGS } from './byokAiClient';
 import { exportResumeToDocxBlob } from './docxExporter';
 import { buildStandaloneResumeHtml } from './htmlExporter';
 import { resumeToMarkdown } from './markdownExporter';
@@ -330,6 +330,19 @@ export const apiClient = {
     return { ...DEFAULT_BYOK_SETTINGS };
   },
 
+  async listAiProfiles():Promise<AiProfileCatalog>{
+    if(window.resumeDesktop)return window.resumeDesktop.ai.listProfiles();
+    return {activeProfileId:'browser',profiles:[]};
+  },
+  async createAiProfile(input:Partial<ByokAiSettings>):Promise<AiProfileCatalog>{
+    if(!window.resumeDesktop)throw new Error('模型档案仅支持桌面端。');return window.resumeDesktop.ai.createProfile(input);
+  },
+  async activateAiProfile(id:string):Promise<AiProfileCatalog>{
+    if(!window.resumeDesktop)throw new Error('模型档案仅支持桌面端。');return window.resumeDesktop.ai.activateProfile(id);
+  },
+  async removeAiProfile(id:string,revision:string):Promise<AiProfileCatalog>{
+    if(!window.resumeDesktop)throw new Error('模型档案仅支持桌面端。');return window.resumeDesktop.ai.removeProfile(id,revision,'DELETE_AI_PROFILE');
+  },
   async saveAiSettings(settings: ByokAiSettings): Promise<ByokAiSettings> {
     if (window.resumeDesktop) {
       return window.resumeDesktop.ai.saveSettings(settings);

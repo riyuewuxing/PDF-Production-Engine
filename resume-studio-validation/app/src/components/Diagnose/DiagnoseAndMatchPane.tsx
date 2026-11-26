@@ -28,6 +28,9 @@ import { type AtsInspectionResult, runLiveAtsInspection } from '../../lib/atsIns
 import {
   BYOK_PROVIDER_PRESETS,
   type ByokAiSettings,
+  type AiProfileCatalog,
+  assertAiPreviewSettings,
+  resolveAiLimits,
   DEFAULT_BYOK_SETTINGS,
   type PolishMode,
   computeLineDiff,
@@ -87,6 +90,8 @@ export function DiagnoseAndMatchPane({
   // BYOK state
   const [aiSubMode, setAiSubMode] = useState<AiSubMode>('single');
   const [aiSettings, setAiSettings] = useState<ByokAiSettings>(DEFAULT_BYOK_SETTINGS);
+  const [catalog,setCatalog]=useState<AiProfileCatalog|null>(null);
+  const [profileBusy,setProfileBusy]=useState(false);
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
@@ -118,7 +123,11 @@ export function DiagnoseAndMatchPane({
 
   useEffect(() => {
     mountedRef.current = true;
-    void apiClient.getAiSettings().then((settings) => {
+    void (window.resumeDesktop?apiClient.listAiProfiles().then(c=>{
+      if(mountedRef.current)setCatalog(c);
+      const selected=c.profiles.find(p=>p.profileId===c.activeProfileId);
+      if(!selected)throw new Error('当前模型档案不存在。');return selected;
+    }):apiClient.getAiSettings()).then((settings) => {
       if (mountedRef.current) setAiSettings(settings);
     }).catch((err: unknown) => {
       if (mountedRef.current) setSettingsError(err instanceof Error ? err.message : '无法读取 AI 配置。');
@@ -211,21 +220,36 @@ export function DiagnoseAndMatchPane({
   };
 
   const handleSaveAiSettings = async () => {
+    if(profileBusy)return;
+    setProfileBusy(true);
     setSettingsError(null);
     setSettingsSavedMsg(null);
     try {
       const saved = await apiClient.saveAiSettings(aiSettings);
       setAiSettings(saved);
+      if(window.resumeDesktop)setCatalog(await apiClient.listAiProfiles());
+      setPendingRequest(null);
       setSettingsSavedMsg(window.resumeDesktop ? '配置已保存；密钥由系统加密保护。' : '浏览器模式：配置仅在当前页面内存中有效。');
     } catch (err) {
       setSettingsError(err instanceof Error ? err.message : 'AI 配置保存失败。');
-    }
+    }finally{setProfileBusy(false);}
   };
 
-  const assertPreviewSettings = (settings: ByokAiSettings) => {
-    if (!settings.enabled) throw new Error('请先开启并保存 AI 配置。');
-    if (window.resumeDesktop && (settings.apiKey || settings.clearApiKey)) throw new Error('请先保存 AI 配置再发送。');
-    validateByokBaseUrl(settings.baseUrl);
+  const changeProfile=async(action:()=>Promise<AiProfileCatalog>)=>{
+    if(profileBusy||polishing||tailoring||applyingRef.current)return;
+    const old=catalog?.profiles.find(p=>p.profileId===aiSettings.profileId);
+    if(old&&JSON.stringify(old)!==JSON.stringify(aiSettings)&&!window.confirm('当前档案有未保存的编辑。切换或管理档案将放弃这些编辑，继续吗？'))return;
+    setProfileBusy(true);setSettingsError(null);setSettingsSavedMsg(null);
+    try{const c=await action();const active=c.profiles.find(p=>p.profileId===c.activeProfileId);
+      if(!active)throw new Error('当前模型档案不存在。');
+      setCatalog(c);setAiSettings(active);setPendingRequest(null);
+    }catch(err){setSettingsError(err instanceof Error?err.message:'模型档案操作失败。');}
+    finally{setProfileBusy(false);}
+  };
+  const assertPreviewSettings = (settings: ByokAiSettings,options?:ByokCompletionOptions) => {
+    assertAiPreviewSettings(settings,options);
+    const saved=catalog?.profiles.find(p=>p.profileId===settings.profileId);
+    if(window.resumeDesktop&&(!saved||JSON.stringify(saved)!==JSON.stringify(settings)))throw new Error('配置已编辑，请先保存或重新读取。');
   };
 
   const handlePreparePolish = () => {
@@ -240,6 +264,7 @@ export function DiagnoseAndMatchPane({
         mode: polishMode, targetTitle: sanitize(selectedBlock.label),
         content: sanitize(selectedBlock.text), jobTitle: sanitize(document.basic.title),
       });
+      assertPreviewSettings(aiSettings,options);
       setPendingRequest({ mode:'single', basis, settings:aiSettings, options, polishMode });
     } catch(err) {
       setPolishError(err instanceof Error ? err.message : '无法准备发送内容。');
@@ -323,6 +348,7 @@ export function DiagnoseAndMatchPane({
           contextRef.current.tailorUseMasterRef !== masterRef || contextRef.current.aiSubMode !== 'tailor' ||
           contextRef.current.subTab !== 'ai') return;
       const prepared = prepareTailorRequest({document,masterDocument:masterDoc,jdText});
+      assertPreviewSettings(settings,prepared.options);
       setPendingRequest({mode:'tailor',basis,settings,prepared,masterRef});
     } catch(err) {
       if (isCurrent(basis)) setTailorError(err instanceof Error?err.message:'无法准备整卷请求。');
@@ -743,7 +769,7 @@ export function DiagnoseAndMatchPane({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 font-semibold text-slate-800">
                   <ShieldCheck size={14} className="text-teal-600" />
-                  BYOK 自带密钥 / 本地 Ollama 配置
+                  AI 模型中心 · 多配置档案
                 </div>
                 <button
                   type="button"
@@ -760,7 +786,17 @@ export function DiagnoseAndMatchPane({
               {settingsError && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700">{settingsError}</div>}
               {showAiConfig && (
                 <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-                  <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
+                  {catalog&&<div className="space-y-2 rounded border border-teal-200 bg-white p-2">
+                    <label className="block font-semibold">当前模型档案</label>
+                    <select aria-label="当前模型档案" value={aiSettings.profileId} disabled={profileBusy||polishing||tailoring} onChange={e=>{const id=e.target.value;void changeProfile(()=>apiClient.activateAiProfile(id));}} className="w-full rounded border border-slate-300 p-1.5">
+                      {catalog.profiles.map(p=><option key={p.profileId} value={p.profileId}>{p.providerLabel} · {p.model}{p.enabled?'':'（未启用）'}</option>)}
+                    </select>
+                    <button type="button" disabled={profileBusy||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1">新建模型档案</button>
+                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button type="button" disabled={profileBusy||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700">删除档案</button></div>)}</div>
+                    <p className="text-[10px] text-slate-500">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
+                   </div>}
+                   <input aria-label="模型档案名称" value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5" placeholder="档案名称"/>
+                   <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
                     <input
                       type="checkbox"
                       checked={aiSettings.enabled}
@@ -827,11 +863,18 @@ export function DiagnoseAndMatchPane({
                       保存时清除已有密钥
                     </label>
                   )}
+                  <div className="grid grid-cols-3 gap-1">
+                    <label className="text-[10px]">输入字符预算<input aria-label="输入字符预算" type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1"/></label>
+                    <label className="text-[10px]">输出 tokens<input aria-label="输出 tokens" type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1"/></label>
+                    <label className="text-[10px]">超时（秒）<input aria-label="超时（秒）" type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1"/></label>
+                  </div>
+                  <p className="text-[10px] text-slate-500">预算为本地上限，不代表该模型真实上下文能力；不自动重试其他接口。</p>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-emerald-700">{settingsSavedMsg}</span>
                     <button
                       type="button"
                       onClick={() => void handleSaveAiSettings()}
+                       disabled={profileBusy||polishing||tailoring}
                       className="rounded bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-800"
                     >
                       保存本地配置
@@ -867,7 +910,8 @@ export function DiagnoseAndMatchPane({
               <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800">
                 <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>
                 <p>接收方：{validateByokBaseUrl(pendingRequest.settings.baseUrl).baseUrl}/chat/completions</p>
-                <p>模型：{pendingRequest.settings.model}</p>
+                <p>模型：{pendingRequest.settings.model} · 档案：{pendingRequest.settings.providerLabel}</p>
+                 <p>本地上限：{resolveAiLimits(pendingRequest.settings).maxOutputTokens} 输出 tokens；{resolveAiLimits(pendingRequest.settings).timeoutMs/1000} 秒</p>
                 <p>下方是本次实际发送的消息内容。基本联系方式、照片和已识别的隐私内容已尽量省略；仍请检查可见经历或 JD 中是否有其他敏感信息。密钥不在预览中。</p>
                 <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-amber-200 bg-white p-2">
                   <div className="font-semibold">系统消息</div>

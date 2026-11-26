@@ -125,7 +125,7 @@ async function run() {
   const migrated = await js('window.resumeDesktop.ai.getSettings()');
   if (migrated.apiKey !== '' || migrated.hasApiKey !== true) throw Error('renderer credential exposure or migration failed');
   const stored = JSON.parse(fs.readFileSync(path.join(main.dataDir,'.ai-settings.json'),'utf8'));
-  if (stored.apiKey !== undefined || !stored.encryptedApiKey || JSON.stringify(stored).includes('synthetic-test-key')) throw Error('plaintext credential retained');
+  if (stored.schemaVersion!==2 || stored.profiles[0].apiKey !== undefined || !stored.profiles[0].encryptedApiKey || JSON.stringify(stored).includes('synthetic-test-key')) throw Error('plaintext credential retained');
   checks.osCredentialMigration = true;
   await click('诊断优化');
   await click('AI 润色 Diff');

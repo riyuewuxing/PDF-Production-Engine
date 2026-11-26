@@ -1,4 +1,4 @@
-import type { ByokAiSettings, ByokCompletionRequest } from '../lib/byokAiClient';
+import type { ByokAiSettings, ByokCompletionRequest, AiProfileCatalog } from '../lib/byokAiClient';
 import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
@@ -108,6 +108,10 @@ export interface ResumeDesktopBridge {
   };
   ai: {
     getSettings: () => Promise<ByokAiSettings>;
+    listProfiles:()=>Promise<AiProfileCatalog>;
+    createProfile:(input:Partial<ByokAiSettings>)=>Promise<AiProfileCatalog>;
+    activateProfile:(id:string)=>Promise<AiProfileCatalog>;
+    removeProfile:(id:string,revision:string,confirmation:'DELETE_AI_PROFILE')=>Promise<AiProfileCatalog>;
     saveSettings: (settings: ByokAiSettings) => Promise<ByokAiSettings>;
     requestCompletion: (request: ByokCompletionRequest) => Promise<string>;
     cancelCompletion: (requestId: string) => Promise<void>;

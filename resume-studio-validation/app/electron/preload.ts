@@ -62,6 +62,10 @@ const bridge: ResumeDesktopBridge = {
   },
   ai: {
     getSettings: () => ipcRenderer.invoke('ai:getSettings'),
+    listProfiles:()=>ipcRenderer.invoke('ai:listProfiles'),
+    createProfile:input=>ipcRenderer.invoke('ai:createProfile',input),
+    activateProfile:id=>ipcRenderer.invoke('ai:activateProfile',id),
+    removeProfile:(id,revision,confirmation)=>ipcRenderer.invoke('ai:removeProfile',id,revision,confirmation),
     saveSettings: (settings) => ipcRenderer.invoke('ai:saveSettings', settings),
     requestCompletion: (request) => ipcRenderer.invoke('ai:requestCompletion', request),
     cancelCompletion: (requestId) => ipcRenderer.invoke('ai:cancelCompletion', requestId),

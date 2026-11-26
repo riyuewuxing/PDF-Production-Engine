@@ -403,7 +403,7 @@ const aiSettings = new AiSettingsStore(path.join(dataDir, '.ai-settings.json'), 
 const aiRequests = new Map<string, AbortController>();
 const aiCompletionSchema = z.object({
   requestId: z.string().uuid(),
-  profile: z.object({ baseUrl: z.string().max(2048), model: z.string().max(200) }).strict(),
+  profile: z.object({ baseUrl: z.string().max(2048), model: z.string().max(200),profileId:z.string().max(40),revision:z.string().max(40) }).strict(),
   systemPrompt: z.string().min(1).max(20000),
   userPrompt: z.string().max(100000),
   temperature: z.number().min(0).max(2).optional(),
@@ -685,6 +685,10 @@ function registerIpcHandlers(): void {
     return aiSettings.getPublicSettings();
   });
 
+  trustedEditorHandle('ai:listProfiles',()=>aiSettings.getCatalog());
+  trustedEditorHandle('ai:createProfile',(_event,input:unknown)=>aiSettings.create(input));
+  trustedEditorHandle('ai:activateProfile',(_event,id:string)=>aiSettings.activate(id));
+  trustedEditorHandle('ai:removeProfile',(_event,id:string,revision:string,confirmation:unknown)=>aiSettings.remove(id,revision,confirmation));
   trustedEditorHandle('ai:saveSettings', async (_event, rawSettings: unknown) => {
     return aiSettings.save(rawSettings);
   });
@@ -697,7 +701,7 @@ function registerIpcHandlers(): void {
     const controller = new AbortController();
     aiRequests.set(requestId, controller);
     try {
-      const settings = await aiSettings.getRequestSettings();
+      const settings = await aiSettings.getRequestSettings(profile.profileId,profile.revision);
       if (!settings.enabled || settings.baseUrl !== validateByokBaseUrl(profile.baseUrl).baseUrl ||
           settings.model !== profile.model) throw new Error('AI 配置已变化，请先保存并重试。');
       return await requestByokCompletionDirect({ ...options, settings, signal: controller.signal });
