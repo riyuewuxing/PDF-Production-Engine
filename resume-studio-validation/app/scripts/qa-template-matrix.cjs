@@ -8,7 +8,7 @@ const out=process.env.RESUME_MATRIX_OUT;
 const locale=process.env.RESUME_MATRIX_LOCALE;
 if(!out||!['zh-CN','en-US'].includes(locale))throw Error('RESUME_MATRIX_OUT and explicit locale required');
 const modes=(process.env.RESUME_MATRIX_MODES??'compact,extended').split(',');
-if(!modes.length||new Set(modes).size!==modes.length||modes.some(m=>!['compact','extended','natural'].includes(m)))throw Error('invalid matrix modes');
+if(!modes.length||new Set(modes).size!==modes.length||modes.some(m=>!['compact','extended','natural','contacts'].includes(m)))throw Error('invalid matrix modes');
 const isolated=fs.mkdtempSync(path.join(os.tmpdir(),'resume-template-matrix-'));
 process.env.RESUME_STUDIO_DATA_DIR=isolated;
 const userData=path.join(isolated,'electron-userdata');
@@ -41,9 +41,14 @@ function avatar(){
   return nativeImage.createFromBitmap(b,{width,height}).toDataURL();
 }
 function makeFixture(mode){
-  const zh=locale==='zh-CN',long=mode==='extended'||mode==='natural',natural=mode==='natural';
+  const zh=locale==='zh-CN',long=mode==='extended'||mode==='natural',natural=mode==='natural',contacts=mode==='contacts';
   const t=(a,b)=>zh?a:b;
-  const expected=[t('演示候选人','Demo Candidate'),t('示例大学','Example University'),t('示例机构','Example Laboratory'),t('示例课程工具','Sample Course Tool'),t('实验设计能力','Synthetic analysis skill'),t('合成总结甲','Synthetic summary text'),t('虚构奖项甲','Synthetic award entry'),'qa-'+(zh?'zh':'en')+'@example.invalid'];
+  const email=contacts
+    ? 'qa-'+(zh?'zh':'en')+'.long.research.candidate+teaching@synthetic-subdomain.example.invalid'
+    : 'qa-'+(zh?'zh':'en')+'@example.invalid';
+  const phone=contacts?t('+86 000 0000 0000','+1 202 555 0107'):'';
+  const location=contacts?t('虚构科学研究示范校区，示例城市','Example Research Campus, Synthetic City'):t('示例城市','Example City');
+  const expected=[t('演示候选人','Demo Candidate'),t('示例大学','Example University'),t('示例机构','Example Laboratory'),t('示例课程工具','Sample Course Tool'),t('实验设计能力','Synthetic analysis skill'),t('合成总结甲','Synthetic summary text'),t('虚构奖项甲','Synthetic award entry'),email];
   const hidden=['HIDDENBIRTHMARKER','HIDDENEDUCATIONMARKER','HIDDENCUSTOMMARKER','DISABLEDSECTIONMARKER'];
   const labels=[['name',t('姓名','Name')],['title',t('职位','Role')],['email',t('邮箱','Email')],['phone',t('电话','Phone')],['location',t('所在地','Location')],['birthDate',t('生日','Birth')],['employmentStatus',t('状态','Status')]];
   const sections=[
@@ -52,7 +57,7 @@ function makeFixture(mode){
   const doc={
     schemaVersion:1,id:'qa-'+locale+'-'+mode,title:t('合成测试简历','Synthetic resume'),
     templateId:ids[0],createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z',activeSection:'basic',
-    basic:{name:expected[0],title:t('示例教师','Sample Instructor'),email:expected[7],phone:'',location:t('示例城市','Example City'),birthDate:hidden[0],employmentStatus:'',photo:long?avatar():'',
+    basic:{name:expected[0],title:t('示例教师','Sample Instructor'),email:expected[7],phone,location,birthDate:hidden[0],employmentStatus:'',photo:long||contacts?avatar():'',
       fieldOrder:labels.map(([key,label],i)=>({id:'field-'+i,key,label,visible:key!=='birthDate'}))},
     menuSections:sections.map(([id,title],order)=>({id,title,order,enabled:id!=='custom-disabled',pageBreakBefore:mode==='extended'&&id==='projects'})),
     education:[{id:'edu-1',school:expected[1],major:t('科学教育','Science Education'),degree:t('硕士','Master'),startDate:'2022.09',endDate:'2025.06',description:t('- 实验设计与数据记录。','- Designed experiments and recorded results.')},{id:'edu-hidden',school:hidden[1],visible:false}],
@@ -62,6 +67,10 @@ function makeFixture(mode){
     customData:{'custom-awards':[{id:'award-1',title:expected[6],subtitle:t('虚构机构','Synthetic organization'),dateRange:'2025',description:t('演示说明','Sample note')},{id:'award-hidden',title:hidden[2],visible:false}], 'custom-disabled':[{id:'disabled-1',title:hidden[3]}]},
     globalSettings:{locale,themeColor:'#167883',baseFontSize:13,sectionSpacing:15,paragraphSpacing:8,pagePadding:28,lineHeight:1.25}
   };
+  if(contacts){
+    expected.push(phone,location);
+    doc.globalSettings={...doc.globalSettings,baseFontSize:15,lineHeight:1.35,pagePadding:32};
+  }
   if(long){
     const paragraph=t('负责虚构课程的实验准备、数据整理、材料检查与讨论记录，形成可复核的报告，并与示例团队共同改进教学材料。','Prepared synthetic course experiments, organized records, reviewed materials, and summarized findings for the fictional team.');
     for(let i=2;i<=5;i++)doc.experience.push({id:'exp-'+i,company:t('示例研究小组','Example Research Group')+' '+i,position:t('研究助理','Research Assistant'),startDate:'2024.01',endDate:'2024.12',description:Array.from({length:3},()=>'- '+paragraph).join('\n')});

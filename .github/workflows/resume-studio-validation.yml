@@ -71,6 +71,12 @@ jobs:
           - locale: en-US
             modes: compact,extended
             suite: legacy
+          - locale: zh-CN
+            modes: contacts
+            suite: contacts
+          - locale: en-US
+            modes: contacts
+            suite: contacts
     defaults:
       run:
         working-directory: resume-studio-validation/app
@@ -94,13 +100,24 @@ jobs:
         env:
           RESUME_MATRIX_LOCALE: ${{ matrix.locale }}
           RESUME_MATRIX_MODES: ${{ matrix.modes }}
-          RESUME_MATRIX_SOURCE_SHA: 'c8cea379c387bc663779dc01780843c6342a79a6'
         run: |
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_MATRIX_SOURCE_SHA = (Get-Content runner-manifest.json -Raw | ConvertFrom-Json).sourceSha
           $env:RESUME_MATRIX_OUT = Join-Path $env:GITHUB_WORKSPACE 'natural-matrix'
           & .\node_modules\.bin\electron.cmd .\scripts\qa-template-matrix.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload natural pagination evidence
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: |
+          python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit actual PDF output
+        timeout-minutes: 2
+        run: |
+          $source = (Get-Content runner-manifest.json -Raw | ConvertFrom-Json).sourceSha
+          python scripts/qa-audit-template-matrix.py --root (Join-Path $env:GITHUB_WORKSPACE 'natural-matrix') --locale '${{ matrix.locale }}' --modes '${{ matrix.modes }}' --source-sha $source --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload PDF matrix and audit evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
