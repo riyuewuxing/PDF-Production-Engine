@@ -47,6 +47,7 @@ import {AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
 import {AiLayoutPane} from './AiLayoutPane';
 import {FactBankPane} from './FactBankPane';
+import {JobRequirementsPane} from './JobRequirementsPane';
 import type {FactBank} from '../../schema/factBankSchema';
 import {prepareFactSelection,assertFreshFactSelection,loadLocalFactBank,type FactSelection} from '../../lib/factSelection';
 import {TextPdfReviewGate} from './TextPdfReviewGate';
@@ -648,6 +649,7 @@ export function DiagnoseAndMatchPane({
               />
             </label>
 
+            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText}/>
             {jdResult.totalKeywords > 0 ? (
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex items-center justify-between">
@@ -679,11 +681,11 @@ export function DiagnoseAndMatchPane({
 
                 <div>
                   <div className="mb-1.5 font-semibold text-amber-700">
-                    JD 高频但简历缺失（建议自然融入，{jdResult.missingKeywords.length}）
+                    JD 文字线索未命中（需先核实真实经历，{jdResult.missingKeywords.length}）
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {jdResult.missingKeywords.length === 0 ? (
-                      <span className="text-[11px] text-emerald-600">所有提取关键词均已覆盖！</span>
+                      <span className="text-[11px] text-emerald-600">已覆盖提取的词语，不代表满足招聘条件。</span>
                     ) : (
                       jdResult.missingKeywords.map((kw) => (
                         <span

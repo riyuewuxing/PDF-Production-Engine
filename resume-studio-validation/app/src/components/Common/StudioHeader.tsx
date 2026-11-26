@@ -218,7 +218,7 @@ export function StudioHeader({
               </button>
 
               {isRedactionPopoverOpen && (
-                <div className="absolute top-full left-0 z-50 mt-1.5 w-64 sm:left-auto sm:right-0 rounded-lg border border-slate-700 bg-[#19202c] p-3 text-xs text-slate-100 shadow-2xl">
+                <div className="absolute top-full left-0 z-50 mt-1.5 w-64 rounded-lg border border-slate-700 bg-[#19202c] p-3 text-xs text-slate-100 shadow-2xl">
                   <div className="font-semibold text-white">自定义脱敏敏感词</div>
                   <p className="mt-1 text-[10px] text-slate-400">
                     自动打码姓名/手机/邮箱并隐藏证件照；下方填写需替换为{' '}
@@ -229,7 +229,7 @@ export function StudioHeader({
                     data-native-undo="true"
                     value={redactionTermsInput}
                     onChange={(e) => onRedactionTermsChange(e.target.value)}
-                    placeholder="例如：云南大学, 中国科学院"
+                    placeholder="例如：示例大学, 示例研究院"
                     className="mt-2 w-full rounded border border-slate-700 bg-slate-900 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none"
                   />
                   <div className="mt-2 flex items-center justify-between">

@@ -54,6 +54,17 @@ async function run() {
   const wideHeader=await resizeHeader(1440);await capture('60-header-wide');
   const mediumHeader=await resizeHeader(1080);await capture('61-header-medium');
   const narrowHeader=await resizeHeader(900);await capture('62-header-narrow');
+  const headerAction=label=>js('(()=>{const e=document.querySelector("[aria-label="+JSON.stringify('+JSON.stringify(label)+')+"]");if(!e||e.disabled)return false;e.click();return true})()');
+  const popupInView=selector=>js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&r.width>100})()');
+  if(!await headerAction('设置自定义脱敏敏感词'))throw Error('privacy popup unavailable');
+  await until('privacy popup within narrow window',()=>popupInView('header textarea'));
+  await capture('64-header-narrow-privacy-popup');
+  await click('完成');
+  if(!await headerAction('更多导出格式'))throw Error('export popup unavailable');
+  await until('export popup within narrow window',()=>popupInView('header [role=menu]'));
+  await capture('65-header-narrow-export-menu');
+  await headerAction('更多导出格式');
+  checks.headerPopupsVisible=true;
   if(narrowHeader.width>960||wideHeader.width<narrowHeader.width||mediumHeader.width<narrowHeader.width)throw Error('requested width not exercised '+JSON.stringify([wideHeader,mediumHeader,narrowHeader]));
   checks.headerResponsive=true;
   await resizeHeader(1440);
@@ -868,6 +879,7 @@ async function run() {
     await click('打开本地证据目录');await until('vault directory opened',()=>openedVault===vault);
   }finally{require('electron').shell.openPath=originalOpenPath;}
   fs.unlinkSync(orphan);
+  await until('previous evidence action settled',()=>js('[...document.querySelectorAll("button")].some(b=>b.innerText==="核对本地附件目录"&&!b.disabled)'));
   await click('核对本地附件目录');await until('directory audit clean after explicit test cleanup',()=>bodyHas('未索引文件 0'));
   checks.evidenceVaultAuditNoMutation=true;checks.evidenceVaultOpenScoped=true;
   // The index disappearing must never authorize a new index over retained copies.
@@ -1004,6 +1016,46 @@ async function run() {
   await scrollEvidence();await capture('57-evidence-purged');
   await click('关闭附件索引');
   checks.evidenceDetachedAndPurgedOriginalSafe=true;
+  // Local requirement review: exact source, no auto eligibility, explicit local-only fact and stale review invalidation.
+  const reviewDoc=await main.store.getResume('master'),reviewCalls=providerCalls;
+  let reviewBank=await js('window.resumeDesktop.facts.get()');
+  const reviewFactInput={slug:'master',docRevision:JSON.stringify([reviewDoc.id,reviewDoc.updatedAt]),blockKey:'edu:'+reviewDoc.education[0].id,bankRevision:reviewBank.revision,fact:{kind:'credential',assertion:'本人核对合成教师资格证',value:'',unit:'',timeframe:'2025',evidenceRef:'SYNTHETIC_JOB_LOCAL_ONLY',sensitivity:'local-only'},confirmation:'CONFIRM_SELF_REPORTED_FACT'};
+  reviewBank=await js('window.resumeDesktop.facts.add('+JSON.stringify(reviewFactInput)+')');
+  const reviewFact=reviewBank.records.find(r=>r.assertion===reviewFactInput.fact.assertion);
+  await click('JD 雷达');
+  const jobSource='合成招聘公告\n须持高中物理教师资格证；硕士优先。\n不要求班主任经验；必须硕士且经验优先\n报名截止2026-12-01。';
+  await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',jobSource);
+  await click('分析岗位原文');await until('six source clauses',()=>bodyHas('候选 6 条'));
+  await click('加载 / 刷新岗位事实依据');await until('current job evidence loaded',()=>bodyHas('已加载本地有效原始事实')&&js('[...document.querySelectorAll("button")].some(b=>b.innerText==="记录本条人工核对"&&!b.disabled)'));
+  const jobSelect=(name,val)=>js('(()=>{const e=document.querySelector("select[aria-label="+JSON.stringify('+JSON.stringify(name)+')+"]");if(!e||e.disabled)return false;e.value='+JSON.stringify(val)+';e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  const jobQuote=()=>js('document.querySelector("[aria-label=\\"岗位条款原文\\"]")?.innerText');
+  const clauseId=(quote)=>{const start=jobSource.indexOf(quote);return start+':'+(start+quote.length);};
+  if(!await jobSelect('岗位候选条款',clauseId('须持高中物理教师资格证；')))throw Error('job clause unavailable');
+  await until('exact job clause',async()=>await jobQuote()==='须持高中物理教师资格证；');
+  if(!await js('document.querySelector("select[aria-label=\\"岗位条件类型\\"]")?.value==="unknown"&&document.querySelector("select[aria-label=\\"岗位核对结果\\"]")?.value==="unchecked"'))throw Error('job auto approved');
+  await jobSelect('岗位条件类型','mandatory');await jobSelect('岗位核对结果','supported');
+  if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="记录本条人工核对")?.disabled===true'))throw Error('job support without evidence');
+  await setValue('input[aria-label="搜索岗位依据"]','SYNTHETIC_JOB_LOCAL_ONLY');
+  if(!await checkLabel('本人核对合成教师资格证'))throw Error('local-only job evidence missing');
+  await setValue('textarea[aria-label="岗位核对说明"]','合成示例：已本人核对，非资格结论');
+  await js('(()=>{document.querySelector("[aria-label=\\"岗位原文与证据核对\\"]")?.scrollIntoView({block:"start"});return true})()');
+  await capture('66-job-requirement-evidence');
+  await click('记录本条人工核对');await until('job evidence explicitly recorded',()=>bodyHas('已记录 1 条')&&bodyHas('自述支持 1')&&bodyHas('已记录该条人工核对结果'));
+  await jobSelect('岗位候选条款',clauseId('不要求班主任经验；'));await until('negative clause exact',async()=>await jobQuote()==='不要求班主任经验；');
+  if(!await js('document.querySelector("select[aria-label=\\"岗位条件类型\\"]")?.value==="unknown"'))throw Error('negation auto marked mandatory');
+  await jobSelect('岗位条件类型','not-requirement');await click('记录本条人工核对');await until('non requirement recorded',()=>bodyHas('已记录 2 条'));
+  await jobSelect('岗位候选条款',clauseId('必须硕士且经验优先'));await until('compound clause exact',async()=>await jobQuote()==='必须硕士且经验优先');
+  await jobSelect('岗位条件类型','unknown');await jobSelect('岗位核对结果','gap');await click('记录本条人工核对');await until('job gap recorded',()=>bodyHas('已记录 3 条')&&bodyHas('缺口 1'));
+  await js('(()=>{document.querySelector("[aria-label=\\"岗位核对记录\\"]")?.scrollIntoView({block:"center"});return true})()');await capture('67-job-review-results');
+  reviewBank=await js('window.resumeDesktop.facts.revoke('+JSON.stringify({id:reviewFact.id,bankRevision:reviewBank.revision,confirmation:'REVOKE_FACT'})+')');
+  await until('job review controls ready',()=>js('[...document.querySelectorAll("button")].some(b=>b.innerText==="记录本条人工核对"&&!b.disabled)'));
+  await click('记录本条人工核对');await until('stale job review cleared',()=>bodyHas('旧核对记录已清空')&&bodyHas('已记录 0 条'));
+  await capture('68-job-review-stale');
+  await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',jobSource+'\n合成附加条件');
+  await until('job source change clears session',()=>js('!document.querySelector("select[aria-label=\\"岗位候选条款\\"]")'));
+  if(providerCalls!==reviewCalls||JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(reviewDoc))throw Error('job review wrote resume or contacted model');
+  checks.jobRequirementSourceExact=true;checks.jobRequirementExplicitEvidence=true;checks.jobRequirementStaleCleared=true;checks.jobRequirementNoNetwork=true;
+
 
 
 
