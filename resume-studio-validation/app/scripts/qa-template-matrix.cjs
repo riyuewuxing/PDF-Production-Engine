@@ -13,6 +13,8 @@ const userData=path.join(isolated,'electron-userdata');
 fs.mkdirSync(userData,{recursive:true});
 app.setPath('userData',userData);
 app.disableHardwareAcceleration();
+// Headless QA owns the process lifecycle: closing a hidden print window must not quit Electron.
+app.on('window-all-closed',()=>{});
 fs.mkdirSync(out,{recursive:true});
 const main=require(path.join(repo,'dist-electron','main.cjs'));
 const schemaText=fs.readFileSync(path.join(repo,'src/schema/resumeSchema.ts'),'utf8');

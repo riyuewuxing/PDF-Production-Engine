@@ -81,7 +81,7 @@ jobs:
         timeout-minutes: 8
         env:
           RESUME_MATRIX_LOCALE: ${{ matrix.locale }}
-          RESUME_MATRIX_SOURCE_SHA: '0a6b9362400264fb743a1da61d0b6bf5200b800c'
+          RESUME_MATRIX_SOURCE_SHA: 'e0a77190719591e437bfa675bfc357acc0500363'
         run: |
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:RESUME_MATRIX_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-matrix-${{ matrix.locale }}'
