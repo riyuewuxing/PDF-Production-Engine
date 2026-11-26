@@ -1,5 +1,5 @@
 {
-  "sourceSha": "3a8fdc473a11da80ff1bdca083af0d260741eb17",
+  "sourceSha": "ec6717c15e6546f3e11ea5e3fe86337e958b6a7a",
   "scope": "Audited runtime/build dependency closure and targeted synthetic regression suite; actual Electron runtime with synthetic fixtures and local mock providers; no private history or data",
   "publicOverlays": [
     "src/lib/sampleResumeData.ts entirely synthetic",
@@ -12,5 +12,5 @@
     "localFsApi: synthetic legacy fixture slug"
   ],
   "fixture": "synthetic, no actual personal data",
-  "sourceValidation": "fixed-SHA runtime and synthetic regression code; private-only .gitignore and context-packing privacy exclusion remain private; public runner does not contain fact records from a user. Private-only gitignore/context pack integration is statically inspected; only synthetic path exclusion helper/test mirrored.; explicit local job archive schema, disk CAS, snapshot linkage and renderer reload regression; ledger data and permanent snapshots remain synthetic and excluded from source bundles.; local notice PDF, explicit page comparison and provenance archive tests with synthetic text and graphic-only pages."
+  "sourceValidation": "fixed-SHA runtime and synthetic regression code; private-only .gitignore and context-packing privacy exclusion remain private; public runner does not contain fact records from a user. Private-only gitignore/context pack integration is statically inspected; only synthetic path exclusion helper/test mirrored.; explicit local job archive schema, disk CAS, snapshot linkage and renderer reload regression; ledger data and permanent snapshots remain synthetic and excluded from source bundles.; local notice PDF, explicit page comparison and provenance archive tests with synthetic text and graphic-only pages.; native Chinese PDF fixture and scrollable original page zoom."
 }

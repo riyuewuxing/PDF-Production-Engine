@@ -5,7 +5,7 @@ export const MAX_JOB_PDF_BYTES=10*1024*1024;
 export const MAX_JOB_PDF_TEXT=20000;
 export const JobPdfOriginSchema=z.object({
   version:z.literal(1),
-  fileName:z.string().min(1).max(255).refine(s=>!/[\\/\u0000-\u001f]/.test(s)),
+  fileName:z.string().min(1).max(255).refine(s=>!/[\\/\u0000-\u001f]/.test(s)&&/\.pdf$/i.test(s)),
   sha256:z.string().regex(/^[a-f0-9]{64}$/),
   totalPages:z.number().int().min(1).max(MAX_JOB_PDF_PAGES),
   pages:z.array(z.object({page:z.number().int().min(1).max(MAX_JOB_PDF_PAGES),start:z.number().int().nonnegative().max(MAX_JOB_PDF_TEXT),end:z.number().int().positive().max(MAX_JOB_PDF_TEXT)})).min(1).max(MAX_JOB_PDF_PAGES),

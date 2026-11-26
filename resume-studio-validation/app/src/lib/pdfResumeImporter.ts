@@ -421,12 +421,12 @@ export async function extractTokensFromPdfArrayBuffer(
   buffer: ArrayBuffer | Uint8Array,
   maxPages=Infinity,
   signal?:AbortSignal,
-  limits?:{maxPageTokens:number;maxTotalChars:number},
+  limits?:{maxPageTokens:number;maxTotalTokens:number;maxTotalChars:number},
 ): Promise<ExtractedPdfPageTokens[]> {
   ensurePdfWorkerConfigured();
   // pdfjs 会接管并可能 detach 传入的 buffer，必须复制一份再交给它
   const source = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  const loadingTask = getDocument({ data: new Uint8Array(source), ...(limits?{isEvalSupported:false}: {}) });
+  const loadingTask = getDocument({ data: new Uint8Array(source) });
   const abort=()=>{void loadingTask.destroy().catch(()=>{});};
   signal?.addEventListener('abort',abort,{once:true});
   try {
@@ -434,7 +434,7 @@ export async function extractTokensFromPdfArrayBuffer(
     const pdf=await loadingTask.promise;
     if(pdf.numPages>maxPages)throw new Error('PDF 页数超出对照上限。');
     const pages: ExtractedPdfPageTokens[] = [];
-    let totalChars=0;
+    let totalChars=0,totalTokens=0;
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
       if(signal?.aborted)throw new Error('PDF 抽取已取消。');
       const page = await pdf.getPage(pageNo);
@@ -444,7 +444,7 @@ export async function extractTokensFromPdfArrayBuffer(
       const tokens: PdfTextToken[] = [];
       for (const item of content.items) {
         if (!('str' in item) || typeof item.str !== 'string') continue;
-        if(limits){totalChars+=item.str.length;if(tokens.length>=limits.maxPageTokens||totalChars>limits.maxTotalChars)throw new Error('PDF 文本层超过本地安全上限；没有截断。');}
+        if(limits){totalChars+=item.str.length;totalTokens++;if(tokens.length>=limits.maxPageTokens||totalTokens>limits.maxTotalTokens||totalChars>limits.maxTotalChars)throw new Error('PDF 文本层超过本地安全上限；没有截断。');}
         const transform = Array.isArray(item.transform) ? item.transform : [];
         const rawHeight =
           typeof item.height === 'number' && Number.isFinite(item.height)
@@ -519,7 +519,7 @@ export async function renderPdfPageImages(buffer:Uint8Array,maxPages:number,sign
 /** Render one original notice page, bounded by pixel dimensions and cancellable. */
 export async function renderJobNoticePdfPage(bytes:Uint8Array,pageNo:number,maxPages:number,signal:AbortSignal):Promise<string>{
   ensurePdfWorkerConfigured();
-  const loadingTask=getDocument({data:new Uint8Array(bytes),isEvalSupported:false});
+  const loadingTask=getDocument({data:new Uint8Array(bytes)});
   const abort=()=>{void loadingTask.destroy().catch(()=>{});};
   signal.addEventListener('abort',abort,{once:true});
   let canvas:HTMLCanvasElement|undefined;

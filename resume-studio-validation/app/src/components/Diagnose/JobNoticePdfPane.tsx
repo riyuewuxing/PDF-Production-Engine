@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {extractTokensFromPdfArrayBuffer,renderJobNoticePdfPage} from '../../lib/pdfResumeImporter';
-import {detectColumnLayout,reconstructPageLinesColumnAware} from '../../lib/pdfTextLayout';
+import {detectColumnLayout,reconstructPageLinesColumnAware,reconstructLinesFromTextItems} from '../../lib/pdfTextLayout';
 import {prepareJobPdfSource,type JobPdfDraft} from '../../lib/jobPdfSource';
 import {MAX_JOB_PDF_BYTES,MAX_JOB_PDF_PAGES,type JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
 
@@ -12,6 +12,7 @@ export function JobNoticePdfPane({jdText,origin,onConfirm}:Props){
   const [page,setPage]=useState(1);
   const [reviewed,setReviewed]=useState<number[]>([]);
   const [image,setImage]=useState('');
+  const [zoom,setZoom]=useState(150);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [confirmed,setConfirmed]=useState(false);
@@ -35,9 +36,9 @@ export function JobNoticePdfPane({jdText,origin,onConfirm}:Props){
       if(!new TextDecoder().decode(data.subarray(0,1024)).includes('%PDF-'))throw new Error('文件没有有效 PDF 文件头。');
       const digest=await crypto.subtle.digest('SHA-256',data);
       const sha256=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-      const pages=await extractTokensFromPdfArrayBuffer(data,MAX_JOB_PDF_PAGES,signal,{maxPageTokens:6000,maxTotalChars:200000});
+      const pages=await extractTokensFromPdfArrayBuffer(data,MAX_JOB_PDF_PAGES,signal,{maxPageTokens:3000,maxTotalTokens:18000,maxTotalChars:200000});
       if(signal.aborted||!alive.current)throw new Error('已取消。');
-      const extracted=pages.map((p,i)=>({page:i+1,text:reconstructPageLinesColumnAware(p).join('\n'),hasColumns:!!detectColumnLayout(p)}));
+      const extracted=pages.map((p,i)=>{const hasColumns=!!detectColumnLayout(p);return {page:i+1,text:(hasColumns?reconstructPageLinesColumnAware(p):reconstructLinesFromTextItems(p.tokens)).join('\n'),hasColumns};});
       bytes.current=data;setDraft({fileName:file.name,sha256,pages:extracted});setSelected(extracted.map(p=>p.page));setPage(1);
     });
   };
@@ -71,7 +72,11 @@ export function JobNoticePdfPane({jdText,origin,onConfirm}:Props){
         {current.hasColumns&&<p className="text-amber-800">检测到可能分栏，请特别核对阅读顺序与表格行列。</p>}
         <pre aria-label="公告逐页提取文本" className="max-h-44 overflow-auto whitespace-pre-wrap rounded border bg-white p-2 font-sans">{current.text||'未检测到可选文本，可能是扫描或图片页。'}</pre>
         <button type="button" disabled={busy} onClick={preview} className="rounded border bg-white px-2 py-1">渲染本页 PDF 原件</button>
-        {image&&<img alt={'公告 PDF 第 '+page+' 页实际渲染'} src={image} className="max-h-96 w-full rounded border bg-white object-contain"/>}
+        {image&&<div className="min-w-0 space-y-1">
+          <label className="flex items-center gap-2">原件显示比例<select aria-label="公告原件显示比例" value={zoom} onChange={e=>setZoom(Number(e.target.value))} className="rounded border bg-white p-1">{[100,150,200,300].map(n=><option key={n} value={n}>{n}%</option>)}</select></label>
+          <div aria-label="公告原件滚动预览" className="max-h-96 w-full overflow-auto rounded border bg-white"><img alt={'公告 PDF 第 '+page+' 页实际渲染'} src={image} style={{width:zoom+'%',maxWidth:'none',height:'auto'}} className="block"/></div>
+          <p className="text-slate-600">可放大并横向、纵向滚动，若表格或小字仍无法可靠核对，请直接查看本地原 PDF。</p>
+        </div>}
         <label className="flex items-start gap-1"><input type="checkbox" aria-label={'确认已对照 PDF 第 '+page+' 页'} disabled={busy||!image||!usable(current)} checked={reviewed.includes(page)} onChange={e=>{setReviewed(old=>e.target.checked?[...old,page]:old.filter(n=>n!==page));setConfirmed(false);}}/>本人已对照本页原件，确认提取文字和阅读顺序可供核对（不是官方鉴真）。</label>
       </>}
       {validation&&<p className="text-amber-800">{validation}</p>}
