@@ -1,0 +1,85 @@
+name: Resume Studio V6 MCP transport boundary validation
+on:
+  push:
+    branches: ['resume-studio/v6-mcp-transport-validation']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-mcp-transport-validation
+  cancel-in-progress: true
+jobs:
+  transport:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reproduce real old MCP transport failures
+        timeout-minutes: 3
+        run: |
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-mcp-transport-evidence'
+          New-Item -ItemType Directory -Force $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          $target = 'scripts/mcp-server.ts'
+          $candidate = [IO.File]::ReadAllBytes((Join-Path (Get-Location) $target))
+          try {
+            [IO.File]::WriteAllBytes((Join-Path (Get-Location) $target), [IO.File]::ReadAllBytes((Join-Path (Get-Location) 'validation-fixtures/mcp-server.turn27-baseline.txt')))
+            node scripts/build-electron.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'baseline build failed' }
+            node validation-mcp-transport.cjs baseline
+            if ($LASTEXITCODE -ne 0) { throw 'baseline observations did not meet reproduction conditions' }
+          } finally {
+            [IO.File]::WriteAllBytes((Join-Path (Get-Location) $target), $candidate)
+          }
+      - name: Candidate typecheck
+        timeout-minutes: 2
+        run: pnpm typecheck
+      - name: Full synthetic unit regression on Windows
+        if: runner.os == 'Windows'
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-mcp-transport-evidence'
+          pnpm exec vitest run --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual candidate entry
+        timeout-minutes: 2
+        run: node scripts/build-electron.mjs
+      - name: Verify framed input, EOF backpressure and preserved originals
+        timeout-minutes: 3
+        run: |
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-mcp-transport-evidence'
+          node validation-mcp-transport.cjs candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Existing real MCP tools and concurrency regression
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('mcp-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-mcp-transport-evidence'
+          node validation-mcp-process.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload real process evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-mcp-transport-${{ matrix.os }}
+          path: resume-studio-mcp-transport-evidence/
+          if-no-files-found: error
+          retention-days: 3
