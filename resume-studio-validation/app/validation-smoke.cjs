@@ -47,6 +47,17 @@ async function run() {
   win.setSize(1440, 920);
   await capture('01-workbench');
   checks.appLoaded = true;
+  // Inspect actual rendered header geometry, not screenshot existence alone.
+  const headerGeometry=()=>js('(()=>{const h=document.querySelector("header[aria-label=\\"工作台顶栏\\"]");const rect=h.getBoundingClientRect();const nodes=[...h.querySelectorAll("button, select, [aria-label=\\"本地保存状态\\"]")].filter(e=>e.getClientRects().length);return {width:innerWidth,height:rect.height,overflow:nodes.filter(e=>{const r=e.getBoundingClientRect();return r.left<rect.left-1||r.right>rect.right+1||r.top<rect.top-1||r.bottom>rect.bottom+1||r.height<10;}).map(e=>e.innerText||e.getAttribute("aria-label")),saveHeight:h.querySelector("[aria-label=\\"本地保存状态\\"]").getBoundingClientRect().height,saveText:h.querySelector("[aria-label=\\"本地保存状态\\"]").innerText};})()');
+  const resizeHeader=async width=>{win.setContentSize(width,860);await sleep(350);const g=await headerGeometry();if(g.overflow.length||g.saveHeight>32||!g.saveText.includes('已保存'))throw Error('header geometry failed '+JSON.stringify(g));return g;};
+  win.setMinimumSize(760,650);
+  const wideHeader=await resizeHeader(1440);await capture('60-header-wide');
+  const mediumHeader=await resizeHeader(1080);await capture('61-header-medium');
+  const narrowHeader=await resizeHeader(900);await capture('62-header-narrow');
+  if(narrowHeader.width>960||wideHeader.width<narrowHeader.width||mediumHeader.width<narrowHeader.width)throw Error('requested width not exercised '+JSON.stringify([wideHeader,mediumHeader,narrowHeader]));
+  checks.headerResponsive=true;
+  await resizeHeader(1440);
+  win.setMinimumSize(1080,720);
   // Real renderer IPC: editor is allowed, another window with identical preload is not.
   const { BrowserWindow, ipcMain } = require('electron');
   const rogue = new BrowserWindow({show:false,webPreferences:{preload:path.join(__dirname,'dist-electron','preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
@@ -92,6 +103,12 @@ async function run() {
   };
   await js('(()=>{const e=document.querySelector("#basic-field-name");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,"演示候选人（修改）");e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
   await until('visible save failure', () => js('[...document.querySelectorAll("[title]")].some(e=>e.title.includes("受控写入失败"))'));
+  win.setMinimumSize(760,650);win.setContentSize(900,860);await sleep(350);
+  const failedHeader=await headerGeometry();
+  if(failedHeader.overflow.length||!failedHeader.saveText.includes('保存失败')||!failedHeader.saveText.includes('重试保存'))throw Error('narrow save error inaccessible '+JSON.stringify(failedHeader));
+  await capture('63-header-narrow-save-error');
+  win.setContentSize(1440,920);win.setMinimumSize(1080,720);await sleep(350);
+  checks.headerNarrowSaveError=true;
   await capture('02-save-error');
   let closeDialogCount = 0;
   const originalDialog = dialog.showMessageBoxSync;

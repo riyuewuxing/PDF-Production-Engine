@@ -90,8 +90,8 @@ export function StudioHeader({
   onOpenCommandPalette,
 }: StudioHeaderProps) {
   return (
-    <header className="no-print flex h-11 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-[#11161f] px-4 text-slate-100">
-      <div className="flex min-w-0 items-center gap-3">
+    <header aria-label="工作台顶栏" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-800 bg-[#11161f] px-3 py-1.5 text-slate-100 2xl:flex-nowrap">
+      <div aria-label="版本与保存状态" className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1 2xl:flex-1 2xl:flex-nowrap">
         <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold tracking-tight text-white">
           <HardDrive size={15} className="text-teal-400" />
           Resume Studio
@@ -102,7 +102,7 @@ export function StudioHeader({
           aria-label="快速切换简历版本"
           value={activeSlug}
           onChange={(e) => onSwitchVersion(e.target.value)}
-          className="max-w-[220px] rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-100 focus:border-teal-500 focus:outline-none"
+          className="min-w-[88px] max-w-[min(220px,35vw)] rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-100 focus:border-teal-500 focus:outline-none"
         >
           {summaries.map((item) => (
             <option key={item.slug} value={item.slug}>
@@ -112,7 +112,7 @@ export function StudioHeader({
           {masterSummary && <option value="master">母库：{masterSummary.title}</option>}
         </select>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             disabled={!canUndo}
@@ -137,7 +137,7 @@ export function StudioHeader({
           </button>
         </div>
 
-        <div className="hidden items-center gap-1.5 text-xs sm:flex">
+        <div role="status" aria-label="本地保存状态" className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs">
           {saveState === 'saving' && (
             <span className="inline-flex items-center gap-1 text-slate-400">
               <Loader2 size={12} className="animate-spin" /> 正在落盘...
@@ -164,17 +164,17 @@ export function StudioHeader({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div aria-label="工作台操作" className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 whitespace-nowrap 2xl:shrink-0 2xl:flex-nowrap">
         <button
           type="button"
           onClick={onOpenCommandPalette}
           aria-label="打开命令面板"
           title="全局命令面板 (Ctrl+K)"
-          className="hidden items-center gap-1.5 rounded border border-slate-700/80 bg-slate-900/90 px-2 py-1 text-[11px] text-slate-300 hover:border-teal-500/50 hover:text-white md:inline-flex"
+          className="inline-flex items-center gap-1.5 rounded border border-slate-700/80 bg-slate-900/90 px-2 py-1 text-[11px] text-slate-300 hover:border-teal-500/50 hover:text-white"
         >
           <Command size={11} className="text-teal-400" />
           <span>快捷搜索</span>
-          <kbd className="rounded bg-slate-800 px-1 font-mono text-[10px] text-slate-400">Ctrl+K</kbd>
+          <kbd className="hidden rounded bg-slate-800 px-1 font-mono text-[10px] text-slate-400 xl:inline">Ctrl+K</kbd>
         </button>
 
         {activeTab === 'templates' && (
@@ -218,7 +218,7 @@ export function StudioHeader({
               </button>
 
               {isRedactionPopoverOpen && (
-                <div className="absolute top-full right-0 z-50 mt-1.5 w-64 rounded-lg border border-slate-700 bg-[#19202c] p-3 text-xs text-slate-100 shadow-2xl">
+                <div className="absolute top-full left-0 z-50 mt-1.5 w-64 sm:left-auto sm:right-0 rounded-lg border border-slate-700 bg-[#19202c] p-3 text-xs text-slate-100 shadow-2xl">
                   <div className="font-semibold text-white">自定义脱敏敏感词</div>
                   <p className="mt-1 text-[10px] text-slate-400">
                     自动打码姓名/手机/邮箱并隐藏证件照；下方填写需替换为{' '}
@@ -357,7 +357,7 @@ export function StudioHeader({
             <button
               type="button"
               onClick={() => void apiClient.openExportsDir()}
-              className="hidden items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-700 md:inline-flex"
+              className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-700"
             >
               <FolderOpen size={12} /> 打开导出目录
             </button>
