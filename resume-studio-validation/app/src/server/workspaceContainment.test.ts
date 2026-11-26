@@ -24,7 +24,7 @@ afterEach(async()=>{
   for(const link of links.splice(0)){const st=await fs.lstat(link);if(!st.isSymbolicLink())throw Error('expected synthetic directory link');if(process.platform==='win32')await fs.rmdir(link);else await fs.unlink(link);}
   for(const root of roots.splice(0))await fs.rm(root,{recursive:true,force:true});
 });
-function code<T>(result:PromiseSettledResult<T>){return result.status==='rejected'?(result.reason as {code?:string})?.code:'FULFILLED';}
+function code(result:PromiseSettledResult<unknown>){return result.status==='rejected'?(result.reason as {code?:string})?.code:'FULFILLED';}
 const png=(bytes:string)=>'data:image/png;base64,'+Buffer.from(bytes).toString('base64');
 describe('managed workspace entry containment',()=>{
   it('isolates hard-linked resume and master records in listing and direct reading',async()=>{
