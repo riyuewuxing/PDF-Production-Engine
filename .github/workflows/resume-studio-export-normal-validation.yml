@@ -1,0 +1,53 @@
+name: Resume Studio V6 normal export scenario validation
+on:
+  push:
+    branches: ['resume-studio/v6-export-normal-validation']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual desktop application
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Real ordinary export and reversible synthetic archive scenario
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-export-normal-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'resume-studio-export-normal'
+          & .\node_modules\.bin\electron.cmd .\validation-export-normal.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+      - name: Verify actual artifact contents
+        timeout-minutes: 2
+        run: python validation-export-normal-audit.py --root (Join-Path $env:GITHUB_WORKSPACE 'resume-studio-export-normal') --runner-sha $env:GITHUB_SHA
+      - name: Upload actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resume-studio-export-normal
+          path: resume-studio-export-normal/
+          if-no-files-found: error
+          retention-days: 3
