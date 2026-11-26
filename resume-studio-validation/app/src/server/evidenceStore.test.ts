@@ -149,6 +149,19 @@ describe('isolated evidence vault',()=>{
     expect(await fs.readFile(file(a!),'utf8')).toBe('SYNTHETIC_RESIDUAL');
     expect(await evidence.get()).toEqual(purged);
   });
+  it('never recreates a lost index over existing managed copies',async()=>{
+    const index=await evidence.attachSelectedFile(input,source),entry=index.entries[0]!;
+    const indexFile=path.join(store.dataDir,'.evidence-index-v1.json');
+    const old=await fs.readFile(indexFile);await fs.unlink(indexFile);
+    expect(await evidence.audit()).toMatchObject({indexMissingWithFiles:true,unindexedFiles:1,regularFiles:1});
+    await expect(evidence.assertAttachAllowed(input)).rejects.toThrow('禁止自动重建索引');
+    await expect(evidence.attachSelectedFile(input,source)).rejects.toThrow('禁止自动重建索引');
+    await expect(fs.access(indexFile)).rejects.toThrow();
+    expect(await fs.readFile(file(entry))).toEqual(bytes);
+    await fs.writeFile(indexFile,old);
+    expect(await evidence.get()).toEqual(index);
+    expect(await evidence.audit()).toMatchObject({indexMissingWithFiles:false,unindexedFiles:0});
+  });
   it('refuses unsafe managed directory and nonregular managed file',async()=>{
     const index=await evidence.attachSelectedFile(input,source),entry=index.entries[0]!,read={id:entry.id,indexRevision:index.revision};
     await fs.unlink(file(entry));await fs.mkdir(file(entry));

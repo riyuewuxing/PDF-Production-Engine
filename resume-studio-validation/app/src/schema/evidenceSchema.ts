@@ -41,4 +41,4 @@ export type PurgeEvidenceInput=z.infer<typeof PurgeEvidenceSchema>;
 export type EvidenceIntegrity={id:string;state:'intact'|'missing'|'changed'|'unreadable'|'purged';checkedAt:string};
 
 /** Directory-level reconciliation, not a full-content hash check. No raw paths returned. */
-export type EvidenceVaultAudit={checkedAt:string;exists:boolean;totalBytes:number;regularFiles:number;missingCopies:number;sizeMismatches:number;unsafeEntries:number;unindexedFiles:number;purgedResiduals:number};
+export type EvidenceVaultAudit={checkedAt:string;exists:boolean;indexMissingWithFiles:boolean;totalBytes:number;regularFiles:number;missingCopies:number;sizeMismatches:number;unsafeEntries:number;unindexedFiles:number;purgedResiduals:number};

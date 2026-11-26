@@ -853,6 +853,28 @@ async function run() {
   fs.unlinkSync(orphan);
   await click('核对本地附件目录');await until('directory audit clean after explicit test cleanup',()=>bodyHas('未索引文件 0'));
   checks.evidenceVaultAuditNoMutation=true;checks.evidenceVaultOpenScoped=true;
+  // The index disappearing must never authorize a new index over retained copies.
+  const indexPath=path.join(main.dataDir,'.evidence-index-v1.json'),savedIndexPath=path.join(root,'synthetic-index-backup.json');
+  fs.renameSync(indexPath,savedIndexPath);
+  try{
+    await click('加载 / 刷新附件索引');
+    await until('lost index read',()=>bodyHas('有效关联 0')&&bodyHas('本地索引 0/200'));
+    await click('核对本地附件目录');
+    await until('lost index guarded',()=>bodyHas('证据索引缺失但目录仍有文件'));
+    if(!await checkLabel('我确认将选择的附件复制到本地'))throw Error('evidence confirmation missing in lost-index test');
+    if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="选择文件并关联证据")?.disabled===true'))throw Error('lost index did not disable import');
+    const raw={slug:'master',docRevision:JSON.stringify([linkBase.id,linkBase.updatedAt]),factId:linkRoot.id,bankRevision:linkBank.revision,indexRevision:'empty-v1',note:'synthetic',confirmation:'CONFIRM_LOCAL_EVIDENCE_COPY'};
+    let reopenedPicker=false;const originalPicker=dialog.showOpenDialog;
+    try{dialog.showOpenDialog=async()=>{reopenedPicker=true;return {canceled:true,filePaths:[]};};
+      const rejected=await js('window.resumeDesktop.evidence.attach('+JSON.stringify(raw)+').then(()=>false,e=>String(e).includes("禁止自动重建索引"))');
+      if(!rejected||reopenedPicker||fs.existsSync(indexPath)||!fs.readFileSync(managedEvidence).equals(evidenceBytes))throw Error('lost index fail-closed gate failed');
+    }finally{dialog.showOpenDialog=originalPicker;}
+    await scrollEvidence();await capture('59-evidence-index-missing');
+  }finally{fs.renameSync(savedIndexPath,indexPath);}
+  await click('加载 / 刷新附件索引');await until('index manually restored',()=>bodyHas('有效关联 1')&&bodyHas('synthetic-evidence-only.txt'));
+  await click('校验副本 SHA-256');await until('restored index valid',()=>bodyHas('字节校验一致'));
+  checks.evidenceLostIndexFailClosed=true;
+
   await scrollEvidence();await capture('54-evidence-intact');
   fs.writeFileSync(managedEvidence,Buffer.alloc(evidenceBytes.length,65));
   await click('校验副本 SHA-256');await until('evidence changed',()=>bodyHas('本地副本已变化'));

@@ -74,13 +74,14 @@ export function EvidenceAttachmentPane(props:Props){
     <button type="button" disabled={locked||!bridge} onClick={refresh} className="rounded border bg-white px-2 py-1">加载 / 刷新附件索引</button>
     <div className="flex flex-wrap gap-1">
       <button type="button" disabled={locked||!bridge} onClick={()=>void task(async()=>{const value=await bridge!.audit();if(mounted.current)setAudit(value);})} className="rounded border bg-white px-2 py-1">核对本地附件目录</button>
-      <button type="button" disabled={locked||!bridge||!audit?.exists} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1">打开本地证据目录</button>
+      <button type="button" disabled={locked||!bridge} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1">打开本地证据目录</button>
     </div>
     {audit&&<div aria-label="本地附件目录核对结果" className="rounded border border-indigo-200 bg-white p-2 space-y-1">
       <div className="font-semibold">目录核对（全库，非全文哈希）</div>
       <div>普通文件 {audit.regularFiles} 个 · {sizeLabel(audit.totalBytes)} / {MAX_EVIDENCE_VAULT_BYTES/1048576} MB</div>
       <div>缺失副本 {audit.missingCopies} · 大小变化 {audit.sizeMismatches} · 未索引文件 {audit.unindexedFiles}</div>
       <div>异常项目 {audit.unsafeEntries} · 已删除记录残留 {audit.purgedResiduals}</div>
+      {audit.indexMissingWithFiles&&<p className="font-semibold text-red-800">证据索引缺失但目录仍有文件：已禁止新增附件。请先备份并恢复原索引，不自动重建。</p>}
       <div className="text-slate-600">检查时间：{audit.checkedAt.replace('T',' ').slice(0,19)} UTC。仅报告，不自动删除或修复；同大小内容变化需逐个 SHA-256 校验。</div>
       {(audit.missingCopies+audit.sizeMismatches+audit.unindexedFiles+audit.unsafeEntries+audit.purgedResiduals)>0&&<p className="text-amber-800">发现目录差异，请先核对并备份；系统未自动更改任何附件。</p>}
     </div>}
@@ -112,7 +113,7 @@ export function EvidenceAttachmentPane(props:Props){
         <p>支持 PDF、PNG、JPG、UTF-8 TXT；单文件 {MAX_EVIDENCE_FILE_BYTES/1048576} MB，目录最多 {MAX_EVIDENCE_VAULT_BYTES/1048576} MB。只复制明确选择的文件，不扫描目录、不自动打开附件。</p>
         <label className="block">来源说明（可选）<textarea aria-label="附件来源说明" disabled={locked} rows={2} maxLength={500} value={note} onChange={e=>{setNote(e.target.value);setConsent(false);}} className="mt-1 w-full rounded border p-1.5"/></label>
         <label className="flex items-start gap-1"><input type="checkbox" disabled={locked} checked={consent} onChange={e=>setConsent(e.target.checked)}/>我确认将选择的附件复制到本地并关联该事实，不允许自动外发</label>
-        <button type="button" disabled={locked||!consent||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50">选择文件并关联证据</button>
+        <button type="button" disabled={locked||!consent||audit?.indexMissingWithFiles===true||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50">选择文件并关联证据</button>
       </div>:<p className="text-slate-600">只有当前版本的有效原始事实可新增附件；历史或其他版本记录仍可本地追溯。</p>}
     </>}
   </section>;

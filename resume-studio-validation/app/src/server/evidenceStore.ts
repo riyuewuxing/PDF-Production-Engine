@@ -100,13 +100,13 @@ export class EvidenceStore{
         if(!found)missingCopies++;
         else if(found.regular&&found.size!==e.size)sizeMismatches++;
       }
-      return {checkedAt:new Date().toISOString(),exists:scan.exists,totalBytes:scan.totalBytes,
+      return {checkedAt:new Date().toISOString(),exists:scan.exists,indexMissingWithFiles:index.revision==='empty-v1'&&scan.files.size>0,totalBytes:scan.totalBytes,
         regularFiles:[...scan.files.values()].filter(e=>e.regular).length,missingCopies,sizeMismatches,
         unsafeEntries:scan.unsafeEntries,unindexedFiles:[...scan.files.entries()].filter(([name,e])=>e.regular&&!known.has(name)).length,purgedResiduals};
     });
   }
   /** Explicitly open the validated managed directory; no renderer-provided path. */
-  async vaultPath():Promise<string>{await this.assertVault();return this.vault;}
+  async vaultPath():Promise<string>{try{await this.assertVault();}catch(e){if(missing(e))throw fail('EVIDENCE_VAULT_MISSING','本地证据目录尚未建立。');throw e;}return this.vault;}
   private async basis(raw:unknown){
     const input=AttachEvidenceSchema.parse(raw),index=await this.get();this.check(index,input.indexRevision);
     const bank=await this.facts.get(),doc=await this.resumes.getResume(input.slug);
@@ -117,8 +117,14 @@ export class EvidenceStore{
     if(index.entries.length>=MAX_EVIDENCE_RECORDS)throw fail('EVIDENCE_LIMIT','证据索引已达到记录上限。');
     return {input,index,fact};
   }
+  private async assertImportStorage(index:EvidenceIndex,additionalBytes:number){
+    const scan=await this.scanVault();
+    if(index.revision==='empty-v1'&&scan.files.size)throw fail('EVIDENCE_INDEX_MISSING','证据索引缺失但目录仍有文件，请先核对并备份，禁止自动重建索引。');
+    if(scan.unsafeEntries)throw fail('EVIDENCE_VAULT','证据目录含异常项目，请在本地检查。');
+    if(scan.totalBytes+additionalBytes>MAX_EVIDENCE_VAULT_BYTES)throw fail('EVIDENCE_LIMIT','证据目录达到 200 MB 上限。');
+  }
   /** Before opening the dialog, and again when the selected file is committed. */
-  async assertAttachAllowed(raw:unknown):Promise<void>{await this.basis(raw);}
+  async assertAttachAllowed(raw:unknown):Promise<void>{const {index}=await this.basis(raw);await this.assertImportStorage(index,1);}
   async attachSelectedFile(raw:unknown,selectedPath:string):Promise<EvidenceIndex>{
     // The file path comes only from the native file picker, never from renderer IPC input.
     const name=path.basename(selectedPath).replace(/[\x00-\x1f\x7f]/g,'_').slice(0,255);
@@ -128,9 +134,7 @@ export class EvidenceStore{
       const {input,index,fact}=await this.basis(raw);
       if(index.entries.some(e=>e.factId===fact.id&&e.sha256===sha256&&e.status==='attached'))throw fail('EVIDENCE_DUPLICATE','该事实已关联相同内容的附件。');
       await this.assertVault(true);
-      const scan=await this.scanVault();
-      if(scan.unsafeEntries)throw fail('EVIDENCE_VAULT','证据目录含异常项目，请在本地检查。');
-      if(scan.totalBytes+bytes.length>MAX_EVIDENCE_VAULT_BYTES)throw fail('EVIDENCE_LIMIT','证据目录达到 200 MB 上限。');
+      await this.assertImportStorage(index,bytes.length);
       const now=new Date().toISOString(),entry:EvidenceEntry={id:randomUUID(),factId:fact.id,docId:fact.docId,originalName:name,kind,size:bytes.length,sha256,note:input.note,createdAt:now,changedAt:now,status:'attached'};
       const dest=this.fileFor(entry);
       const handle=await fs.open(dest,'wx',0o600);
