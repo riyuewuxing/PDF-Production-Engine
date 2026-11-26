@@ -1,6 +1,7 @@
 import {comparableFactEntity,sameFactEvidence,type FactBank,type FactRecord} from '../schema/factBankSchema';
 import type {ResumeDocument} from '../schema/resumeSchema';
 import {createAiTextSanitizer,factEntityId,isShareableFact} from './aiContext';
+import {collectEditableBlocks} from './resumeBlocks';
 
 export function canLinkFactToDocument(target:ResumeDocument,root:FactRecord):boolean{
   if(root.sourceScope!=='manual'||root.verifiedStatus!=='user-confirmed'||root.docId===target.id)return false;
@@ -9,7 +10,7 @@ export function canLinkFactToDocument(target:ResumeDocument,root:FactRecord):boo
   return !!entityId&&!!signature&&signature===comparableFactEntity({docId:target.id,blockKey:root.blockKey,entityId});
 }
 export function isLinkedPrivacyCompatible(target:ResumeDocument,source:ResumeDocument,root:FactRecord):boolean{
-  const content=[root.assertion,root.value,root.unit,root.timeframe].filter(Boolean).join('\n');
+  const content=[collectEditableBlocks(target).find(b=>b.key===root.blockKey)?.label,root.assertion,root.value,root.unit,root.timeframe].filter(Boolean).join('\n');
   return createAiTextSanitizer([target,source])(content)===createAiTextSanitizer([target])(content);
 }
 /** Source version and root fact are checked again before any linked fact may leave the app. */

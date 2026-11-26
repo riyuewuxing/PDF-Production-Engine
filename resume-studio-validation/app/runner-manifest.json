@@ -1,5 +1,5 @@
 {
-  "sourceSha": "1b28f6c114d868dc2f668cd01799818408af6c4d",
+  "sourceSha": "abd1eab67447b38a9b1d3c210282e4c88d4466e1",
   "scope": "Audited runtime/build dependency closure and targeted synthetic regression suite; actual Electron runtime with synthetic fixtures and local mock providers; no private history or data",
   "publicOverlays": [
     "src/lib/sampleResumeData.ts entirely synthetic",

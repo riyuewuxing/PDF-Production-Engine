@@ -42,7 +42,7 @@ export const FactBankSchema=z.object({
   for(const record of bank.records){
     if(record.supersedesId){
       const old=prior.get(record.supersedesId);
-      if(!old||old.verifiedStatus!=='revoked'||superseded.has(old.id)||old.entityId!==record.entityId||old.docId!==record.docId||old.blockKey!==record.blockKey)
+      if(!old||old.sourceScope!=='manual'||old.verifiedStatus!=='revoked'||superseded.has(old.id)||old.entityId!==record.entityId||old.docId!==record.docId||old.blockKey!==record.blockKey)
         ctx.addIssue({code:z.ZodIssueCode.custom,message:'事实修订链不一致'});
       superseded.add(record.supersedesId);
     }

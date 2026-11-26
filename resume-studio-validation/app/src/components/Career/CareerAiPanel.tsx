@@ -50,7 +50,11 @@ export function CareerAiPanel(props:Props){
     const now=current.current;
     return mounted.current&&now.props.document===b.document&&now.props.slug===b.slug&&now.props.company===b.company&&now.props.role===b.role&&now.props.jdText===b.jdText&&now.kind===b.kind&&now.props.drafts[b.kind]===b.draftText&&now.selected?.profileId===b.settings.profileId&&now.selected?.revision===b.settings.revision&&JSON.stringify(now.factIds)===JSON.stringify(b.selection.records.map(r=>r.id))&&(!b.selection.binding||now.bank?.revision===b.selection.binding.bankRevision);
   };
-  const assertFresh=async(b:Basis)=>{await assertFreshFactSelection(b.document,b.selection,loadLocalFactBank);if(!isCurrent(b))throw new Error('文案、岗位、模型或事实选择已变化，旧审批作废。');};
+  const assertFresh=async(b:Basis)=>{
+    try{await assertFreshFactSelection(b.document,b.selection,loadLocalFactBank);}
+    catch(err){if(isCurrent(b)&&b.selection.records.length){setFactIds([]);setBank(null);clearApprovals();}throw err;}
+    if(!isCurrent(b))throw new Error('文案、岗位、模型或事实选择已变化，旧审批作废。');
+  };
   const prepare=()=>{
     if(!selected||locked)return;setError(null);setProposal(null);setConfirmed(false);setPreview(null);
     try{
@@ -106,7 +110,7 @@ export function CareerAiPanel(props:Props){
       <p className="break-all">接收方：{validateByokBaseUrl(preview.basis.settings.baseUrl).baseUrl}/chat/completions</p>
       <p>模型：{preview.basis.settings.model} · {preview.basis.settings.providerLabel}</p>
       <p>{preview.request.replacements.length} 类身份字段在本地替换，不发送真实映射。</p>
-      {preview.request.providedFacts.length>0&&<div aria-label="文案外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 p-2"><p className="font-semibold">本次外发 {preview.request.providedFacts.length} 条本人确认事实</p>{preview.request.providedFacts.map(r=><div key={r.id} className="border-t py-1 whitespace-pre-wrap break-words">{r.id}<div>{r.facts}</div><div className="text-slate-500">本地关联（不外发）：{r.label}</div></div>)}</div>}
+      {preview.request.providedFacts.length>0&&<div aria-label="文案外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 p-2"><p className="font-semibold">本次外发 {preview.request.providedFacts.length} 条本人确认事实</p>{preview.request.providedFacts.map(r=><div key={r.id} className="border-t py-1 whitespace-pre-wrap break-words">{r.id} · {r.label}<div>{r.facts}</div></div>)}</div>}
       <div className="max-h-64 space-y-1 overflow-auto rounded bg-slate-100 p-2"><p className="font-semibold">系统指令</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.systemPrompt}</pre><p className="font-semibold">发送内容</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.userPrompt}</pre></div>
       <div className="flex flex-wrap gap-2"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送文案给模型</button><button type="button" onClick={()=>setPreview(null)} className="rounded border px-2 py-1">取消文案发送</button></div>
     </section>}

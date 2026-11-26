@@ -78,11 +78,12 @@ export function appendSelectedFactSources(doc:ResumeDocument,map:AiFactSourceMap
   if(records.length>20||new Set(records.map(r=>r.id)).size!==records.length)throw new Error('事实选择重复或超过20条。');
   const keys=new Set(selectedKeys),sanitize=createAiTextSanitizer([doc,...additionalPrivateDocs]);
   const next={...map};
+  const blocks=collectEditableBlocks(doc);
   records.forEach((r,i)=>{
     const sources=next[r.blockKey];
     if(!keys.has(r.blockKey)||!isShareableFact(doc,r)||!sources)throw new Error('所选事实已撤销、不可外发或与当前主体不匹配。');
     next[r.blockKey]=[...sources,{
-      id:'record-'+(i+1),blockKey:r.blockKey,scope:'record',entity:r.entityId,label:'本人确认的事实',
+      id:'record-'+(i+1),blockKey:r.blockKey,scope:'record',entity:r.entityId,label:'本人确认的事实 · '+sanitize(blocks.find(b=>b.key===r.blockKey)?.label??'当前段落'),
       facts:sanitize([r.assertion,r.value,r.unit,r.timeframe].filter(Boolean).join('\n')),
       status:'user-confirmed',
     }];

@@ -130,11 +130,13 @@ describe('independent local fact bank',()=>{
     const target=await createTarget();
     await expect(bank.link({...linkInput(target,saved.revision,r.id),sensitivity:'shareable'})).rejects.toThrow('不能提升外发权限');
     for(const patch of [{company:'Changed entity'},{startDate:'2023.01'},{visible:false}]){
-      const changed=await store.saveResume('target',{...target,experience:target.experience.map(e=>e.id==='synthetic-exp'?{...e,...patch}:e)});
+      const current=await store.getResume('target');
+      const changed=await store.saveResume('target',{...current,experience:target.experience.map(e=>e.id==='synthetic-exp'?{...e,...patch}:e)});
       await expect(bank.link(linkInput(changed,saved.revision,r.id))).rejects.toThrow('主体、时间完全匹配');
     }
     const changedSource=await store.saveResume('synthetic',{...doc,experience:doc.experience.map(e=>({...e,position:'Changed origin'}))});
-    const clean=await createTarget();
+    const current=await store.getResume('target');
+    const clean=await store.saveResume('target',{...current,experience:target.experience});
     expect(changedSource.id).toBe(doc.id);
     await expect(bank.link(linkInput(clean,saved.revision,r.id))).rejects.toThrow('来源版本主体已变化');
     expect(await bank.get()).toEqual(saved);

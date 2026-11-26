@@ -18,7 +18,8 @@ const occurrences=(text:string,needle:string)=>text.split(needle).length-1;
 export function prepareCareerRefine(input:{document:ResumeDocument;kind:CareerAiKind;company:string;role:string;draftText:string;jdText:string;records?:readonly FactRecord[]}):CareerRefinePrepared{
   const {document,kind,draftText}=input;
   if(!draftText.trim())throw new Error('请先填写文案草稿。');
-  if(/\[\[LOCAL_|【隐私已省略】/.test(draftText))throw new Error('草稿含保留标记，请先整理。');
+  if(/\[\[LOCAL_|【隐私已省略】/i.test(draftText))throw new Error('草稿含保留标记，请先整理。');
+  if([input.company,input.role,input.jdText].some(s=>/\[\[LOCAL_/i.test(s)))throw new Error('岗位信息含保留隐私占位符，请先整理。');
   const {basic}=document;
   const sensitive=[basic.name,basic.email,basic.phone,basic.birthDate,basic.photo,basic.location,...basic.customFields.filter(f=>!f.visible).map(f=>f.value),...(!visibleBasicValue(document,'title')?[basic.title]:[]),...(!visibleBasicValue(document,'employmentStatus')?[basic.employmentStatus]:[])];
   const values=[...new Set(sensitive.map(s=>s.trim()).filter(s=>s.length>0&&s.length<=4096))].sort((a,b)=>b.length-a.length);
@@ -50,8 +51,10 @@ export function prepareCareerRefine(input:{document:ResumeDocument;kind:CareerAi
     const context=collectAiToolContext(document,[...new Set(records.map(r=>r.blockKey))],0,records);
     const rows=context.toolResults.inspect_block_facts.map(row=>{
       const sources=row.sources.filter(s=>s.scope==='record');
-      const label=context.toolResults.list_visible_blocks.find(b=>b.blockKey===row.blockKey)?.label??row.blockKey;
-      for(const s of sources)providedFacts.push({id:s.id,label,facts:s.facts});
+      for(const s of sources){
+        if(/\[\[LOCAL_/i.test(s.label+'\n'+s.facts))throw new Error('所选事实含保留隐私占位符，请先更正事实。');
+        providedFacts.push({id:s.id,label:s.label,facts:s.facts});
+      }
       return {blockKey:row.blockKey,sources};
     });
     options.userPrompt=JSON.stringify({...JSON.parse(options.userPrompt),toolResults:{inspect_block_facts:rows}},null,2);

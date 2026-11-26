@@ -40,11 +40,16 @@ describe('career scoped evidence',()=>{
     const p=prepareCareerRefine({...input,document:d,records:selection.records});
     const prompt=p.options.userPrompt;
     expect(prompt).toContain('核对 18 份合成资料');expect(p.providedFacts).toHaveLength(1);
-    for(const secret of [r.id,r.docId,r.blockKey,r.entityId,r.evidenceRef,'演示甲','示例学校','学习实验设计','整理记录'])expect(prompt).not.toContain(secret);
+    expect(p.providedFacts[0]?.label).toContain('教育经历 · 示例学校');
+    for(const secret of [r.id,r.docId,r.blockKey,r.entityId,r.evidenceRef,'演示甲','学习实验设计','整理记录'])expect(prompt).not.toContain(secret);
     expect(()=>assertBoundFactPrompt(d,selection.binding!,selection.records,prompt)).not.toThrow();
     expect(()=>assertBoundFactPrompt(d,selection.binding!,selection.records,prompt.replace('核对 18','核对 99'))).toThrow();
     const restored=restoreCareerRefine(JSON.parse(prompt).draftText+'\n核对 18 份合成资料',p);
     expect(restored.warnings.some(w=>w.token==='18')).toBe(true);
+  });
+  it('rejects reserved local identity markers in facts or unrelated job data',()=>{
+    for(const patch of [{company:'[[LOCAL_1]]'},{role:'[[local_1]]'},{jdText:'[[LOCAL_bad'}])expect(()=>prepareCareerRefine({...input,document:d,...patch})).toThrow('保留隐私占位符');
+    expect(()=>prepareCareerRefine({...input,document:d,records:[{...r,assertion:'测试 [[LOCAL_1]]'}]})).toThrow('保留隐私占位符');
   });
   it('rejects revoked, private and wrong-document records before preparation',()=>{
     for(const changed of [{...r,verifiedStatus:'revoked' as const},{...r,sensitivity:'local-only' as const},{...r,docId:'other'}])
