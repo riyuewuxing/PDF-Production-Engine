@@ -661,6 +661,48 @@ export class LocalResumeStore {
     };
   }
 
+  /** Snapshot paths are independent of the active document. Never follow a
+   * linked backup directory into another workspace. A missing directory is
+   * normal for listing; only creation may make ordinary directories. */
+  private async checkedSnapshotDir(rawSlug:string,create:boolean):Promise<{slug:string;dir:string}|null>{
+    const target=this.resolveSnapshotDir(rawSlug);
+    let root:string;
+    try{root=await fs.realpath(this.dataDir);}catch(err){if(isMissing(err)&&!create)return null;throw err;}
+    for(const p of [this.backupsDir,target.dir]){
+      if(create)await fs.mkdir(p).catch(err=>{if((err as NodeJS.ErrnoException).code!=='EEXIST')throw err;});
+      try{
+        const st=await fs.lstat(p);
+        const expected=path.join(root,path.relative(this.dataDir,p));
+        if(!st.isDirectory()||st.isSymbolicLink()||path.relative(expected,await fs.realpath(p))!==''){
+          throw new LocalFsApiError(422,'SNAPSHOT_UNSAFE','历史快照目录不安全，未读取、写入或清理。');
+        }
+      }catch(err){if(isMissing(err)&&!create)return null;throw err;}
+    }
+    const dir=await fs.realpath(target.dir);
+    return {slug:path.basename(dir),dir};
+  }
+
+  /** The filename, directory and embedded metadata must identify the same
+   * snapshot. Never use an unverified metadata ID as a deletion target. */
+  private async readSnapshotRecord(slug:string,dir:string,id:string):Promise<{meta:ResumeSnapshotMeta;document:ResumeDocument}>{
+    const file=resolveContainedPath(dir,id+'.json');
+    try{
+      const st=await fs.lstat(file);
+      if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||path.relative(file,await fs.realpath(file))!=='')throw Error('not an independent ordinary file');
+      const raw=JSON.parse(await fs.readFile(file,'utf8')) as {meta?:Partial<ResumeSnapshotMeta>;document?:unknown};
+      const meta=raw?.meta;
+      const sameSlug=typeof meta?.slug==='string'&&assertSafeSlug(meta.slug)===meta.slug&&
+        (process.platform==='win32'?meta.slug.toLowerCase()===slug.toLowerCase():meta.slug===slug);
+      if(!meta||meta.id!==id||!sameSlug||typeof meta.createdAt!=='string'||!Number.isFinite(Date.parse(meta.createdAt)))throw Error('metadata mismatch');
+      const document=ResumeDocumentSchema.parse(raw.document);
+      return {meta:{id,slug,createdAt:meta.createdAt,reason:typeof meta.reason==='string'?meta.reason:'自动快照',
+        templateId:document.templateId,title:document.title,charCount:countDocumentChars(document)},document};
+    }catch(err){
+      if(isMissing(err))throw new LocalFsApiError(404,'SNAPSHOT_NOT_FOUND','历史快照不存在或已变化。');
+      throw new LocalFsApiError(422,'SNAPSHOT_INVALID','历史快照文件损坏、标识不一致或路径不安全；原文件保留，未执行回滚。');
+    }
+  }
+
   async createSnapshot(
     rawSlug: string,
     reason = '手动创建快照',
@@ -678,16 +720,16 @@ export class LocalResumeStore {
     });
   }
   private async createSnapshotUnlocked(rawSlug:string,reason:string,docOverride?:ResumeDocument):Promise<ResumeSnapshotMeta>{
-    const { slug, dir } = this.resolveSnapshotDir(rawSlug);
     const sourceDoc = docOverride
       ? ResumeDocumentSchema.parse(docOverride)
-      : await this.getResume(slug);
-    await fs.mkdir(dir, { recursive: true });
+      : await this.getResume(rawSlug);
+    const checked=await this.checkedSnapshotDir(rawSlug,true);
+    if(!checked)throw new LocalFsApiError(422,'SNAPSHOT_UNSAFE','无法确认历史快照目录。');
+    const {slug,dir}=checked;
 
     const createdAt = new Date().toISOString();
     const stamp = createdAt.replace(/[:.]/g, '-');
-    const shortRand = Math.random().toString(36).slice(2, 6);
-    const id = `${stamp}-${shortRand}`;
+    const id = `${stamp}-${randomUUID()}`;
     const meta: ResumeSnapshotMeta = {
       id,
       slug,
@@ -699,6 +741,7 @@ export class LocalResumeStore {
     };
 
     const filePath = resolveContainedPath(dir, `${id}.json`);
+    if(await pathEntryExists(filePath))throw new LocalFsApiError(409,'SNAPSHOT_EXISTS','历史快照标识已占用，未覆盖。');
     await atomicWriteFile(
       filePath,
       `${JSON.stringify({ meta, document: sourceDoc }, null, 2)}\n`,
@@ -719,61 +762,38 @@ export class LocalResumeStore {
   }
 
   async listSnapshots(rawSlug: string): Promise<ResumeSnapshotMeta[]> {
-    const { slug, dir } = this.resolveSnapshotDir(rawSlug);
-    if (!(await fileExists(dir))) {
-      return [];
-    }
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    const metas: ResumeSnapshotMeta[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
-      const fullPath = resolveContainedPath(dir, entry.name);
-      try {
-        const raw = JSON.parse(await fs.readFile(fullPath, 'utf-8')) as {
-          meta?: Partial<ResumeSnapshotMeta>;
-          document?: unknown;
-        };
-        if (raw.meta && typeof raw.meta.id === 'string' && typeof raw.meta.createdAt === 'string') {
-          metas.push({
-            id: raw.meta.id,
-            slug: raw.meta.slug || slug,
-            reason: raw.meta.reason || '自动快照',
-            createdAt: raw.meta.createdAt,
-            templateId: (raw.meta.templateId as TemplateId) || 'left-right',
-            title: raw.meta.title || slug,
-            charCount: typeof raw.meta.charCount === 'number' ? raw.meta.charCount : 0,
-          });
-        }
-      } catch {
-        // Ignore unreadable backup file
+    const checked=await this.checkedSnapshotDir(rawSlug,false);
+    if(!checked)return [];
+    const {slug,dir}=checked;
+    const entries=await fs.readdir(dir,{withFileTypes:true});
+    const metas:ResumeSnapshotMeta[]=[];
+    for(const entry of entries){
+      if(!entry.isFile()||!entry.name.endsWith('.json'))continue;
+      const id=entry.name.slice(0,-5);
+      try{
+        if(assertSafeSnapshotId(id)!==id)continue;
+        metas.push((await this.readSnapshotRecord(slug,dir,id)).meta);
+      }catch{
+        // A corrupt/foreign record is preserved, never counted toward the
+        // retention cap and never used as the target of automatic deletion.
       }
     }
-    metas.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return metas;
+    return metas.sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)||b.id.localeCompare(a.id));
   }
 
-  async restoreSnapshot(rawSlug: string, rawSnapshotId: string, expectedRevision?: string): Promise<ResumeDocument> {
-    const { slug, dir } = this.resolveSnapshotDir(rawSlug);
-    const snapshotId = assertSafeSnapshotId(rawSnapshotId);
-    const snapPath = resolveContainedPath(dir, `${snapshotId}.json`);
-    if (!(await fileExists(snapPath))) {
-      throw new LocalFsApiError(404, 'SNAPSHOT_NOT_FOUND', `未找到历史快照: ${snapshotId}`);
-    }
-
-    const parsedRaw = JSON.parse(await fs.readFile(snapPath, 'utf-8')) as {
-      document?: unknown;
-    };
-    const restoredDoc = ResumeDocumentSchema.parse(parsedRaw.document);
-
-    // Always capture reversible pre-rollback backup if target file exists
-    const { filePath: targetPath } = this.resolveResumePath(slug);
-    return withResumeWriteLock(this.dataDir, async () => {
-      const current = await this.readOptionalResume(targetPath);
-      if (!current) throw new LocalFsApiError(404,'NOT_FOUND','当前简历不存在，请通过回收站恢复原版本。');
-      if (expectedRevision !== undefined) assertExpectedRevision(current, expectedRevision);
-      if (current.id !== restoredDoc.id) throw new LocalFsApiError(409,'DOCUMENT_ID_CONFLICT','该历史快照属于另一份简历，未覆盖当前版本。');
-      await this.createSnapshotUnlocked(slug, '回滚前自动备份', current);
-      return this.writeResume(targetPath, restoredDoc, current);
+  async restoreSnapshot(rawSlug:string,rawSnapshotId:string,expectedRevision?:string):Promise<ResumeDocument>{
+    const snapshotId=assertSafeSnapshotId(rawSnapshotId);
+    const {slug,filePath:targetPath}=this.resolveResumePath(rawSlug);
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const checked=await this.checkedSnapshotDir(slug,false);
+      if(!checked)throw new LocalFsApiError(404,'SNAPSHOT_NOT_FOUND','历史快照不存在。');
+      const restoredDoc=(await this.readSnapshotRecord(checked.slug,checked.dir,snapshotId)).document;
+      const current=await this.readOptionalResume(targetPath);
+      if(!current)throw new LocalFsApiError(404,'NOT_FOUND','当前简历不存在，请通过回收站恢复原版本。');
+      if(expectedRevision!==undefined)assertExpectedRevision(current,expectedRevision);
+      if(current.id!==restoredDoc.id)throw new LocalFsApiError(409,'DOCUMENT_ID_CONFLICT','该历史快照属于另一份简历，未覆盖当前版本。');
+      await this.createSnapshotUnlocked(slug,'回滚前自动备份',current);
+      return this.writeResume(targetPath,restoredDoc,current);
     });
   }
 
