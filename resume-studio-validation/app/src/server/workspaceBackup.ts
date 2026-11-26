@@ -196,3 +196,31 @@ export async function restoreWorkspaceBackup(workspace:string,backupFolder:strin
   });
   return {...checked.summary,folder};
 }
+
+/** Read the current managed data of an already restored workspace, not the old backup.
+ * A folder prefix is only a type hint; the actual data and containment are verified. */
+export async function inspectRestoredWorkspace(folder:string,signal:AbortSignal,currentWorkspace?:string){
+  const root=await actualDirectory(folder);
+  if(!path.basename(root).startsWith(RESTORE_PREFIX))throw new Error('请选择已恢复的独立工作区，不是原备份或普通目录。');
+  if(currentWorkspace){
+    const current=await actualDirectory(currentWorkspace);
+    if(inside(current,root)||inside(root,current))throw new Error('不能启动当前工作区或与其互相嵌套的目录。');
+  }
+  const data=await actualDirectory(path.join(root,'data'));
+  if(data!==path.join(root,'data'))throw new Error('恢复工作区数据目录不安全。');
+  for(const name of ['.electron-userdata','exports']){
+    try{await ordinaryChild(root,name,true);}catch(err){if(!missing(err))throw err;}
+  }
+  try{await ordinaryChild(data,'.ai-settings.json',false);}catch(err){if(!missing(err))throw err;}
+  return withResumeWriteLock(data,async()=>{
+    const files:BackupFile[]=[];
+    for(const relative of await scan(data,true,signal)){
+      const bytes=await readBounded(data,relative,MAX_BACKUP_FILE_BYTES,signal);
+      validateFile(relative,bytes);
+      files.push({path:relative,size:bytes.length,sha256:hash(bytes)});
+    }
+    const manifest=WorkspaceBackupManifestSchema.parse({format:'resume-studio-workspace',version:1,createdAt:new Date().toISOString(),files:files.sort(sort)});
+    const summary=await verifyFiles(data,manifest,true,signal);
+    return {root,summary,basis:hash(Buffer.from(JSON.stringify(manifest.files)))};
+  });
+}

@@ -8,7 +8,7 @@ import {
   PenLine,
   Stethoscope,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { JobCareerPane } from './components/Career/JobCareerPane';
 import { QuickLogApplicationModal } from './components/Career/QuickLogApplicationModal';
 import {
@@ -67,6 +67,8 @@ function buildDefaultGlobalSettings(doc: ResumeDocument): GlobalSettings {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<StudioNavTab>('edit');
+  const [workspaceContext,setWorkspaceContext]=useState<{folder:string;restored:boolean}|null>(null);
+  useEffect(()=>{let alive=true;void window.resumeDesktop?.workspaceBackup?.context?.().then(v=>{if(alive)setWorkspaceContext(v);}).catch(()=>{});return()=>{alive=false;};},[]);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isMasterMergeOpen, setIsMasterMergeOpen] = useState(false);
   const [isRedacted, setIsRedacted] = useState(false);
@@ -327,6 +329,10 @@ export default function App() {
     [activeSlug, activeDocRef, flushPendingSave, getCurrentRevision, handleImmediateChange],
   );
 
+  useEffect(()=>{
+    if(workspaceContext?.restored&&!loading&&!loadError&&activeDoc&&activeSlug)void window.resumeDesktop?.workspaceBackup?.editorReady?.(activeSlug,activeDoc.id).catch(()=>{});
+  },[workspaceContext,loading,loadError,activeSlug,activeDoc?.id]);
+
   const parsedRedactionTerms = useMemo(
     () => parseCustomRedactionTerms(redactionTermsInput),
     [redactionTermsInput],
@@ -420,6 +426,7 @@ export default function App() {
         onExportFormat={(format, saveAs) => void handleExportFormat(format, saveAs)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
+      {workspaceContext?.restored&&<div aria-label="独立恢复工作区标识" className="no-print flex shrink-0 flex-wrap items-center gap-x-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"><strong className="shrink-0">独立恢复工作区</strong><span className="min-w-0 break-all">{workspaceContext.folder}</span><span>编辑仅写入此副本；原工作区不受影响。</span></div>}
       {saveState==='error' && (
         <div role="alert" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-300 bg-red-50 px-4 py-2 text-xs text-red-900">
           <div className="min-w-0 flex-1 break-words">{saveError || '保存失败。'} 当前编辑仍在内存中；可以先另存草稿，不会覆盖原简历。</div>

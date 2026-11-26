@@ -10,7 +10,7 @@ import type {
 
 const bridge: ResumeDesktopBridge = {
   isDesktop: true,
-  workspaceBackup:{create:()=>ipcRenderer.invoke('workspaceBackup:create'),inspect:()=>ipcRenderer.invoke('workspaceBackup:inspect'),restore:(token,confirmation)=>ipcRenderer.invoke('workspaceBackup:restore',token,confirmation)},
+  workspaceBackup:{create:()=>ipcRenderer.invoke('workspaceBackup:create'),inspect:()=>ipcRenderer.invoke('workspaceBackup:inspect'),restore:(token,confirmation)=>ipcRenderer.invoke('workspaceBackup:restore',token,confirmation),context:()=>ipcRenderer.invoke('workspaceBackup:context'),editorReady:(slug,id)=>ipcRenderer.invoke('workspaceBackup:editorReady',slug,id),prepareLaunch:mode=>ipcRenderer.invoke('workspaceBackup:prepareLaunch',mode),launch:(token,confirmation)=>ipcRenderer.invoke('workspaceBackup:launch',token,confirmation)},
   resumes: {
     list: () => ipcRenderer.invoke('resumes:list'),
     get: (slug: string) => ipcRenderer.invoke('resumes:get', slug),

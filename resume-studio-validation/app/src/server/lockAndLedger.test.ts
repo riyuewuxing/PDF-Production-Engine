@@ -140,7 +140,7 @@ it('persists immutable job reviews with CAS and verified application snapshot li
   expect(await store.deleteApplicationSnapshot(logged.entry.snapshotId)).toEqual({deleted:true});
 });
 
-import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,inspectRestoredWorkspace} from './workspaceBackup';
 import {BACKUP_MANIFEST,managedBackupPath,WorkspaceBackupManifestSchema} from '../schema/workspaceBackupSchema';
 import {createHash} from 'node:crypto';
 async function backupFixture(){
@@ -255,5 +255,33 @@ describe('portable workspace backup',()=>{
     await expect(createWorkspaceBackup(f.root,f.dest,f.signal)).rejects.toThrow();
     expect(await fs.readdir(f.dest)).toEqual([]);
     expect(await fs.readFile(path.join(f.data,'master.json'),'utf8')).toBe('corrupt');
+  });
+});
+
+describe('restored workspace launch preparation',()=>{
+  it('requires a disjoint restored directory and fingerprints its current persisted data',async()=>{
+    const f=await backupFixture(),b=await createWorkspaceBackup(f.root,f.dest,f.signal),checked=await inspectWorkspaceBackup(b.folder,f.signal);
+    const restored=await restoreWorkspaceBackup(f.root,b.folder,checked.manifestHash,f.dest,f.signal);
+    const first=await inspectRestoredWorkspace(restored.folder,f.signal,f.root);
+    const same=await inspectRestoredWorkspace(restored.folder,f.signal,f.root);
+    expect(first.basis).toBe(same.basis);
+    await expect(inspectRestoredWorkspace(b.folder,f.signal,f.root)).rejects.toThrow('已恢复');
+    await expect(inspectRestoredWorkspace(restored.folder,f.signal,restored.folder)).rejects.toThrow('当前工作区');
+    await expect(inspectRestoredWorkspace(restored.folder,f.signal,f.dest)).rejects.toThrow('互相嵌套');
+    const store=new LocalResumeStore(path.join(restored.folder,'data'));
+    const original=await store.getResume('master');
+    await store.saveResume('master',{...original,title:'独立副本编辑'},{expectedRevision:resumeRevision(original)});
+    expect((await inspectRestoredWorkspace(restored.folder,f.signal,f.root)).basis).not.toBe(first.basis);
+    expect((await f.store.getResume('master')).title).not.toBe('独立副本编辑');
+  });
+  it('refuses missing and corrupt restored data, without initializing or repairing it',async()=>{
+    const f=await backupFixture(),empty=path.join(f.dest,'resume-studio-restored-v1-empty');
+    await fs.mkdir(empty);
+    await expect(inspectRestoredWorkspace(empty,f.signal,f.root)).rejects.toThrow();
+    expect(await fs.readdir(empty)).toEqual([]);
+    await fs.mkdir(path.join(empty,'data'));
+    await fs.writeFile(path.join(empty,'data','master.json'),'broken');
+    await expect(inspectRestoredWorkspace(empty,f.signal,f.root)).rejects.toThrow();
+    expect(await fs.readFile(path.join(empty,'data','master.json'),'utf8')).toBe('broken');
   });
 });

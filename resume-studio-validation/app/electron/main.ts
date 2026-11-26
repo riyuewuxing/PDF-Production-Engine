@@ -1,9 +1,11 @@
 import { BrowserWindow, app, dialog, ipcMain, nativeImage, protocol, shell, safeStorage, type IpcMainInvokeEvent } from 'electron';
 import { execFile } from 'node:child_process';
-import { promises as fs } from 'node:fs';
+import { promises as fs, lstatSync, realpathSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from '../src/server/workspaceBackup';
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,inspectRestoredWorkspace} from '../src/server/workspaceBackup';
+import {RESTORE_PREFIX} from '../src/schema/workspaceBackupSchema';
+import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace} from './workspaceLaunch';
 import { promisify } from 'node:util';
 import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
 import { z } from 'zod';
@@ -54,6 +56,16 @@ const resolvedPaths = resolveAppPaths({
 const rootDir = resolvedPaths.dataRootDir;
 const dataDir = resolvedPaths.dataDir;
 const exportsDir = resolvedPaths.exportsDir;
+const restoredWorkspace=path.basename(rootDir).startsWith(RESTORE_PREFIX);
+const launchHandoff=readLaunchHandoff(process.env);
+let launchReceiptSent=false,launchReceiptTask:Promise<void>|null=null;
+async function reportLaunch(status:'ready'|'failed',message?:string){
+  if(!launchHandoff||launchReceiptSent)return;
+  if(launchReceiptTask)return launchReceiptTask;
+  const task=writeLaunchReceipt(launchHandoff,{folder:rootDir,status,pid:process.pid,message}).then(()=>{launchReceiptSent=true;});
+  launchReceiptTask=task;
+  try{await task;}finally{if(launchReceiptTask===task)launchReceiptTask=null;}
+}
 const store = new LocalResumeStore(dataDir);
 const facts=new FactBankStore(store);
 const evidence=new EvidenceStore(store,facts);
@@ -472,6 +484,8 @@ async function authorizeShellFile(filePath:string):Promise<string> {
 
 let backupBusy=false;
 let inspectedBackup:{token:string;folder:string;manifestHash:string}|null=null;
+let lastRestoredFolder:string|null=null;
+let inspectedLaunch:{token:string;folder:string;basis:string}|null=null;
 async function runBackupOperation<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
   if(backupBusy)throw new Error('已有备份操作正在进行。');
   backupBusy=true;const ctl=new AbortController();
@@ -501,7 +515,36 @@ function registerIpcHandlers(): void {
     if(!basis||token!==basis.token||confirmation!=='RESTORE_TO_NEW_WORKSPACE')throw new Error('恢复前必须检查备份并明确确认创建新工作区。');
     inspectedBackup=null;
     const parent=await pickBackupFolder('选择恢复位置（仅新建独立工作区）');
-    return parent?await restoreWorkspaceBackup(rootDir,basis.folder,basis.manifestHash,parent,signal):null;
+    if(!parent)return null;
+    const result=await restoreWorkspaceBackup(rootDir,basis.folder,basis.manifestHash,parent,signal);
+    lastRestoredFolder=result.folder;return result;
+  }));
+  trustedEditorHandle('workspaceBackup:context',()=>({folder:rootDir,restored:restoredWorkspace}));
+  trustedEditorHandle('workspaceBackup:editorReady',async(_event,slug:unknown,id:unknown)=>{
+    if(!launchHandoff||launchReceiptSent)return;
+    if(typeof slug!=='string'||typeof id!=='string'||!restoredWorkspace)throw new Error('独立窗口就绪凭据不匹配。');
+    const actual=await store.getResume(slug);
+    if(actual.id!==id)throw new Error('独立窗口尚未确认加载目标简历。');
+    const owner=mainWindow;if(!owner||owner.isDestroyed())throw new Error('独立窗口尚未创建。');
+    if(!owner.isVisible())owner.show();
+    await reportLaunch('ready');
+  });
+  trustedEditorHandle('workspaceBackup:prepareLaunch',(_event,mode:unknown)=>runBackupOperation(async signal=>{
+    inspectedLaunch=null;
+    if(mode!=='last'&&mode!=='choose')throw new Error('未知的工作区打开方式。');
+    const folder=mode==='last'?lastRestoredFolder:await pickBackupFolder('选择已恢复的独立工作区（不是备份文件夹）');
+    if(!folder)return null;
+    const verified=await inspectRestoredWorkspace(folder,signal,rootDir),token=randomUUID();
+    inspectedLaunch={token,folder:verified.root,basis:verified.basis};
+    return {...verified.summary,folder:verified.root,token};
+  }));
+  trustedEditorHandle('workspaceBackup:launch',(_event,token:unknown,confirmation:unknown)=>runBackupOperation(async signal=>{
+    const basis=inspectedLaunch;
+    if(!basis||token!==basis.token||confirmation!=='OPEN_INDEPENDENT_WORKSPACE')throw new Error('打开前必须检查并明确确认独立工作区。');
+    inspectedLaunch=null;
+    const checked=await inspectRestoredWorkspace(basis.folder,signal,rootDir);
+    if(checked.basis!==basis.basis)throw new Error('恢复工作区数据已变化，请重新检查。');
+    return launchWorkspace({isPackaged:app.isPackaged,exePath:app.getPath('exe'),appDir:path.resolve(__dirname,'..'),env:process.env,root:checked.root,basis:checked.basis},signal);
   }));
   trustedEditorHandle('facts:get',()=>facts.get());
   trustedEditorHandle('facts:add',(_event,input:unknown)=>facts.add(input));
@@ -869,7 +912,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
     minWidth: 1080,
     minHeight: 720,
     show: false,
-    title: 'Resume Studio - 本地简历桌面工作台',
+    title: restoredWorkspace?'Resume Studio - 独立恢复工作区':'Resume Studio - 本地简历桌面工作台',
     icon: appIcon.isEmpty() ? undefined : appIcon,
     backgroundColor: '#11161f',
     autoHideMenuBar: true,
@@ -983,15 +1026,20 @@ export async function registerAssetProtocol(): Promise<void> {
 
 if (require.main === module) {
   if (process.env.RESUME_STUDIO_DATA_DIR?.trim()) {
-    app.setPath(
-      'userData',
-      path.join(path.resolve(process.env.RESUME_STUDIO_DATA_DIR.trim()), '.electron-userdata'),
-    );
+    const profile=path.join(rootDir,'.electron-userdata');
+    if(restoredWorkspace){
+      // Never create a new empty restored root or redirect its browser profile via a link.
+      if(realpathSync(rootDir)!==rootDir||!lstatSync(rootDir).isDirectory()||lstatSync(rootDir).isSymbolicLink()||
+         realpathSync(dataDir)!==dataDir||!lstatSync(dataDir).isDirectory()||lstatSync(dataDir).isSymbolicLink())throw new Error('恢复工作区目录不安全。');
+      mkdirSync(profile,{recursive:true});
+      if(!lstatSync(profile).isDirectory()||lstatSync(profile).isSymbolicLink()||realpathSync(profile)!==profile)throw new Error('恢复工作区的独立浏览器配置目录不安全。');
+    }
+    app.setPath('userData',profile);
   }
 
   const gotSingleInstanceLock = app.requestSingleInstanceLock();
   if (!gotSingleInstanceLock) {
-    app.quit();
+    void reportLaunch('failed','目标工作区已有运行实例，请查看现有窗口。').catch(()=>{}).finally(()=>app.quit());
   } else {
     app.on('second-instance', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1004,7 +1052,11 @@ if (require.main === module) {
     });
 
     app.whenReady().then(async () => {
-      await ensureInitialDataFromLegacy({ rootDir, force: false });
+      if(restoredWorkspace){
+        const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),120000);
+        try{const checked=await inspectRestoredWorkspace(rootDir,ctl.signal);if(launchHandoff&&checked.basis!==launchHandoff.basis)throw new Error('独立工作区启动前数据已变化，拒绝加载。');}
+        finally{clearTimeout(timer);}
+      }else{if(launchHandoff)throw new Error('独立启动目标不是恢复工作区。');await ensureInitialDataFromLegacy({ rootDir, force: false });}
       await registerAssetProtocol();
       registerIpcHandlers();
       await createMainWindow();
@@ -1014,6 +1066,10 @@ if (require.main === module) {
           void createMainWindow();
         }
       });
+    }).catch(async err=>{
+      const message=err instanceof Error?err.message:'工作区启动失败。';
+      await reportLaunch('failed',message).catch(()=>{});
+      dialog.showErrorBox('工作区启动失败',message);app.quit();
     });
 
     app.on('window-all-closed', () => {

@@ -1332,6 +1332,56 @@ async function run() {
     const cold=JSON.parse(fs.readFileSync(path.join(out,'workspace-restored-cold.json'),'utf8'));
     if(!cold.master||!cold.ledger||!cold.facts||!cold.evidence||cold.jobReviews<2||cold.pdfArchives<1)throw Error('restored workspace failed independent readback');
     checks.workspaceRestoredColdProcess=true;
+    // Use the production desktop IPC and the real independent application entry, not the cold harness.
+    const badLaunch=await js('window.resumeDesktop.workspaceBackup.launch("invalid","OPEN_INDEPENDENT_WORKSPACE").then(()=>false,()=>true)');
+    if(!badLaunch)throw Error('unprepared launch accepted');
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[backupFolder]});
+    await click('检查并打开已有恢复工作区');await until('backup folder is not runnable',()=>bodyHas('请选择已恢复的独立工作区'));
+    checks.workspaceLaunchRejectBackup=true;
+    await click('检查并打开刚恢复的工作区');await until('launch inspected',()=>bodyHas('独立工作区当前数据检查完成'));
+    if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="确认打开独立工作区")?.disabled===true'))throw Error('workspace launch confirmation missing');
+    await js('document.querySelector("[aria-label=\\"独立工作区打开确认\\"]")?.scrollIntoView({block:"center"})');
+    await capture('85-workspace-launch-review');
+    const restoredMaster=path.join(restoreFolder,'data','master.json');
+    fs.appendFileSync(restoredMaster,' ');
+    if(!await namedCheck('确认打开独立恢复工作区'))throw Error('missing launch checkbox');
+    await click('确认打开独立工作区');await until('stale launch refused',()=>bodyHas('恢复工作区数据已变化'));
+    await capture('86-workspace-launch-stale');
+    checks.workspaceLaunchStaleRejected=true;
+    fs.writeFileSync(restoredMaster,currentMaster);
+    await click('检查并打开刚恢复的工作区');await until('launch rechecked',()=>bodyHas('独立工作区当前数据检查完成'));
+    if(!await namedCheck('确认打开独立恢复工作区'))throw Error('missing fresh launch checkbox');
+    await click('确认打开独立工作区');
+    await until('production child editor ready',()=>bodyHas('独立恢复工作区已实际加载，新窗口就绪'),55000);
+    const pid=Number(await js('document.querySelector("[aria-label=\\"独立工作区进程 ID\\"]")?.textContent'));
+    if(!Number.isSafeInteger(pid)||pid<=0||pid===process.pid)throw Error('invalid child pid');
+    let childClosed=false;
+    try{
+      process.kill(pid,0);
+      if(!fs.existsSync(path.join(restoreFolder,'.electron-userdata'))||!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster)||providerCalls!==backupCalls)throw Error('independent launch changed source or shared user profile');
+      await js('document.querySelector("[aria-label=\\"独立工作区启动结果\\"]")?.scrollIntoView({block:"center"})');
+      await capture('87-workspace-launch-ready');
+      checks.workspaceLaunchProductionReady=true;
+      dialog.showOpenDialog=async()=>({canceled:false,filePaths:[restoreFolder]});
+      const inspected=await js('window.resumeDesktop.workspaceBackup.prepareLaunch("choose")');
+      if(!inspected?.token)throw Error('existing restored workspace could not be inspected');
+      const refused=await js('window.resumeDesktop.workspaceBackup.launch('+JSON.stringify(inspected.token)+',"OPEN_INDEPENDENT_WORKSPACE").then(()=>false,e=>String(e).includes("已有运行实例"))');
+      if(!refused)throw Error('duplicate restored workspace launch not rejected');
+      checks.workspaceLaunchDuplicateRefused=true;
+      // Close the actual child through its native window rather than using an in-process mock.
+      const cp=require('node:child_process');
+      const cmd='$p=Get-Process -Id '+pid+' -ErrorAction Stop; if(!$p.CloseMainWindow()){throw "no independent main window"}; $p.WaitForExit(8000)';
+      const closed=cp.execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',cmd],{encoding:'utf8',timeout:12000});
+      if(!closed.includes('True'))throw Error('independent window did not close');
+      childClosed=true;checks.workspaceLaunchNativeWindow=true;
+    }finally{if(!childClosed){try{process.kill(pid);}catch{}}}
+    // The backup remains untouched even after editing the restored copy.
+    const edit=JSON.parse(fs.readFileSync(restoredMaster,'utf8'));edit.title='独立恢复副本的编辑';fs.writeFileSync(restoredMaster,JSON.stringify(edit,null,2));
+    dialog.showOpenDialog=async()=>({canceled:false,filePaths:[restoreFolder]});
+    await click('检查并打开已有恢复工作区');await until('edited workspace reinspection',()=>bodyHas('独立工作区当前数据检查完成'));
+    if(!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster)||!fs.readFileSync(path.join(backupFolder,'data','master.json')).equals(currentMaster))throw Error('restored edit changed original or backup');
+    checks.workspaceLaunchEditedCopyAccepted=true;
+
   }finally{dialog.showOpenDialog=originalBackupDialog;fs.rmSync(backupParent,{recursive:true,force:true});}
 
   // At the very end, mutate only the isolated synthetic disk to simulate another process.
