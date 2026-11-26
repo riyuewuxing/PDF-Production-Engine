@@ -47,6 +47,69 @@ async function run() {
   win.setSize(1440, 920);
   await capture('01-workbench');
   checks.appLoaded = true;
+
+  // Real renderer controls -> save -> Electron IPC -> actual output files.
+  // Only synthetic names, data and paths are used.
+  const clickAria19=async label=>{
+    const found=await js('(()=>{const b=[...document.querySelectorAll("button[aria-label]")].find(e=>e.getAttribute("aria-label")==='+JSON.stringify(label)+');if(!b||b.disabled)return false;b.click();return true})()');
+    if(!found)throw Error('export visibility control missing: '+label);
+  };
+  const visible19=async (expected)=>{
+    const doc=await main.store.getResume('runner-fixture');
+    return ['name','title'].every(key=>doc.basic.fieldOrder.some(f=>f.key===key&&f.visible===expected))&&doc.basic.name===fixture.basic.name&&doc.basic.title===fixture.basic.title;
+  };
+  await clickAria19('隐藏姓名');
+  await clickAria19('隐藏职位');
+  await until('hidden name and role persisted',()=>visible19(false),15000);
+  await until('hidden-field save settled',()=>bodyHas('已保存至本地硬盘'),15000);
+  await capture('95-export-hidden-controls');
+  function docxXml19(zip){
+    let offset=0;
+    while(offset+30<=zip.length&&zip.readUInt32LE(offset)===0x04034b50){
+      const method=zip.readUInt16LE(offset+8),size=zip.readUInt32LE(offset+18);
+      const nameLength=zip.readUInt16LE(offset+26),extraLength=zip.readUInt16LE(offset+28);
+      const start=offset+30+nameLength+extraLength;
+      const name=zip.subarray(offset+30,offset+30+nameLength).toString('utf8');
+      if(name==='word/document.xml'){
+        const payload=zip.subarray(start,start+size);
+        if(method!==0&&method!==8)throw Error('unexpected Word ZIP method');
+        return (method===8?require('node:zlib').inflateRawSync(payload):payload).toString('utf8');
+      }
+      offset=start+size;
+    }
+    throw Error('Word document XML missing');
+  }
+  const artifacts19=path.join(out,'export-visibility');
+  fs.mkdirSync(artifacts19,{recursive:true});
+  for(const [label,ext,feedback,check] of [
+    ['Word 可编辑 (.docx)','.docx','已导出Word 文档','wordExportVisibility'],
+    ['Markdown (.md)','.md','已导出Markdown 文档','markdownExportVisibility'],
+    ['单文件网页主页 (.html)','.html','已导出离线网页主页','htmlExportVisibility'],
+  ]){
+    const existing=new Set(fs.existsSync(main.exportsDir)?fs.readdirSync(main.exportsDir):[]);
+    await clickAria19('更多导出格式');
+    await click(label);
+    await until('export UI success '+ext,()=>bodyHas(feedback),15000);
+    const added=fs.readdirSync(main.exportsDir).filter(n=>!existing.has(n)&&n.endsWith(ext));
+    if(added.length!==1)throw Error('expected exactly one new '+ext+' export: '+JSON.stringify(added));
+    const name=added[0],bytes=fs.readFileSync(path.join(main.exportsDir,name));
+    const content=ext==='.docx'?docxXml19(bytes):bytes.toString('utf8');
+    if(ext==='.docx'&&!content.includes('<w:document'))throw Error('Word document content missing');
+    for(const marker of [fixture.basic.name,fixture.basic.title,fixture.title]){
+      if(name.includes(marker)||content.includes(marker))throw Error('hidden or internal marker leaked in '+ext);
+    }
+    if(!content.includes(fixture.basic.email)||!content.includes(fixture.projects[0].name))throw Error('visible content dropped in '+ext);
+    if(!await visible19(false))throw Error('export changed persisted source visibility/data');
+    fs.writeFileSync(path.join(artifacts19,name),bytes);
+    checks[check]=true;
+    await capture('96-export-hidden-'+ext.slice(1));
+  }
+  await clickAria19('显示姓名');
+  await clickAria19('显示职位');
+  await until('visibility restored for existing regression',()=>visible19(true),15000);
+  await until('restored visibility save settled',()=>bodyHas('已保存至本地硬盘'),15000);
+  checks.exportVisibilitySourceRestored=true;
+
   // Inspect actual rendered header geometry, not screenshot existence alone.
   const headerGeometry=()=>js('(()=>{const h=document.querySelector("header[aria-label=\\"工作台顶栏\\"]");const rect=h.getBoundingClientRect();const nodes=[...h.querySelectorAll("button, select, [aria-label=\\"本地保存状态\\"]")].filter(e=>e.getClientRects().length);return {width:innerWidth,height:rect.height,overflow:nodes.filter(e=>{const r=e.getBoundingClientRect();return r.left<rect.left-1||r.right>rect.right+1||r.top<rect.top-1||r.bottom>rect.bottom+1||r.height<10;}).map(e=>e.innerText||e.getAttribute("aria-label")),saveHeight:h.querySelector("[aria-label=\\"本地保存状态\\"]").getBoundingClientRect().height,saveText:h.querySelector("[aria-label=\\"本地保存状态\\"]").innerText};})()');
   const resizeHeader=async width=>{win.setContentSize(width,860);await sleep(350);const g=await headerGeometry();if(g.overflow.length||g.saveHeight>32||!g.saveText.includes('已保存'))throw Error('header geometry failed '+JSON.stringify(g));return g;};
