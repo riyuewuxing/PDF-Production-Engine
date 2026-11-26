@@ -1332,6 +1332,12 @@ async function run() {
     const cold=JSON.parse(fs.readFileSync(path.join(out,'workspace-restored-cold.json'),'utf8'));
     if(!cold.master||!cold.ledger||!cold.facts||!cold.evidence||cold.jobReviews<2||cold.pdfArchives<1||!cold.restoredIdentity)throw Error('restored workspace failed independent readback');
     checks.workspaceRestoredColdProcess=true;
+    const feedbackVisible=selector=>js('(()=>{const e=document.querySelector('+JSON.stringify(selector)+');if(!e)return false;const r=e.getBoundingClientRect();if(r.width<=0||r.height<=0||r.left<0||r.top<0||r.right>innerWidth+1||r.bottom>innerHeight+1)return false;for(let p=e.parentElement;p;p=p.parentElement){const css=getComputedStyle(p),b=p.getBoundingClientRect();if(/auto|scroll|hidden|clip/.test(css.overflowY)&&(r.top<b.top-1||r.bottom>b.bottom+1))return false;}const center=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!center&&(center===e||e.contains(center));})()');
+    const feedbackAlert='[aria-label="工作区操作反馈"] [role="alert"]',feedbackStatus='[aria-label="工作区操作反馈"] [role="status"]';
+    await until('manual fallback collapsed',()=>js('document.querySelector("[aria-label=\\"工作区备份结果\\"] details")?.open===false'));
+    checks.workspaceManualFallbackCollapsed=true;
+    // Short and narrow actual content viewport. No test-side scroll after confirming launch.
+    win.setContentSize(1080,650);await sleep(350);
     // Use the production desktop IPC and the real independent application entry, not the cold harness.
     const badLaunch=await js('window.resumeDesktop.workspaceBackup.launch("invalid","OPEN_INDEPENDENT_WORKSPACE").then(()=>false,()=>true)');
     if(!badLaunch)throw Error('unprepared launch accepted');
@@ -1346,7 +1352,8 @@ async function run() {
     fs.appendFileSync(restoredMaster,' ');
     if(!await namedCheck('确认打开独立恢复工作区'))throw Error('missing launch checkbox');
     await click('确认打开独立工作区');await until('stale launch refused',()=>bodyHas('恢复工作区数据已变化'));
-    await capture('86-workspace-launch-stale');
+    await until('refusal actually visible without test scroll',()=>feedbackVisible(feedbackAlert));
+    await capture('86-workspace-launch-stale');checks.workspaceLaunchRefusalVisible=true;
     checks.workspaceLaunchStaleRejected=true;
     const staleToken=await js('window.resumeDesktop.workspaceBackup.prepareLaunch("last")');
     dialog.showOpenDialog=async()=>({canceled:true,filePaths:[]});
@@ -1365,8 +1372,11 @@ async function run() {
     try{
       process.kill(pid,0);
       if(!fs.existsSync(path.join(restoreFolder,'.electron-userdata'))||!fs.readFileSync(path.join(main.dataDir,'master.json')).equals(currentMaster)||providerCalls!==backupCalls)throw Error('independent launch changed source or shared user profile');
-      await js('document.querySelector("[aria-label=\\"独立工作区启动结果\\"]")?.scrollIntoView({block:"center"})');
-      await capture('87-workspace-launch-ready');
+      await until('success text actually visible without test scroll',()=>feedbackVisible(feedbackStatus));
+      await until('launch result actually visible without test scroll',()=>feedbackVisible('[aria-label="独立工作区启动结果"]'));
+      await capture('87-workspace-launch-ready');checks.workspaceLaunchReadyVisible=true;
+      win.setContentSize(1440,860);await sleep(350);
+      await until('success remains visible wide',()=>feedbackVisible(feedbackStatus));await capture('88-workspace-launch-ready-wide');checks.workspaceLaunchWideVisible=true;
       checks.workspaceLaunchProductionReady=true;
       dialog.showOpenDialog=async()=>({canceled:false,filePaths:[restoreFolder]});
       const inspected=await js('window.resumeDesktop.workspaceBackup.prepareLaunch("choose")');
