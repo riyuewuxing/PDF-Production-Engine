@@ -141,7 +141,6 @@ export default function App() {
     exportStatus,
     setExportStatus,
     lastExportedPdfSnapshot,
-    setLastExportedPdfSnapshot,
     invalidateExportFeedback,
     handleExportFormat,
   } = useResumeExport({

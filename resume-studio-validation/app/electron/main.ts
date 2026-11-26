@@ -750,7 +750,7 @@ function registerIpcHandlers(): void {
       if (options.saveAs && mainWindow) {
         const result = await dialog.showSaveDialog(mainWindow, {
           title: '导出求职自荐信 A4 PDF',
-          defaultPath: targetPath,
+          defaultPath: resolveUniqueExportPath(targetPath),
           filters: [{ name: 'PDF 文件', extensions: ['pdf'] }],
         });
         if (result.canceled || !result.filePath) {

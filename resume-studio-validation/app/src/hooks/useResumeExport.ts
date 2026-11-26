@@ -105,8 +105,8 @@ export function useResumeExport({
           setLastExportedPdfSnapshot(null);
           if (!jrRes.canceled) {
             setExportStatus({
-              type: 'ok',
-              text: `已导出标准 JSON Resume（仅可见内容；非完整备份）${suffix}：${jrRes.filePath ?? jrRes.fileName}`,
+              type: sameVersion()?'ok':'warn',
+              text: `已导出标准 JSON Resume（仅可见内容；非完整备份）${suffix}：${jrRes.filePath ?? jrRes.fileName}${sameVersion()?'':'。文件属于此前版本。'}`,
               filePath: jrRes.filePath,
             });
           }
