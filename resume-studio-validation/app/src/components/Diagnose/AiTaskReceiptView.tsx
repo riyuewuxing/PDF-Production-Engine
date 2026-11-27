@@ -13,7 +13,7 @@ export function failedAiTask(response:AiCompletionResult|undefined,error?:unknow
 export function AiTaskReceiptView({label,attempt}:{label:string;attempt:AiTaskReceipt|null}){
   if(!attempt)return null;
   const state=attempt.status;
-  return <section aria-label={label} data-attempt-state={state} className="space-y-1 break-words rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">
+  return <section aria-label={label} data-attempt-state={state} className="space-y-1 break-words rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700 studio-ui-border studio-ui-raised studio-ui-primary">
     <div className="font-semibold">{label}</div>
     {state==='received'?<><p>已收到模型响应；不代表内容真实、已批准或已应用。</p><div style={{overflowWrap:"anywhere"}}>{describeAiCompletionReceipt(attempt.receipt).map((line,i)=><p key={i}>{line}</p>)}</div></>:
       state==='rejected'?<><p>已收到模型响应，但本地未形成可用结果；不会自动重试。</p><div style={{overflowWrap:"anywhere"}}>{describeAiCompletionReceipt(attempt.receipt).map((line,i)=><p key={i}>{line}</p>)}</div></>:

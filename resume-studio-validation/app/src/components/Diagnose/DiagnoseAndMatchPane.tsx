@@ -593,7 +593,7 @@ export function DiagnoseAndMatchPane({
         </div>
       </div>
 
-      <div data-studio-region={subTab === 'hr' || subTab === 'ats' ? 'diagnose-body' : undefined} data-studio-surface={subTab === 'hr' || subTab === 'ats' ? 'panel' : undefined} data-studio-theme={subTab === 'hr' || subTab === 'ats' ? studioThemeId : undefined} style={subTab === 'hr' || subTab === 'ats' ? surfaceStyle(studioThemeId, 'panel') : undefined} className="flex-1 overflow-y-auto p-4 text-xs">
+      <div data-studio-region={subTab === 'jd' ? 'diagnose-jd' : subTab === 'ai' ? 'diagnose-ai' : 'diagnose-body'} data-studio-surface="panel" data-studio-theme={studioThemeId} style={surfaceStyle(studioThemeId, 'panel')} className="flex-1 overflow-y-auto p-4 text-xs">
         {subTab === 'hr' && (
           <div className="space-y-4">
             {/* Overall Score Card */}
@@ -667,41 +667,41 @@ export function DiagnoseAndMatchPane({
         {subTab === 'jd' && (
           <div className="space-y-4">
             <label className="flex flex-col gap-1.5">
-              <span className="font-semibold text-slate-800">粘贴目标岗位招聘 JD / 考编公告条件</span>
-              <textarea
+              <span className="font-semibold text-slate-800 studio-ui-primary">粘贴目标岗位招聘 JD / 考编公告条件</span>
+              <textarea data-studio-control="true"
                 rows={6}
                 data-native-undo="true"
                 value={jdText}
                 onChange={(e) => setJdText(e.target.value)}
                 placeholder="例如：招聘高中物理教师，要求硕士及以上学历，持有高中物理教师资格证，熟悉新高考课程标准与实验教学，具备班级管理、班主任经验或 AI 智慧课堂/可视化课件开发能力者优先..."
-                className="w-full rounded-lg border border-slate-200 p-2.5 text-xs leading-relaxed text-slate-900 focus:border-teal-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 p-2.5 text-xs leading-relaxed text-slate-900 focus:border-teal-500 focus:outline-none studio-ui-border studio-ui-primary studio-ui-focus-border"
               />
             </label>
 
             <JobNoticePdfPane jdText={jdText} origin={pdfOrigin} onConfirm={setJdText}/>
-            {jobRewriteApplied?.slug===activeSlug&&jobRewriteApplied.source===jdText&&sameJobReviewDocument(jobRewriteApplied.document,document)&&<p role="status" className="rounded border border-teal-200 bg-teal-50 p-2 text-teal-900">已将核对后的岗位定向正文修改提交至编辑器；保存以工作台状态为准。原岗位核对会话因简历变化失效，请重新分析。可使用 Ctrl+Z 撤回正文修改。</p>}
+            {jobRewriteApplied?.slug===activeSlug&&jobRewriteApplied.source===jdText&&sameJobReviewDocument(jobRewriteApplied.document,document)&&<p role="status" className="rounded border border-teal-200 bg-teal-50 p-2 text-teal-900 studio-ui-info-border studio-ui-info-surface studio-ui-info">已将核对后的岗位定向正文修改提交至编辑器；保存以工作台状态为准。原岗位核对会话因简历变化失效，请重新分析。可使用 Ctrl+Z 撤回正文修改。</p>}
             <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} pdfOrigin={pdfOrigin} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision} rewriteActions={{overflowPx,onFlushBeforeApply,getCurrentRevision,onImmediateChange:next=>{onImmediateChange(next);setJobRewriteApplied({slug:activeSlug,document:next,source:jdText});}}}/>
             {jdResult.totalKeywords > 0 ? (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 studio-ui-border studio-ui-raised">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">JD 关键词覆盖度雷达</span>
-                  <span className="rounded-full bg-teal-600 px-2.5 py-0.5 font-mono text-xs font-bold text-white">
+                  <span className="font-bold text-slate-900 studio-ui-primary">JD 关键词覆盖度雷达</span>
+                  <span className="rounded-full bg-teal-600 px-2.5 py-0.5 font-mono text-xs font-bold text-white studio-ui-fill studio-ui-on-fill">
                     {jdResult.coveragePercent}%（{jdResult.matchedCount}/{jdResult.totalKeywords}）
                   </span>
                 </div>
 
                 <div>
-                  <div className="mb-1.5 font-semibold text-emerald-700">
+                  <div className="mb-1.5 font-semibold text-emerald-700 studio-ui-success">
                     简历已命中（{jdResult.matchedKeywords.length}）
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {jdResult.matchedKeywords.length === 0 ? (
-                      <span className="text-[11px] text-slate-400">暂无直接命中关键词</span>
+                      <span className="text-[11px] text-slate-400 studio-ui-muted">暂无直接命中关键词</span>
                     ) : (
                       jdResult.matchedKeywords.map((kw) => (
                         <span
                           key={kw}
-                          className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 studio-ui-success-border studio-ui-success-surface studio-ui-success"
                         >
                           ✓ {kw}
                         </span>
@@ -711,17 +711,17 @@ export function DiagnoseAndMatchPane({
                 </div>
 
                 <div>
-                  <div className="mb-1.5 font-semibold text-amber-700">
+                  <div className="mb-1.5 font-semibold text-amber-700 studio-ui-warning">
                     JD 文字线索未命中（需先核实真实经历，{jdResult.missingKeywords.length}）
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {jdResult.missingKeywords.length === 0 ? (
-                      <span className="text-[11px] text-emerald-600">已覆盖提取的词语，不代表满足招聘条件。</span>
+                      <span className="text-[11px] text-emerald-600 studio-ui-success">已覆盖提取的词语，不代表满足招聘条件。</span>
                     ) : (
                       jdResult.missingKeywords.map((kw) => (
                         <span
                           key={kw}
-                          className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                          className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning"
                         >
                           + {kw}
                         </span>
@@ -731,7 +731,7 @@ export function DiagnoseAndMatchPane({
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-[11px] text-slate-400">
+              <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-[11px] text-slate-400 studio-ui-border studio-ui-muted">
                 在上方粘贴任意招聘 JD 文本，离线引擎将即刻分析关键词命中率。
               </div>
             )}
@@ -878,39 +878,39 @@ export function DiagnoseAndMatchPane({
 
         {subTab === 'ai' && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 studio-ui-border studio-ui-raised">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                  <ShieldCheck size={14} className="text-teal-600" />
+                <div className="flex items-center gap-1.5 font-semibold text-slate-800 studio-ui-primary">
+                  <ShieldCheck size={14} className="text-teal-600 studio-ui-info" />
                   AI 模型中心 · 多配置档案
                 </div>
-                <button
+                <button data-studio-control="true"
                   type="button"
                   onClick={() => setShowAiConfig((v) => !v)}
-                  className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
+                  className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-100 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
                 >
                   <KeyRound size={11} /> {showAiConfig ? '收起设置' : aiSettings.enabled ? '已启用 · 修改' : '去配置'}
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <p className="mt-1 text-[11px] text-slate-500 studio-ui-muted">
                 默认关闭。桌面端密钥由系统加密保护，已保存密钥不再回传界面；模型请求由主进程发送。浏览器模式不持久化密钥。技能版本：{AI_SKILL_VERSION}。
               </p>
 
-              {settingsError && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700">{settingsError}</div>}
+              {settingsError && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700 studio-ui-error-border studio-ui-error-surface studio-ui-error">{settingsError}</div>}
               {showAiConfig && (
-                <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-                  {catalog&&<div className="space-y-2 rounded border border-teal-200 bg-white p-2">
+                <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 studio-ui-border">
+                  {catalog&&<div className="space-y-2 rounded border border-teal-200 bg-white p-2 studio-ui-info-border studio-ui-surface">
                     <label className="block font-semibold">当前模型档案</label>
-                    <select aria-label="当前模型档案" value={aiSettings.profileId} disabled={profileBusy||testingConnection||polishing||tailoring} onChange={e=>{const id=e.target.value;void changeProfile(()=>apiClient.activateAiProfile(id));}} className="w-full rounded border border-slate-300 p-1.5">
+                    <select data-studio-control="true" aria-label="当前模型档案" value={aiSettings.profileId} disabled={profileBusy||testingConnection||polishing||tailoring} onChange={e=>{const id=e.target.value;void changeProfile(()=>apiClient.activateAiProfile(id));}} className="w-full rounded border border-slate-300 p-1.5 studio-ui-border">
                       {catalog.profiles.map(p=><option key={p.profileId} value={p.profileId}>{p.providerLabel} · {p.model}{p.enabled?'':'（未启用）'}</option>)}
                     </select>
-                    <button type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1">新建模型档案</button>
-                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700">删除档案</button></div>)}</div>
-                    <p className="text-[10px] text-slate-500">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
+                    <button data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1 studio-ui-info-border">新建模型档案</button>
+                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700 studio-ui-error">删除档案</button></div>)}</div>
+                    <p className="text-[10px] text-slate-500 studio-ui-muted">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
                    </div>}
-                   <input aria-label="模型档案名称" value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5" placeholder="档案名称"/>
-                   <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
-                    <input
+                   <input data-studio-control="true" aria-label="模型档案名称" value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5 studio-ui-border" placeholder="档案名称"/>
+                   <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800 studio-ui-primary">
+                    <input data-studio-control="true"
                       type="checkbox"
                       checked={aiSettings.enabled}
                       onChange={(e) =>
@@ -922,7 +922,7 @@ export function DiagnoseAndMatchPane({
 
                   <div className="flex flex-wrap gap-1">
                     {BYOK_PROVIDER_PRESETS.map((p) => (
-                      <button
+                      <button data-studio-control="true"
                         key={p.label}
                         type="button"
                         onClick={() =>
@@ -937,73 +937,73 @@ export function DiagnoseAndMatchPane({
                             clearApiKey: false,
                           }))
                         }
-                        className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100"
+                        className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
                       >
                         {p.label}
                       </button>
                     ))}
                   </div>
 
-                  <input
+                  <input data-studio-control="true"
                     type="text"
                     data-native-undo="true"
                     value={aiSettings.baseUrl}
                     onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value, deepseekThinking:undefined, apiKey: '', hasApiKey: false, clearApiKey: false }))}
                     placeholder="OpenAI 兼容 Base URL"
-                    className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                    className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <input
+                    <input data-studio-control="true"
                       type="password"
                       data-native-undo="true"
                       value={aiSettings.apiKey}
                       onChange={(e) => setAiSettings((prev) => ({ ...prev, apiKey: e.target.value, clearApiKey: false }))}
                       placeholder={aiSettings.hasApiKey && !aiSettings.clearApiKey ? '已保存密钥，留空保留' : 'API Key（Ollama 可留空）'}
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={aiSettings.model}
                       onChange={(e) => setAiSettings((prev) => ({ ...prev, model: e.target.value, deepseekThinking:supportsDeepSeekThinking(prev.baseUrl,e.target.value)?prev.deepseekThinking:undefined }))}
                       aria-label="模型名"
                       placeholder="模型名（如 deepseek-flash）"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
                   </div>
-                  {supportsDeepSeekThinking(aiSettings.baseUrl,aiSettings.model)&&<div className="space-y-1 rounded border border-slate-200 bg-white p-2">
-                    <label className="block text-[11px] font-semibold">DeepSeek 思考模式<select aria-label="DeepSeek 思考模式" value={aiSettings.deepseekThinking??'provider-default'} onChange={e=>setAiSettings(p=>({...p,deepseekThinking:e.target.value as ByokAiSettings['deepseekThinking']}))} className="mt-1 w-full rounded border p-1"><option value="disabled">关闭思考 · 短任务优先</option><option value="enabled">开启思考 · 可能更慢</option><option value="provider-default">服务商默认 · 不额外发送参数</option></select></label>
-                    <p className="text-[10px] text-slate-500">思考与正文共用输出预算；连接测试只发送固定合成文本（显式关闭时64 tokens，其余最多1024且不超过档案上限）。已有档案不会自动换模型。</p>
+                  {supportsDeepSeekThinking(aiSettings.baseUrl,aiSettings.model)&&<div className="space-y-1 rounded border border-slate-200 bg-white p-2 studio-ui-border studio-ui-surface">
+                    <label className="block text-[11px] font-semibold">DeepSeek 思考模式<select data-studio-control="true" aria-label="DeepSeek 思考模式" value={aiSettings.deepseekThinking??'provider-default'} onChange={e=>setAiSettings(p=>({...p,deepseekThinking:e.target.value as ByokAiSettings['deepseekThinking']}))} className="mt-1 w-full rounded border p-1 studio-ui-border"><option value="disabled">关闭思考 · 短任务优先</option><option value="enabled">开启思考 · 可能更慢</option><option value="provider-default">服务商默认 · 不额外发送参数</option></select></label>
+                    <p className="text-[10px] text-slate-500 studio-ui-muted">思考与正文共用输出预算；连接测试只发送固定合成文本（显式关闭时64 tokens，其余最多1024且不超过档案上限）。已有档案不会自动换模型。</p>
                   </div>}
-                  {/^deepseek-(chat|reasoner)$/.test(aiSettings.model.trim())&&/^(https:\/\/api\.deepseek\.com)(\/v1)?\/?$/.test(aiSettings.baseUrl.trim())&&<p className="rounded bg-amber-50 p-2 text-[11px] text-amber-900">旧模型名称已不在当前官方推荐列表。可按需手动改为 deepseek-flash 或 deepseek-v4-pro 后保存；不会自动修改现有档案。</p>}
+                  {/^deepseek-(chat|reasoner)$/.test(aiSettings.model.trim())&&/^(https:\/\/api\.deepseek\.com)(\/v1)?\/?$/.test(aiSettings.baseUrl.trim())&&<p className="rounded bg-amber-50 p-2 text-[11px] text-amber-900 studio-ui-warning-surface studio-ui-warning">旧模型名称已不在当前官方推荐列表。可按需手动改为 deepseek-flash 或 deepseek-v4-pro 后保存；不会自动修改现有档案。</p>}
                   {aiSettings.hasApiKey && (
-                    <label className="flex items-center gap-2 text-[11px] text-slate-600">
-                      <input type="checkbox" checked={Boolean(aiSettings.clearApiKey)}
+                    <label className="flex items-center gap-2 text-[11px] text-slate-600 studio-ui-muted">
+                      <input data-studio-control="true" type="checkbox" checked={Boolean(aiSettings.clearApiKey)}
                         onChange={(e) => setAiSettings(prev => ({ ...prev, clearApiKey: e.target.checked, apiKey: '' }))} />
                       保存时清除已有密钥
                     </label>
                   )}
                   <div className="grid grid-cols-3 gap-1">
-                    <label className="text-[10px]">输入字符预算<input aria-label="输入字符预算" type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1"/></label>
-                    <label className="text-[10px]">输出 tokens<input aria-label="输出 tokens" type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1"/></label>
-                    <label className="text-[10px]">超时（秒）<input aria-label="超时（秒）" type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1"/></label>
+                    <label className="text-[10px]">输入字符预算<input data-studio-control="true" aria-label="输入字符预算" type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">输出 tokens<input data-studio-control="true" aria-label="输出 tokens" type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">超时（秒）<input data-studio-control="true" aria-label="超时（秒）" type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1 studio-ui-border"/></label>
                   </div>
-                  <p className="text-[10px] text-slate-500">预算为本地上限，不代表该模型真实上下文能力；不自动重试其他接口。</p>
+                  <p className="text-[10px] text-slate-500 studio-ui-muted">预算为本地上限，不代表该模型真实上下文能力；不自动重试其他接口。</p>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-emerald-700">{settingsSavedMsg}</span>
-                    <button
+                    <span className="text-[11px] text-emerald-700 studio-ui-success">{settingsSavedMsg}</span>
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() => void handleSaveAiSettings()}
                        disabled={profileBusy||testingConnection||polishing||tailoring}
-                      className="rounded bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-800"
+                      className="rounded bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-800 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
                     >
                       保存本地配置
                     </button>
                   </div>
-                  <div className="rounded border border-teal-200 bg-white p-2 space-y-1">
-                    <p className="text-[10px] text-slate-500">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），输出上限为64或1024 tokens，并受档案上限约束。</p>
-                    <div className="flex items-center gap-2"><button type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50">测试模型连接</button>{testingConnection&&<button type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1">取消连接测试</button>}</div>
-                    {connectionTip&&<p role="status" className="text-emerald-700">{connectionTip}</p>}
+                  <div className="rounded border border-teal-200 bg-white p-2 space-y-1 studio-ui-info-border studio-ui-surface">
+                    <p className="text-[10px] text-slate-500 studio-ui-muted">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），输出上限为64或1024 tokens，并受档案上限约束。</p>
+                    <div className="flex items-center gap-2"><button data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50 studio-ui-info-border studio-ui-info">测试模型连接</button>{testingConnection&&<button data-studio-control="true" type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消连接测试</button>}</div>
+                    {connectionTip&&<p role="status" className="text-emerald-700 studio-ui-success">{connectionTip}</p>}
                      {connectionAttempt?.settings===aiSettings&&<AiTaskReceiptView label="连接测试调用回执" attempt={connectionAttempt.value}/>}
                   </div>
                 </div>
@@ -1011,51 +1011,51 @@ export function DiagnoseAndMatchPane({
             </div>
 
             {/* Mode Switch: Single-Block vs Whole-Resume JD Tailor */}
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium">
-              <button
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-medium studio-ui-border studio-ui-raised">
+              <button data-studio-control="true"
                 type="button"
                 disabled={polishing||tailoring||applying}
                 onClick={() => setAiSubMode('single')}
                 className={`rounded py-1.5 transition ${
-                  aiSubMode === 'single' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  aiSubMode === 'single' ? 'bg-white text-slate-900 shadow-xs studio-ui-selected studio-ui-selected-text' : 'text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary'
                 }`}
               >
                 单段精修
               </button>
-              <button
+              <button data-studio-control="true"
                 type="button"
                 disabled={polishing||tailoring||applying}
                 onClick={() => setAiSubMode('tailor')}
                 className={`rounded py-1.5 transition ${
-                  aiSubMode === 'tailor' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  aiSubMode === 'tailor' ? 'bg-white text-slate-900 shadow-xs studio-ui-selected studio-ui-selected-text' : 'text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary'
                 }`}
               >
                 整卷 JD 改写
               </button>
-              <button type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('assistant')} className={'rounded py-1.5 '+(aiSubMode==='assistant'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:bg-slate-100')}>AI 自由任务</button>
-              <button type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('layout')} className={'rounded py-1.5 '+(aiSubMode==='layout'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:bg-slate-100')}>AI 版式优化</button>
+              <button data-studio-control="true" type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('assistant')} className={'rounded py-1.5 '+(aiSubMode==='assistant'?'bg-white text-slate-900 shadow-xs studio-ui-selected studio-ui-selected-text':'text-slate-600 hover:bg-slate-100 studio-ui-muted studio-ui-hover')}>AI 自由任务</button>
+              <button data-studio-control="true" type="button" disabled={polishing||tailoring||applying} onClick={()=>setAiSubMode('layout')} className={'rounded py-1.5 '+(aiSubMode==='layout'?'bg-white text-slate-900 shadow-xs studio-ui-selected studio-ui-selected-text':'text-slate-600 hover:bg-slate-100 studio-ui-muted studio-ui-hover')}>AI 版式优化</button>
             </div>
             {aiSubMode==='layout'&&<AiLayoutPane document={document} slug={activeSlug} settings={aiSettings} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>} 
 
             {aiSubMode==='assistant'&&<ResumeAiAssistantPane document={document} slug={activeSlug} settings={aiSettings} jdText={jdText} overflowPx={overflowPx} onFlushBeforeApply={onFlushBeforeApply} getCurrentRevision={getCurrentRevision} onImmediateChange={onImmediateChange} assertSettings={assertPreviewSettings}/>}
             {(aiSubMode==='single'||aiSubMode==='tailor')&&<FactBankPane key={activeSlug+':'+document.id+':'+aiSubMode} document={document} slug={activeSlug} blocks={editableBlocks} keys={factKeys} bank={factBank} selected={factIds} locked={polishing||tailoring||applying||factsBusy||singleReview.busy||wholeReview.busy} onBank={bank=>{setFactBank(bank);setFactIds([]);clearTextApprovals();}} onSelected={ids=>{setFactIds(ids.filter(id=>factBank?.records.some(r=>r.id===id&&isShareableFact(document,r)&&factKeys.includes(r.blockKey))));clearTextApprovals();}} onBusy={setFactsBusy} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision}/>}
             {pendingRequest && (
-              <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800">
-                <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>
+              <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800 studio-ui-warning-border studio-ui-warning-surface studio-ui-primary">
+                <div className="font-bold text-amber-900 studio-ui-warning">发送前确认（尚未调用模型）</div>
                 <p>接收方：{validateByokBaseUrl(pendingRequest.settings.baseUrl).baseUrl}/chat/completions</p>
                 <p>模型：{pendingRequest.settings.model} · 档案：{pendingRequest.settings.providerLabel} · {aiThinkingLabel(pendingRequest.settings)}</p>
                  <p>{describeAiRequest(pendingRequest.settings,pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options)}</p>
                 <p>下方是本次实际发送的消息内容。基本联系方式、照片和已识别的隐私内容已尽量省略；仍请检查可见经历或 JD 中是否有其他敏感信息。密钥不在预览中。</p>
-                {pendingRequest.basis.selection.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 bg-white p-2 space-y-1"><div className="font-semibold">本次明确外发 {pendingRequest.basis.selection.records.length} 条本人确认事实（证据位置不外发）</div>{Object.values(pendingRequest.mode==='single'?pendingRequest.basis.sourceMap:pendingRequest.prepared.sourceMap).flat().filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1"><span className="text-teal-800">{s.id} · 本人确认</span><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}
-                <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-amber-200 bg-white p-2">
+                {pendingRequest.basis.selection.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 bg-white p-2 space-y-1 studio-ui-warning-border studio-ui-surface"><div className="font-semibold">本次明确外发 {pendingRequest.basis.selection.records.length} 条本人确认事实（证据位置不外发）</div>{Object.values(pendingRequest.mode==='single'?pendingRequest.basis.sourceMap:pendingRequest.prepared.sourceMap).flat().filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1 studio-ui-border"><span className="text-teal-800 studio-ui-info">{s.id} · 本人确认</span><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}
+                <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-amber-200 bg-white p-2 studio-ui-warning-border studio-ui-surface">
                   <div className="font-semibold">系统消息</div>
                   <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).systemPrompt}</pre>
                   <div className="mt-2 font-semibold">用户消息</div>
                   <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).userPrompt}</pre>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" disabled={factsBusy||polishing||tailoring||applying} onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white">确认发送给模型</button>
-                  <button type="button" onClick={()=>setPendingRequest(null)} className="rounded border border-slate-300 bg-white px-3 py-1.5">取消发送</button>
+                  <button data-studio-control="true" type="button" disabled={factsBusy||polishing||tailoring||applying} onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white studio-ui-fill studio-ui-on-fill">确认发送给模型</button>
+                  <button data-studio-control="true" type="button" onClick={()=>setPendingRequest(null)} className="rounded border border-slate-300 bg-white px-3 py-1.5 studio-ui-border studio-ui-surface">取消发送</button>
                 </div>
               </section>
             )}
@@ -1063,42 +1063,42 @@ export function DiagnoseAndMatchPane({
             {aiSubMode === 'tailor' && (
               <div className="space-y-3">
                 <label className="flex flex-col gap-1">
-                  <span className="font-semibold text-slate-800">目标岗位招聘 JD（与「JD 雷达」同步）</span>
-                  <textarea
+                  <span className="font-semibold text-slate-800 studio-ui-primary">目标岗位招聘 JD（与「JD 雷达」同步）</span>
+                  <textarea data-studio-control="true"
                     rows={4}
                     data-native-undo="true"
                     value={jdText}
                     onChange={(e) => setJdText(e.target.value)}
                     placeholder="请在此或「JD 雷达」粘贴目标岗位要求，AI 将针对性微调最多 8 个段落并通过 Fact Guard 核查数字/资质边界..."
-                    className="w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-900 focus:border-teal-500 focus:outline-none studio-ui-border studio-ui-primary studio-ui-focus-border"
                   />
                 </label>
 
-                <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] text-slate-700">
-                  <input
+                <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] text-slate-700 studio-ui-primary">
+                  <input data-studio-control="true"
                     type="checkbox"
                     checked={tailorUseMasterRef}
                     onChange={(e) => setTailorUseMasterRef(e.target.checked)}
-                    className="rounded border-slate-300"
+                    className="rounded border-slate-300 studio-ui-border"
                   />
                   <span>可选：仅参考母库中与本段主体及时间相同的可见经历（自述，须人工核实）</span>
                 </label>
 
                 <div className="flex items-center gap-2">
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     disabled={tailoring || applying || factsBusy}
                     onClick={() => void handlePrepareTailor()}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
                   >
                     <Wand2 size={13} />
                     {tailoring ? '正在分析整卷匹配与防编造检查...' : '生成整卷 JD 定向提案'}
                   </button>
                   {tailoring && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() => {tailorAbortRef.current?.abort();setWholeAttempt({status:'cancelled'});setTailorError(null);setPendingRequest(null);}}
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
                     >
                       <XCircle size={13} /> 取消
                     </button>
@@ -1107,21 +1107,21 @@ export function DiagnoseAndMatchPane({
 
                 {wholeBasis&&isCurrent(wholeBasis)&&<AiTaskReceiptView label="整卷调用回执" attempt={wholeAttempt}/>}
                 {tailorError && (
-                  <div role="alert" ref={tailorErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                  <div role="alert" ref={tailorErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 studio-ui-error-border studio-ui-error-surface studio-ui-error">
                     {tailorError}
                   </div>
                 )}
                 {tailorNotice && (
-                  <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800">
+                  <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800 studio-ui-success-border studio-ui-success-surface studio-ui-success">
                     {tailorNotice}
                   </div>
                 )}
 
                 {tailorProposals.length > 0 && (
                   <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 studio-ui-border studio-ui-raised">
                       <div className="flex flex-wrap gap-1.5">
-                        <button
+                        <button data-studio-control="true"
                           type="button"
                           disabled={applying}
                           onClick={() => {
@@ -1129,27 +1129,27 @@ export function DiagnoseAndMatchPane({
                               setTailorProposals(prev=>prev.map(p=>({...p,accepted:p.factWarnings.length===0})));
                             }
                           }}
-                          className="rounded border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50"
+                          className="rounded border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50 studio-ui-success-border studio-ui-surface studio-ui-success studio-ui-success-hover"
                         >
                           已核对后全选无机器预警项
                         </button>
-                        <button
+                        <button data-studio-control="true"
                           type="button"
                           disabled={applying}
                           onClick={() =>
                             setTailorProposals((prev) => prev.map((p) => ({ ...p, accepted: false })))
                           }
-                          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100"
+                          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-100 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
                         >
                           清空
                         </button>
                       </div>
 
-                      <button
+                      <button data-studio-control="true"
                         type="button"
                         disabled={applying || factsBusy || !tailorProposals.some((p) => p.accepted) || !wholeReview.canApply}
                         onClick={() => void handleApplyTailorProposals()}
-                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:opacity-40 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
                       >
                         <Check size={12} /> 应用已勾选的 {tailorProposals.filter((p) => p.accepted).length} 条修改
                       </button>
@@ -1164,13 +1164,13 @@ export function DiagnoseAndMatchPane({
                           key={proposal.id}
                           className={`rounded-xl border p-3 space-y-2 ${
                             proposal.factWarnings.length > 0
-                              ? 'border-amber-300 bg-amber-50/40'
-                              : 'border-slate-200 bg-white'
+                              ? 'border-amber-300 bg-amber-50/40 studio-ui-warning-border studio-ui-warning-surface'
+                              : 'border-slate-200 bg-white studio-ui-border studio-ui-surface'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <label className="flex cursor-pointer items-center gap-2 font-bold text-slate-900">
-                              <input
+                            <label className="flex cursor-pointer items-center gap-2 font-bold text-slate-900 studio-ui-primary">
+                              <input data-studio-control="true"
                                 type="checkbox"
                                 checked={proposal.accepted}
                                 disabled={applying}
@@ -1184,23 +1184,23 @@ export function DiagnoseAndMatchPane({
                                     ),
                                   );
                                 }}
-                                className="rounded border-slate-300"
+                                className="rounded border-slate-300 studio-ui-border"
                               />
                               <span>{proposal.label}</span>
                             </label>
-                            <button
+                            <button data-studio-control="true"
                               type="button"
                               onClick={() =>
                                 setTailorEditingKey(isEditing ? null : proposal.blockKey)
                               }
-                              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
+                              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50 studio-ui-border studio-ui-surface studio-ui-muted studio-ui-hover"
                             >
                               {isEditing ? '收起微调' : '手工微调'}
                             </button>
                           </div>
 
-                          <div className="text-[11px] text-slate-600">{proposal.reason}</div>
-                          <div className="rounded border border-slate-200 bg-slate-50 p-2 text-[10px] text-slate-600">
+                          <div className="text-[11px] text-slate-600 studio-ui-muted">{proposal.reason}</div>
+                          <div className="rounded border border-slate-200 bg-slate-50 p-2 text-[10px] text-slate-600 studio-ui-border studio-ui-raised studio-ui-muted">
                             事实来源（候选人自述，不是独立证明）：
                             {(tailorSources[proposal.blockKey] ?? []).map(source=>(
                               <div key={source.id}>{source.scope==='current'?'当前段落':source.scope==='record'?'本人确认事实':'同源母库'} · {source.label} · {source.id}{proposal.factIds.includes(source.id)?'（模型引用）':''}{source.scope==='record'&&<div className="whitespace-pre-wrap break-words">{source.facts}<div>本地证据：{wholeBasis?.selection.records[Number(source.id.slice(7))-1]?.evidenceRef}</div></div>}</div>
@@ -1213,7 +1213,7 @@ export function DiagnoseAndMatchPane({
                               {proposal.matchedJdKeywords.map((kw) => (
                                 <span
                                   key={kw}
-                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
+                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 studio-ui-success-border studio-ui-success-surface studio-ui-success"
                                 >
                                   + 命中 {kw}
                                 </span>
@@ -1222,9 +1222,9 @@ export function DiagnoseAndMatchPane({
                           )}
 
                           {proposal.factWarnings.length > 0 && (
-                            <div className="rounded-lg border border-amber-300 bg-amber-100/80 p-2 text-[11px] text-amber-900 space-y-1">
+                            <div className="rounded-lg border border-amber-300 bg-amber-100/80 p-2 text-[11px] text-amber-900 space-y-1 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">
                               <div className="flex items-center gap-1 font-bold">
-                                <ShieldAlert size={13} className="text-amber-700" />
+                                <ShieldAlert size={13} className="text-amber-700 studio-ui-warning" />
                                 Fact Guard 防编造预警（确认事实后逐项勾选）
                               </div>
                               {proposal.factWarnings.map((w, idx) => (
@@ -1236,7 +1236,7 @@ export function DiagnoseAndMatchPane({
                           )}
 
                           {isEditing ? (
-                            <textarea
+                            <textarea data-studio-control="true"
                               rows={4}
                               data-native-undo="true"
                               value={proposal.suggestedText}
@@ -1252,19 +1252,19 @@ export function DiagnoseAndMatchPane({
                                   ),
                                 );
                               }}
-                              className="w-full rounded border border-teal-300 bg-white p-2 text-[11px] text-slate-900 focus:outline-none"
+                              className="w-full rounded border border-teal-300 bg-white p-2 text-[11px] text-slate-900 focus:outline-none studio-ui-info-border studio-ui-surface studio-ui-primary"
                             />
                           ) : (
-                            <div className="space-y-0.5 rounded border border-slate-200 bg-white p-2 font-mono text-[10px]">
+                            <div className="space-y-0.5 rounded border border-slate-200 bg-white p-2 font-mono text-[10px] studio-ui-border studio-ui-surface">
                               {linesDiff.map((seg, i) => (
                                 <div
                                   key={i}
                                   className={
                                     seg.type === 'removed'
-                                      ? 'bg-red-50 text-red-700 line-through'
+                                      ? 'bg-red-50 text-red-700 line-through studio-ui-error-surface studio-ui-error'
                                       : seg.type === 'added'
-                                        ? 'bg-emerald-50 text-emerald-800'
-                                        : 'text-slate-500'
+                                        ? 'bg-emerald-50 text-emerald-800 studio-ui-success-surface studio-ui-success'
+                                        : 'text-slate-500 studio-ui-muted'
                                   }
                                 >
                                   {seg.type === 'removed' ? '- ' : seg.type === 'added' ? '+ ' : '  '}
@@ -1286,14 +1286,14 @@ export function DiagnoseAndMatchPane({
             {/* Polish Execution */}
             <div className="space-y-2.5">
               <label className="flex flex-col gap-1">
-                <span className="font-semibold text-slate-800">选择要润色的简历段落</span>
-                <select
+                <span className="font-semibold text-slate-800 studio-ui-primary">选择要润色的简历段落</span>
+                <select data-studio-control="true"
                   value={selectedBlock?.key ?? ''}
                   onChange={(e) => {
                     setSelectedBlockKey(e.target.value);
                     setSuggestedText(null);
                   }}
-                  className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
+                  className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                 >
                   {editableBlocks.map((b) => (
                     <option key={b.key} value={b.key}>
@@ -1311,14 +1311,14 @@ export function DiagnoseAndMatchPane({
                     ['concise', '精简控字'],
                   ] as const
                 ).map(([id, label]) => (
-                  <button
+                  <button data-studio-control="true"
                     key={id}
                     type="button"
                     onClick={() => setPolishMode(id)}
                     className={`rounded border py-1.5 font-medium ${
                       polishMode === id
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        ? 'border-slate-900 bg-slate-900 text-white studio-ui-selected-border studio-ui-fill studio-ui-on-fill'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover'
                     }`}
                   >
                     {label}
@@ -1326,19 +1326,19 @@ export function DiagnoseAndMatchPane({
                 ))}
               </div>
 
-              <button
+              <button data-studio-control="true"
                 type="button"
                 disabled={polishing || applying || factsBusy || !selectedBlock}
                 onClick={handlePreparePolish}
-                className="flex w-full items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-1.5 rounded-md bg-teal-600 py-2 font-semibold text-white hover:bg-teal-500 disabled:opacity-50 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
               >
                 <Wand2 size={13} /> {polishing ? '请求模型生成中...' : '生成润色对比 Diff'}
               </button>
 
-              {polishing&&<button type="button" onClick={()=>{polishAbortRef.current?.abort();setSingleAttempt({status:'cancelled'});setPolishError(null);}} className="rounded border px-2 py-1">取消单段请求</button>}
+              {polishing&&<button data-studio-control="true" type="button" onClick={()=>{polishAbortRef.current?.abort();setSingleAttempt({status:'cancelled'});setPolishError(null);}} className="rounded border px-2 py-1 studio-ui-border">取消单段请求</button>}
               {singleBasis&&isCurrent(singleBasis)&&<AiTaskReceiptView label="单段调用回执" attempt={singleAttempt}/>}
               {polishError && (
-                <div role="alert" ref={polishErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                <div role="alert" ref={polishErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 studio-ui-error-border studio-ui-error-surface studio-ui-error">
                   {polishError}
                 </div>
               )}
@@ -1346,60 +1346,60 @@ export function DiagnoseAndMatchPane({
 
             {/* Side-by-side / Line-by-line Diff Review */}
             {suggestedText !== null && selectedBlock && (
-              <div className="space-y-2.5 rounded-xl border border-teal-300 bg-teal-50/40 p-3">
+              <div className="space-y-2.5 rounded-xl border border-teal-300 bg-teal-50/40 p-3 studio-ui-info-border studio-ui-info-surface">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-teal-900">原文 vs 建议 Diff 审阅</span>
+                  <span className="font-bold text-teal-900 studio-ui-info">原文 vs 建议 Diff 审阅</span>
                   <div className="flex items-center gap-1.5">
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() => setSuggestedText(null)}
-                      className="rounded border border-slate-300 bg-white px-2.5 py-1 text-[11px] text-slate-600 hover:bg-slate-50"
+                      className="rounded border border-slate-300 bg-white px-2.5 py-1 text-[11px] text-slate-600 hover:bg-slate-50 studio-ui-border studio-ui-surface studio-ui-muted studio-ui-hover"
                     >
                       放弃
                     </button>
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       disabled={applying || factsBusy || !polishRiskConfirmed || !singleReview.canApply}
                       onClick={() => void handleAdoptDiff()}
-                      className="inline-flex items-center gap-1 rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-500"
+                      className="inline-flex items-center gap-1 rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-500 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
                     >
                       <Check size={12} /> 采纳替换（可 Ctrl+Z）
                     </button>
                   </div>
                 </div>
 
-                <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
+                <div className="space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">
                   <div>来源：当前所选段落（候选人自述）。数字检查不等于事实或语义验证，请核对主体、角色、时间及否定限定。</div>
-                  {singleBasis?.selection.records.map((r,i)=><div key={r.id} className="rounded border border-amber-200 p-1 break-words">提供给模型的事实 record-{i+1}：{r.assertion}<div>本地证据：{r.evidenceRef}（纯正文输出不代表模型逐条引用）</div></div>)}
+                  {singleBasis?.selection.records.map((r,i)=><div key={r.id} className="rounded border border-amber-200 p-1 break-words studio-ui-warning-border">提供给模型的事实 record-{i+1}：{r.assertion}<div>本地证据：{r.evidenceRef}（纯正文输出不代表模型逐条引用）</div></div>)}
                   {polishWarnings.map((warning, i) => <div key={i}>{warning.message}</div>)}
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={polishRiskConfirmed} disabled={applying}
+                    <input data-studio-control="true" type="checkbox" checked={polishRiskConfirmed} disabled={applying}
                       onChange={(e) => setPolishRiskConfirmed(e.target.checked)} />
                     我已核对以上事实，确认属实
                   </label>
                 </div>
                 <TextPdfReviewGate gate={singleReview} disabled={applying||!polishRiskConfirmed} label="试渲染单段提案"/>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="rounded border border-slate-200 bg-white p-2">
-                    <div className="mb-1 text-[10px] font-bold text-slate-500">当前原文</div>
-                    <div className="whitespace-pre-wrap text-[11px] text-slate-700">{selectedBlock.text}</div>
+                  <div className="rounded border border-slate-200 bg-white p-2 studio-ui-border studio-ui-surface">
+                    <div className="mb-1 text-[10px] font-bold text-slate-500 studio-ui-muted">当前原文</div>
+                    <div className="whitespace-pre-wrap text-[11px] text-slate-700 studio-ui-primary">{selectedBlock.text}</div>
                   </div>
-                  <div className="rounded border border-emerald-200 bg-emerald-50/60 p-2">
-                    <div className="mb-1 text-[10px] font-bold text-emerald-700">AI 建议版</div>
-                    <div className="whitespace-pre-wrap text-[11px] text-slate-900">{suggestedText}</div>
+                  <div className="rounded border border-emerald-200 bg-emerald-50/60 p-2 studio-ui-success-border studio-ui-success-surface">
+                    <div className="mb-1 text-[10px] font-bold text-emerald-700 studio-ui-success">AI 建议版</div>
+                    <div className="whitespace-pre-wrap text-[11px] text-slate-900 studio-ui-primary">{suggestedText}</div>
                   </div>
                 </div>
 
-                <div className="space-y-0.5 rounded border border-slate-200 bg-white p-2 font-mono text-[10px]">
+                <div className="space-y-0.5 rounded border border-slate-200 bg-white p-2 font-mono text-[10px] studio-ui-border studio-ui-surface">
                   {diffSegments.map((seg, i) => (
                     <div
                       key={i}
                       className={
                         seg.type === 'removed'
-                          ? 'bg-red-50 text-red-700 line-through'
+                          ? 'bg-red-50 text-red-700 line-through studio-ui-error-surface studio-ui-error'
                           : seg.type === 'added'
-                            ? 'bg-emerald-50 text-emerald-800'
-                            : 'text-slate-500'
+                            ? 'bg-emerald-50 text-emerald-800 studio-ui-success-surface studio-ui-success'
+                            : 'text-slate-500 studio-ui-muted'
                       }
                     >
                       {seg.type === 'removed' ? '- ' : seg.type === 'added' ? '+ ' : '  '}

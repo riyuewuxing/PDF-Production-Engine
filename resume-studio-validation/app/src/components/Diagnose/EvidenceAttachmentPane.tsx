@@ -65,56 +65,56 @@ export function EvidenceAttachmentPane(props:Props){
     if(!index||!rootOnly||!window.confirm('永久删除工作台管理的附件副本？不会删除你选择的原始文件，历史文件名、摘要和说明仍保留。此操作不可撤销。'))return;
     void task(async()=>{const value=await bridge!.purge({id:e.id,indexRevision:index.revision,confirmation:'DELETE_MANAGED_EVIDENCE_COPY'});if(mounted.current){update(value);setNotice('已删除工作台副本，保留历史索引。');}});
   };
-  return <section aria-label="本地证据附件索引" className="space-y-2 rounded border border-indigo-200 bg-indigo-50/50 p-2 break-words">
-    <div className="flex items-start justify-between gap-2"><div className="font-semibold text-indigo-900">本地证据附件索引</div><button type="button" disabled={locked} onClick={props.onClose} className="rounded border px-2 py-0.5">关闭附件索引</button></div>
+  return <section aria-label="本地证据附件索引" className="space-y-2 rounded border border-indigo-200 bg-indigo-50/50 p-2 break-words studio-ui-info-border studio-ui-info-surface">
+    <div className="flex items-start justify-between gap-2"><div className="font-semibold text-indigo-900 studio-ui-info">本地证据附件索引</div><button data-studio-control="true" type="button" disabled={locked} onClick={props.onClose} className="rounded border px-2 py-0.5 studio-ui-border">关闭附件索引</button></div>
     <div>事实：{props.fact.assertion}</div>
-    {!rootOnly&&<p className="text-indigo-900">跨版本关联：只读查看原始事实的附件；增删请管理原始记录。</p>}
+    {!rootOnly&&<p className="text-indigo-900 studio-ui-info">跨版本关联：只读查看原始事实的附件；增删请管理原始记录。</p>}
     <p>附件、文件名、说明和 SHA-256 仅存本地，不进入 AI 请求或简历导出。字节一致仅表示与导入副本相符，不代表内容真实或已独立鉴证。附件管理不改变既有事实外发授权。</p>
     {!bridge&&<p>当前仅桌面版支持本地附件管理。</p>}
-    <button type="button" disabled={locked||!bridge} onClick={refresh} className="rounded border bg-white px-2 py-1">加载 / 刷新附件索引</button>
+    <button data-studio-control="true" type="button" disabled={locked||!bridge} onClick={refresh} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">加载 / 刷新附件索引</button>
     <div className="flex flex-wrap gap-1">
-      <button type="button" disabled={locked||!bridge} onClick={()=>void task(async()=>{const value=await bridge!.audit();if(mounted.current)setAudit(value);})} className="rounded border bg-white px-2 py-1">核对本地附件目录</button>
-      <button type="button" disabled={locked||!bridge} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1">打开本地证据目录</button>
+      <button data-studio-control="true" type="button" disabled={locked||!bridge} onClick={()=>void task(async()=>{const value=await bridge!.audit();if(mounted.current)setAudit(value);})} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">核对本地附件目录</button>
+      <button data-studio-control="true" type="button" disabled={locked||!bridge} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">打开本地证据目录</button>
     </div>
-    {audit&&<div aria-label="本地附件目录核对结果" className="rounded border border-indigo-200 bg-white p-2 space-y-1">
+    {audit&&<div aria-label="本地附件目录核对结果" className="rounded border border-indigo-200 bg-white p-2 space-y-1 studio-ui-info-border studio-ui-surface">
       <div className="font-semibold">目录核对（全库，非全文哈希）</div>
       <div>普通文件 {audit.regularFiles} 个 · {sizeLabel(audit.totalBytes)} / {MAX_EVIDENCE_VAULT_BYTES/1048576} MB</div>
       <div>缺失副本 {audit.missingCopies} · 大小变化 {audit.sizeMismatches} · 未索引文件 {audit.unindexedFiles}</div>
       <div>异常项目 {audit.unsafeEntries} · 已删除记录残留 {audit.purgedResiduals}</div>
-      {audit.indexMissingWithFiles&&<p className="font-semibold text-red-800">证据索引缺失但目录仍有文件：已禁止新增附件。请先备份并恢复原索引，不自动重建。</p>}
-      <div className="text-slate-600">检查时间：{audit.checkedAt.replace('T',' ').slice(0,19)} UTC。仅报告，不自动删除或修复；同大小内容变化需逐个 SHA-256 校验。</div>
-      {(audit.missingCopies+audit.sizeMismatches+audit.unindexedFiles+audit.unsafeEntries+audit.purgedResiduals)>0&&<p className="text-amber-800">发现目录差异，请先核对并备份；系统未自动更改任何附件。</p>}
+      {audit.indexMissingWithFiles&&<p className="font-semibold text-red-800 studio-ui-error">证据索引缺失但目录仍有文件：已禁止新增附件。请先备份并恢复原索引，不自动重建。</p>}
+      <div className="text-slate-600 studio-ui-muted">检查时间：{audit.checkedAt.replace('T',' ').slice(0,19)} UTC。仅报告，不自动删除或修复；同大小内容变化需逐个 SHA-256 校验。</div>
+      {(audit.missingCopies+audit.sizeMismatches+audit.unindexedFiles+audit.unsafeEntries+audit.purgedResiduals)>0&&<p className="text-amber-800 studio-ui-warning">发现目录差异，请先核对并备份；系统未自动更改任何附件。</p>}
     </div>}
     {busy&&<p role="status">正在处理本地附件…</p>}
-    {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</div>}
-    {notice&&<div role="status" className="text-teal-800">{notice}</div>}
+    {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-800 studio-ui-error-surface studio-ui-error">{error}</div>}
+    {notice&&<div role="status" className="text-teal-800 studio-ui-info">{notice}</div>}
     {index&&<>
-      <div className="text-slate-600">有效关联 {rows.filter(e=>e.status==='attached').length} · 历史 {rows.filter(e=>e.status!=='attached').length} · 本地索引 {index.entries.length}/{MAX_EVIDENCE_RECORDS}</div>
-      <label className="block">搜索附件<input aria-label="搜索证据附件" value={query} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded border p-1.5" placeholder="名称、来源说明、格式、SHA-256"/></label>
+      <div className="text-slate-600 studio-ui-muted">有效关联 {rows.filter(e=>e.status==='attached').length} · 历史 {rows.filter(e=>e.status!=='attached').length} · 本地索引 {index.entries.length}/{MAX_EVIDENCE_RECORDS}</div>
+      <label className="block">搜索附件<input data-studio-control="true" aria-label="搜索证据附件" value={query} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded border p-1.5 studio-ui-border" placeholder="名称、来源说明、格式、SHA-256"/></label>
       <div aria-label="本地附件列表" className="max-h-64 space-y-2 overflow-auto">
         {!shown.length&&<p>没有匹配的附件记录。</p>}
-        {shown.map(e=><div key={e.id} className="space-y-1 rounded border bg-white p-2">
+        {shown.map(e=><div key={e.id} className="space-y-1 rounded border bg-white p-2 studio-ui-surface studio-ui-border">
           <div className="font-semibold">{e.originalName}</div>
           <div>{e.kind.toUpperCase()} · {sizeLabel(e.size)} · {e.status==='attached'?'有效关联':e.status==='detached'?'已解除关联，保留副本':'已删除副本，保留历史'}</div>
-          <div className="text-slate-600">{e.note||'（无补充说明）'}</div>
-          <div className="text-slate-600">SHA-256：<span className="font-mono break-all">{e.sha256}</span></div>
-          <div className="text-slate-600">导入：{e.createdAt.replace('T',' ').slice(0,19)} UTC</div>
-          {integrity[e.id]&&<div role="status" className={integrity[e.id]?.state==='intact'?'text-teal-800':'text-red-800'}>{INTEGRITY[integrity[e.id]!.state]} · {integrity[e.id]!.checkedAt.replace('T',' ').slice(0,19)} UTC</div>}
+          <div className="text-slate-600 studio-ui-muted">{e.note||'（无补充说明）'}</div>
+          <div className="text-slate-600 studio-ui-muted">SHA-256：<span className="font-mono break-all">{e.sha256}</span></div>
+          <div className="text-slate-600 studio-ui-muted">导入：{e.createdAt.replace('T',' ').slice(0,19)} UTC</div>
+          {integrity[e.id]&&<div role="status" className={integrity[e.id]?.state==='intact'?'text-teal-800 studio-ui-info':'text-red-800 studio-ui-error'}>{INTEGRITY[integrity[e.id]!.state]} · {integrity[e.id]!.checkedAt.replace('T',' ').slice(0,19)} UTC</div>}
           <div className="flex flex-wrap gap-1">
-            <button type="button" disabled={locked||e.status==='purged'} onClick={()=>verify(e)} className="rounded border px-2 py-1">校验副本 SHA-256</button>
-            <button type="button" disabled={locked||e.status==='purged'} onClick={()=>reveal(e)} className="rounded border px-2 py-1">在文件夹定位副本</button>
-            {rootOnly&&e.status==='attached'&&<button type="button" disabled={locked} onClick={()=>detach(e)} className="rounded border px-2 py-1 text-amber-800">解除附件关联</button>}
-            {rootOnly&&e.status==='detached'&&<button type="button" disabled={locked} onClick={()=>purge(e)} className="rounded border px-2 py-1 text-red-800">删除本地附件副本</button>}
+            <button data-studio-control="true" type="button" disabled={locked||e.status==='purged'} onClick={()=>verify(e)} className="rounded border px-2 py-1 studio-ui-border">校验副本 SHA-256</button>
+            <button data-studio-control="true" type="button" disabled={locked||e.status==='purged'} onClick={()=>reveal(e)} className="rounded border px-2 py-1 studio-ui-border">在文件夹定位副本</button>
+            {rootOnly&&e.status==='attached'&&<button data-studio-control="true" type="button" disabled={locked} onClick={()=>detach(e)} className="rounded border px-2 py-1 text-amber-800 studio-ui-warning studio-ui-border">解除附件关联</button>}
+            {rootOnly&&e.status==='detached'&&<button data-studio-control="true" type="button" disabled={locked} onClick={()=>purge(e)} className="rounded border px-2 py-1 text-red-800 studio-ui-error studio-ui-border">删除本地附件副本</button>}
           </div>
         </div>)}
       </div>
-      {canAttach?<div className="space-y-2 rounded border bg-white p-2">
+      {canAttach?<div className="space-y-2 rounded border bg-white p-2 studio-ui-surface studio-ui-border">
         <div className="font-semibold">关联新的本地文件</div>
         <p>支持 PDF、PNG、JPG、UTF-8 TXT；单文件 {MAX_EVIDENCE_FILE_BYTES/1048576} MB，目录最多 {MAX_EVIDENCE_VAULT_BYTES/1048576} MB。只复制明确选择的文件，不扫描目录、不自动打开附件。</p>
-        <label className="block">来源说明（可选）<textarea aria-label="附件来源说明" disabled={locked} rows={2} maxLength={500} value={note} onChange={e=>{setNote(e.target.value);setConsent(false);}} className="mt-1 w-full rounded border p-1.5"/></label>
-        <label className="flex items-start gap-1"><input type="checkbox" disabled={locked} checked={consent} onChange={e=>setConsent(e.target.checked)}/>我确认将选择的附件复制到本地并关联该事实，不允许自动外发</label>
-        <button type="button" disabled={locked||!consent||audit?.indexMissingWithFiles===true||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50">选择文件并关联证据</button>
-      </div>:<p className="text-slate-600">只有当前版本的有效原始事实可新增附件；历史或其他版本记录仍可本地追溯。</p>}
+        <label className="block">来源说明（可选）<textarea data-studio-control="true" aria-label="附件来源说明" disabled={locked} rows={2} maxLength={500} value={note} onChange={e=>{setNote(e.target.value);setConsent(false);}} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
+        <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={locked} checked={consent} onChange={e=>setConsent(e.target.checked)}/>我确认将选择的附件复制到本地并关联该事实，不允许自动外发</label>
+        <button data-studio-control="true" type="button" disabled={locked||!consent||audit?.indexMissingWithFiles===true||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">选择文件并关联证据</button>
+      </div>:<p className="text-slate-600 studio-ui-muted">只有当前版本的有效原始事实可新增附件；历史或其他版本记录仍可本地追溯。</p>}
     </>}
   </section>;
 }

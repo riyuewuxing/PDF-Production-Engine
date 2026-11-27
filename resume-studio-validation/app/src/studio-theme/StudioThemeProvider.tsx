@@ -27,3 +27,8 @@ export function useStudioTheme(): StudioThemeContextValue {
   if (!value) throw new Error('StudioThemeProvider missing');
   return value;
 }
+
+/** Optional read-only palette for independent review portals and standalone test fixtures. */
+export function useStudioThemeId(): StudioThemeId {
+  return useContext(Context)?.themeId ?? 'classic';
+}
