@@ -1,12 +1,14 @@
-import {formatAiCompletionReceipt,type AiCompletionReceipt,type AiCompletionResult} from '../../lib/byokAiClient';
+import {formatAiCompletionReceipt,AiGatewayError,type AiCompletionReceipt,type AiCompletionResult} from '../../lib/byokAiClient';
 
 /** Transient metadata only; never store model text, credentials, prompts or a billing estimate. */
 export type AiTaskReceipt = {status:'received'|'rejected';receipt:AiCompletionReceipt|null}|{status:'unconfirmed'|'cancelled'};
 export function receivedAiTask(response:AiCompletionResult):AiTaskReceipt{
   return {status:'received',receipt:response.receipt};
 }
-export function failedAiTask(response:AiCompletionResult|undefined):AiTaskReceipt{
-  return response?{status:'rejected',receipt:response.receipt}:{status:'unconfirmed'};
+export function failedAiTask(response:AiCompletionResult|undefined,error?:unknown):AiTaskReceipt{
+  if(response)return {status:'rejected',receipt:response.receipt};
+  if(error instanceof AiGatewayError&&error.receipt)return {status:'rejected',receipt:error.receipt};
+  return {status:'unconfirmed'};
 }
 export function AiTaskReceiptView({label,attempt}:{label:string;attempt:AiTaskReceipt|null}){
   if(!attempt)return null;

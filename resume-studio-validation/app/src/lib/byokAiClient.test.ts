@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {requestByokCompletionDirect,requestByokCompletionDirectWithReceipt,describeAiRequest,formatAiCompletionReceipt,supportsDeepSeekThinking,connectionProbeOptions,DEFAULT_BYOK_SETTINGS,type ByokAiSettings} from './byokAiClient';
+import {requestByokCompletionDirect,requestByokCompletionDirectWithReceipt,requestByokCompletionWithReceipt,AiGatewayError,describeAiRequest,formatAiCompletionReceipt,supportsDeepSeekThinking,connectionProbeOptions,DEFAULT_BYOK_SETTINGS,type ByokAiSettings} from './byokAiClient';
 const settings:ByokAiSettings={enabled:true,providerLabel:'Mock',baseUrl:'https://example.invalid/v1',apiKey:'synthetic-test-key',model:'mock',contextBudgetChars:1000,maxOutputTokens:128,timeoutMs:1000};
 const options={settings,systemPrompt:'system',userPrompt:'synthetic payload',maxTokens:300};
 afterEach(()=>vi.unstubAllGlobals());
@@ -95,5 +95,38 @@ describe('bounded completion receipts',()=>{
     expect(r.receipt?.completionTokens).toBeUndefined();
     expect(r.receipt?.totalTokens).toBeUndefined();
     expect(formatAiCompletionReceipt(r.receipt)).toContain('未报告');
+  });
+});
+
+describe('failure receipt compatibility',()=>{
+  it('keeps safe counters for a truncated or empty decoded reply, not the unusable partial text',async()=>{
+    const payload={model:'mock-v3',usage:{prompt_tokens:100,completion_tokens:128,total_tokens:228,prompt_cache_hit_tokens:0},choices:[{message:{content:'PRIVATE_PARTIAL_TEXT',reasoning_content:'PRIVATE_REASONING'},finish_reason:'length'}]};
+    const f=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(payload))).mockResolvedValueOnce(new Response(JSON.stringify({...payload,choices:[{message:{content:''}}]}))).mockResolvedValueOnce(new Response('provider private body',{status:429}));
+    vi.stubGlobal('fetch',f);
+    for(const code of ['LIMIT','FORMAT']){
+      const error=await requestByokCompletionDirectWithReceipt(options).catch(e=>e);
+      expect(error).toBeInstanceOf(AiGatewayError);
+      expect(error).toMatchObject({code,receipt:{requestedModel:'mock',reportedModel:'mock-v3',promptTokens:100,completionTokens:128,totalTokens:228,cachedInputTokens:0}});
+      expect(JSON.stringify(error)).not.toContain('PRIVATE_PARTIAL_TEXT');expect(JSON.stringify(error)).not.toContain('PRIVATE_REASONING');
+    }
+    const error=await requestByokCompletionDirectWithReceipt(options).catch(e=>e);
+    expect(error).toMatchObject({code:'HTTP'});expect(error.receipt).toBeUndefined();
+    expect(f).toHaveBeenCalledTimes(3);
+  });
+  it('selects structured failure transport before sending and never retries an error through older IPC',async()=>{
+    const receipt={requestedModel:'mock',reportedModel:'mock-v3',totalTokens:228,latencyMs:15,maxOutputTokens:128,timeoutMs:1000};
+    const newer=vi.fn(async()=>({ok:false,error:{code:'LIMIT',message:'bounded synthetic failure',receipt}}));
+    const older=vi.fn(),legacy=vi.fn(),cancel=vi.fn();
+    vi.stubGlobal('window',{resumeDesktop:{ai:{requestCompletionOutcome:newer,requestCompletionWithReceipt:older,requestCompletion:legacy,cancelCompletion:cancel}}});
+    const desktop={...options,settings:{...settings,apiKey:'',profileId:'test-profile',revision:'test-revision'}};
+    await expect(requestByokCompletionWithReceipt(desktop)).rejects.toMatchObject({code:'LIMIT',receipt});
+    expect(newer).toHaveBeenCalledTimes(1);expect(older).not.toHaveBeenCalled();expect(legacy).not.toHaveBeenCalled();
+  });
+  it('uses a previous bridge exactly once and does not invent a receipt for string compatibility',async()=>{
+    const legacy=vi.fn(async()=> 'old reply');
+    vi.stubGlobal('window',{resumeDesktop:{ai:{requestCompletion:legacy,cancelCompletion:vi.fn()}}});
+    const desktop={...options,settings:{...settings,apiKey:'',profileId:'test-profile',revision:'test-revision'}};
+    expect(await requestByokCompletionWithReceipt(desktop)).toEqual({text:'old reply',receipt:null});
+    expect(legacy).toHaveBeenCalledTimes(1);
   });
 });

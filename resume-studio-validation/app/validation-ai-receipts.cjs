@@ -87,7 +87,7 @@ async function run(){
     if(mode==='cancel'){await click(c.cancel);}
     if(mode==='stale'){await click('JD 雷达');await until('stale request aborted',()=>active.aborted);await sleep(100);assert(!await js('!!'+q(sel)),'stale result visible after leaving scope');await click('AI 润色 Diff');await click(c.tab);await until('task ready after stale response',()=>button(c.prepare));assert(!await js('!!'+q(sel)),'old receipt reappeared');report.checks.staleScopeDiscarded=true;}
     else{
-      const state=mode==='cancel'?'cancelled':mode==='http'||mode==='limit'?'unconfirmed':mode==='reject'||mode==='empty'?'rejected':'received';
+      const state=mode==='cancel'?'cancelled':mode==='http'?'unconfirmed':mode==='reject'||mode==='empty'||mode==='limit'?'rejected':'received';
       await until('receipt '+kind+' '+mode,()=>js(q(sel)+'?.dataset.attemptState==='+JSON.stringify(state)));
       const rendered=await js(q(sel)+'?.innerText||""');
       obs.state=state;obs.receipt=rendered;
@@ -117,7 +117,7 @@ async function run(){
   }
   await enter('single');await evaluate('single','unknown');await evaluate('single','http');await evaluate('single','limit');await evaluate('single','stale');
   await enter('whole');await evaluate('whole','empty');
-  report.checks.unknownMetadata=true;report.checks.httpAndLengthUnconfirmed=true;report.checks.noRetry=true;report.checks.zeroCandidateRejected=true;
+  report.checks.unknownMetadata=true;report.checks.httpUnconfirmedAndLengthReceipt=true;report.checks.noRetry=true;report.checks.zeroCandidateRejected=true;
   await verifyDisk();write();
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e?.message||'fixture failure').split(key).join('[redacted]').slice(0,400);write();app.exit(1)});

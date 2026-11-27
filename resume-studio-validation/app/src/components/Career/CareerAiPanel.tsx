@@ -82,7 +82,7 @@ export function CareerAiPanel(props:Props){
       if(!isCurrent(p.basis))throw new Error('原文已变化，已丢弃旧模型建议。');
       await assertFresh(p.basis);if(ctrl.signal.aborted)return;
       setProposal({...p,...restoreCareerRefine(response.text,p.request)});setAttempt({basis:p.basis,value:receivedAiTask(response)});
-    }catch(err){if(sameTextScope(p.basis)&&!ctrl.signal.aborted){if(isCurrent(p.basis))setAttempt({basis:p.basis,value:failedAiTask(response)});setError(localErrorMessage(err,'文案精修失败'));}}
+    }catch(err){if(sameTextScope(p.basis)&&!ctrl.signal.aborted){if(isCurrent(p.basis))setAttempt({basis:p.basis,value:failedAiTask(response,err)});setError(localErrorMessage(err,'文案精修失败'));}}
     finally{if(controller.current===ctrl){if(ctrl.signal.aborted&&isCurrent(p.basis))setAttempt({basis:p.basis,value:{status:'cancelled'}});controller.current=null;if(mounted.current)setBusy(false);}}
   };
   const apply=async()=>{

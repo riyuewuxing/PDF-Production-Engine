@@ -162,6 +162,8 @@ export interface AiCompletionReceipt {
   thinking?:'enabled'|'disabled';
 }
 export interface AiCompletionResult {text:string; receipt:AiCompletionReceipt|null}
+export type AiGatewayErrorCode='HTTP'|'FORMAT'|'LIMIT'|'TIMEOUT'|'CANCELLED'|'NETWORK';
+export type AiCompletionOutcome={ok:true;result:AiCompletionResult}|{ok:false;error:{code:AiGatewayErrorCode;message:string;receipt?:AiCompletionReceipt}};
 type CompletionParams=ByokCompletionOptions & {settings:ByokAiSettings; signal?:AbortSignal};
 export function resolveAiRequestLimits(settings:ByokAiSettings,options:Pick<ByokCompletionOptions,'maxTokens'|'timeoutMs'>){
   const limits=resolveAiLimits(settings);
@@ -176,7 +178,7 @@ export function formatAiCompletionReceipt(r:AiCompletionReceipt|null){
   const n=(v:number|undefined)=>v===undefined?'未报告':String(v);
   const model=r.reportedModel??'未报告';
   const mismatch=r.reportedModel&&r.reportedModel!==r.requestedModel?'（与请求不同；服务商报告值）':'';
-  return '请求：'+r.requestedModel+' · 返回模型：'+model+mismatch+'；输入 '+n(r.promptTokens)+' / 输出 '+n(r.completionTokens)+' / 合计 '+n(r.totalTokens)+' tokens；缓存命中输入 '+n(r.cachedInputTokens)+'；耗时 '+r.latencyMs+' ms。用量以服务商报告为准，非账单金额。';
+  return '请求：'+r.requestedModel+' · 返回模型：'+model+mismatch+'；输入 '+n(r.promptTokens)+' / 输出 '+n(r.completionTokens)+' / 合计 '+n(r.totalTokens)+' tokens；缓存命中输入 '+n(r.cachedInputTokens)+'；耗时 '+r.latencyMs+' ms；实际请求上限 '+r.maxOutputTokens+' 输出 tokens / '+r.timeoutMs/1000+' 秒；思考：'+(r.thinking==='enabled'?'开启（显式）':r.thinking==='disabled'?'关闭（显式）':'服务商默认')+'。用量以服务商报告为准，非账单金额。';
 }
 export async function requestByokCompletion(params:CompletionParams):Promise<string>{
   return (await requestByokCompletionWithReceipt(params)).text;
@@ -198,7 +200,13 @@ export async function requestByokCompletionWithReceipt(params:CompletionParams):
   try {
     const request={...options,requestId,profile:{baseUrl:validateByokBaseUrl(settings.baseUrl).baseUrl,model:settings.model.trim(),profileId:settings.profileId,revision:settings.revision}};
     // Compatibility is decided before calling. Never retry an unsuccessful paid call.
-    const result=bridge.requestCompletionWithReceipt?await bridge.requestCompletionWithReceipt(request):{text:await bridge.requestCompletion(request),receipt:null};
+    let result:AiCompletionResult;
+    if(bridge.requestCompletionOutcome){
+      const outcome=await bridge.requestCompletionOutcome(request);
+      if(signal?.aborted)throw new DOMException('请求已取消','AbortError');
+      if(!outcome.ok)throw new AiGatewayError(outcome.error.code,outcome.error.message,outcome.error.receipt);
+      result=outcome.result;
+    }else result=bridge.requestCompletionWithReceipt?await bridge.requestCompletionWithReceipt(request):{text:await bridge.requestCompletion(request),receipt:null};
     if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
     return result;
   } finally {
@@ -273,15 +281,18 @@ export async function requestByokCompletionDirectWithReceipt(params:CompletionPa
     catch(err){if(controller.signal.aborted)throw err;throw new AiGatewayError('FORMAT','模型响应格式异常或超过安全大小限制。');}
     const content=payload?.choices?.[0]?.message?.content;
     const result=typeof content==='string'?content.trim():'';
-    if(payload?.choices?.[0]?.finish_reason==='length')throw new AiGatewayError('LIMIT','模型输出达到长度上限，未返回完整结果。');
-    if (!result) throw new AiGatewayError('FORMAT','模型未返回有效文本内容。');
     if(controller.signal.aborted)throw new Error('aborted');
     const token=(v:unknown):number|undefined=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0?v:undefined;
     const requestedModel=settings.model.trim();
     const reported=payload?.model;
     const safeModel=typeof reported==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/.test(reported)&&(!settings.apiKey.trim()||!reported.includes(settings.apiKey.trim()))?reported:undefined;
     const usage=payload?.usage;
-    return {text:result,receipt:{requestedModel,reportedModel:safeModel,promptTokens:token(usage?.prompt_tokens),completionTokens:token(usage?.completion_tokens),totalTokens:token(usage?.total_tokens),cachedInputTokens:token(usage?.prompt_cache_hit_tokens)??token(usage?.prompt_tokens_details?.cached_tokens),latencyMs:Math.max(0,Math.round(performance.now()-started)),maxOutputTokens:outputBudget,timeoutMs:deadlineMs,thinking}};
+    const receipt:AiCompletionReceipt={requestedModel,reportedModel:safeModel,promptTokens:token(usage?.prompt_tokens),completionTokens:token(usage?.completion_tokens),totalTokens:token(usage?.total_tokens),cachedInputTokens:token(usage?.prompt_cache_hit_tokens)??token(usage?.prompt_tokens_details?.cached_tokens),latencyMs:Math.max(0,Math.round(performance.now()-started)),maxOutputTokens:outputBudget,timeoutMs:deadlineMs,thinking};
+    // Preserve safe provider metadata for a received JSON reply even when its text cannot be used.
+    // Raw partial text and reasoning never travel in an error outcome.
+    if(payload?.choices?.[0]?.finish_reason==='length')throw new AiGatewayError('LIMIT','模型输出达到长度上限，未返回完整结果。',receipt);
+    if (!result) throw new AiGatewayError('FORMAT','模型未返回有效文本内容。',receipt);
+    return {text:result,receipt};
   } catch(err){
     if(timedOut)throw new AiGatewayError('TIMEOUT','模型请求达到超时上限，已停止等待。');
     if(signal?.aborted||controller.signal.aborted)throw new AiGatewayError('CANCELLED','模型请求已取消。');
@@ -302,7 +313,7 @@ export function resolveAiLimits(settings:ByokAiSettings){
     timeoutMs:check(settings.timeoutMs,DEFAULT_AI_LIMITS.timeoutMs,1000,120000)};
 }
 export class AiGatewayError extends Error{
-  constructor(readonly code:'HTTP'|'FORMAT'|'LIMIT'|'TIMEOUT'|'CANCELLED'|'NETWORK',message:string){super(message);this.name='AiGatewayError';}
+  constructor(readonly code:AiGatewayErrorCode,message:string,readonly receipt?:AiCompletionReceipt){super(message);this.name='AiGatewayError';}
 }
 async function readBoundedJson(response:Response):Promise<unknown>{
   // The stream limit applies to actual HTTP responses, including chunked bodies.

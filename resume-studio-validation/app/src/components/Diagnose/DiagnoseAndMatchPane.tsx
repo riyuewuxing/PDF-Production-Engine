@@ -367,7 +367,7 @@ export function DiagnoseAndMatchPane({
       setSuggestedText(output);setSingleAttempt(receivedAiTask(response));
     } catch (err) {
       if (polishAbortRef.current === controller && isCurrent(basis) && !controller.signal.aborted) {
-        setSingleAttempt(failedAiTask(response));
+        setSingleAttempt(failedAiTask(response,err));
         setPolishError(err instanceof Error ? err.message : '润色请求失败');
       }
     } finally {
@@ -473,7 +473,7 @@ export function DiagnoseAndMatchPane({
       setTailorNotice((res.proposals.length===0?'模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。 ':'')+formatProposalDiagnostics(res.diagnostics));
     } catch (err) {
       if (tailorAbortRef.current !== controller || !isCurrent(basis) || controller.signal.aborted) return;
-      setWholeAttempt(failedAiTask(response));
+      setWholeAttempt(failedAiTask(response,err));
       setTailorError(err instanceof Error ? err.message : '整卷定向改写失败');
     } finally {
       if (tailorAbortRef.current === controller && mountedRef.current) setTailoring(false);

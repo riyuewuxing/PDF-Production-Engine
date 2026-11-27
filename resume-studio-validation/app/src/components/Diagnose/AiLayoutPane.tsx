@@ -43,7 +43,7 @@ export function AiLayoutPane(props:Props){
       const proposal=parseLayoutProposal(response.text,req.basis.allowTemplate);
       setCandidate({basis:req.basis,proposal,next:previewLayoutProposal(req.basis.document,proposal,req.basis.allowTemplate)});
       setAttempt({basis:req.basis,value:receivedAiTask(response)});
-    }catch(err){if(same(req.basis)&&!controller.signal.aborted){setAttempt({basis:req.basis,value:failedAiTask(response)});setError(localErrorMessage(err,'版式提案失败'));}}
+    }catch(err){if(same(req.basis)&&!controller.signal.aborted){setAttempt({basis:req.basis,value:failedAiTask(response,err)});setError(localErrorMessage(err,'版式提案失败'));}}
     finally{if(controller.signal.aborted&&same(req.basis))setAttempt({basis:req.basis,value:{status:'cancelled'}});
       ctrl.current=null;active.current=false;if(mounted.current)setBusy(null);}
   };

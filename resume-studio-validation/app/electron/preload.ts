@@ -74,6 +74,7 @@ const bridge: ResumeDesktopBridge = {
     saveSettings: (settings) => ipcRenderer.invoke('ai:saveSettings', settings),
     requestCompletion: (request) => ipcRenderer.invoke('ai:requestCompletion', request),
     requestCompletionWithReceipt: request=>ipcRenderer.invoke('ai:requestCompletionWithReceipt',request),
+    requestCompletionOutcome: request=>ipcRenderer.invoke('ai:requestCompletionOutcome',request),
     cancelCompletion: (requestId) => ipcRenderer.invoke('ai:cancelCompletion', requestId),
   },
   shell: {

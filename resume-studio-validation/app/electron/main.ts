@@ -7,7 +7,7 @@ import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,insp
 import {RESTORE_PREFIX} from '../src/schema/workspaceBackupSchema';
 import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace,recordLaunchStage,shouldBootstrapWorkspace} from './workspaceLaunch';
 import { promisify } from 'node:util';
-import { requestByokCompletionDirectWithReceipt, validateByokBaseUrl } from '../src/lib/byokAiClient';
+import { requestByokCompletionDirectWithReceipt, validateByokBaseUrl,AiGatewayError,type AiCompletionOutcome } from '../src/lib/byokAiClient';
 import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
 import {FactBankStore} from '../src/server/factBankStore';
@@ -936,6 +936,11 @@ function registerIpcHandlers(): void {
   };
   trustedEditorHandle('ai:requestCompletion',async (_event,raw:unknown)=>(await completeAiRequest(raw)).text);
   trustedEditorHandle('ai:requestCompletionWithReceipt',async (_event,raw:unknown)=>completeAiRequest(raw));
+  // Additive structured error channel; retain both existing throwing contracts.
+  trustedEditorHandle('ai:requestCompletionOutcome',async (_event,raw:unknown):Promise<AiCompletionOutcome>=>{
+    try{return {ok:true,result:await completeAiRequest(raw)};}
+    catch(err){if(err instanceof AiGatewayError)return {ok:false,error:{code:err.code,message:err.message,receipt:err.receipt}};throw err;}
+  });
 
   trustedEditorHandle('ai:cancelCompletion', (_event, requestId: string) => {
     if (typeof requestId === 'string') aiRequests.get(requestId)?.abort();
