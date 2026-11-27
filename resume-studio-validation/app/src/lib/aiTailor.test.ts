@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { prepareTailorRequest, generateTailorProposals, parseTailorProposalsResponse, scanFactGuardWarnings, scanScopedProposalWarnings } from './aiTailor';
+import { prepareTailorRequest, generateTailorProposals, analyzeTailorProposalsResponse, formatProposalDiagnostics, parseTailorProposalsResponse, scanFactGuardWarnings, scanScopedProposalWarnings } from './aiTailor';
 import { buildAiFactSources, createAiTextSanitizer, PRIVACY_PLACEHOLDER } from './aiContext';
 import { collectEditableBlocks } from './resumeBlocks';
 import { preparePolishRequest } from './byokAiClient';
@@ -88,5 +88,23 @@ describe('V6 scoped AI fact and privacy guards',()=>{
     const body=JSON.parse(String(fetchMock.mock.calls[0]![1].body));
     expect(body.messages).toEqual([{role:'system',content:prepared.options.systemPrompt},{role:'user',content:prepared.options.userPrompt}]);
     expect(result.proposals.map(p=>p.blockKey)).toEqual(['skills']);
+  });
+});
+
+describe('model proposal quality diagnostics',()=>{
+  it('counts repeated, unauthorized and unchanged model outputs without weakening write gates',()=>{
+    const doc=fixture(),r=prepareTailorRequest({document:doc,jdText:'教师'});
+    const raw=JSON.stringify([{blockKey:'B1',suggestedText:'主修实验设计。',reason:'事实不足，保留原文。'},{blockKey:'B2',suggestedText:'协助组织30课时。'},{blockKey:'B2',suggestedText:'独立主讲30课时。'},{blockKey:'internal-exp',suggestedText:'越权内容',reason:'DO_NOT_DISPLAY'},{blockKey:'B3',suggestedText:''}]);
+    const v=analyzeTailorProposalsResponse(raw,r.blocks,r.sourceMap,[],r.aliases);
+    expect(v.proposals.map(p=>[p.blockKey,p.accepted])).toEqual([['exp:internal-exp',false]]);
+    expect(v.diagnostics).toMatchObject({received:5,unauthorized:1,duplicate:1,unchanged:1,empty:1,beyondLimit:0});
+    const message=formatProposalDiagnostics(v.diagnostics);
+    expect(message).toContain('事实不足，保留原文。');
+    expect(message).toContain('重复段落 1');
+    expect(message).not.toContain('DO_NOT_DISPLAY');
+    expect(parseTailorProposalsResponse(raw,r.blocks,r.sourceMap,[],r.aliases)).toEqual(v.proposals);
+  });
+  it('explicitly asks each model for one best candidate per block',()=>{
+    expect(prepareTailorRequest({document:fixture(),jdText:'教师'}).options.systemPrompt).toContain('同一 blockKey 最多返回一项');
   });
 });

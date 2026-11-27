@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type TailorBlockProposal,
   generateTailorProposals,
+  formatProposalDiagnostics,
   prepareTailorRequest,
   prepareScopedPolishRequest,
   scanFactGuardWarnings,
@@ -457,7 +458,7 @@ export function DiagnoseAndMatchPane({
       if (controller.signal.aborted || tailorAbortRef.current !== controller || !isCurrent(basis)) return;
       setTailorProposals(res.proposals);
       setTailorSources(res.sourceMap);
-      if (res.proposals.length === 0) setTailorNotice('模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。');
+      setTailorNotice((res.proposals.length===0?'模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。 ':'')+formatProposalDiagnostics(res.diagnostics));
     } catch (err) {
       if (tailorAbortRef.current !== controller || !isCurrent(basis)) return;
       setTailorError(controller.signal.aborted ? '已取消整卷改写请求。' :

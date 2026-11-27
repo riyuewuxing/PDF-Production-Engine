@@ -398,7 +398,7 @@ async function run() {
         else if(user.mode==='plan')content='建议先核对经历，再精简表达，不增加事实。';
         else if(user.mode==='co-create'){
           const b=user.toolResults.list_visible_blocks[0],f=user.toolResults.inspect_block_facts[0].sources[0];
-          content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- '+(user.goal.includes('本步骤：')?'核对分步合成内容。':'整理实验记录。'),reason:'合成改写',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改'}]);
+          content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text,reason:'合成保留原文说明',factIds:[f.id]},{blockKey:b.blockKey,suggestedText:b.text+'\n- '+(user.goal.includes('本步骤：')?'核对分步合成内容。':'整理实验记录。'),reason:'合成改写',factIds:[f.id]},{blockKey:b.blockKey,suggestedText:'重复备选不采用',reason:'重复项',factIds:[f.id]},{blockKey:'basic.name',suggestedText:'非法身份修改',reason:'UNAUTHORIZED_REASON_HIDDEN'}]);
         }else if(Array.isArray(user.blocks)){
           const b=user.blocks[0];
           content=JSON.stringify([{blockKey:b.blockKey,suggestedText:b.text+'\n- 复核合成实验数据。',reason:'整卷合成候选',factIds:[b.sources[0].id]}]);
@@ -406,7 +406,7 @@ async function run() {
           content=JSON.stringify({reason:'合成版式微调',changes:{baseFontSize:14,pagePadding:24,lineHeight:1.2}});
         }else content='OK';
       }
-      res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content},finish_reason:'stop'}]}));
+      res.setHeader('Content-Type','application/json');res.end(JSON.stringify({model:body.model==='second-model'?'second-model-versioned':body.model,usage:{prompt_tokens:120,completion_tokens:45,total_tokens:165,prompt_tokens_details:{cached_tokens:12}},choices:[{message:{content},finish_reason:'stop'}]}));
     });
   });
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
@@ -650,6 +650,13 @@ async function run() {
   await click('协作改写');
   await click('预览 AI 自由任务');await click('确认发送自由任务');
   await until('assistant proposal',()=>bodyHas('合成改写'));
+  const diagnosticText=await js('document.querySelector('+JSON.stringify('[aria-label="提案筛选说明"]')+')?.innerText||""');
+  if(!diagnosticText.includes('未授权目标 1')||!diagnosticText.includes('重复段落 1')||!diagnosticText.includes('正文未变化 1')||!diagnosticText.includes('合成保留原文说明')||diagnosticText.includes('UNAUTHORIZED_REASON_HIDDEN'))throw Error('proposal diagnostic mismatch');
+  const receiptText=await js('document.querySelector('+JSON.stringify('[aria-label="自由任务调用回执"]')+')?.innerText||""');
+  if(!receiptText.includes('second-model-versioned')||!receiptText.includes('与请求不同')||!receiptText.includes('输入 120 / 输出 45 / 合计 165 tokens'))throw Error('provider receipt mismatch');
+  checks.aiProposalDiagnostics=true;checks.aiProviderReceipt=true;
+  await js('document.querySelector('+JSON.stringify('[aria-label="自由任务调用回执"]')+')?.scrollIntoView({block:"start"})');
+  await capture('19a-ai-receipt-diagnostics');
   const applyDisabled=await js('[...document.querySelectorAll("button")].find(b=>b.innerText.includes("应用已核对提案"))?.disabled===true');
   if(!applyDisabled)throw Error('assistant applies without approval');
   if(JSON.stringify(await main.store.getResume('master'))!==JSON.stringify(baseline))throw Error('assistant modified before approval');
