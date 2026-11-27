@@ -761,7 +761,7 @@ function registerIpcHandlers(): void {
     if(submissionPackageBusy||pdfReceiptBusy||pdfPickerBusy)throw Error('已有投递包或 PDF 核验操作正在进行。');
     submissionPackageBusy=true;pdfPickerBusy=true;
     try{
-      const record=await store.getLinkedApplicationSnapshot(link),receipt=record.meta.pdfReceipt;
+      const record=await boundedPackageWork(async signal=>{const linked=await store.getLinkedApplicationSnapshot(link);signal.throwIfAborted();return linked;}),receipt=record.meta.pdfReceipt;
       if(!receipt)throw Error('历史记录没有 PDF 字节凭证，不能制作核验投递包。');
       const original=record.meta.exportedFilePath;
       const ledger=await store.getApplications(false);

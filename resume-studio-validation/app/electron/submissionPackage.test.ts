@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {buildSubmissionZip,publishSubmissionZip,packageEntryName,MAX_PACKAGE_PDFS} from './submissionPackage';
+import {MAX_RECEIPT_PDF_BYTES} from './pdfReceipt';
 import {readPdfFingerprint} from './pdfReceipt';
 const pdf=(text:string)=>Buffer.from('%PDF-1.7\n'+text+'\n%%EOF\n');
 describe('explicit submission package ZIP',()=>{
@@ -31,6 +32,13 @@ describe('explicit submission package ZIP',()=>{
     const controller=new AbortController();controller.abort();
     expect(()=>buildSubmissionZip([pdf('a')],controller.signal)).toThrow();
   });
+  it('refuses over-limit aggregate and individual PDF sizes before building',()=>{
+    const a=Buffer.alloc(MAX_RECEIPT_PDF_BYTES);a.write('%PDF-');
+    const b=Buffer.from(a);b[5]=1;
+    const tooBig=Buffer.alloc(MAX_RECEIPT_PDF_BYTES+1);tooBig.write('%PDF-');
+    expect(()=>buildSubmissionZip([tooBig])).toThrow(/32 MiB/);
+    expect(()=>buildSubmissionZip([a,b,pdf('extra')])).toThrow(/64 MiB/);
+  });
   it('captures the same fingerprinted bytes; existing non-capture API returns no bytes',async()=>{
     const dir=await fs.mkdtemp(path.join(os.tmpdir(),'submission-pdf-'));
     try{
@@ -41,6 +49,25 @@ describe('explicit submission package ZIP',()=>{
       expect(a.bytes).toEqual(original);expect(a.fingerprint.sha256).toBe(createHash('sha256').update(original).digest('hex'));
       const b=await readPdfFingerprint(file);expect(b.status).toBe('read');if(b.status==='read')expect(b.bytes).toBeUndefined();
       await fs.writeFile(file,pdf('changed'));expect(a.bytes).toEqual(original);
+    }finally{await fs.rm(dir,{recursive:true,force:true});}
+  });
+  it('does not leave a staged output on a pre-aborted request',async()=>{
+    const dir=await fs.mkdtemp(path.join(os.tmpdir(),'submission-abort-'));
+    try{
+      const controller=new AbortController();controller.abort();
+      await expect(publishSubmissionZip(path.join(dir,'aborted.zip'),buildSubmissionZip([pdf('a')]).bytes,controller.signal)).rejects.toThrow();
+      expect(await fs.readdir(dir)).toEqual([]);
+    }finally{await fs.rm(dir,{recursive:true,force:true});}
+  });
+  it('concurrent publication has one winner and never overwrites it',async()=>{
+    const dir=await fs.mkdtemp(path.join(os.tmpdir(),'submission-race-'));
+    try{
+      const target=path.join(dir,'race.zip'),a=buildSubmissionZip([pdf('a')]),b=buildSubmissionZip([pdf('b')]);
+      const results=await Promise.allSettled([publishSubmissionZip(target,a.bytes),publishSubmissionZip(target,b.bytes)]);
+      const winners=results.flatMap((r,i)=>r.status==='fulfilled'?[i]:[]);
+      expect(winners).toHaveLength(1);
+      expect(await fs.readFile(target)).toEqual(winners[0]===0?a.bytes:b.bytes);
+      expect(await fs.readdir(dir)).toEqual(['race.zip']);
     }finally{await fs.rm(dir,{recursive:true,force:true});}
   });
   it('publishes exact bytes, refuses occupied targets and cleans staging',async()=>{

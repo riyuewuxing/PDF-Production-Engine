@@ -63,6 +63,7 @@ async function run(){
  const fake=await js(async ({entry,doc})=>{try{await window.resumeDesktop.applications.log({entry:{...entry,id:crypto.randomUUID(),snapshotId:''},document:doc});return false}catch{return true}},{entry,doc});
  assert(fake,'forged receipt accepted');checks.forgedReceiptRejected=true;
  const packageLabel='制作投递包 合成凭证学校';
+ const waitPackage=async(label,message)=>until(label,async()=>await has(message)&&await js(label=>{const b=document.querySelector('button[aria-label="'+label+'"]');return !!b&&!b.disabled},packageLabel));
  const origMessage=dialog.showMessageBox,origOpen=dialog.showOpenDialog,origSave=dialog.showSaveDialog;
  const extra=path.join(root,'selected-attachment.pdf'),unselected=path.join(root,'unselected-private.pdf');
  const pdfWindow=new BrowserWindow({show:false});
@@ -70,24 +71,42 @@ async function run(){
  const extraBytes=await pdfWindow.webContents.printToPDF({pageSize:'A4'});pdfWindow.destroy();
  fs.writeFileSync(extra,extraBytes);fs.writeFileSync(unselected,extraBytes);
  const output=path.join(root,'explicit-package.zip'),existing=path.join(root,'existing-package.zip');
- const sentinel=Buffer.from('existing must not change');
+ const sentinel=Buffer.from('existing must not change'),ledgerBytes=fs.readFileSync(store.applicationsPath);
+ const changedExtra=Buffer.from(extraBytes);changedExtra[changedExtra.length-10]^=1;
  fs.writeFileSync(existing,sentinel);
  let phase='cancel',calls=[];
  dialog.showMessageBox=async(_owner,opts)=>{
    calls.push(opts.title);
-   if(opts.title==='选择投递包内容')return {response:phase==='cancel'?2:phase==='only'?0:1,checkboxChecked:false};
+   if(opts.title==='选择投递包内容'){assert(opts.detail.includes('合成凭证学校'),'target employer absent');return {response:phase==='cancel'?2:phase==='only'?0:1,checkboxChecked:false};}
    assert(opts.title==='确认投递包文件清单','unexpected message box: '+opts.title);
-   assert(opts.detail.includes('resume.pdf')&&!opts.detail.includes('unselected-private.pdf'),'bad confirmed file list');
+   assert(opts.detail.includes('合成凭证学校')&&opts.detail.includes('resume.pdf')&&!opts.detail.includes('unselected-private.pdf'),'bad target or confirmed file list');
    if(phase!=='only')assert(opts.detail.includes('attachment-01.pdf')&&opts.detail.includes('selected-attachment.pdf'),'selected attachment absent');
    return {response:phase==='cancel-confirm'?1:0,checkboxChecked:false};
  };
- dialog.showOpenDialog=async(_owner,opts)=>{calls.push('open');assert(opts.properties.includes('multiSelections'),'not explicit multiselect');return {canceled:false,filePaths:[extra]};};
- dialog.showSaveDialog=async(_owner,opts)=>{calls.push('save');assert(opts.filters[0].extensions[0]==='zip','wrong save type');return {canceled:false,filePath:phase==='occupied'?existing:output};};
- await rowClick(packageLabel);await until('package cancel',()=>has('已取消制作投递包'));assert(!fs.existsSync(output)&&calls.length===1,'cancel wrote or opened additional dialog');unchanged();checks.packageCancelNoWrite=true;
- phase='cancel-confirm';calls=[];await rowClick(packageLabel);await until('confirmation cancel',()=>has('已取消制作投递包'));assert(!fs.existsSync(output)&&!calls.includes('save'),'confirmation cancel opened save or wrote');unchanged();checks.packageConfirmCancelNoWrite=true;
- phase='occupied';calls=[];await rowClick(packageLabel);await until('occupied target',()=>has('目标 ZIP 已存在，未覆盖'));assert(fs.readFileSync(existing).equals(sentinel),'occupied destination overwritten');unchanged();checks.packageOccupiedRejected=true;
- phase='only';calls=[];fs.writeFileSync(first,changed);await rowClick(packageLabel);await until('changed package refused',()=>has('封存简历 PDF 字节已变更'));assert(!calls.includes('save')&&!fs.existsSync(output),'changed package wrote');fs.writeFileSync(first,original);unchanged();checks.packageChangedReceiptRejected=true;
- phase='success';calls=[];await rowClick(packageLabel);await until('actual ZIP',()=>has('本地投递包 ZIP 已生成（未发送）')&&fs.existsSync(output));
+ dialog.showOpenDialog=async(_owner,opts)=>{calls.push('open');assert(opts.properties.includes('multiSelections'),'not explicit multiselect');return {canceled:false,filePaths:phase==='duplicate'?[extra,unselected]:[extra]};};
+ dialog.showSaveDialog=async(_owner,opts)=>{
+   calls.push('save');assert(opts.filters[0].extensions[0]==='zip','wrong save type');
+   if(phase==='cancel-save')return {canceled:true};
+   if(phase==='stale-save'){
+     const altered=JSON.parse(ledgerBytes.toString('utf8'));
+     altered.applications[0].notes='synthetic external ledger change during Save As';
+     fs.writeFileSync(store.applicationsPath,JSON.stringify(altered,null,2)+'\n');
+   }
+   if(phase==='success'){fs.writeFileSync(first,changed);fs.writeFileSync(extra,changedExtra);}
+   return {canceled:false,filePath:phase==='occupied'?existing:output};
+ };
+ await rowClick(packageLabel);await waitPackage('package cancel','已取消制作投递包');assert(!fs.existsSync(output)&&calls.length===1,'cancel wrote or opened additional dialog');unchanged();checks.packageCancelNoWrite=true;
+ phase='cancel-confirm';calls=[];await rowClick(packageLabel);await waitPackage('confirmation cancel','已取消制作投递包');assert(!fs.existsSync(output)&&calls.includes('确认投递包文件清单')&&!calls.includes('save'),'confirmation cancel did not finish, opened save or wrote');unchanged();checks.packageConfirmCancelNoWrite=true;
+ phase='cancel-save';calls=[];await rowClick(packageLabel);await waitPackage('save dialog cancel','已取消制作投递包');assert(calls.includes('save')&&!fs.existsSync(output),'save cancel wrote or did not reach Save As');unchanged();checks.packageSaveCancelNoWrite=true;
+ phase='duplicate';calls=[];await rowClick(packageLabel);await waitPackage('duplicate attachment refused','投递包包含字节完全相同的重复文件');assert(!calls.includes('save')&&!fs.existsSync(output),'duplicate attachment wrote');unchanged();checks.packageDuplicateAttachmentRejected=true;
+ phase='occupied';calls=[];await rowClick(packageLabel);await waitPackage('occupied target','目标 ZIP 已存在，未覆盖');assert(fs.readFileSync(existing).equals(sentinel),'occupied destination overwritten');unchanged();checks.packageOccupiedRejected=true;
+ phase='only';calls=[];fs.writeFileSync(first,changed);await rowClick(packageLabel);await waitPackage('changed package refused','封存简历 PDF 字节已变更');assert(!calls.includes('save')&&!fs.existsSync(output),'changed package wrote');fs.writeFileSync(first,original);unchanged();checks.packageChangedReceiptRejected=true;
+ phase='stale-save';calls=[];await rowClick(packageLabel);await waitPackage('stale save association','磁盘投递台账已变化');assert(calls.includes('save')&&!fs.existsSync(output),'stale ledger wrote or did not reach Save As');
+ assert(!fs.readFileSync(store.applicationsPath).equals(ledgerBytes),'external mutation was not exercised');
+ fs.writeFileSync(store.applicationsPath,ledgerBytes);unchanged();checks.packageLateLedgerChangeRejected=true;
+ phase='success';calls=[];await rowClick(packageLabel);await waitPackage('actual ZIP','本地投递包 ZIP 已生成（未发送）');assert(fs.existsSync(output),'output not found');
+ assert(fs.readFileSync(first).equals(changed)&&fs.readFileSync(extra).equals(changedExtra),'post-confirm source mutation not exercised');
+ fs.writeFileSync(first,original);fs.writeFileSync(extra,extraBytes);checks.packageFrozenSourcesAfterConfirm=true;
  const zip=fs.readFileSync(output);assert(await has(sha(zip)),'actual ZIP SHA missing');assert(await has('attachment-01.pdf'),'entry missing');await capture('08-submission-package');
  fs.copyFileSync(output,path.join(out,'actual-package.zip'));fs.writeFileSync(path.join(out,'expected-resume.pdf'),original);fs.writeFileSync(path.join(out,'expected-attachment.pdf'),extraBytes);
  observations.package={sha256:sha(zip),sizeBytes:zip.length,resumeSha256:hash,attachmentSha256:sha(extraBytes)};

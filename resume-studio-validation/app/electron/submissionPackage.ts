@@ -21,14 +21,18 @@ export function packageEntryName(index:number):string{
  * byte buffer. A PDF signature is not a semantic/visual/safety validation. */
 export function buildSubmissionZip(pdfs:readonly Buffer[],signal?:AbortSignal){
   if(pdfs.length<1||pdfs.length>MAX_PACKAGE_PDFS)throw Error('投递包须包含 1～8 份 PDF。');
-  let total=0;const hashes=new Set<string>();
+  let total=0;
+  for(const bytes of pdfs){
+    signal?.throwIfAborted();
+    if(!Buffer.isBuffer(bytes)||bytes.length<5||bytes.length>MAX_RECEIPT_PDF_BYTES||bytes.subarray(0,5).toString('ascii')!=='%PDF-')throw Error('投递包仅支持普通 PDF 文件，每份最多 32 MiB。');
+    total+=bytes.length;if(total>MAX_PACKAGE_BYTES)throw Error('投递包 PDF 总大小超过 64 MiB。');
+  }
+  const hashes=new Set<string>();
   const parts:Buffer[]=[],central:Buffer[]=[];
   const entries:{name:string;sizeBytes:number;sha256:string}[]=[];
   let offset=0,centralSize=0;
   for(const [index,bytes] of pdfs.entries()){
     signal?.throwIfAborted();
-    if(!Buffer.isBuffer(bytes)||bytes.length<5||bytes.length>MAX_RECEIPT_PDF_BYTES||bytes.subarray(0,5).toString('ascii')!=='%PDF-')throw Error('投递包仅支持普通 PDF 文件，每份最多 32 MiB。');
-    total+=bytes.length;if(total>MAX_PACKAGE_BYTES)throw Error('投递包 PDF 总大小超过 64 MiB。');
     const digest=hash(bytes);if(hashes.has(digest))throw Error('投递包包含字节完全相同的重复文件。');hashes.add(digest);
     const entryName=packageEntryName(index),name=Buffer.from(entryName,'ascii'),crc=crc32(bytes);
     const local=Buffer.alloc(30);
@@ -95,6 +99,7 @@ export async function publishSubmissionZip(filePath:string,bytes:Buffer,signal?:
     if(published)throw Error('ZIP 可能已写入，但无法确认最终状态，请手动检查：'+filePath);
     const code=(error as NodeJS.ErrnoException)?.code;
     if(code==='EEXIST')throw Error('目标 ZIP 已存在，未覆盖；请另选新文件名。');
+    if(code==='EXDEV'||code==='ENOTSUP'||code==='ENOSYS'||code==='EPERM')throw Error('目标目录不支持安全无覆盖发布或权限不足，请选择其他本地目录。');
     throw error;
   }finally{
     if(created)try{await fs.unlink(stage);}catch{throw Error('投递包临时文件未能清理，请检查：'+stage+(published?'；输出可能已存在：'+filePath:''));}
