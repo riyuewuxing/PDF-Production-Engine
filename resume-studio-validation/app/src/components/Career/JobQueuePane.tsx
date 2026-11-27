@@ -11,6 +11,10 @@ type Check={id:string;revision:string;status:'same'|'stale'|'unavailable';at:str
 type Job={controller:AbortController;cancel:()=>void};
 const field='w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900 disabled:opacity-60';
 const button='rounded border border-slate-300 bg-white px-2 py-1.5 font-medium text-slate-700 disabled:opacity-40';
+function assertQueue(tasks:JobQueueTask[]){
+  const result=JobQueueSchema.safeParse(tasks);
+  if(!result.success)throw Error(result.error.issues[0]?.message||'岗位队列校验失败。');
+}
 
 /** No scheduler, AI call, resume write, or application status mutation here. */
 export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;activeDoc:ResumeDocument;redacted:boolean}){
@@ -35,11 +39,11 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
     if(readRef.current||writeRef.current)throw Error('已有操作进行中。');
     const controller=new AbortController();
     let timer:ReturnType<typeof setTimeout>|undefined,rejectWait:((error:Error)=>void)|undefined;
-    const cancel=()=>{controller.abort();rejectWait?.(Error('读取已取消或超时。'));};
+    const cancel=(reason='已取消读取。')=>{controller.abort();rejectWait?.(Error(reason));};
     const job={controller,cancel};readRef.current=job;setBusy(kind);
     const start=scope.current;
     try{
-      const result=await Promise.race([new Promise<never>((_resolve,reject)=>{rejectWait=reject;timer=setTimeout(cancel,10000);}),work(controller.signal)]);
+      const result=await Promise.race([new Promise<never>((_resolve,reject)=>{rejectWait=reject;timer=setTimeout(()=>cancel('读取超过10秒，未继续等待。'),10000);}),work(controller.signal)]);
       if(!mounted.current||controller.signal.aborted||scope.current.activeSlug!==start.activeSlug||scope.current.activeDoc!==start.activeDoc||scope.current.redacted||!isReady(revision))throw Error('当前简历或台账已变化，请重新核对。');
       return result;
     }finally{
@@ -62,7 +66,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
         // actual current content, then use the authoritative disk revision.
         if(!sameJobReviewDocument(doc,source.activeDoc))throw Error('当前编辑与磁盘版本不同，请先完成保存或重载后再登记。');
         const task=await prepareJobQueueTask({id:crypto.randomUUID(),company,role,jdText:jd,slug:source.activeSlug,createdAt:new Date().toISOString()},doc);
-        JobQueueSchema.parse([...tasks,task]);
+        assertQueue([...tasks,task]);
         return {task,title:doc.title,revision,source:source.activeDoc};
       });
       if(mounted.current&&!scope.current.redacted)setCandidate(result);
@@ -75,7 +79,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
     writeRef.current=true;setBusy('save');setMessage(null);setCandidate(null);setCheck(null);
     try{
       const current=careerLedger.getSnapshot();
-      JobQueueSchema.parse([...(current.data.jobQueue??[]),task]);
+      assertQueue([...(current.data.jobQueue??[]),task]);
       if(!isReady(revision))throw Error('台账已变化，请重新核对。');
       if(!careerLedger.update(data=>({...data,jobQueue:[...(data.jobQueue??[]),task]})))throw Error('台账未准备好，未登记。');
       await careerLedger.flush();
