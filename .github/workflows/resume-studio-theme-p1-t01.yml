@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 10
       - name: Restore exact old source for baseline only
         if: matrix.phase == 'baseline'
         working-directory: .

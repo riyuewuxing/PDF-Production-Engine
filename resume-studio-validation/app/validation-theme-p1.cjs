@@ -35,7 +35,8 @@ async function run() {
   const win = await main.createMainWindow();
   const js = code => win.webContents.executeJavaScript(code);
   const key = 'resume-studio-ui-theme-v1';
-  const disk = path.join(root,'resumes','runner-fixture.json');
+  const disk = path.join(main.store.resumesDir,'runner-fixture.json');
+  assert.ok(!path.relative(root,disk).startsWith('..')&&!path.isAbsolute(path.relative(root,disk)),'fixture path escaped isolated workspace');
   async function ready() {
     await until('synthetic document loaded', () => js('document.querySelector("#basic-field-name")?.value === "演示候选人"'));
     await until('saved state', () => js('document.querySelector("[aria-label=\\\"本地保存状态\\\"]")?.innerText.includes("已保存至本地硬盘")'));
