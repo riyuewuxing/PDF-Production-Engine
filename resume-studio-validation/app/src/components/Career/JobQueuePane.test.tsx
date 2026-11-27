@@ -4,12 +4,12 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {JobQueuePane} from './JobQueuePane';
 import {comparisonFixture} from '../../lib/comparisonSyntheticFixture';
 import {prepareJobQueueTask} from '../../lib/jobQueueBinding';
-import type {ApplicationsStoreData} from '../../schema/applicationSchema';
+import type {ApplicationsStoreData,JobQueueTask,JobQueueCommand} from '../../schema/applicationSchema';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {ResumeDesktopBridge} from '../../types/electron';
 type State={data:ApplicationsStoreData;ready:boolean;loading:boolean;saving:boolean;dirty:boolean;error:string|null;recoveryError:string|null};
-const session=vi.hoisted(()=>({state:null as unknown as State,listeners:new Set<()=>void>(),load:vi.fn(),update:vi.fn(),flush:vi.fn()}));
-vi.mock('../../lib/careerLedgerSession',()=>({careerLedger:{getSnapshot:()=>session.state,subscribe:(listener:()=>void)=>{session.listeners.add(listener);return ()=>session.listeners.delete(listener);},load:session.load,update:session.update,flush:session.flush}}));
+const session=vi.hoisted(()=>({state:null as unknown as State,listeners:new Set<()=>void>(),load:vi.fn(),update:vi.fn(),flush:vi.fn(),controlQueue:vi.fn(),refreshQueue:vi.fn()}));
+vi.mock('../../lib/careerLedgerSession',()=>({careerLedger:{getSnapshot:()=>session.state,subscribe:(listener:()=>void)=>{session.listeners.add(listener);return ()=>session.listeners.delete(listener);},load:session.load,update:session.update,flush:session.flush,controlQueue:session.controlQueue,refreshQueue:session.refreshQueue}}));
 const read=vi.fn(),save=vi.fn(),log=vi.fn(),ai=vi.fn();
 const revision='a'.repeat(64);
 const props=()=>({activeSlug:'current',activeDoc:comparisonFixture(),redacted:false});
@@ -26,6 +26,7 @@ beforeEach(()=>{
   vi.resetAllMocks();vi.stubGlobal('crypto',webcrypto);session.listeners.clear();
   session.state={data:{schemaVersion:1,revision,applications:[],coverLetters:[],interviewAnswers:{}},ready:true,loading:false,saving:false,dirty:false,error:null,recoveryError:null};
   session.load.mockResolvedValue(undefined);
+  session.refreshQueue.mockResolvedValue('refreshed');
   session.update.mockImplementation((transform:(d:ApplicationsStoreData)=>ApplicationsStoreData)=>{publish({data:transform(session.state.data),dirty:true});return true;});
   session.flush.mockImplementation(async()=>{publish({data:{...session.state.data,revision:'b'.repeat(64)},dirty:false});});
   read.mockResolvedValue(comparisonFixture());
@@ -87,5 +88,61 @@ describe('job queue registration renderer safeguards',()=>{
     session.flush.mockRejectedValueOnce(Error('合成磁盘写入失败'));render(<JobQueuePane {...props()}/>);fill();prepare();await screen.findByRole('button',{name:'确认登记岗位任务'});fireEvent.click(confirm()!);
     await screen.findByText('合成磁盘写入失败');expect(session.state.dirty).toBe(true);expect(screen.getByRole('button',{name:'核对任务绑定'})).toBeDisabled();
     expect(screen.queryByText('岗位任务已保存到本地台账；尚未运行。')).toBeNull();expect(ai).not.toHaveBeenCalled();
+  });
+});
+
+describe('explicit queue execution renderer',()=>{
+  async function seed(){
+    const p=props();
+    const task=await prepareJobQueueTask({id:crypto.randomUUID(),company:'合成单位',role:'物理教师',jdText:jd,slug:p.activeSlug,createdAt:'2026-11-27T00:00:00Z'},p.activeDoc);
+    const other={...task,id:crypto.randomUUID(),company:'另一合成单位'};
+    session.state={...session.state,data:{...session.state.data,jobQueue:[task,other]}};
+    return {p,task,other};
+  }
+  function enableBridge(){window.resumeDesktop!.applications.commandJobQueue=vi.fn();}
+  function running(task:JobQueueTask):JobQueueTask{
+    return {...task,status:'running',execution:{attempts:1,attemptId:crypto.randomUUID(),updatedAt:new Date().toISOString(),deadlineAt:new Date(Date.now()+30000).toISOString(),failure:null,result:null}};
+  }
+  const start=()=>screen.getByRole('button',{name:'开始岗位 合成单位 物理教师'});
+  it('offers no execution on an older desktop bridge and starts only the explicitly clicked task',async()=>{
+    const {p,task,other}=await seed(),view=render(<JobQueuePane {...p}/>);
+    expect(screen.queryByRole('button',{name:'开始岗位 合成单位 物理教师'})).toBeNull();
+    enableBridge();view.rerender(<JobQueuePane {...p}/>);
+    expect(session.controlQueue).not.toHaveBeenCalled();expect(session.refreshQueue).not.toHaveBeenCalled();
+    let release!:()=>void;
+    session.controlQueue.mockImplementationOnce(async(_c:JobQueueCommand)=>{await new Promise<void>(r=>{release=r;});publish({data:{...session.state.data,revision:'b'.repeat(64),jobQueue:[running(task),other]}});});
+    fireEvent.click(start());expect(start()).toBeDisabled();fireEvent.click(start());
+    expect(session.controlQueue).toHaveBeenCalledExactlyOnceWith({taskId:task.id,ledgerRevision:revision,action:'start'});
+    await act(async()=>release());
+    expect(screen.getByText('本地准备中')).toBeTruthy();
+    expect(screen.getByRole('button',{name:'开始岗位 另一合成单位 物理教师'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'暂停岗位 合成单位 物理教师'})).not.toBeDisabled();
+    expect(session.update).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled();expect(ai).not.toHaveBeenCalled();
+  });
+  it('leaves control usable during polling and hides raw records and commands on redaction',async()=>{
+    const {p,task,other}=await seed();enableBridge();
+    const active=running(task);publish({data:{...session.state.data,jobQueue:[active,other]}});
+    let finishPoll!:(r:string)=>void;
+    session.refreshQueue.mockImplementationOnce(()=>new Promise(r=>{finishPoll=r;}));
+    vi.useFakeTimers();const view=render(<JobQueuePane {...p}/>);
+    await act(async()=>{await vi.advanceTimersByTimeAsync(1001);});
+    expect(session.refreshQueue).toHaveBeenCalledTimes(1);
+    const pause=screen.getByRole('button',{name:'暂停岗位 合成单位 物理教师'});expect(pause).not.toBeDisabled();
+    session.controlQueue.mockImplementationOnce(async()=>publish({data:{...session.state.data,revision:'b'.repeat(64),jobQueue:[{...active,status:'paused',execution:{...active.execution!,deadlineAt:null}},other]}}));
+    await act(async()=>fireEvent.click(pause));
+    expect(session.controlQueue).toHaveBeenCalledExactlyOnceWith({taskId:task.id,ledgerRevision:revision,action:'pause'});
+    expect(screen.getByText('已暂停')).toBeTruthy();expect(screen.getByRole('button',{name:'重试岗位 合成单位 物理教师'})).not.toBeDisabled();
+    view.rerender(<JobQueuePane {...p} redacted/>);await act(async()=>finishPoll('unavailable'));
+    expect(screen.queryByText('合成单位 · 物理教师')).toBeNull();expect(screen.queryByRole('button',{name:'重试岗位 合成单位 物理教师'})).toBeNull();
+    expect(session.update).not.toHaveBeenCalled();expect(ai).not.toHaveBeenCalled();
+  });
+  it('shows a bounded command acknowledgement warning without unlocking or repeating the write',async()=>{
+    const {p}=await seed();enableBridge();vi.useFakeTimers();
+    let release!:()=>void;session.controlQueue.mockImplementationOnce(()=>new Promise<void>(r=>{release=r;}));
+    render(<JobQueuePane {...p}/>);fireEvent.click(start());
+    await act(async()=>{await vi.advanceTimersByTimeAsync(10001);});
+    expect(screen.getByText(/等待任务回执超过10秒/)).toBeTruthy();expect(start()).toBeDisabled();
+    fireEvent.click(start());expect(session.controlQueue).toHaveBeenCalledTimes(1);
+    await act(async()=>release());expect(start()).not.toBeDisabled();expect(session.update).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {LocalResumeStore} from './localFsApi';
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
 import {JobQueueExecutor} from './jobQueueExecutor';
 import {JobQueueSchema,JobQueueTaskSchema,JOB_QUEUE_RUN_MS,MAX_JOB_QUEUE_ATTEMPTS,type JobQueueCommand,type JobQueueTask,type JobQueueResult} from '../schema/applicationSchema';
 import {ResumeDocumentSchema} from '../schema/resumeSchema';
@@ -20,7 +21,7 @@ async function fixture(){
   const x=await make(a,'demo-a','合成学校甲','必须具备教师资格。\n硕士优先。'),y=await make(b,'demo-b','合成学校乙','合成研究经历。');
   const base=await store.getApplications(),ledger=await store.saveApplications({...base,jobQueue:[x,y]},base.revision);
   const original=await Promise.all(['demo-a','demo-b'].map(s=>fs.readFile(store.resolveResumePath(s).filePath)));
-  return {store,a,b,x,y,ledger,original,make,other:new LocalResumeStore(store.dataDir)};
+  return {root,store,a,b,x,y,ledger,original,make,other:new LocalResumeStore(store.dataDir)};
 }
 function command(task:JobQueueTask,rev:string,action:JobQueueCommand['action']):JobQueueCommand{return {taskId:task.id,ledgerRevision:rev,action};}
 const readBytes=(s:LocalResumeStore)=>fs.readFile(s.applicationsPath);
@@ -139,6 +140,59 @@ describe('durable local queue commands',()=>{
     const valid=rows.map((t,i)=>({...t,status:'prepared',execution:{attempts:1,attemptId:randomUUID(),updatedAt:new Date().toISOString(),deadlineAt:null,failure:null,result:{...result(t,1),clauseCount:i%80+1}}}));
     expect(JobQueueSchema.safeParse(valid).success).toBe(true);
   });
+});
+describe('queue storage failure and workspace isolation',()=>{
+  it('does not dispatch if publishing the running state fails; leaves exact prior ledger bytes',async()=>{
+    const f=await fixture(),executor=new JobQueueExecutor(f.store),before=await readBytes(f.store),worker=vi.spyOn(f.store,'prepareJobQueueAttempt');
+    const rename=fs.rename.bind(fs),inject=vi.spyOn(fs,'rename').mockImplementation(async(a,b)=>{
+      if(String(b)===f.store.applicationsPath)throw Object.assign(Error('synthetic ENOSPC'),{code:'ENOSPC'});
+      return rename(a,b);
+    });
+    await expect(executor.command(command(f.x,f.ledger.revision!,'start'))).rejects.toThrow('synthetic ENOSPC');
+    expect(worker).not.toHaveBeenCalled();expect(await readBytes(f.store)).toEqual(before);expect(await f.store.getApplications()).toEqual(f.ledger);
+    inject.mockRestore();
+    await executor.command(command(f.x,f.ledger.revision!,'start'));await until(async()=>row(await f.store.getApplications(),f.x.id).status==='prepared');
+    expect(worker).toHaveBeenCalledTimes(1);
+  });
+  it('retains the running lease on an actual atomic publication failure, then allows explicit expiry recovery',async()=>{
+    const f=await fixture(),s=await f.store.commandJobQueue(command(f.x,f.ledger.revision!,'start')),task=s.started!,before=await readBytes(f.store);
+    const prepared=await f.store.prepareJobQueueAttempt(task,signal());
+    const rename=fs.rename.bind(fs),inject=vi.spyOn(fs,'rename').mockImplementation(async(a,b)=>{
+      if(String(b)===f.store.applicationsPath)throw Object.assign(Error('synthetic ENOSPC'),{code:'ENOSPC'});
+      return rename(a,b);
+    });
+    await expect(f.store.finishJobQueueAttempt(task.id,task.execution!.attemptId!,{result:prepared})).rejects.toThrow('synthetic ENOSPC');
+    expect(await readBytes(f.store)).toEqual(before);expect(row(await f.other.getApplications(),task.id).status).toBe('running');
+    inject.mockRestore();vi.spyOn(Date,'now').mockReturnValue(Date.parse(task.execution!.deadlineAt!)+1);
+    const recovered=await f.other.commandJobQueue(command(task,s.store.revision!,'recover'));
+    expect(row(recovered.store,task.id)).toMatchObject({status:'failed',execution:{failure:'interrupted',result:null}});
+    expect(row(recovered.store,f.y.id)).toEqual(f.y);
+  });
+  it('completion merges with a concurrent unrelated acknowledged ledger edit without losing either change',async()=>{
+    const f=await fixture(),s=await f.store.commandJobQueue(command(f.x,f.ledger.revision!,'start')),task=s.started!;
+    const r=await f.store.prepareJobQueueAttempt(task,signal()),{jobQueue:_omitted,...oldClient}=s.store;
+    const edited=await f.other.saveApplications({...oldClient,interviewAnswers:{synthetic:'new answer'}},s.store.revision);
+    const finished=await f.store.finishJobQueueAttempt(task.id,task.execution!.attemptId!,{result:r});
+    expect(finished.interviewAnswers).toEqual(edited.interviewAnswers);expect(row(finished,task.id).status).toBe('prepared');expect(row(finished,f.y.id)).toEqual(f.y);
+    await expect(f.other.saveApplications({...edited,interviewAnswers:{synthetic:'late'}},edited.revision)).rejects.toMatchObject({code:'APPLICATION_CONFLICT'});
+    expect(await f.store.getApplications()).toEqual(finished);
+  });
+  it('copies prepared and running states byte-exactly into a separate backup; recovery never runs or affects the original workspace',async()=>{
+    const f=await fixture();await f.store.saveResume('master',doc('synthetic-master'));
+    const a=await f.store.commandJobQueue(command(f.x,f.ledger.revision!,'start')),p=await f.store.prepareJobQueueAttempt(a.started!,signal());
+    const done=await f.store.finishJobQueueAttempt(f.x.id,a.started!.execution!.attemptId!,{result:p});
+    const b=await f.store.commandJobQueue(command(f.y,done.revision!,'start')),source=await readBytes(f.store);
+    const dest=await fs.mkdtemp(path.join(os.tmpdir(),'synthetic-exec-backup-'));dirs.push(dest);
+    const backup=await createWorkspaceBackup(f.root,dest,signal()),inspection=await inspectWorkspaceBackup(backup.folder,signal());
+    const restored=await restoreWorkspaceBackup(f.root,backup.folder,inspection.manifestHash,dest,signal());
+    const copy=new LocalResumeStore(path.join(restored.folder,'data')),worker=vi.spyOn(copy,'prepareJobQueueAttempt');
+    new JobQueueExecutor(copy);
+    expect(await readBytes(copy)).toEqual(source);expect(await copy.getApplications()).toEqual(b.store);expect(worker).not.toHaveBeenCalled();
+    vi.spyOn(Date,'now').mockReturnValue(Date.parse(b.started!.execution!.deadlineAt!)+1);
+    const recovered=await copy.commandJobQueue(command(f.y,b.store.revision!,'recover'));
+    expect(row(recovered.store,f.y.id).status).toBe('failed');expect(row(recovered.store,f.x.id)).toEqual(row(done,f.x.id));expect(worker).not.toHaveBeenCalled();
+    expect(await readBytes(f.store)).toEqual(source);expect(row(await f.store.getApplications(),f.y.id).status).toBe('running');
+  },20000);
 });
 describe('local worker cancellation and watchdog',()=>{
   it('explicitly starts a single worker, refuses overlapping work, and ignores a delayed canceled result',async()=>{
