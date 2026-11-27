@@ -279,6 +279,10 @@ export async function generateTailorProposals(input: {
 }): Promise<{ proposals: TailorBlockProposal[]; sourceMap: AiFactSourceMap;diagnostics:ProposalDiagnostics }> {
   const prepared=input.prepared;
   const rawText=await requestByokCompletion({...prepared.options,settings:input.settings,signal:input.signal});
+  return analyzePreparedTailorResponse(rawText,prepared);
+}
+
+export function analyzePreparedTailorResponse(rawText:string,prepared:PreparedTailorRequest){
   return {...analyzeTailorProposalsResponse(rawText,prepared.blocks,prepared.sourceMap,prepared.jdMissingKeywords,prepared.aliases),sourceMap:prepared.sourceMap};
 }
 

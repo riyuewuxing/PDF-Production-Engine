@@ -1,12 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
 import {Sparkles,ShieldCheck} from 'lucide-react';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
-import {assertAiPreviewSettings,requestByokCompletion,describeAiRequest,validateByokBaseUrl,type AiProfileCatalog,type ByokAiSettings} from '../../lib/byokAiClient';
+import {assertAiPreviewSettings,requestByokCompletionWithReceipt,type AiCompletionResult,describeAiRequest,validateByokBaseUrl,type AiProfileCatalog,type ByokAiSettings} from '../../lib/byokAiClient';
 import {CAREER_AI_LABELS,prepareCareerRefine,restoreCareerRefine,type CareerAiKind,type CareerRefinePrepared} from '../../lib/careerAi';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {FactBank} from '../../schema/factBankSchema';
 import {collectEditableBlocks} from '../../lib/resumeBlocks';
 import {isShareableFact} from '../../lib/aiContext';
+import {AiTaskReceiptView,receivedAiTask,failedAiTask,type AiTaskReceipt} from '../Diagnose/AiTaskReceiptView';
 import {prepareFactSelection,assertFreshFactSelection,loadLocalFactBank,type FactSelection} from '../../lib/factSelection';
 type Props={document:ResumeDocument;slug:string;company:string;role:string;jdText:string;drafts:Record<CareerAiKind,string>;onApply:(kind:CareerAiKind,text:string)=>void};
 type Basis={document:ResumeDocument;slug:string;company:string;role:string;jdText:string;kind:CareerAiKind;draftText:string;settings:ByokAiSettings;selection:FactSelection};
@@ -18,6 +19,7 @@ export function CareerAiPanel(props:Props){
   const [kind,setKind]=useState<CareerAiKind>('coverLetter');
   const [preview,setPreview]=useState<Prepared|null>(null);
   const [proposal,setProposal]=useState<Proposal|null>(null);
+  const [attempt,setAttempt]=useState<{basis:Basis;value:AiTaskReceipt}|null>(null);
   const [confirmed,setConfirmed]=useState(false);
   const [busy,setBusy]=useState(false);
   const [bank,setBank]=useState<FactBank|null>(null);
@@ -30,7 +32,7 @@ export function CareerAiPanel(props:Props){
   const mounted=useRef(false);
   const selected=catalog?.profiles.find(p=>p.profileId===profileId);
   const current=useRef({props,kind,selected,bank,factIds});current.current={props,kind,selected,bank,factIds};
-  const clearApprovals=()=>{setPreview(null);setProposal(null);setConfirmed(false);};
+  const clearApprovals=()=>{setPreview(null);setProposal(null);setConfirmed(false);setAttempt(null);};
   const locked=busy||factsBusy||applying;
   const blocks=collectEditableBlocks(props.document);
   const eligible=bank?.records.filter(r=>isShareableFact(props.document,r))??[];
@@ -56,7 +58,7 @@ export function CareerAiPanel(props:Props){
     if(!isCurrent(b))throw new Error('文案、岗位、模型或事实选择已变化，旧审批作废。');
   };
   const prepare=()=>{
-    if(!selected||locked)return;setError(null);setProposal(null);setConfirmed(false);setPreview(null);
+    if(!selected||locked)return;setError(null);clearApprovals();
     try{
       const keys=blocks.filter(b=>eligible.some(r=>factIds.includes(r.id)&&r.blockKey===b.key)).map(b=>b.key);
       const selection=prepareFactSelection(props.document,props.slug,keys,bank,factIds);
@@ -71,15 +73,16 @@ export function CareerAiPanel(props:Props){
     const p=preview;setPreview(null);
     if(!isCurrent(p.basis)){setError('文案、简历、岗位或模型已变化，请重新预览。');return;}
     const ctrl=new AbortController();controller.current=ctrl;setBusy(true);setError(null);setProposal(null);setConfirmed(false);
+    let response:AiCompletionResult|undefined;
     try{
       await assertFresh(p.basis);if(ctrl.signal.aborted)return;
-      const output=await requestByokCompletion({...p.request.options,settings:p.basis.settings,signal:ctrl.signal});
+      response=await requestByokCompletionWithReceipt({...p.request.options,settings:p.basis.settings,signal:ctrl.signal});
       if(ctrl.signal.aborted)return;
       if(!isCurrent(p.basis))throw new Error('原文已变化，已丢弃旧模型建议。');
       await assertFresh(p.basis);if(ctrl.signal.aborted)return;
-      setProposal({...p,...restoreCareerRefine(output,p.request)});
-    }catch(err){if(mounted.current)setError(localErrorMessage(err,'文案精修失败'));}
-    finally{if(controller.current===ctrl){controller.current=null;if(mounted.current)setBusy(false);}}
+      setProposal({...p,...restoreCareerRefine(response.text,p.request)});setAttempt({basis:p.basis,value:receivedAiTask(response)});
+    }catch(err){if(mounted.current&&!ctrl.signal.aborted){if(isCurrent(p.basis))setAttempt({basis:p.basis,value:failedAiTask(response)});setError(localErrorMessage(err,'文案精修失败'));}}
+    finally{if(controller.current===ctrl){if(ctrl.signal.aborted&&isCurrent(p.basis))setAttempt({basis:p.basis,value:{status:'cancelled'}});controller.current=null;if(mounted.current)setBusy(false);}}
   };
   const apply=async()=>{
     if(!proposal||!confirmed||locked||applyRef.current)return;
@@ -104,6 +107,7 @@ export function CareerAiPanel(props:Props){
       {!selected?.enabled&&<p className="text-slate-500">请先在「诊断优化 → AI 润色 Diff」启用模型档案。</p>}
     </>:<p>桌面端模型档案尚未加载。离线文案仍可编辑。</p>}
     {busy&&<div className="flex items-center justify-between"><span>模型正在处理…</span><button type="button" onClick={()=>controller.current?.abort()} className="rounded border px-2 py-1">取消文案请求</button></div>}
+    {attempt&&isCurrent(attempt.basis)&&<AiTaskReceiptView label="文案调用回执" attempt={attempt.value}/>}
     {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800">{error}</div>}
     {preview&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2">
       <div className="font-bold text-amber-900">文案发送前确认（尚未调用模型）</div>

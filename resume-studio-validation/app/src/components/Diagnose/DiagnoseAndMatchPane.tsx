@@ -17,7 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type TailorBlockProposal,
-  generateTailorProposals,
+  analyzePreparedTailorResponse,
   formatProposalDiagnostics,
   prepareTailorRequest,
   prepareScopedPolishRequest,
@@ -39,7 +39,7 @@ import {
   DEFAULT_BYOK_SETTINGS,
   type PolishMode,
   computeLineDiff,
-  requestByokCompletion,
+  type AiCompletionResult,
   validateByokBaseUrl,
   type ByokCompletionOptions,
 } from '../../lib/byokAiClient';
@@ -50,6 +50,7 @@ import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {ResumeAiAssistantPane} from './ResumeAiAssistantPane';
 import {AiLayoutPane} from './AiLayoutPane';
+import {AiTaskReceiptView,receivedAiTask,failedAiTask,type AiTaskReceipt} from './AiTaskReceiptView';
 import {FactBankPane} from './FactBankPane';
 import type {JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
 import {JobNoticePdfPane} from './JobNoticePdfPane';
@@ -128,6 +129,8 @@ export function DiagnoseAndMatchPane({
   const [selectedBlockKey, setSelectedBlockKey] = useState<string>(() => editableBlocks[0]?.key ?? 'skills');
   const [polishMode, setPolishMode] = useState<PolishMode>('star');
   const [polishing, setPolishing] = useState(false);
+  const [singleAttempt,setSingleAttempt]=useState<AiTaskReceipt|null>(null);
+  const [wholeAttempt,setWholeAttempt]=useState<AiTaskReceipt|null>(null);
   const [polishError, setPolishError] = useState<string | null>(null);
   const polishErrorElement=useRef<HTMLDivElement|null>(null);
   const [suggestedText, setSuggestedText] = useState<string | null>(null);
@@ -207,7 +210,7 @@ export function DiagnoseAndMatchPane({
     if(!isCurrent(basis))throw new Error('任务范围、模型或事实选择已变化，请重新预览。');
   };
   const clearTextApprovals=()=>{
-    setPendingRequest(null);setSuggestedText(null);setPolishRiskConfirmed(false);
+    setPendingRequest(null);setSuggestedText(null);setPolishRiskConfirmed(false);setSingleAttempt(null);setWholeAttempt(null);
     setTailorProposals([]);setTailorSources({});setTailorNotice(null);setTailorEditingKey(null);
     polishAbortRef.current?.abort();tailorAbortRef.current?.abort();
   };
@@ -321,6 +324,7 @@ export function DiagnoseAndMatchPane({
   };
   const handlePreparePolish = () => {
     if (!selectedBlock || applyingRef.current || polishing || factsBusy) return;
+    clearTextApprovals();
     setPolishError(null);
     setPendingRequest(null);
     try {
@@ -347,19 +351,22 @@ export function DiagnoseAndMatchPane({
     setPolishing(true);
     setPolishError(null);
     setSuggestedText(null);
-    setPolishRiskConfirmed(false);
+    setPolishRiskConfirmed(false);setSingleAttempt(null);
+    let response:AiCompletionResult|undefined;
     try {
       await assertFactsFresh(basis);
       if(controller.signal.aborted)return;
-      const output = await requestByokCompletion({...request.options,settings:request.settings,signal:controller.signal});
+      response = await requestByokCompletionWithReceipt({...request.options,settings:request.settings,signal:controller.signal});
+      const output=response.text;
       await assertFactsFresh(basis);
       if (controller.signal.aborted || polishAbortRef.current !== controller || !isCurrent(basis)) return;
       const block = editableBlocks.find(b=>b.key===basis.blockKey);
       if (!block || output.length > block.maxCharsHint) throw new Error('润色结果超出段落字数预算，请缩短后重试。');
       if (output.includes(PRIVACY_PLACEHOLDER)) throw new Error('模型保留了隐私省略标记，未生成可直接应用的建议。');
-      setSuggestedText(output);
+      setSuggestedText(output);setSingleAttempt(receivedAiTask(response));
     } catch (err) {
-      if (polishAbortRef.current === controller && isCurrent(basis)) {
+      if (polishAbortRef.current === controller && isCurrent(basis) && !controller.signal.aborted) {
+        setSingleAttempt(failedAiTask(response));
         setPolishError(err instanceof Error ? err.message : '润色请求失败');
       }
     } finally {
@@ -409,6 +416,7 @@ export function DiagnoseAndMatchPane({
 
   const handlePrepareTailor = async () => {
     if (applyingRef.current || tailoring || factsBusy) return;
+    clearTextApprovals();
     tailorAbortRef.current?.abort();
     const controller = new AbortController();
     tailorAbortRef.current = controller;
@@ -449,20 +457,23 @@ export function DiagnoseAndMatchPane({
     setTailoring(true);
     setTailorError(null);
     setTailorNotice(null);
-    setTailorProposals([]);
+    setTailorProposals([]);setWholeAttempt(null);
+    let response:AiCompletionResult|undefined;
     try {
       await assertFactsFresh(basis);
       if(controller.signal.aborted)return;
-      const res = await generateTailorProposals({settings:request.settings,prepared:request.prepared,signal:controller.signal});
+      response = await requestByokCompletionWithReceipt({...request.prepared.options,settings:request.settings,signal:controller.signal});
       await assertFactsFresh(basis);
       if (controller.signal.aborted || tailorAbortRef.current !== controller || !isCurrent(basis)) return;
+      const res=analyzePreparedTailorResponse(response.text,request.prepared);
+      setWholeAttempt(receivedAiTask(response));
       setTailorProposals(res.proposals);
       setTailorSources(res.sourceMap);
       setTailorNotice((res.proposals.length===0?'模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。 ':'')+formatProposalDiagnostics(res.diagnostics));
     } catch (err) {
-      if (tailorAbortRef.current !== controller || !isCurrent(basis)) return;
-      setTailorError(controller.signal.aborted ? '已取消整卷改写请求。' :
-        err instanceof Error ? err.message : '整卷定向改写失败');
+      if (tailorAbortRef.current !== controller || !isCurrent(basis) || controller.signal.aborted) return;
+      setWholeAttempt(failedAiTask(response));
+      setTailorError(err instanceof Error ? err.message : '整卷定向改写失败');
     } finally {
       if (tailorAbortRef.current === controller && mountedRef.current) setTailoring(false);
     }
@@ -1076,7 +1087,7 @@ export function DiagnoseAndMatchPane({
                   {tailoring && (
                     <button
                       type="button"
-                      onClick={() => tailorAbortRef.current?.abort()}
+                      onClick={() => {tailorAbortRef.current?.abort();setWholeAttempt({status:'cancelled'});setTailorError(null);setPendingRequest(null);}}
                       className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50"
                     >
                       <XCircle size={13} /> 取消
@@ -1084,6 +1095,7 @@ export function DiagnoseAndMatchPane({
                   )}
                 </div>
 
+                {wholeBasis&&isCurrent(wholeBasis)&&<AiTaskReceiptView label="整卷调用回执" attempt={wholeAttempt}/>}
                 {tailorError && (
                   <div role="alert" ref={tailorErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
                     {tailorError}
@@ -1313,6 +1325,8 @@ export function DiagnoseAndMatchPane({
                 <Wand2 size={13} /> {polishing ? '请求模型生成中...' : '生成润色对比 Diff'}
               </button>
 
+              {polishing&&<button type="button" onClick={()=>{polishAbortRef.current?.abort();setSingleAttempt({status:'cancelled'});setPolishError(null);}} className="rounded border px-2 py-1">取消单段请求</button>}
+              {singleBasis&&isCurrent(singleBasis)&&<AiTaskReceiptView label="单段调用回执" attempt={singleAttempt}/>}
               {polishError && (
                 <div role="alert" ref={polishErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
                   {polishError}

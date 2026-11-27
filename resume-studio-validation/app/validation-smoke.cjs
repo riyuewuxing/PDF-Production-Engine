@@ -780,6 +780,10 @@ async function run() {
 
   await js('(()=>{const e=[...document.querySelectorAll("summary")].find(e=>e.textContent.includes("本地事实资料库"));if(e?.parentElement?.open)e.click();return true})()');
 
+  const checkReceipt=async(label,model='second-model-versioned')=>{
+    const value=await js('document.querySelector('+JSON.stringify('[aria-label="'+label+'"]')+')?.innerText||""');
+    if(!value.includes(model)||!value.includes('输入 120 / 输出 45 / 合计 165 tokens')||!value.includes('不代表内容真实、已批准或已应用'))throw Error('receipt mismatch '+label+' '+value);
+  };
   await click('AI 版式优化');
   await setValue('textarea[aria-label="AI 版式目标"]','在不删减正文的情况下适度紧凑');
   const beforeLayout=await main.store.getResume('master');
@@ -790,6 +794,7 @@ async function run() {
   await capture('24-layout-outbound');
   await click('确认发送版式请求');
   await until('layout candidate',()=>bodyHas('版式候选（尚未应用）'));
+  await checkReceipt('版式调用回执');checks.layoutReceipt=true;
   if(!lastAiRequest.second||JSON.stringify(lastAiRequest.body.messages).includes('演示候选人')||JSON.stringify(lastAiRequest.body.messages).includes('demo@example.invalid')||JSON.stringify(lastAiRequest.body.messages).includes('整理实验记录'))throw Error('layout sent candidate data');
   if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="应用已核对版式")?.disabled===true'))throw Error('layout not gated before render');
   await capture('25-layout-proposal');
@@ -873,6 +878,7 @@ async function run() {
   await capture('35-single-fact-preview');
   await click('确认发送给模型');
   await until('single scoped result',()=>bodyHas('原文 vs 建议 Diff 审阅'));
+  await checkReceipt('单段调用回执');checks.singleReceipt=true;
   if(providerCalls!==beforeUnifiedCalls+1||JSON.stringify(lastAiRequest.body.messages.map(m=>m.content))!==JSON.stringify(singleMessages)||JSON.stringify(lastAiRequest.body).includes(unified.id)||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('single exact outbound scope failed');
   if(!await checkLabel('我已核对以上事实，确认属实'))throw Error('single fact approval unavailable');
   await click('试渲染单段提案');
@@ -904,6 +910,7 @@ async function run() {
   await capture('38-whole-fact-preview');
   await click('确认发送给模型');
   await until('whole fact proposal',()=>bodyHas('整卷合成候选'));
+  await checkReceipt('整卷调用回执');checks.wholeReceipt=true;
   if(providerCalls!==beforeUnifiedCalls+2||JSON.stringify(lastAiRequest.body.messages.map(m=>m.content))!==JSON.stringify(wholeMessages)||JSON.stringify(lastAiRequest.body).includes(tailorRecord.id)||JSON.stringify(lastAiRequest.body).includes('factBinding'))throw Error('whole exact outbound scope failed');
   const wholeFacts=JSON.parse(lastAiRequest.body.messages[1].content).blocks.flatMap(b=>b.sources.filter(s=>s.scope==='record').map(s=>({block:b.blockKey,id:s.id})));
   if(wholeFacts.length!==1||wholeFacts[0].block!=='B1'||wholeFacts[0].id!=='record-1')throw Error('whole fact scope drift');
@@ -996,6 +1003,7 @@ async function run() {
   await capture('21-career-ai-preview');
   await click('确认发送文案给模型');
   await until('career proposed',()=>bodyHas('候选文案（本地还原）'));
+  await checkReceipt('文案调用回执');checks.careerReceipt=true;
   if(!lastAiRequest.second||JSON.stringify(lastAiRequest.body.messages)!==JSON.stringify(careerMessages))throw Error('career exact preview or route mismatch');
   if(!await js('[...document.querySelectorAll("button")].find(b=>b.innerText==="采纳文案草稿")?.disabled===true'))throw Error('career apply not gated');
   await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.includes("采纳文案草稿"));b?.scrollIntoView({block:"center"});return true})()');
