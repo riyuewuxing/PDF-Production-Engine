@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeftRight, RefreshCw, X } from 'lucide-react';
-import type { ApplicationSnapshotLink,JobApplication } from '../../schema/applicationSchema';
+import {samePdfReceipt,type ApplicationSnapshotLink,type JobApplication } from '../../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 import type { ResumeSnapshotMeta } from '../../server/localFsApi';
 import { apiClient, localErrorMessage } from '../../lib/apiClient';
@@ -8,7 +8,7 @@ import { compareResumeDocuments, type ComparisonCategory, type ComparisonKind, t
 
 type Target={key:string;label:string;slug:string;docId:string;kind:'disk'|'snapshot'|'memory';snapshot?:ResumeSnapshotMeta};
 type Loaded={key:string;targetDocId:string;targetSnapshotTime?:string;baselineTitle:string;baselineTime:string;targetTitle:string;targetTime:string;capturedAt:string;diff:ResumeComparison};
-export type ApplicationReviewSource=Pick<JobApplication,'id'|'snapshotId'|'resumeSlug'|'company'|'role'|'exportedFilePath'|'atsScore'>&{ledgerRevision:string};
+export type ApplicationReviewSource=Pick<JobApplication,'id'|'snapshotId'|'resumeSlug'|'company'|'role'|'exportedFilePath'|'atsScore'|'pdfReceipt'>&{ledgerRevision:string};
 type Props={applicationReview?:ApplicationReviewSource;activeSlug:string;activeDoc:ResumeDocument;summaries:ResumeSummary[];masterSummary:ResumeSummary|null;snapshots:ResumeSnapshotMeta[];initialSnapshotId?:string;onClose:()=>void};
 const CATEGORIES=[['all','全部'],['content','内容'],['structure','结构'],['style','样式']] as const;
 const KINDS:Record<ComparisonKind,string>={added:'对照新增',removed:'对照移除',modified:'差异',ambiguous:'身份歧义'};
@@ -82,7 +82,7 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
         const link:ApplicationSnapshotLink={applicationId:sealed.id,snapshotId:sealed.snapshotId,ledgerRevision:sealed.ledgerRevision};
         const rec=await apiClient.getLinkedApplicationSnapshot(link,controller.signal);
         const canonical=sealed.snapshotId.replace(/\.json$/i,'');
-        if(rec.meta.id!==canonical||rec.meta.applicationId!==sealed.id||rec.meta.resumeSlug!==sealed.resumeSlug||rec.meta.exportedFilePath!==sealed.exportedFilePath||rec.meta.atsScore!==sealed.atsScore||rec.meta.title!==rec.document.title||rec.meta.templateId!==rec.document.templateId||!Number.isFinite(Date.parse(rec.meta.createdAt)))throw new Error('永久快照关联身份校验失败，未显示原稿。');
+        if(rec.meta.id!==canonical||rec.meta.applicationId!==sealed.id||rec.meta.resumeSlug!==sealed.resumeSlug||rec.meta.exportedFilePath!==sealed.exportedFilePath||rec.meta.atsScore!==sealed.atsScore||!samePdfReceipt(rec.meta.pdfReceipt,sealed.pdfReceipt)||rec.meta.title!==rec.document.title||rec.meta.templateId!==rec.document.templateId||!Number.isFinite(Date.parse(rec.meta.createdAt)))throw new Error('永久快照关联身份校验失败，未显示原稿。');
         if(controller.signal.aborted)throw new Error('已取消对照。');
         return {left:{document:rec.document,time:rec.meta.createdAt},right:await loadTarget()};
       };
@@ -115,7 +115,7 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
       <div className="space-y-2 border-b border-slate-200 px-4 py-3 text-xs">
         {applicationReview&&<div className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-950">
           <div className="font-semibold break-all">{applicationReview.company} · {applicationReview.role||'未填写岗位'}</div>
-          <div>台账关联版本：<span className="font-mono break-all">{applicationReview.resumeSlug}</span>；{applicationReview.exportedFilePath?'记录有 PDF 路径，但本次不读取或核验 PDF 字节。':'没有关联 PDF 路径。'} 本复盘不是已发送/送达证明。</div>
+          <div>台账关联版本：<span className="font-mono break-all">{applicationReview.resumeSlug}</span>；{applicationReview.pdfReceipt?'已封存 PDF 字节凭证，本次文档对照不读取 PDF 文件。':applicationReview.exportedFilePath?'记录有 PDF 路径，但本次不读取或核验 PDF 字节。':'没有关联 PDF 路径。'} 本复盘不是已发送/送达证明。</div>
           {!seen.has(applicationReview.resumeSlug)&&applicationReview.resumeSlug!==activeSlug&&<div className="text-amber-900">关联版本不在当前可用列表；仍可对照其他版本，不自动恢复原版本。</div>}
           {target&&target.slug!==applicationReview.resumeSlug&&<div className="text-amber-900">对照稿不是台账原关联版本；差异不等于同一份简历的修改历史。</div>}
         </div>}

@@ -42,6 +42,8 @@ import {
   COVER_LETTER_HEADER_VARIANTS,
   type CoverLetterHeaderVariant,
   type JobApplication,
+  type ApplicationPdfCheck,
+  samePdfReceipt,
   type SavedCoverLetter,
 } from '../../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
@@ -89,6 +91,9 @@ export function JobCareerPane({
   const [cloningId, setCloningId] = useState<string | null>(null);
   const [review,setReview]=useState<{activeSlug:string;activeDocId:string;source:ApplicationReviewSource}|null>(null);
   const [clonePhase,setClonePhase]=useState<'reading'|'writing'|null>(null);
+  const [pdfCheck,setPdfCheck]=useState<{id:string;revision:string;action:'check'|'open'|'choose';result?:ApplicationPdfCheck;error?:string}|null>(null);
+  const pdfTask=useRef<symbol|null>(null);
+  const pdfScope=useRef({revision:storeData.revision,comparisonDisabled,subTab,activeSlug});pdfScope.current={revision:storeData.revision,comparisonDisabled,subTab,activeSlug};
   const cloneRead=useRef<{controller:AbortController;cancel:()=>void;phase:'reading'|'writing'}|null>(null);
   const cloneScope=useRef({activeSlug,activeDocId:activeDoc.id,comparisonDisabled,subTab});cloneScope.current={activeSlug,activeDocId:activeDoc.id,comparisonDisabled,subTab};
   const mounted=useRef(false);
@@ -98,6 +103,7 @@ export function JobCareerPane({
   const reviewValid=Boolean(review&&canReview&&subTab==='tracker'&&review.activeSlug===activeSlug&&review.activeDocId===activeDoc.id&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
   useEffect(()=>{if(!reviewValid)setReview(null);},[reviewValid]);
   useEffect(()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();},[activeSlug,activeDoc.id,comparisonDisabled,subTab]);
+  useEffect(()=>{setPdfCheck(null);},[activeSlug,comparisonDisabled,subTab,storeData.revision,ledger.dirty,ledger.loading,ledger.saving]);
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');
@@ -166,9 +172,26 @@ export function JobCareerPane({
     careerLedger.update(current=>({...current,applications:current.applications.filter(entry=>entry.id!==item.id)}));
   };
 
+  const handlePdfCheck=async(item:JobApplication,action:'check'|'open'|'choose')=>{
+    if(!canReview||!desktop||!item.snapshotId||!item.pdfReceipt||!storeData.revision||pdfTask.current)return;
+    const revision=storeData.revision,slug=activeSlug,token=Symbol('pdf-check');
+    pdfTask.current=token;
+    setPdfCheck({id:item.id,revision,action});
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const alive=()=>mounted.current&&pdfTask.current===token&&pdfScope.current.revision===revision&&!pdfScope.current.comparisonDisabled&&pdfScope.current.subTab==='tracker'&&pdfScope.current.activeSlug===slug&&!careerLedger.getSnapshot().dirty&&!careerLedger.getSnapshot().saving&&!careerLedger.getSnapshot().loading;
+    try{
+      // Native file picker may remain open until the user chooses/cancels. No
+      // fabricated cancellation of a system dialog; byte hashing has its own
+      // main-process watchdog. Recorded-path checks have a UI wait deadline.
+      const promise=apiClient.checkApplicationPdf({applicationId:item.id,snapshotId:item.snapshotId,ledgerRevision:revision},action);
+      const result=action==='choose'?await promise:await Promise.race([promise,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('等待 PDF 核验超过 12 秒；不显示迟到结果。系统打开操作若已派发不能撤回。')),12000);})]);
+      if(alive())setPdfCheck({id:item.id,revision,action,result});
+    }catch(err){if(alive())setPdfCheck({id:item.id,revision,action,error:localErrorMessage(err,'PDF 字节核验失败')});}
+    finally{if(timer!==undefined)clearTimeout(timer);if(pdfTask.current===token)pdfTask.current=null;}
+  };
   const openApplicationReview=(item:JobApplication)=>{
     if(!canReview||!item.snapshotId||!storeData.revision)return;
-    setReview({activeSlug,activeDocId:activeDoc.id,source:{id:item.id,snapshotId:item.snapshotId,resumeSlug:item.resumeSlug,company:item.company,role:item.role,exportedFilePath:item.exportedFilePath,atsScore:item.atsScore,ledgerRevision:storeData.revision}});
+    setReview({activeSlug,activeDocId:activeDoc.id,source:{id:item.id,snapshotId:item.snapshotId,resumeSlug:item.resumeSlug,company:item.company,role:item.role,exportedFilePath:item.exportedFilePath,atsScore:item.atsScore,pdfReceipt:item.pdfReceipt,ledgerRevision:storeData.revision}});
   };
   const handleCloneSnapshotToWorkspace = async (item: JobApplication) => {
     if (!item.snapshotId || !onCloneSnapshot||!canReview||!storeData.revision||cloneRead.current) return;
@@ -188,7 +211,7 @@ export function JobCareerPane({
       if(!mounted.current||controller.signal.aborted)return;
       const current=careerLedger.getSnapshot();
       if(cloneScope.current.activeSlug!==slug||cloneScope.current.activeDocId!==docId||cloneScope.current.subTab!=='tracker'||cloneScope.current.comparisonDisabled||current.dirty||current.saving||current.loading||current.error||current.data.revision!==revision)throw new Error('当前版本或台账状态已变化，未克隆永久快照。');
-      if(record.meta.id!==item.snapshotId.replace(/\.json$/i,'')||record.meta.applicationId!==item.id||record.meta.resumeSlug!==item.resumeSlug||record.meta.exportedFilePath!==item.exportedFilePath||record.meta.atsScore!==item.atsScore||record.meta.title!==record.document.title||record.meta.templateId!==record.document.templateId||!Number.isFinite(Date.parse(record.meta.createdAt)))throw new Error('永久快照关联身份校验失败，未克隆。');
+      if(record.meta.id!==item.snapshotId.replace(/\.json$/i,'')||record.meta.applicationId!==item.id||record.meta.resumeSlug!==item.resumeSlug||record.meta.exportedFilePath!==item.exportedFilePath||record.meta.atsScore!==item.atsScore||!samePdfReceipt(record.meta.pdfReceipt,item.pdfReceipt)||record.meta.title!==record.document.title||record.meta.templateId!==record.document.templateId||!Number.isFinite(Date.parse(record.meta.createdAt)))throw new Error('永久快照关联身份校验失败，未克隆。');
       const cleanName = item.company+'-'+(item.role||record.document.title)+'-复盘版';
       // The explicit clone command is a separate, normal version-create operation.
       // The 10-second deadline applies only to the read, never claims to cancel a write already started.
@@ -641,7 +664,12 @@ export function JobCareerPane({
                                 </button>
                               )}
                               {cloningId===item.id&&clonePhase==='reading'&&<button type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900">取消读取快照</button>}
-                              {item.exportedFilePath && desktop && (
+                              {item.pdfReceipt&&item.snapshotId&&item.exportedFilePath&&desktop&&<>
+                                <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">核验 PDF</button>
+                                <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40">核验并打开</button>
+                                <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40">选择文件核验</button>
+                              </>}
+                              {item.exportedFilePath && !item.pdfReceipt && desktop && (
                                 <button
                                   type="button"
                                   disabled={comparisonDisabled}
@@ -665,6 +693,23 @@ export function JobCareerPane({
                             </div>
                           </div>
 
+                          {item.exportedFilePath&&<div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700">
+                            {item.pdfReceipt?<><div className="font-semibold text-indigo-800">已封存导出字节凭证 · 尚需按需核验</div>
+                              <div className="break-all font-mono text-[10px]" title={item.pdfReceipt.sha256}>SHA256 {item.pdfReceipt.sha256.slice(0,16)}… · {item.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>
+                              {!desktop&&<div>文件字节核验仅支持桌面工作台。</div>}
+                              {!comparisonDisabled&&pdfCheck?.id===item.id&&pdfCheck.revision===storeData.revision&&<div role={pdfCheck.error?'alert':'status'} className="mt-1 rounded bg-white p-1.5">
+                                {pdfCheck.error??(!pdfCheck.result?'正在核验…':{
+                                  verified:pdfCheck.action==='choose'?'所选文件字节一致（未修改台账路径）':pdfCheck.result.opened?'记录路径字节一致，已请求系统打开':'记录路径字节一致',
+                                  changed:'文件字节与封存凭证不一致，未打开',
+                                  missing:'记录文件缺失，未打开',
+                                  unsafe:'路径或文件类型不安全，未读取或打开',
+                                  unavailable:'无法核验（可能是外部路径、权限、大小上限或取消选择）；可显式选择文件',
+                                  unknown:'没有可核验的历史字节凭证'
+                                }[pdfCheck.result.status])}
+                                {pdfCheck.result&&<div className="text-[10px] text-slate-500">核验时间 {new Date(pdfCheck.result.checkedAt).toLocaleString('zh-CN',{hour12:false})}；仅本次观察，不证明发送或送达。</div>}
+                              </div>}
+                            </>:<span>历史 PDF 路径 · 无字节凭证（内容未验证）</span>}
+                          </div>}
                           {/* Interview schedule + .ics */}
                           <div className="grid grid-cols-5 items-center gap-1.5">
                             <input
