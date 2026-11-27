@@ -28,6 +28,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const [check,setCheck]=useState<Check|null>(null);
   const [busy,setBusy]=useState<'prepare'|'check'|'save'|'execute'|null>(null);
   const [message,setMessage]=useState<{error:boolean;text:string}|null>(null);
+  const [pollUnavailable,setPollUnavailable]=useState(false),[clock,setClock]=useState(Date.now);
   const readRef=useRef<Job|null>(null),writeRef=useRef(false),mounted=useRef(false);
   const scope=useRef({activeSlug,activeDoc,redacted,revision:ledger.data.revision});
   scope.current={activeSlug,activeDoc,redacted,revision:ledger.data.revision};
@@ -38,10 +39,19 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   // Read-only refresh of acknowledged disk state while this panel is visible.
   // Never overwrite a dirty draft, start work, or auto-retry on restart.
   useEffect(()=>{
-    if(!supportsExecution||!hasRunning||!ready||redacted||busy!==null)return;
-    const timer=setTimeout(()=>{if(!writeRef.current&&!readRef.current)void careerLedger.load().catch(()=>{});},750);
-    return()=>clearTimeout(timer);
-  },[supportsExecution,hasRunning,ready,redacted,busy,ledger.data,ledger.loading]);
+    setClock(Date.now());
+    setPollUnavailable(false);
+    if(!supportsExecution||!hasRunning||redacted)return;
+    let live=true;
+    const tick=()=>{
+      setClock(Date.now());
+      if(!writeRef.current&&!readRef.current)void careerLedger.refreshQueue().then(result=>{
+        if(live&&result!=='skipped')setPollUnavailable(result==='unavailable');
+      });
+    };
+    const timer=setInterval(tick,1000);
+    return()=>{live=false;clearInterval(timer);};
+  },[supportsExecution,hasRunning,redacted]);
   const isReady=(revision:string)=>{
     const now=careerLedger.getSnapshot();
     return now.ready&&!now.loading&&!now.saving&&!now.dirty&&!now.error&&now.data.revision===revision;
@@ -124,11 +134,12 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const execute=async(task:JobQueueTask,action:JobQueueCommand['action'])=>{
     if(!supportsExecution||!ready||redacted||readRef.current||writeRef.current||candidate||!ledger.data.revision||!isReady(ledger.data.revision))return;
     writeRef.current=true;setBusy('execute');setMessage(null);setCheck(null);
+    const watchdog=setTimeout(()=>{if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:'等待任务回执超过10秒；结果未确认，不会自动重试。请勿重复提交。'});},10000);
     try{
       await careerLedger.controlQueue({taskId:task.id,ledgerRevision:ledger.data.revision,action});
       if(mounted.current&&!scope.current.redacted)setMessage({error:false,text:'任务操作已获本地台账回执。当前状态以任务列表为准。'});
     }catch(err){if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:localErrorMessage(err,'任务操作未确认，请刷新磁盘台账。')});}
-    finally{writeRef.current=false;if(mounted.current)setBusy(null);}
+    finally{clearTimeout(watchdog);writeRef.current=false;if(mounted.current)setBusy(null);}
   };
   if(redacted)return <p className="rounded border bg-slate-50 p-3 text-slate-700">脱敏预览开启时隐藏岗位队列原文和登记操作。</p>;
   const locked=!ready||busy!==null;
@@ -139,6 +150,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
       <p className="text-[10px] text-slate-600">已登记 {tasks.length}/{MAX_JOB_QUEUE_TASKS} · 原文每项最多 {MAX_JOB_QUEUE_JD_CHARS} 字 · 队列为本地台账的一部分；备份与恢复沿用台账机制。</p>
     </div>
     {!supportsExecution&&<p className="text-slate-600">执行控制仅支持已升级的桌面工作台；当前仍可登记和核验。</p>}
+    {pollUnavailable&&<p role="status" className="text-amber-800">自动状态读取未确认；当前为上次确认的台账状态，可手动刷新。执行不会因此自动重试。</p>}
     {!ready&&<p role="status" className="text-amber-800">请先完成台账保存或重新读取磁盘台账，再进行登记和核验。</p>}
     <div className="rounded-lg border border-slate-200 p-3 space-y-2">
       <h4 className="font-semibold">登记新岗位</h4>
@@ -175,13 +187,13 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
             <p>执行尝试 {task.execution.attempts}/{MAX_JOB_QUEUE_ATTEMPTS} · {task.execution.updatedAt}</p>
             {task.execution.deadlineAt&&<p>本地准备期限：{task.execution.deadlineAt}；超期可显式恢复为失败，不自动重试。</p>}
             {task.execution.failure&&<p role="status" className="text-amber-800">{failureLabels[task.execution.failure]}</p>}
-            {task.execution.result&&<p className="text-teal-800">本地候选条款 {task.execution.result.clauseCount} 条；尚未人工核对，不代表符合招聘条件。</p>}
+            {task.execution.result&&<p className="text-teal-800">本地候选条款 {task.execution.result.clauseCount} 条；尚未人工核对，不代表符合招聘条件。后续使用前仍需核验绑定版本。</p>}
           </div>}
           {supportsExecution&&<div className="flex flex-wrap gap-2">
             {task.status==='pending'&&<button type="button" aria-label={'开始岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning} onClick={()=>void execute(task,'start')}>开始本地准备</button>}
             {(task.status==='paused'||task.status==='failed')&&<button type="button" aria-label={'重试岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning||(task.execution?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS} onClick={()=>void execute(task,'retry')}>{task.status==='paused'?'继续准备（新尝试）':'重试准备'}</button>}
             {task.status==='running'&&<><button type="button" aria-label={'暂停岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void execute(task,'pause')}>暂停</button>
-              <button type="button" aria-label={'恢复中断岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||!task.execution?.deadlineAt||Date.now()<Date.parse(task.execution.deadlineAt)} onClick={()=>void execute(task,'recover')}>恢复中断为失败</button></>}
+              <button type="button" aria-label={'恢复中断岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||!task.execution?.deadlineAt||clock<Date.parse(task.execution.deadlineAt)} onClick={()=>void execute(task,'recover')}>恢复中断为失败</button></>}
             {task.status!=='canceled'&&task.status!=='prepared'&&<button type="button" aria-label={'取消岗位 '+task.company+' '+task.role} className={button+' text-red-700'} disabled={locked||!!candidate} onClick={()=>void execute(task,'cancel')}>取消任务（保留记录）</button>}
           </div>}
         </article>;

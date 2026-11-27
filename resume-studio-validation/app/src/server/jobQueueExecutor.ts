@@ -1,6 +1,6 @@
 import {JOB_QUEUE_RUN_MS,JobQueueCommandSchema,type JobQueueTask,type JobQueueFailure,type JobQueueResult,type ApplicationsStoreData} from '../schema/applicationSchema';
 import type {LocalResumeStore} from './localFsApi';
-type Attempt={task:JobQueueTask;abort:AbortController;workerDone:boolean;settled:boolean;completion:Promise<void>};
+type Attempt={task:JobQueueTask;abort:AbortController;workerDone:boolean;settled:boolean};
 type Store=Pick<LocalResumeStore,'commandJobQueue'|'prepareJobQueueAttempt'|'finishJobQueueAttempt'>;
 /** One bounded local worker per process; disk CAS also enforces one running
  * attempt per workspace. No boot-time dispatch, timer-driven retry, or network. */
@@ -22,7 +22,7 @@ export class JobQueueExecutor{
   }
   private dispatch(task:JobQueueTask){
     const abort=new AbortController();
-    const attempt:Attempt={task,abort,workerDone:false,settled:false,completion:Promise.resolve()};
+    const attempt:Attempt={task,abort,workerDone:false,settled:false};
     this.active=attempt;
     const release=()=>{if(attempt.workerDone&&attempt.settled&&this.active===attempt)this.active=null;};
     const run=Promise.resolve().then(()=>this.store.prepareJobQueueAttempt(task,abort.signal));
@@ -38,7 +38,7 @@ export class JobQueueExecutor{
       onAbort=()=>reject(Error('queue aborted'));
       abort.signal.addEventListener('abort',onAbort,{once:true});
     });
-    attempt.completion=(async()=>{
+    void (async()=>{
       try{
         let outcome:{result:JobQueueResult}|{failure:JobQueueFailure};
         try{outcome={result:await Promise.race([run,timeout,canceled])};}

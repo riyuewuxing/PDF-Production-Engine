@@ -77,7 +77,7 @@ async function run(){
    await untouched([1,2]);checks.explicitRetryProducesRealReceipt=true;await capture('04-prepared',0);
    await click(label('开始',1));await status(1,'running','本地准备中');await until('second worker held',()=>held.has(tasks[1].id));
    await click(label('取消',1));await status(1,'canceled','已取消');
-   const canceledHash=ledgerHash();assert(held.get(tasks[1].id).signal.aborted,'cancel did not signal worker');
+   const canceledRow=await byIndex(1),canceledHash=ledgerHash();assert(held.get(tasks[1].id).signal.aborted,'cancel did not signal worker');
    held.get(tasks[1].id).resolve();held.delete(tasks[1].id);await sleep(250);
    assert(ledgerHash()===canceledHash&&!await enabled(label('重试',1)),'late cancellation changed ledger or restarted');
    checks.cancelLateReplyIgnored=true;await capture('05-canceled',1);
@@ -93,7 +93,7 @@ async function run(){
    held.get(tasks[2].id).resolve();held.delete(tasks[2].id);await status(2,'failed','绑定简历发生变化');
    const changed=await byIndex(2);assert(changed.execution.failure==='source-changed'&&changed.execution.result===null&&sourceHash(slugs[2])===changedHash,'stale result accepted or source changed');
    const beforeStale=ledgerHash();await click(label('重试',2));await until('stale retry rejected',()=>has('岗位任务绑定的磁盘简历已变化'));
-   assert(ledgerHash()===beforeStale&&JSON.stringify(await byIndex(0))===JSON.stringify(done)&&JSON.stringify(await byIndex(1))===JSON.stringify((await store.getApplications()).jobQueue[1]),'stale retry wrote ledger');
+   assert(ledgerHash()===beforeStale&&JSON.stringify(await byIndex(0))===JSON.stringify(done)&&JSON.stringify(await byIndex(1))===JSON.stringify(canceledRow),'stale retry wrote ledger');
    sourceUnchanged([0,1]);assert((await store.getApplications()).applications.length===1,'unexpected application creation');
    checks.staleRetryRejectedOtherRowsIntact=true;await capture('07-stale-retry-refused',2);
    await click('隐私脱敏');await until('redacted',()=>has('脱敏预览开启时隐藏岗位队列原文和登记操作。'));assert(!await has(labels[0])&&!await has(labels[1])&&!await has(labels[2]),'queue exposed');

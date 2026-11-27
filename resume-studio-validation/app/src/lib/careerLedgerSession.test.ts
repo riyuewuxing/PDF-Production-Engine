@@ -56,4 +56,34 @@ describe('career ledger renderer queue',()=>{
     await session.load();expect(session.getSnapshot().error).toBeNull();
     expect(commandJobQueue).toHaveBeenCalledTimes(2);
   });
+
+  it('poll is nonblocking, ignores a late read after a command or local draft, and does not write',async()=>{
+    let reply!:(d:ApplicationsStoreData)=>void;
+    const read=vi.fn().mockResolvedValueOnce(data()).mockImplementationOnce(()=>new Promise(r=>{reply=r;})).mockResolvedValueOnce(data('r3'));
+    const commandJobQueue=vi.fn().mockResolvedValue(data('r2')),saveApplications=vi.fn();
+    const session=new CareerLedgerSession({getApplications:read,saveApplications,logApplication:vi.fn(),commandJobQueue});
+    await session.load();
+    const poll=session.refreshQueue();await Promise.resolve();
+    expect(session.getSnapshot().loading).toBe(false);
+    await session.controlQueue({taskId:'synthetic',ledgerRevision:'r0',action:'pause'});
+    reply(data('stale-r1'));expect(await poll).toBe('skipped');
+    expect(session.getSnapshot().data.revision).toBe('r2');
+    expect(await session.refreshQueue()).toBe('refreshed');expect(session.getSnapshot().data.revision).toBe('r3');
+    expect(saveApplications).not.toHaveBeenCalled();
+  });
+  it('bounds the status poll at five seconds, never repeats a hung read, and ignores its late reply',async()=>{
+    vi.useFakeTimers();
+    try{
+      let reply!:(d:ApplicationsStoreData)=>void;
+      const read=vi.fn().mockResolvedValueOnce(data()).mockImplementationOnce(()=>new Promise(r=>{reply=r;})).mockResolvedValueOnce(data('new'));
+      const session=new CareerLedgerSession({getApplications:read,saveApplications:vi.fn(),logApplication:vi.fn()});
+      await session.load();const poll=session.refreshQueue();
+      await vi.advanceTimersByTimeAsync(5001);
+      expect(await poll).toBe('unavailable');expect(await session.refreshQueue()).toBe('skipped');
+      expect(read).toHaveBeenCalledTimes(2);expect(session.getSnapshot().loading).toBe(false);
+      reply(data('late'));await Promise.resolve();await Promise.resolve();
+      expect(session.getSnapshot().data.revision).toBe('r0');
+      expect(await session.refreshQueue()).toBe('refreshed');expect(session.getSnapshot().data.revision).toBe('new');
+    }finally{vi.useRealTimers();}
+  });
 });

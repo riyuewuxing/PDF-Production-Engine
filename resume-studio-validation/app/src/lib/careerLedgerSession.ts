@@ -17,6 +17,7 @@ export class CareerLedgerSession {
   private checkpoint:Checkpoint|undefined;
   private inFlight:Promise<void>|null=null;
   private loadingTask:Promise<void>|null=null;
+  private queueReadInFlight=false;
   private logTask:Promise<{entry:JobApplication;store:ApplicationsStoreData}>|null=null;
   constructor(private api:LedgerApi){}
   getSnapshot=()=>this.state;
@@ -79,6 +80,23 @@ export class CareerLedgerSession {
       finally{this.change({loading:false});}
     })();
     this.loadingTask=work;try{await work;}finally{if(this.loadingTask===work)this.loadingTask=null;}
+  };
+  /** A status poll must never lock out pause/cancel, adopt over a new draft,
+   * or repeatedly issue reads if an IPC reply is hung. */
+  refreshQueue=async():Promise<'refreshed'|'skipped'|'unavailable'>=>{
+    const start=this.state;
+    if(this.queueReadInFlight||!start.ready||start.dirty||start.loading||start.saving||start.error||this.inFlight||this.logTask||this.loadingTask)return 'skipped';
+    this.queueReadInFlight=true;
+    const request=Promise.resolve().then(()=>this.api.getApplications());
+    void request.then(()=>{this.queueReadInFlight=false;},()=>{this.queueReadInFlight=false;});
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    try{
+      const data=await Promise.race([request,new Promise<never>((_resolve,reject)=>{timer=setTimeout(()=>reject(Error('queue read deadline')),5000);})]);
+      if(this.state!==start||this.loadingTask||this.logTask||this.inFlight)return 'skipped';
+      if(validRevision(data)!==this.baseRevision)this.adopt(data);
+      return 'refreshed';
+    }catch{return 'unavailable';}
+    finally{if(timer!==undefined)clearTimeout(timer);}
   };
   controlQueue=async(command:JobQueueCommand):Promise<void>=>{
     if(!this.api.commandJobQueue)throw Error('岗位任务执行需要升级桌面工作台。');
