@@ -1,0 +1,90 @@
+name: Resume Studio T46 scoped backup and snapshot regression
+on:
+  push:
+    branches: ['resume-studio/v6-security-snapshot-backup-turn46']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-t46-snapshot-backup
+  cancel-in-progress: true
+jobs:
+  storage:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 9
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fixed-source storage and containment tests
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'security-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          pnpm exec vitest run src/server/jobQueueWorkflow.test.ts --reporter=json --outputFile="$out/storage-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload storage evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-queue-backup-${{ matrix.os }}
+          path: security-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  containment:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Electron
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Native snapshot rotation and rollback
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-snapshot-ui-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/snapshot'
+          & .\node_modules\.bin\electron.cmd .\validation-snapshot-integrity.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-snapshot
+          path: security-evidence/
+          if-no-files-found: error
+          retention-days: 3

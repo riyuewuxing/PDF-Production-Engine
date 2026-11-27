@@ -5,6 +5,8 @@ import path from 'node:path';
 import os from 'node:os';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {LocalResumeStore} from './localFsApi';
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
+import {JobQueueExecutor} from './jobQueueExecutor';
 import {comparisonFixture} from '../lib/comparisonSyntheticFixture';
 import {prepareJobQueueTask} from '../lib/jobQueueBinding';
 import {verifyQueueWorkflowOpen} from '../lib/jobQueueWorkflow';
@@ -151,4 +153,67 @@ describe('task-scoped material persistence',()=>{
     await expect(f.store.getLinkedApplicationSnapshot({applicationId:entry.id,snapshotId:saved.entry.snapshotId,ledgerRevision:saved.store.revision!})).rejects.toMatchObject({code:'APPLICATION_SNAPSHOT_LINK'});
     expect(await read(f)).toEqual(before);
   });
+});
+
+describe('T46 independent backup of fixed-job materials',()=>{
+  async function backupFixture(){
+    const f=await fixture(),dest=await fs.mkdtemp(path.join(os.tmpdir(),'synthetic-queue-copy-'));roots.push(dest);
+    await f.store.saveResume('master',{...comparisonFixture(),id:'synthetic-backup-master'});
+    const issued=await f.issue(f.x,f.a),entry=f.entry(f.x);
+    const sealed=await f.store.logApplication({entry,document:f.a},issued.pdfReceipt);
+    const review=await f.archive(f.x,f.a);
+    const questions=await preparePracticeQuestions(f.a,f.x.slug,f.x.role,undefined,f.x.id);
+    const ledger=await f.store.saveApplications({...sealed.store,jobReviews:[{...review,applicationId:entry.id,snapshotId:sealed.entry.snapshotId}],coverLetters:[f.letter(f.x),f.letter(f.y)],interviewAnswers:{[questions[0]!.answerKey]:'合成甲岗练习'}},sealed.store.revision);
+    const snapshot=path.join(f.store.appSnapshotsDir,sealed.entry.snapshotId+'.json');
+    const link={applicationId:entry.id,snapshotId:sealed.entry.snapshotId,ledgerRevision:ledger.revision!};
+    return {...f,dest,ledger,snapshot,link};
+  }
+  it('restores scoped materials byte-for-byte, preserves legacy suffix links and isolates subsequent edits',async()=>{
+    const f=await backupFixture();
+    const raw=JSON.parse((await read(f)).toString());
+    raw.applications[0].snapshotId=f.link.snapshotId+'.json';
+    raw.jobReviews[0].snapshotId=raw.applications[0].snapshotId;
+    await fs.writeFile(f.store.applicationsPath,JSON.stringify(raw));
+    const actual=await f.store.getApplications(),link={...f.link,snapshotId:raw.applications[0].snapshotId,ledgerRevision:actual.revision!};
+    const original=await read(f),snapBytes=await fs.readFile(f.snapshot);
+    expect((await f.store.getLinkedApplicationSnapshot(link)).meta.queueTaskId).toBe(f.x.id);
+    const backup=await createWorkspaceBackup(f.root,f.dest,signal());
+    const checked=await inspectWorkspaceBackup(backup.folder,signal());
+    const restored=await restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,f.dest,signal());
+    const copy=new LocalResumeStore(path.join(restored.folder,'data')),worker=vi.spyOn(copy,'prepareJobQueueAttempt');
+    new JobQueueExecutor(copy);
+    expect(await fs.readFile(copy.applicationsPath)).toEqual(original);
+    expect(await fs.readFile(path.join(copy.appSnapshotsDir,path.basename(f.snapshot)))).toEqual(snapBytes);
+    expect(await copy.getApplications()).toEqual(actual);
+    expect((await copy.getLinkedApplicationSnapshot(link)).document).toEqual(f.a);
+    expect((await copy.openPreparedJobQueue(open(f.y,actual))).task).toEqual(f.y);
+    expect(worker).not.toHaveBeenCalled();
+    await copy.saveResume('demo-a',{...f.a,title:'仅修改恢复副本'},{expectedRevision:f.x.documentRevision});
+    await expect(copy.openPreparedJobQueue(open(f.y,actual))).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    expect((await copy.getLinkedApplicationSnapshot(link)).document).toEqual(f.a);
+    expect((await copy.openPreparedJobQueue(open(f.z,actual))).task).toEqual(f.z);
+    expect(await fs.readFile(f.store.resolveResumePath('demo-a').filePath)).toEqual(f.originalA);
+    expect(await read(f)).toEqual(original);
+    expect(await fs.readFile(f.snapshot)).toEqual(snapBytes);
+    expect((await inspectWorkspaceBackup(backup.folder,signal())).manifestHash).toBe(checked.manifestHash);
+    expect([backup.warnings,checked.summary.warnings,restored.warnings]).toEqual([[],[],[]]);
+  },20000);
+  it('warns about a schema-valid but misbound permanent queue snapshot without repairing or losing bytes',async()=>{
+    const f=await backupFixture(),raw=JSON.parse(await fs.readFile(f.snapshot,'utf8'));
+    await fs.writeFile(f.snapshot,JSON.stringify({...raw,meta:{...raw.meta,queueTaskId:f.y.id}}));
+    const ledgerBytes=await read(f),damaged=await fs.readFile(f.snapshot);
+    await expect(f.store.getLinkedApplicationSnapshot(f.link)).rejects.toMatchObject({code:'APPLICATION_SNAPSHOT_LINK'});
+    const backup=await createWorkspaceBackup(f.root,f.dest,signal());
+    const checked=await inspectWorkspaceBackup(backup.folder,signal());
+    const restored=await restoreWorkspaceBackup(f.root,backup.folder,checked.manifestHash,f.dest,signal());
+    const copy=new LocalResumeStore(path.join(restored.folder,'data'));
+    await expect(copy.getLinkedApplicationSnapshot(f.link)).rejects.toMatchObject({code:'APPLICATION_SNAPSHOT_LINK'});
+    expect(await fs.readFile(copy.applicationsPath)).toEqual(ledgerBytes);
+    expect(await fs.readFile(path.join(copy.appSnapshotsDir,path.basename(f.snapshot)))).toEqual(damaged);
+    expect(await fs.readFile(f.snapshot)).toEqual(damaged);
+    expect(await read(f)).toEqual(ledgerBytes);
+    expect((await copy.openPreparedJobQueue(open(f.z,f.ledger))).task).toEqual(f.z);
+    const warning='原数据已有永久投递快照关联异常：'+f.link.snapshotId;
+    expect([backup.warnings,checked.summary.warnings,restored.warnings]).toEqual([[warning],[warning],[warning]]);
+  },20000);
 });

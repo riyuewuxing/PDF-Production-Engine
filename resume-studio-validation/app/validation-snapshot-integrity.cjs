@@ -68,7 +68,7 @@ async function run(){
   preserve();checks.invalidDirectIpcRollbackRefusedWithoutSideEffects=true;
   // Exercise real rollback UI and explicit confirmation, not a mocked store.
   await js('(()=>{window.confirm=()=>true;return true})()');
-  const clicked=await js('(()=>{const e=[...document.querySelectorAll("span")].find(x=>x.innerText==="合成最新有效历史");const row=e?.parentElement?.parentElement?.parentElement;const b=row?.querySelector("button");if(!b||b.disabled||!b.innerText.includes("回滚"))return false;b.scrollIntoView({block:"center"});b.click();return true})()');
+  const clicked=await js('(()=>{const e=[...document.querySelectorAll("span")].find(x=>x.innerText==="合成最新有效历史");const row=e?.parentElement?.parentElement?.parentElement;const b=[...(row?.querySelectorAll("button")??[])].find(x=>x.innerText.trim()==="回滚");if(!b||b.disabled)return false;b.scrollIntoView({block:"center"});b.click();return true})()');
   assert(clicked,'valid history rollback button unavailable');
   await until('actual rollback written',async()=>(await main.store.getResume('runner-fixture')).basic.name==='合成历史候选人');
   await until('UI rollback result',()=>has('已回滚至选定历史快照'));
