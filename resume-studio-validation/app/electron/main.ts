@@ -692,6 +692,7 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('applications:get', () => store.getApplications());
   trustedEditorHandle('applications:save', (_event, data: unknown,revision:string) => store.saveApplications(data,revision));
   trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>store.logApplication(input));
+  trustedEditorHandle('applications:getLinkedSnapshot',(_event,input:Parameters<typeof store.getLinkedApplicationSnapshot>[0])=>store.getLinkedApplicationSnapshot(input));
   trustedEditorHandle('writeLock:inspect',()=>inspectResumeWriteLock(store.dataDir));
   trustedEditorHandle('writeLock:recover',(_event,token:string,confirmation:unknown)=>recoverResumeWriteLock(store.dataDir,token,confirmation));
   trustedEditorHandle(

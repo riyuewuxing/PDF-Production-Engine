@@ -9,6 +9,7 @@ import {restoreArchivedJobReview,sameJobReviewDocument} from '../lib/jobRequirem
 import { adaptResumeOrLegacy } from '../schema/legacyAdapter';
 import {
   type ApplicationSnapshotMeta,
+  type ApplicationSnapshotLink,
   type ApplicationSnapshotRecord,
   ApplicationsStoreSchema,
   JobApplicationSchema,
@@ -871,8 +872,8 @@ export class LocalResumeStore {
     await atomicWriteFile(this.applicationsPath,JSON.stringify(next,null,2)+'\n');
     return next;
   }
-  async getApplications(): Promise<ApplicationsStoreData> {
-    await fs.mkdir(this.dataDir,{recursive:true});
+  async getApplications(createRoot=true): Promise<ApplicationsStoreData> {
+    if(createRoot)await fs.mkdir(this.dataDir,{recursive:true});
     let text:string;
     try{
       await checkWorkspaceFile(this.dataDir,this.applicationsPath);
@@ -997,6 +998,45 @@ export class LocalResumeStore {
     };
   }
 
+  /** A permanent snapshot review is bound to a unique persisted ledger row and
+   * its acknowledged revision. It does not restore, create or require the
+   * original editable resume. Legacy standalone raw reads remain unchanged. */
+  async getLinkedApplicationSnapshot(input:ApplicationSnapshotLink):Promise<ApplicationSnapshotRecord>{
+    if(!input||typeof input!=='object'||Array.isArray(input)||
+       typeof input.applicationId!=='string'||!input.applicationId.trim()||input.applicationId.length>200||
+       typeof input.snapshotId!=='string'||input.snapshotId.length>125||
+       typeof input.ledgerRevision!=='string'||!/^[a-f0-9]{64}$/.test(input.ledgerRevision)){
+      throw new LocalFsApiError(400,'INVALID_APPLICATION_LINK','投递复盘关联标识或台账版本无效。');
+    }
+    const id=assertSafeSnapshotId(input.snapshotId);
+    // A .json suffix in an already-persisted legacy link is supported; no
+    // caller-chosen aliases, padding or case substitution of the record ID.
+    if(input.snapshotId!==id&&input.snapshotId.slice(0,-5)!==id)throw new LocalFsApiError(400,'INVALID_APPLICATION_LINK','永久快照关联标识不规范。');
+    const current=await this.getApplications(false);
+    if(current.revision!==input.ledgerRevision)throw new LocalFsApiError(409,'APPLICATION_CONFLICT','磁盘投递台账已变化，请重新读取台账后复盘。');
+    const matches=current.applications.filter(a=>a.id===input.applicationId);
+    if(matches.length!==1||matches[0]!.snapshotId!==input.snapshotId||!matches[0]!.snapshotId){
+      throw new LocalFsApiError(409,'APPLICATION_SNAPSHOT_LINK','投递记录不存在、重复或永久快照关联不一致，未读取原稿。');
+    }
+    const entry=matches[0]!;
+    const slug=assertSafeSlug(entry.resumeSlug);
+    if(slug!==entry.resumeSlug)throw new LocalFsApiError(422,'APPLICATION_SNAPSHOT_LINK','关联简历标识不规范，未读取原稿。');
+    let record:ApplicationSnapshotRecord;
+    try{record=await this.getApplicationSnapshot(id);}
+    catch(err){if(err instanceof LocalFsApiError)throw err;throw new LocalFsApiError(422,'APPLICATION_SNAPSHOT_INVALID','永久快照损坏或结构无效，原文件保留，未显示原稿。');}
+    const meta=record.meta,doc=record.document;
+    if(!meta||meta.id!==id||meta.applicationId!==entry.id||meta.resumeSlug!==slug||
+       meta.exportedFilePath!==entry.exportedFilePath||meta.atsScore!==entry.atsScore||
+       meta.title!==doc.title||meta.templateId!==doc.templateId||typeof meta.createdAt!=='string'||!Number.isFinite(Date.parse(meta.createdAt))){
+      throw new LocalFsApiError(409,'APPLICATION_SNAPSHOT_LINK','永久快照与台账身份、导出关联或原稿元数据不一致，未显示原稿；请核对原件或备份。');
+    }
+    // A concurrent atomic ledger update must not make a stale association look
+    // verified. This is a point-in-time check, not a filesystem transaction.
+    const after=await this.getApplications(false);
+    if(after.revision!==current.revision)throw new LocalFsApiError(409,'APPLICATION_CONFLICT','读取期间投递台账已变化，请重新读取台账后复盘。');
+    return {meta:{id,applicationId:entry.id,resumeSlug:slug,exportedFilePath:entry.exportedFilePath,createdAt:meta.createdAt,title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore},document:doc};
+  }
+
   async deleteApplicationSnapshot(rawSnapshotId: string): Promise<{ deleted: boolean }> {
     const id = assertSafeSnapshotId(rawSnapshotId);
     const targetPath = resolveContainedPath(this.appSnapshotsDir, `${id}.json`);
@@ -1097,6 +1137,21 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown): void 
   res.end(JSON.stringify(data));
 }
 
+/** Historical resume data must only be returned to a local same-origin
+ * browser development session. Native app uses trusted-editor IPC. */
+function assertLocalSnapshotRead(req:IncomingMessage,res:ServerResponse,method:string):void {
+  res.setHeader('Cache-Control','no-store');
+  res.setHeader('Cross-Origin-Resource-Policy','same-origin');
+  const host=req.headers.host??'',origin=req.headers.origin,site=req.headers['sec-fetch-site'];
+  const localPeer=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress??'');
+  const localHost=/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$/i.test(host);
+  const scheme='encrypted' in req.socket&&req.socket.encrypted?'https:':'http:';
+  let originMatches=true;
+  if(origin!==undefined){try{const u=new URL(origin);originMatches=u.protocol===scheme&&u.host.toLowerCase()===host.toLowerCase()&&!u.username&&!u.password&&u.pathname==='/'&&!u.search&&!u.hash;}catch{originMatches=false;}}
+  if(!localPeer||!localHost||!originMatches||(site!==undefined&&site!=='same-origin'&&site!=='none'))throw new LocalFsApiError(403,'SNAPSHOT_LOCAL_ONLY','历史快照对照仅允许本地同源读取。');
+  if(method!=='GET'){res.setHeader('Allow','GET');throw new LocalFsApiError(405,'METHOD_NOT_ALLOWED','历史快照对照只支持 GET，不执行任何写入。');}
+}
+
 export type ConnectNext = (err?: unknown) => void;
 
 export function createLocalFsMiddleware(store: LocalResumeStore) {
@@ -1184,6 +1239,14 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         return;
       }
 
+      if(pathname==='/api/application-snapshot-review'){
+        assertLocalSnapshotRead(req,res,method);
+        const query=new URLSearchParams(rawUrl.includes('?')?rawUrl.slice(rawUrl.indexOf('?')+1):'');
+        const keys=['applicationId','snapshotId','ledgerRevision'] as const;
+        if([...query.keys()].length!==keys.length||keys.some(k=>query.getAll(k).length!==1))throw new LocalFsApiError(400,'INVALID_APPLICATION_LINK','投递复盘查询参数无效。');
+        sendJson(res,200,await store.getLinkedApplicationSnapshot({applicationId:query.get('applicationId')!,snapshotId:query.get('snapshotId')!,ledgerRevision:query.get('ledgerRevision')!}));return;
+      }
+
       if (pathname.startsWith('/api/application-snapshots/')) {
         const snapId = pathname.slice('/api/application-snapshots/'.length);
         if (method === 'GET') {
@@ -1206,18 +1269,7 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         }
         const previewMatch=/^([^/]+)\/snapshot-preview\/([^/]+)$/.exec(tail);
         if(previewMatch?.[1]&&previewMatch?.[2]){
-          // Historical content can contain information removed from the current version.
-          // The optional browser development path is local and same-origin only.
-          res.setHeader('Cache-Control','no-store');
-          res.setHeader('Cross-Origin-Resource-Policy','same-origin');
-          const host=req.headers.host??'',origin=req.headers.origin,site=req.headers['sec-fetch-site'];
-          const localPeer=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress??'');
-          const localHost=/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$/i.test(host);
-          const scheme='encrypted' in req.socket&&req.socket.encrypted?'https:':'http:';
-          let originMatches=true;
-          if(origin!==undefined){try{const u=new URL(origin);originMatches=u.protocol===scheme&&u.host.toLowerCase()===host.toLowerCase()&&!u.username&&!u.password&&u.pathname==='/'&&!u.search&&!u.hash;}catch{originMatches=false;}}
-          if(!localPeer||!localHost||!originMatches||(site!==undefined&&site!=='same-origin'&&site!=='none'))throw new LocalFsApiError(403,'SNAPSHOT_LOCAL_ONLY','历史快照对照仅允许本地同源读取。');
-          if(method!=='GET'){res.setHeader('Allow','GET');throw new LocalFsApiError(405,'METHOD_NOT_ALLOWED','历史快照对照只支持 GET，不执行任何写入。');}
+          assertLocalSnapshotRead(req,res,method);
           sendJson(res,200,await store.getSnapshotForComparison(previewMatch[1],previewMatch[2]));return;
         }
         const snapMatch = /^([^/]+)\/snapshots(\/restore)?$/.exec(tail);

@@ -40,6 +40,7 @@ const bridge: ResumeDesktopBridge = {
     saveSnapshot: (input: SaveApplicationSnapshotInput) =>
       ipcRenderer.invoke('applications:saveSnapshot', input),
     getSnapshot: (snapshotId: string) => ipcRenderer.invoke('applications:getSnapshot', snapshotId),
+    getLinkedSnapshot: link=>ipcRenderer.invoke('applications:getLinkedSnapshot',link),
     deleteSnapshot: (snapshotId: string) =>
       ipcRenderer.invoke('applications:deleteSnapshot', snapshotId),
   },

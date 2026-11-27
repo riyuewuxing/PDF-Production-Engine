@@ -142,4 +142,6 @@ export interface ApplicationSnapshotRecord {
   document: ResumeDocument;
 }
 
+export interface ApplicationSnapshotLink { applicationId:string; snapshotId:string; ledgerRevision:string; }
+
 export interface ApplicationLogInput { entry:JobApplication; document:ResumeDocument; }

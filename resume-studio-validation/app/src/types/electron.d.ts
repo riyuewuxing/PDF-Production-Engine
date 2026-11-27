@@ -4,6 +4,7 @@ import type { ByokAiSettings, ByokCompletionRequest, AiProfileCatalog, AiComplet
 import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
+  ApplicationSnapshotLink,
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
@@ -98,6 +99,7 @@ export interface ResumeDesktopBridge {
     log?: (input:ApplicationLogInput)=>Promise<{entry:JobApplication;store:ApplicationsStoreData}>;
     saveSnapshot: (input: SaveApplicationSnapshotInput) => Promise<ApplicationSnapshotMeta>;
     getSnapshot: (snapshotId: string) => Promise<ApplicationSnapshotRecord>;
+    getLinkedSnapshot?: (link:ApplicationSnapshotLink)=>Promise<ApplicationSnapshotRecord>;
     deleteSnapshot: (snapshotId: string) => Promise<{ deleted: boolean }>;
   };
   assets: {

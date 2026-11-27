@@ -6,6 +6,7 @@ import { buildResumeExportFilename, printResumeInBrowser } from './resumeExportN
 import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
+  ApplicationSnapshotLink,
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
@@ -229,6 +230,16 @@ export const apiClient = {
     }
     const res = await fetch(`/api/application-snapshots/${encodeURIComponent(snapshotId)}`);
     return handleJsonResponse<ApplicationSnapshotRecord>(res);
+  },
+
+  async getLinkedApplicationSnapshot(link:ApplicationSnapshotLink,signal?:AbortSignal):Promise<ApplicationSnapshotRecord>{
+    if(window.resumeDesktop){
+      const method=window.resumeDesktop.applications?.getLinkedSnapshot;
+      if(!method)throw new Error('当前桌面桥接不支持投递快照关联核验，请升级工作台。');
+      return method(link);
+    }
+    const query=new URLSearchParams({applicationId:link.applicationId,snapshotId:link.snapshotId,ledgerRevision:link.ledgerRevision});
+    return handleJsonResponse<ApplicationSnapshotRecord>(await fetch('/api/application-snapshot-review?'+query.toString(),{signal,cache:'no-store'}));
   },
 
   async deleteApplicationSnapshot(snapshotId: string): Promise<{ deleted: boolean }> {
