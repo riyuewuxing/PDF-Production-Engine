@@ -7,6 +7,7 @@ import type {
   ApplicationSnapshotLink,
   PdfArtifactReceipt,
   ApplicationPdfCheck,
+  SubmissionPackageResult,
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
@@ -106,6 +107,7 @@ export interface ResumeDesktopBridge {
     getSnapshot: (snapshotId: string) => Promise<ApplicationSnapshotRecord>;
     getLinkedSnapshot?: (link:ApplicationSnapshotLink)=>Promise<ApplicationSnapshotRecord>;
     checkPdf?: (link:ApplicationSnapshotLink,action:'check'|'open'|'choose')=>Promise<ApplicationPdfCheck>;
+    exportPackage?: (link:ApplicationSnapshotLink)=>Promise<SubmissionPackageResult>;
     deleteSnapshot: (snapshotId: string) => Promise<{ deleted: boolean }>;
   };
   assets: {

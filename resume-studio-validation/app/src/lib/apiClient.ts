@@ -8,6 +8,7 @@ import type {
   ApplicationSnapshotRecord,
   ApplicationSnapshotLink,
   ApplicationPdfCheck,
+  SubmissionPackageResult,
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
@@ -241,6 +242,12 @@ export const apiClient = {
     }
     const query=new URLSearchParams({applicationId:link.applicationId,snapshotId:link.snapshotId,ledgerRevision:link.ledgerRevision});
     return handleJsonResponse<ApplicationSnapshotRecord>(await fetch('/api/application-snapshot-review?'+query.toString(),{signal,cache:'no-store'}));
+  },
+
+  async exportApplicationPackage(link:ApplicationSnapshotLink):Promise<SubmissionPackageResult>{
+    const method=window.resumeDesktop?.applications?.exportPackage;
+    if(!method)throw Error('投递包需要新版桌面工作台。');
+    return method(link);
   },
 
   async checkApplicationPdf(link:ApplicationSnapshotLink,action:'check'|'open'|'choose'):Promise<ApplicationPdfCheck>{

@@ -43,6 +43,7 @@ import {
   type CoverLetterHeaderVariant,
   type JobApplication,
   type ApplicationPdfCheck,
+  type SubmissionPackageResult,
   samePdfReceipt,
   type SavedCoverLetter,
 } from '../../schema/applicationSchema';
@@ -93,6 +94,9 @@ export function JobCareerPane({
   const [clonePhase,setClonePhase]=useState<'reading'|'writing'|null>(null);
   const [pdfCheck,setPdfCheck]=useState<{id:string;revision:string;action:'check'|'open'|'choose';result?:ApplicationPdfCheck;error?:string}|null>(null);
   const pdfTask=useRef<symbol|null>(null);
+  const packageTask=useRef<symbol|null>(null);
+  const [packageBusy,setPackageBusy]=useState(false);
+  const [packageStatus,setPackageStatus]=useState<{id:string;revision:string;result?:SubmissionPackageResult;error?:string}|null>(null);
   const pdfEpoch=useRef(0);
   const pdfScope=useRef({revision:storeData.revision,comparisonDisabled,subTab,activeSlug});pdfScope.current={revision:storeData.revision,comparisonDisabled,subTab,activeSlug};
   const cloneRead=useRef<{controller:AbortController;cancel:()=>void;phase:'reading'|'writing'}|null>(null);
@@ -104,7 +108,7 @@ export function JobCareerPane({
   const reviewValid=Boolean(review&&canReview&&subTab==='tracker'&&review.activeSlug===activeSlug&&review.activeDocId===activeDoc.id&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
   useEffect(()=>{if(!reviewValid)setReview(null);},[reviewValid]);
   useEffect(()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();},[activeSlug,activeDoc.id,comparisonDisabled,subTab]);
-  useEffect(()=>{pdfEpoch.current++;setPdfCheck(null);},[activeSlug,activeDoc.id,comparisonDisabled,subTab,storeData.revision,ledger.dirty,ledger.loading,ledger.saving,ledger.error]);
+  useEffect(()=>{pdfEpoch.current++;setPdfCheck(null);setPackageStatus(null);},[activeSlug,activeDoc.id,comparisonDisabled,subTab,storeData.revision,ledger.dirty,ledger.loading,ledger.saving,ledger.error]);
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');
@@ -189,6 +193,17 @@ export function JobCareerPane({
       if(alive())setPdfCheck({id:item.id,revision,action,result});
     }catch(err){if(alive())setPdfCheck({id:item.id,revision,action,error:localErrorMessage(err,'PDF 字节核验失败')});}
     finally{if(timer!==undefined)clearTimeout(timer);if(pdfTask.current===token)pdfTask.current=null;}
+  };
+  const handleSubmissionPackage=async(item:JobApplication)=>{
+    if(!canReview||!desktop||!item.snapshotId||!item.pdfReceipt||!storeData.revision||packageTask.current||pdfTask.current)return;
+    const revision=storeData.revision,token=Symbol('submission-package'),epoch=pdfEpoch.current;
+    packageTask.current=token;setPackageBusy(true);setPackageStatus({id:item.id,revision});
+    const alive=()=>mounted.current&&packageTask.current===token&&pdfEpoch.current===epoch&&pdfScope.current.revision===revision&&!pdfScope.current.comparisonDisabled&&pdfScope.current.subTab==='tracker'&&!careerLedger.getSnapshot().dirty&&!careerLedger.getSnapshot().saving&&!careerLedger.getSnapshot().loading&&!careerLedger.getSnapshot().error;
+    try{
+      const result=await apiClient.exportApplicationPackage({applicationId:item.id,snapshotId:item.snapshotId,ledgerRevision:revision});
+      if(alive())setPackageStatus({id:item.id,revision,result});
+    }catch(err){if(alive())setPackageStatus({id:item.id,revision,error:localErrorMessage(err,'制作投递包失败')});}
+    finally{if(packageTask.current===token)packageTask.current=null;if(mounted.current)setPackageBusy(false);}
   };
   const openApplicationReview=(item:JobApplication)=>{
     if(!canReview||!item.snapshotId||!storeData.revision)return;
@@ -669,6 +684,7 @@ export function JobCareerPane({
                                 <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">核验 PDF</button>
                                 <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40">核验并打开</button>
                                 <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40">选择文件核验</button>
+                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>void handleSubmissionPackage(item)} aria-label={'制作投递包 '+item.company} className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">制作投递包 ZIP</button>
                               </>}
                               {item.exportedFilePath && !item.pdfReceipt && desktop && (
                                 <button
@@ -694,6 +710,15 @@ export function JobCareerPane({
                             </div>
                           </div>
 
+                          {!comparisonDisabled&&packageStatus?.id===item.id&&packageStatus.revision===storeData.revision&&<div role={packageStatus.error?'alert':'status'} className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-900 space-y-1">
+                            {packageStatus.error??(!packageStatus.result?'正在制作投递包，请在系统窗口选择、确认或取消。':packageStatus.result.canceled?'已取消制作投递包。':'本地投递包 ZIP 已生成（未发送）')}
+                            {packageStatus.result&&!packageStatus.result.canceled&&<>
+                              <div className="break-all">{packageStatus.result.filePath}</div>
+                              <div className="break-all font-mono">SHA256 {packageStatus.result.sha256}</div>
+                              {packageStatus.result.entries.map(entry=><div key={entry.name}>{entry.name} · {entry.sizeBytes.toLocaleString()} 字节</div>)}
+                              <div>请在发送前自行核对压缩包中全部文件；未修改投递台账。</div>
+                            </>}
+                          </div>}
                           {item.exportedFilePath&&<div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700">
                             {item.pdfReceipt?<><div className="font-semibold text-indigo-800">已封存导出字节凭证 · 尚需按需核验</div>
                               <div className="break-all font-mono text-[10px]" title={item.pdfReceipt.sha256}>SHA256 {item.pdfReceipt.sha256.slice(0,16)}… · {item.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>

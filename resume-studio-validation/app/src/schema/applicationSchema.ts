@@ -160,5 +160,7 @@ export interface ApplicationSnapshotRecord {
 }
 
 export interface ApplicationSnapshotLink { applicationId:string; snapshotId:string; ledgerRevision:string; }
+/** Local ZIP result only; no application status or delivery claim. */
+export type SubmissionPackageResult={canceled:true}|{canceled:false;filePath:string;sha256:string;entries:{name:string;sizeBytes:number;sha256:string}[]};
 
 export interface ApplicationLogInput { entry:JobApplication; document:ResumeDocument; pdfReceiptToken?:string; }

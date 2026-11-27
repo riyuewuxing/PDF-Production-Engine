@@ -8,7 +8,7 @@ import {isSafeExportFileName,isPathInside} from './securityPolicy';
 export const MAX_RECEIPT_PDF_BYTES=32*1024*1024;
 const HASH_CHUNK=256*1024;
 type Fingerprint={sha256:string;sizeBytes:number;pdf:boolean;realPath:string};
-type ReadResult={status:'read';fingerprint:Fingerprint}|{status:'missing'|'unsafe'|'unavailable'};
+type ReadResult={status:'read';fingerprint:Fingerprint;bytes?:Buffer}|{status:'missing'|'unsafe'|'unavailable'};
 const normalized=(file:string)=>path.resolve(file);
 export const documentSha256=(document:unknown)=>createHash('sha256').update(JSON.stringify(ResumeDocumentSchema.parse(document))).digest('hex');
 const safePdfPath=(file:string)=>isSafeExportFileName(file)&&path.extname(file).toLowerCase()==='.pdf'&&path.relative(normalized(file),file)==='';
@@ -17,7 +17,7 @@ const ordinary=(s:BigIntStats)=>s.isFile()&&!s.isSymbolicLink()&&s.nlink===1n;
 
 /** Bounded, local-only hash. Reject links, aliases, nonordinary files and
  * detectable races. A hash is a point-in-time observation, not a lease. */
-export async function readPdfFingerprint(file:string,signal?:AbortSignal,allowReal?:(real:string)=>Promise<boolean>):Promise<ReadResult>{
+export async function readPdfFingerprint(file:string,signal?:AbortSignal,allowReal?:(real:string)=>Promise<boolean>,captureBytes=false):Promise<ReadResult>{
   if(!safePdfPath(file))return {status:'unsafe'};
   let handle:Awaited<ReturnType<typeof fs.open>>|undefined;
   try{
@@ -31,18 +31,18 @@ export async function readPdfFingerprint(file:string,signal?:AbortSignal,allowRe
     handle=await fs.open(file,constants.O_RDONLY|(process.platform==='win32'?0:constants.O_NOFOLLOW));
     const opened=await handle.stat({bigint:true});
     if(!ordinary(opened)||!sameStat(start,opened))return {status:'unsafe'};
-    const chunk=Buffer.alloc(HASH_CHUNK),hash=createHash('sha256');let offset=0,pdf=false;
+    const chunk=Buffer.alloc(HASH_CHUNK),hash=createHash('sha256'),bytes=captureBytes?Buffer.alloc(Number(opened.size)):undefined;let offset=0,pdf=false;
     while(offset<Number(opened.size)){
       signal?.throwIfAborted();
       const {bytesRead}=await handle.read(chunk,0,Math.min(chunk.length,Number(opened.size)-offset),offset);
       if(bytesRead===0)return {status:'unavailable'};
       if(offset===0)pdf=bytesRead>=5&&chunk.subarray(0,5).toString('ascii')==='%PDF-';
-      hash.update(chunk.subarray(0,bytesRead));offset+=bytesRead;
+      hash.update(chunk.subarray(0,bytesRead));if(bytes)chunk.copy(bytes,offset,0,bytesRead);offset+=bytesRead;
     }
     const end=await handle.stat({bigint:true}),again=await fs.lstat(file,{bigint:true});
     signal?.throwIfAborted();
     if(!ordinary(end)||!ordinary(again)||!sameStat(opened,end)||!sameStat(opened,again)||path.relative(real,await fs.realpath(file))!=='')return {status:'unsafe'};
-    return {status:'read',fingerprint:{sha256:hash.digest('hex'),sizeBytes:offset,pdf,realPath:real}};
+    return {status:'read',fingerprint:{sha256:hash.digest('hex'),sizeBytes:offset,pdf,realPath:real},...(bytes?{bytes}:{})};
   }catch(error){
     const code=(error as NodeJS.ErrnoException)?.code;
     return {status:code==='ENOENT'||code==='ENOTDIR'?'missing':code==='ELOOP'?'unsafe':'unavailable'};

@@ -20,7 +20,7 @@ import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/doc
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
 import { buildResumeExportFilename, formatLocalDate, sanitizeFilePart } from '../src/lib/resumeExportNaming';
-import type { CoverLetterPdfPayload, ApplicationLogInput, ApplicationSnapshotLink,ApplicationPdfCheck } from '../src/schema/applicationSchema';
+import type { CoverLetterPdfPayload, ApplicationLogInput, ApplicationSnapshotLink,ApplicationPdfCheck,SubmissionPackageResult } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
 import { LocalResumeStore, LocalFsApiError, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
 import type {
@@ -32,6 +32,7 @@ import type {
 import { resolveAppPaths, resolveUniqueExportPath } from './paths';
 import { isLoopbackDevEntry, isPathInside, isSafeExportFileName, isTrustedRendererFrame, rendererEntryUrl } from './securityPolicy';
 import {PdfReceiptVault,readPdfFingerprint,checkFingerprint,canCheckRecordedPdf,canCheckRecordedRealPdf} from './pdfReceipt';
+import {buildSubmissionZip,publishSubmissionZip,packageEntryName,MAX_PACKAGE_PDFS,MAX_PACKAGE_BYTES} from './submissionPackage';
 
 const execFileAsync = promisify(execFile);
 
@@ -542,6 +543,11 @@ const authorizedOutputPaths=new Map<string,string>();
 const pdfReceipts=new PdfReceiptVault();
 let pdfReceiptBusy=false;
 let pdfPickerBusy=false;
+let submissionPackageBusy=false;
+async function boundedPackageWork<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
+  try{return await work(controller.signal);}finally{clearTimeout(timer);}
+}
 async function boundedPdfCheck<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
   if(pdfReceiptBusy)throw Error('已有 PDF 字节核验或归档操作正在进行，请稍后重试。');
   pdfReceiptBusy=true;const controller=new AbortController();
@@ -748,6 +754,63 @@ function registerIpcHandlers(): void {
       }
       return result;
     });
+  });
+  trustedEditorHandle('applications:exportPackage',async(event,link:ApplicationSnapshotLink):Promise<SubmissionPackageResult>=>{
+    const owner=mainWindow;
+    if(!owner||owner.isDestroyed())throw Error('工作台已关闭。');
+    if(submissionPackageBusy||pdfReceiptBusy||pdfPickerBusy)throw Error('已有投递包或 PDF 核验操作正在进行。');
+    submissionPackageBusy=true;pdfPickerBusy=true;
+    try{
+      const record=await store.getLinkedApplicationSnapshot(link),receipt=record.meta.pdfReceipt;
+      if(!receipt)throw Error('历史记录没有 PDF 字节凭证，不能制作核验投递包。');
+      const original=record.meta.exportedFilePath;
+      requireRecordedPath(original);
+      assertTrustedEditor(event);
+      const choice=await dialog.showMessageBox(owner,{type:'question',title:'选择投递包内容',message:'为所选投递记录制作本地 ZIP',detail:'只包含封存 PDF 与您明确选择的附加 PDF。不会加入母库、台账、历史原稿、备注或其他岗位材料；不会发送。',buttons:['仅封存简历','另选附加 PDF','取消'],defaultId:2,cancelId:2});
+      assertTrustedEditor(event);
+      if(choice.response!==0&&choice.response!==1)return {canceled:true};
+      let attachments:string[]=[];
+      if(choice.response===1){
+        const picked=await dialog.showOpenDialog(owner,{title:'明确选择附加 PDF（自荐信、证书等）',filters:[{name:'PDF 文件',extensions:['pdf']}],properties:['openFile','multiSelections']});
+        assertTrustedEditor(event);
+        if(picked.canceled)return {canceled:true};
+        attachments=picked.filePaths;
+        if(attachments.length<1||attachments.length>=MAX_PACKAGE_PDFS)throw Error('请选择 1～7 份附加 PDF。');
+      }
+      const chosen=[original,...attachments];
+      if(new Set(chosen.map(file=>process.platform==='win32'?path.resolve(file).toLowerCase():path.resolve(file))).size!==chosen.length)throw Error('投递包不能重复选择同一个文件。');
+      // Freeze exactly the bytes read and checked, not a later path read.
+      const archive=await boundedPackageWork(async signal=>{
+        await store.getLinkedApplicationSnapshot(link);
+        const buffers:Buffer[]=[];let total=0;
+        for(const [index,file] of chosen.entries()){
+          signal.throwIfAborted();
+          const read=await readPdfFingerprint(file,signal,index===0?real=>canCheckRecordedRealPdf(file,real,exportsDir,authorizedOutputPaths):undefined,true);
+          if(read.status!=='read'||!read.bytes||!read.fingerprint.pdf)throw Error('PDF 缺失、路径不安全、文件异常或超过大小/时间限制：'+packageEntryName(index));
+          if(index===0&&checkFingerprint(read,receipt).status!=='verified')throw Error('封存简历 PDF 字节已变更；未制作投递包。');
+          total+=read.bytes.length;if(total>MAX_PACKAGE_BYTES)throw Error('投递包 PDF 总大小超过 64 MiB。');
+          buffers.push(read.bytes);
+        }
+        return buildSubmissionZip(buffers,signal);
+      });
+      assertTrustedEditor(event);
+      const clean=(s:string)=>s.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,'�').slice(0,240);
+      const listing=chosen.map((file,i)=>packageEntryName(i)+' ← '+clean(path.basename(file))+' ('+archive.entries[i]!.sizeBytes+' 字节)').join('\n');
+      const confirm=await dialog.showMessageBox(owner,{type:'warning',title:'确认投递包文件清单',message:'确认仅将以下文件写入 ZIP？',detail:listing+'\n\n简历字节与封存凭证一致；附加 PDF 仅检查本地文件与格式标记，不验证内容、资格或安全性。压缩包未加密，请逐份核对。',buttons:['确认清单并另存','取消'],defaultId:1,cancelId:1});
+      assertTrustedEditor(event);
+      if(confirm.response!==0)return {canceled:true};
+      const selected=await dialog.showSaveDialog(owner,{title:'另存投递包 ZIP（不覆盖现有文件）',defaultPath:path.join(exportsDir,'submission-package-'+Date.now()+'.zip'),filters:[{name:'ZIP 压缩包',extensions:['zip']}]});
+      assertTrustedEditor(event);
+      if(selected.canceled||!selected.filePath)return {canceled:true};
+      const target=selected.filePath;
+      await boundedPackageWork(async signal=>{
+        // The link must still be the exact acknowledged persisted ledger row.
+        await store.getLinkedApplicationSnapshot(link);
+        assertTrustedEditor(event);signal.throwIfAborted();
+        await publishSubmissionZip(target,archive.bytes,signal);
+      });
+      return {canceled:false,filePath:target,sha256:archive.sha256,entries:archive.entries};
+    }finally{submissionPackageBusy=false;pdfPickerBusy=false;}
   });
   trustedEditorHandle('applications:getLinkedSnapshot',(_event,input:Parameters<typeof store.getLinkedApplicationSnapshot>[0])=>store.getLinkedApplicationSnapshot(input));
   trustedEditorHandle('writeLock:inspect',()=>inspectResumeWriteLock(store.dataDir));

@@ -42,6 +42,7 @@ const bridge: ResumeDesktopBridge = {
     getSnapshot: (snapshotId: string) => ipcRenderer.invoke('applications:getSnapshot', snapshotId),
     getLinkedSnapshot: link=>ipcRenderer.invoke('applications:getLinkedSnapshot',link),
     checkPdf: (link,action)=>ipcRenderer.invoke('applications:checkPdf',link,action),
+    exportPackage: link=>ipcRenderer.invoke('applications:exportPackage',link),
     deleteSnapshot: (snapshotId: string) =>
       ipcRenderer.invoke('applications:deleteSnapshot', snapshotId),
   },
