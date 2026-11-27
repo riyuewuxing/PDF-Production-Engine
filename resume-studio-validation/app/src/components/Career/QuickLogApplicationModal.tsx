@@ -28,6 +28,7 @@ interface QuickLogApplicationModalProps {
   defaultAtsScore?: number | null;
   queueTask?:JobQueueTask;
   beforeSubmit?:()=>Promise<unknown>;
+  queueRequestId?:string;
   onClose: () => void;
   onLogged: (entry: JobApplication) => void;
 }
@@ -37,7 +38,7 @@ export function QuickLogApplicationModal({
   snapshot,
   defaultJdText = '',
   defaultAtsScore = null,
-  queueTask,beforeSubmit,
+  queueTask,beforeSubmit,queueRequestId,
   onClose,
   onLogged,
 }: QuickLogApplicationModalProps) {
@@ -55,7 +56,7 @@ export function QuickLogApplicationModal({
 
   useEffect(() => {
     if (!isOpen || !snapshot) return;
-    requestId.current=null;
+    requestId.current=queueTask?queueRequestId??null:null;
     setCompany(queueTask?.company??'');
     setRole(queueTask?.role??snapshot.document.basic.title??'');
     setCity(snapshot.document.basic.location || '');
@@ -64,7 +65,7 @@ export function QuickLogApplicationModal({
     setJdText(queueTask?.jdText??defaultJdText);
     setNotes('');
     setErrorMsg(null);
-  }, [defaultJdText, isOpen, snapshot,queueTask]);
+  }, [defaultJdText, isOpen, snapshot,queueTask,queueRequestId]);
 
   if (!isOpen || !snapshot) return null;
 
@@ -81,7 +82,8 @@ export function QuickLogApplicationModal({
     try {
       if(queueTask){if(!beforeSubmit)throw Error('缺少岗位流程重新核验。');await beforeSubmit();}
       const now = new Date().toISOString();
-      const appId=requestId.current??crypto.randomUUID();
+      if(queueTask&&!queueRequestId)throw Error('岗位归档缺少固定请求标识，请重新导出。');
+      const appId=queueRequestId??requestId.current??crypto.randomUUID();
       requestId.current=appId;
       const entry: JobApplication = {
         id: appId,
@@ -157,6 +159,7 @@ export function QuickLogApplicationModal({
         {errorMsg && (
           <div className="rounded border border-red-500/40 bg-red-950/60 px-3 py-2 text-[11px] text-red-200">
             {errorMsg}
+            {queueTask&&<button type="button" disabled={saving} className="ml-2 rounded border px-2 py-1" onClick={()=>void careerLedger.load().then(()=>setErrorMsg('已刷新磁盘台账，请核验后重试同一请求。')).catch(e=>setErrorMsg(localErrorMessage(e,'刷新失败')))}>刷新岗位归档台账</button>}
           </div>
         )}
 

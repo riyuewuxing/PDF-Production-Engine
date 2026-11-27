@@ -23,7 +23,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
   const [tab,setTab]=useState<Tab>('review');
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
   const [invalid,setInvalid]=useState(false);
-  const [snapshot,setSnapshot]=useState<FrozenPdfExportSnapshot|null>(null),[logOpen,setLogOpen]=useState(false);
+  const [snapshot,setSnapshot]=useState<(FrozenPdfExportSnapshot&{requestId:string})|null>(null),[logOpen,setLogOpen]=useState(false);
   const mounted=useRef(false),action=useRef(false),readBusy=useRef(false);
   useLayoutEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const clean=ledger.ready&&!ledger.loading&&!ledger.saving&&!ledger.dirty&&!ledger.error&&!!ledger.data.revision;
@@ -90,7 +90,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
     if(!result.filePath||!receipt.success||!result.pdfReceiptToken||result.snapshotWarning||result.contentWarning||result.receiptWarning){setError('PDF 输出或原稿凭证未完整确认；可能已有文件，不能归档。'+[result.snapshotWarning,result.contentWarning,result.receiptWarning].filter(Boolean).join('；'));return;}
     try{await verify();}catch(e){if(mounted.current)setError('PDF 已输出，但岗位绑定复核失败，未开放归档：'+localErrorMessage(e,'核验失败'));return;}
     if(!mounted.current)return;
-    setSnapshot({slug:task.slug,document:doc,isRedacted:false,filePath:result.filePath,pdfReceipt:receipt.data,pdfReceiptToken:result.pdfReceiptToken});
+    setSnapshot({slug:task.slug,document:doc,isRedacted:false,filePath:result.filePath,pdfReceipt:receipt.data,pdfReceiptToken:result.pdfReceiptToken,requestId:crypto.randomUUID()});
     setNotice('原稿 PDF 已导出并取得字节凭证；尚未记入投递，未发送。');
   });
   const packagePdf=(entry:JobApplication)=>void run(async()=>{
@@ -112,7 +112,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
       <p className="text-[11px] text-slate-700">已保存核对档案 {archiveCount} · 自荐信 {letters.length} · PDF归档 {applications.length}。这些是记录数量，不是流程通过率。离开或切换模块会丢弃未归档的核对会话；保存的历史保留。</p>
     </div>
     {invalid&&<p role="alert" className="rounded bg-amber-50 p-2 text-amber-900">本次流程核验失效。请返回岗位队列重新核验；若磁盘简历已变更，须登记新任务。不会自动换绑。</p>}
-    {!clean&&<p role="status" className="text-amber-800">台账尚未获得保存确认；完成保存或到投递追踪处理草稿后再操作。</p>}
+    {!clean&&<div role="status" className="text-amber-800">台账尚未获得保存确认；完成保存或到投递追踪处理草稿后再操作。{!ledger.dirty&&!ledger.saving&&!ledger.loading&&<button type="button" disabled={busy||logOpen} className={btn} onClick={()=>void run(async()=>{await careerLedger.load();if(mounted.current)setNotice('已读取磁盘台账，请重新核验。');})}>刷新岗位流程台账</button>}</div>}
     {error&&<p role="alert" className="break-words text-red-700">{error}</p>}
     {notice&&<p role="status" className="break-words text-teal-800">{notice}</p>}
     <div className="grid grid-cols-2 gap-1 rounded bg-slate-100 p-1">
@@ -135,6 +135,6 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
       {snapshot&&<div className="rounded bg-teal-50 p-2 space-y-1"><p className="break-all">{snapshot.filePath}</p><p className="break-all text-[10px]">PDF SHA-256：{snapshot.pdfReceipt.sha256}</p><button type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current)setLogOpen(true);})}>核对并归档岗位 PDF</button></div>}
       {applications.map(a=><article key={a.id} className="rounded border p-2 space-y-1" aria-label={'岗位归档 '+a.id}><p className="font-semibold">{a.company} · {a.role}</p><p>{a.status==='wishlist'?'待投递': '本人台账状态：'+a.status} · 永久快照 {a.snapshotId}</p><p className="text-[10px] break-all">PDF SHA-256：{a.pdfReceipt?.sha256??'缺少凭证'}</p><button type="button" className={btn} disabled={disabled||!a.pdfReceipt||!a.snapshotId||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>packagePdf(a)}>制作本岗位投递包 ZIP</button><p className="text-slate-600">完整只读复盘、状态管理与 PDF 核验仍在投递追踪。</p></article>)}
     </div>}
-    {logOpen&&snapshot&&!invalid&&<QuickLogApplicationModal isOpen snapshot={snapshot} queueTask={task} beforeSubmit={verify} onClose={()=>setLogOpen(false)} onLogged={()=>{if(mounted.current){setSnapshot(null);setNotice('岗位 PDF 已封存至永久台账；未发送。');}}}/>}
+    {logOpen&&snapshot&&!invalid&&<QuickLogApplicationModal isOpen snapshot={snapshot} queueTask={task} queueRequestId={snapshot.requestId} beforeSubmit={verify} onClose={()=>setLogOpen(false)} onLogged={()=>{if(mounted.current){setSnapshot(null);setNotice('岗位 PDF 已封存至永久台账；未发送。');}}}/>}
   </section>;
 }
