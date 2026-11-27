@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [baseline]
+        phase: [candidate]
     runs-on: windows-latest
     timeout-minutes: 15
     defaults:

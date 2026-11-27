@@ -232,8 +232,9 @@ async function run() {
     fs.writeFileSync(path.join(out,name+'.png'),img.toPNG());
     return {styleHash:sha(JSON.stringify(state.paper)),cropHash:sha(img.toBitmap()),size:img.getSize(),scroll:state.scroll,markers:state.markers};
   }
-  // Diagnostic only. The original 204 strict matrix remains the acceptance gate.
-  const passes=[['classic-first','classic',false],['classic-repeat','classic',false],['dark-switched','dark',false],['classic-return','classic',false],['dark-fresh','dark',true],['classic-fresh','classic',true]];
+  // Controlled exact comparison. Do not discard any differing pixel.
+  // Warmup is a separate recorded control, not a substitute for the historical failed gate.
+  const passes=[['warmup','classic',false],...['classic','dark','light','warm'].map(id=>['fresh-'+id,id,true]),['steady-warmup','classic',false],...['classic','dark','light','warm'].map(id=>['switch-'+id,id,false])];
   results.pixelMismatches=[];
   for(const [label,id,fresh] of passes){
     if(fresh){await nav('内容编辑');await until('gallery unmounted',()=>js('!document.querySelector('+JSON.stringify(rootSelector)+')'));}
@@ -246,8 +247,9 @@ async function run() {
     for(let i=0;i<cards.length;i++){
       const proof=await cardProof(i,label+'-'+String(i).padStart(2,'0')+'-paper');
       results.themes[label].push({name:cards[i].name,...proof});
-      if(label!=='classic-first'){
-        const ref=results.themes['classic-first'][i];
+      const prefix=label.startsWith('fresh-')?'fresh-':label.startsWith('switch-')?'switch-':null;
+      if(prefix&&id!=='classic'){
+        const ref=results.themes[prefix+'classic'][i];
         assert.equal(proof.styleHash,ref.styleHash,'paper DOM changed '+label+' '+cards[i].name);
         assert.deepEqual(proof.size,ref.size);
         if(proof.cropHash!==ref.cropHash)results.pixelMismatches.push({label,id,index:i,name:cards[i].name,reference:ref.cropHash,actual:proof.cropHash});
@@ -258,8 +260,11 @@ async function run() {
   }
   assert.equal(sha(fs.readFileSync(disk)),originalDisk);
   checks.diskUnchanged=true;
-  fs.writeFileSync(path.join(out,'result-'+phase+'.json'),JSON.stringify({phase,runnerSha:process.env.GITHUB_SHA,checks,results,diagnosticOnly:true},null,2));
-  console.log(JSON.stringify({phase,checks,diagnosticOnly:true,pixelMismatches:results.pixelMismatches},null,2));
+  checks.freshPixelExact=!results.pixelMismatches.some(x=>x.label.startsWith('fresh-'));
+  checks.switchPixelExact=!results.pixelMismatches.some(x=>x.label.startsWith('switch-'));
+  fs.writeFileSync(path.join(out,'result-'+phase+'.json'),JSON.stringify({phase,runnerSha:process.env.GITHUB_SHA,checks,results,controlledProtocol:true},null,2));
+  console.log(JSON.stringify({phase,checks,controlledProtocol:true,pixelMismatches:results.pixelMismatches},null,2));
+  assert.ok(checks.freshPixelExact&&checks.switchPixelExact,'controlled exact pixel gate failed; preserve all evidence');
 
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0);}).catch(err=>{console.error(err.stack||err.message);fs.writeFileSync(path.join(out,'failure-'+phase+'.json'),JSON.stringify({phase,checks,results,error:err.stack||err.message},null,2));clearTimeout(timer);app.exit(1);});
