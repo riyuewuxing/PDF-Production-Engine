@@ -138,7 +138,7 @@ async function run() {
     checks.coldProcessPersistence=true;
   } else {
     await until('default classic',()=>js('document.querySelector(".studio-shell")?.dataset.studioTheme==="classic"'));
-    await js('window.__themeProbeInput=document.querySelector("#basic-field-name")');
+    await js('(()=>{window.__themeProbeInput=document.querySelector("#basic-field-name");return !!window.__themeProbeInput})()');
     for (const id of ['classic','dark','light','warm']) {
       if (id!=='classic') await selectTheme(id);
       assert.ok(await js('window.__themeProbeInput===document.querySelector("#basic-field-name")'),'editor remounted');
