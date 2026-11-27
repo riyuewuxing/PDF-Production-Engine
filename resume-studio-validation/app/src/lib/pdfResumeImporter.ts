@@ -145,7 +145,7 @@ function guessResumeName(
 ): string {
   // 1. 显式「姓名：」标签优先级最高
   for (const candidate of lines.slice(0, 8)) {
-    const labelName = /(?:姓\s*名|\bName)\s*[:：]\s*([\u4e00-\u9fffA-Za-z·.'\-\s]{2,40})(?=\s*(?:[|｜]|$))/i.exec(candidate);
+    const labelName = /(?:姓\s*名)[:：]\s*([\u4e00-\u9fffA-Za-z·\s]{2,16})/.exec(candidate);
     if (labelName?.[1]) {
       return labelName[1].trim();
     }
@@ -232,14 +232,14 @@ export function parseExtractedResumeText(
   rawText: string,
   fileTitle = 'PDF 导入简历',
   nameOptions?: NameScoringOptions,
-  textOptions?: { markdown: boolean },
+  textOptions?: { markdown: boolean; docx?: boolean },
 ): PdfImportDraft {
   const lines = rawText
     .split(/\r\n|\n|\r/)
     .map((l) => l.trim())
     .filter(Boolean);
   // For text imports, contact candidates come from the header only, not from references or body entries.
-  const headerEnd = lines.findIndex(line=>textOptions?.markdown ? /^#{2,6}\s/.test(line)&&matchHeadingLine(line)!=='ignore' : Boolean(matchHeadingLine(line) && matchHeadingLine(line)!=='ignore'));
+  const headerEnd = lines.findIndex(line=>textOptions?.markdown ? /^#{2,6}\s/.test(line)&&(!textOptions.docx||matchHeadingLine(line)!=='ignore') : Boolean(matchHeadingLine(line) && matchHeadingLine(line)!=='ignore'));
   const header = lines.slice(0,headerEnd===-1?Math.min(lines.length,12):headerEnd);
   const metadataText = textOptions ? header.map(line=>line.replace(/^#\s+|^>\s*/, '')).join('\n') : rawText;
   const emailMatch = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.exec(metadataText);
@@ -252,7 +252,8 @@ export function parseExtractedResumeText(
 
   const nameLines = textOptions ? header.map(line=>line.replace(/^#\s+|^>\s*/, '')) : lines;
   const hasTextNameCue = headerEnd>=0 || header.some(line=>/^(?:#\s+|姓\s*名[:：]|Name\s*[:：])/i.test(line));
-  const guessedName = textOptions && !hasTextNameCue ? '' : guessResumeName(nameLines, nameOptions);
+  const explicitDocxName = textOptions?.docx ? /(?:^|[|｜])[^\S\n]*(?:姓\s*名|Name)\s*[:：][^\S\n]*([^\n|｜]{2,80})/im.exec(metadataText)?.[1]?.trim() : undefined;
+  const guessedName = explicitDocxName ?? (textOptions && !hasTextNameCue ? '' : guessResumeName(nameLines, nameOptions));
 
   const buckets: Record<
     'education' | 'experience' | 'projects' | 'skills' | 'selfEvaluation' | 'honors',

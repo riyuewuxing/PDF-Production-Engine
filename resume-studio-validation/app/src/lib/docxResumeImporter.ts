@@ -135,7 +135,7 @@ function makeDraft(paras:Para[],fileName:string,warnings:string[]):PdfImportDraf
     const lines=text.split('\n').map(l=>/^\s*(?:#|~{3}|\x60{3})/.test(l)?'\u200b'+l:l);
     marked.push(...lines);
   }
-  const d=parseExtractedResumeText(marked.join('\n'),fileName.replace(/\.docx$/i,'')||'DOCX 导入简历',undefined,{markdown:true});
+  const d=parseExtractedResumeText(marked.join('\n'),fileName.replace(/\.docx$/i,'')||'DOCX 导入简历',undefined,{markdown:true,docx:true});
   // Keep guards in experience draft until its Markdown splitting step, then remove them.
   return {...d,rawText:paras.map(p=>p.text).join('\n'),sourceKind:'docx',importWarnings:warnings};
 }

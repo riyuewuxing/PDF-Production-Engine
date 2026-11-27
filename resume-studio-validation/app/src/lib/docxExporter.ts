@@ -457,6 +457,7 @@ export function buildResumeDocxDocument(
   const buildSectionHeading = (title: string, pageBreakBefore: boolean): Paragraph =>
     new Paragraph({
       pageBreakBefore,
+      outlineLevel: 0,
       spacing: { before: 180, after: 100 },
       border: {
         bottom: { style: BorderStyle.SINGLE, size: 12, color: accentHex },
@@ -474,6 +475,7 @@ export function buildResumeDocxDocument(
 
   const buildRowHeader = (leftTitle: string, subTitle: string, rightDate: string): Paragraph =>
     new Paragraph({
+      outlineLevel: 1,
       spacing: { before: 80, after: 40 },
       tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
       children: [
