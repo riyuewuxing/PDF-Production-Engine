@@ -1,0 +1,78 @@
+/* Only explicitly identified chrome regions. No global Tailwind palette,
+   font, sizing, animation or color-scheme changes. No A4/document selectors. */
+@media screen {
+  :is([data-studio-surface="header"], [data-studio-surface="nav"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+    background-color: var(--studio-surface);
+    color: var(--studio-text);
+    border-color: var(--studio-border);
+    color-scheme: var(--studio-scheme);
+  }
+
+  /* Classic deliberately keeps its existing utility classes; markers are
+     activated for pilot alternatives only. */
+  [data-studio-surface="header"][data-studio-theme]:not([data-studio-theme="classic"]) {
+    & .studio-chrome-primary { color: var(--studio-text); }
+    & .studio-chrome-muted { color: var(--studio-muted); }
+    & .studio-chrome-border { border-color: var(--studio-border); }
+    & .studio-chrome-field { background-color: var(--studio-field); }
+    & .studio-chrome-raised { background-color: var(--studio-raised); }
+    & .studio-chrome-divider { background-color: var(--studio-divider); }
+    & .studio-chrome-overlay { background-color: var(--studio-overlay); }
+    & .studio-chrome-hover:hover:not(:disabled) { background-color: var(--studio-hover); }
+    & .studio-chrome-hover-text:hover:not(:disabled) { color: var(--studio-text); }
+    & .studio-chrome-focus:focus { border-color: var(--studio-focus); }
+    & .studio-chrome-hover-border:hover:not(:disabled) { border-color: var(--studio-focus); }
+    & .studio-chrome-placeholder::placeholder { color: var(--studio-muted); }
+    & .studio-chrome-accent-text { color: var(--studio-accent-text); }
+    & .studio-chrome-success { color: var(--studio-success); }
+    & .studio-chrome-warning { color: var(--studio-warning); }
+    & .studio-chrome-error { color: var(--studio-error); }
+    & .studio-chrome-info { color: var(--studio-info); }
+    & .studio-chrome-accent-fill { background-color: var(--studio-accent-fill); color: var(--studio-on-accent); }
+    & .studio-chrome-accent-fill:hover:not(:disabled) { background-color: var(--studio-accent-hover); }
+    & .studio-chrome-accent-border { border-color: var(--studio-focus); }
+    & .studio-chrome-privacy-fill { background-color: var(--studio-privacy-fill); color: var(--studio-on-privacy); }
+    & .studio-chrome-privacy-fill:hover:not(:disabled) { background-color: var(--studio-privacy-hover); }
+    & .studio-chrome-privacy-border { border-color: var(--studio-privacy-border); }
+    & .studio-chrome-privacy-focus:focus { border-color: var(--studio-privacy-border); }
+    & .studio-chrome-error-fill { background-color: var(--studio-error-fill); color: var(--studio-on-error); }
+    & .studio-chrome-error-fill:hover:not(:disabled) { background-color: var(--studio-error-fill); color: var(--studio-on-error); }
+    & .studio-chrome-error-border { border-color: var(--studio-error); }
+    & :is(button, select, textarea, input):focus-visible { outline: 2px solid var(--studio-focus); outline-offset: 2px; }
+  }
+
+  [data-studio-surface="nav"][data-studio-theme]:not([data-studio-theme="classic"]) {
+    & .studio-nav-item { color: var(--studio-muted); }
+    & .studio-nav-item:hover { background-color: var(--studio-hover); color: var(--studio-text); }
+    & .studio-nav-item[aria-current="page"] {
+      background-color: var(--studio-selected);
+      color: var(--studio-selected-text);
+      box-shadow: 0 0 0 1px var(--studio-selected-border);
+    }
+    & .studio-nav-item:focus-visible { outline: 2px solid var(--studio-focus); outline-offset: 2px; }
+  }
+
+  [data-studio-surface="header"] .studio-theme-picker {
+    color: var(--studio-muted);
+  }
+  [data-studio-surface="header"] .studio-theme-select {
+    color: var(--studio-text);
+    background-color: var(--studio-field);
+    border-color: var(--studio-border);
+    color-scheme: var(--studio-scheme);
+  }
+  [data-studio-surface="header"] .studio-theme-select:focus-visible {
+    outline: 2px solid var(--studio-focus);
+    outline-offset: 2px;
+  }
+  [data-studio-surface="header"] .studio-theme-notice { color: var(--studio-warning); }
+
+  @media (forced-colors: active) {
+    [data-studio-surface="header"] .studio-theme-select:focus-visible,
+    [data-studio-surface="header"] :is(button, select, textarea, input):focus-visible,
+    [data-studio-surface="nav"] .studio-nav-item:focus-visible {
+      outline-color: Highlight;
+    }
+    [data-studio-surface="nav"] .studio-nav-item[aria-current="page"] { outline: 1px solid Highlight; }
+  }
+}

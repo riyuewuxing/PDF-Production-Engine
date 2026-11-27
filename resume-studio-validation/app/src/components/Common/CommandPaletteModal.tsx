@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ResumeSummary, TemplateId } from '../../schema/resumeSchema';
 import { TEMPLATE_REGISTRY } from '../../templates/registry';
+import { STUDIO_THEME_IDS, STUDIO_THEMES, type StudioThemeId } from '../../studio-theme/presets';
 
 export type StudioNavTab = 'edit' | 'templates' | 'style' | 'versions' | 'diagnose' | 'career';
 
@@ -24,6 +25,8 @@ export interface CommandPaletteItem {
 }
 
 interface CommandPaletteModalProps {
+  activeStudioTheme?: StudioThemeId;
+  onSelectStudioTheme?: (id: StudioThemeId) => void;
   isOpen: boolean;
   onClose: () => void;
   activeTab: StudioNavTab;
@@ -45,6 +48,8 @@ interface CommandPaletteModalProps {
 }
 
 export function CommandPaletteModal({
+  activeStudioTheme,
+  onSelectStudioTheme,
   isOpen,
   onClose,
   activeTab,
@@ -189,6 +194,19 @@ export function CommandPaletteModal({
       },
     ];
 
+    if (onSelectStudioTheme) {
+      for (const id of STUDIO_THEME_IDS) {
+        items.push({
+          id: 'studio-theme-' + id,
+          category: '快捷操作',
+          title: '工作台外观预览：' + STUDIO_THEMES[id].label,
+          subtitle: (activeStudioTheme === id ? '当前选择 · ' : '') + '仅顶栏和主导航，不改变简历',
+          keywords: 'studio theme appearance 工作台主题 外观 皮肤 ' + id,
+          onSelect: () => onSelectStudioTheme(id),
+        });
+      }
+    }
+
     for (const s of summaries) {
       items.push({
         id: `version-${s.slug}`,
@@ -223,6 +241,8 @@ export function CommandPaletteModal({
 
     return items;
   }, [
+    activeStudioTheme,
+    onSelectStudioTheme,
     activeLocale,
     activeSlug,
     activeTab,

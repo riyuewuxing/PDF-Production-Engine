@@ -37,6 +37,10 @@ import { switchDocumentLocale } from './lib/resumeLocale';
 import type { GlobalSettings, ResumeDocument, TemplateId } from './schema/resumeSchema';
 import type {JobPdfOrigin} from './schema/jobPdfSourceSchema';
 import { TEMPLATE_REGISTRY } from './templates/registry';
+import { StudioThemeProvider, useStudioTheme } from './studio-theme/StudioThemeProvider';
+import { StudioThemePicker } from './studio-theme/StudioThemePicker';
+import { chromeStyle } from './studio-theme/resolve';
+import './studio-theme/styles/chrome.css';
 
 function buildDefaultGlobalSettings(doc: ResumeDocument): GlobalSettings {
   const meta = TEMPLATE_REGISTRY.find((t) => t.id === doc.templateId);
@@ -68,6 +72,11 @@ function buildDefaultGlobalSettings(doc: ResumeDocument): GlobalSettings {
 }
 
 export default function App() {
+  return <StudioThemeProvider><StudioApp /></StudioThemeProvider>;
+}
+
+function StudioApp() {
+  const { themeId, notice: themeNotice, selectTheme } = useStudioTheme();
   const [activeTab, setActiveTab] = useState<StudioNavTab>('edit');
   const [workspaceContext,setWorkspaceContext]=useState<{folder:string;restored:boolean}|null>(null);
   useEffect(()=>{let alive=true;void window.resumeDesktop?.workspaceBackup?.context?.().then(v=>{if(alive)setWorkspaceContext(v);}).catch(()=>{});return()=>{alive=false;};},[]);
@@ -410,9 +419,11 @@ export default function App() {
   ];
 
   return (
-    <div className="studio-shell relative flex h-screen flex-col overflow-hidden bg-[#11161f] text-slate-900" inert={versionTransitioning||isFitting} aria-busy={versionTransitioning||isFitting}>
+    <div className="studio-shell relative flex h-screen flex-col overflow-hidden bg-[#11161f] text-slate-900" data-studio-theme={themeId} inert={versionTransitioning||isFitting} aria-busy={versionTransitioning||isFitting}>
       {(versionTransitioning||isFitting)&&<div className="no-print absolute inset-0 z-[100] flex items-center justify-center bg-slate-900/35"><div className="rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg">{versionTransitioning?'正在安全处理版本，请稍候…':'正在测量页面排版…'}</div></div>}
       <StudioHeader
+        studioThemeId={themeId}
+        themeControl={<StudioThemePicker value={themeId} notice={themeNotice} onChange={selectTheme} />}
         activeSlug={activeSlug}
         activeTab={activeTab}
         summaries={summaries}
@@ -462,6 +473,9 @@ export default function App() {
       <div className="flex min-w-0 min-h-0 flex-1">
         <nav
           aria-label="主导航"
+          data-studio-surface="nav"
+          data-studio-theme={themeId}
+          style={chromeStyle(themeId, 'nav')}
           className="no-print flex w-16 shrink-0 flex-col items-center gap-1.5 border-r border-slate-800 bg-[#0d1118] py-3"
         >
           {navItems.map((item) => {
@@ -473,7 +487,7 @@ export default function App() {
                 type="button"
                 onClick={() => setActiveTab(item.id)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex w-14 flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium transition ${
+                className={`studio-nav-item flex w-14 flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium transition ${
                   active
                     ? 'bg-teal-600/20 text-teal-300 ring-1 ring-teal-500/40'
                     : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
@@ -595,6 +609,8 @@ export default function App() {
       </div>
 
       <CommandPaletteModal
+        activeStudioTheme={themeId}
+        onSelectStudioTheme={selectTheme}
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         activeTab={activeTab}
