@@ -19,6 +19,10 @@ export function PdfImportModal({
   const [busy, setBusy] = useState(false);
   const [docxReviewed,setDocxReviewed] = useState(false);
   const confirming = useRef(false);
+  const scopeRef=useRef<HTMLDivElement>(null);
+  const fieldsRef=useRef<HTMLFieldSetElement>(null);
+  const unknownRef=useRef<HTMLDivElement>(null);
+  const sourceRef=useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +56,7 @@ export function PdfImportModal({
   };
 
   const cancel = () => { if (!confirming.current) onCancel(); };
+  const jump=(target:HTMLElement|null)=>{target?.focus({preventScroll:true});target?.scrollIntoView({block:'start',behavior:'auto'});};
   const sourceLabel = form.sourceKind === 'docx' ? 'DOCX' : form.sourceKind === 'text' ? 'TXT / Markdown' : 'PDF';
   return (
     <div
@@ -85,20 +90,20 @@ export function PdfImportModal({
           </button>
         </div>
 
-        <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 text-xs md:grid-cols-2">
+        <div data-import-review-scroll="true" className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 text-xs md:grid-cols-2">
           {error && (
             <div className="col-span-full rounded border border-red-200 bg-red-50 px-3 py-2 text-red-700">
               {error}
             </div>
           )}
 
-          {form.sourceKind==='docx' && <div className="col-span-full space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-amber-950">
+          {form.sourceKind==='docx' && <div ref={scopeRef} tabIndex={-1} data-import-review-scope="true" className="col-span-full space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-amber-950">
             <p className="font-semibold">DOCX 文字导入范围（请与原始 Word 文件核对）</p>
             <ul className="list-disc pl-5">{(form.importWarnings??[]).map((warning,i)=><li key={i}>{warning}</li>)}</ul>
             <label className="flex items-start gap-2"><input type="checkbox" checked={docxReviewed} disabled={busy} onChange={e=>setDocxReviewed(e.target.checked)} />我已了解提取范围及未导入部分，并核对正文候选内容。</label>
           </div>}
           {/* Left: Editable parsed blocks */}
-          <fieldset disabled={busy} className="min-w-0 space-y-2.5">
+          <fieldset ref={fieldsRef} tabIndex={-1} data-import-review-fields="true" disabled={busy} className="min-w-0 space-y-2.5">
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700">新版本标题</span>
@@ -209,7 +214,7 @@ export function PdfImportModal({
               <span className="font-semibold text-slate-700">荣誉奖项（逐行）</span>
               <textarea rows={3} data-native-undo="true" value={form.honorsText} onChange={e=>updateField('honorsText',e.target.value)} className="rounded border border-slate-200 p-2 text-slate-900" />
             </label>
-            {Boolean(form.unclassifiedText?.trim()) && <div className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2">
+            {Boolean(form.unclassifiedText?.trim()) && <div ref={unknownRef} tabIndex={-1} data-import-review-unclassified="true" className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2">
               <p className="font-semibold text-amber-900">未分类或重复原文（必须明确选择处理方式）</p>
               <label className="flex items-start gap-2"><input type="radio" name="import-unclassified" checked={form.keepUnclassified===true} onChange={()=>updateField('keepUnclassified',true)} />保留为禁用栏目（可能含个人信息或重复字段；原生备份包含该栏目）</label>
               <label className="flex items-start gap-2"><input type="radio" name="import-unclassified" checked={form.keepUnclassified===false} onChange={()=>updateField('keepUnclassified',false)} />不保留未分类原文</label>
@@ -219,9 +224,9 @@ export function PdfImportModal({
           </fieldset>
 
           {/* Right: Raw extracted lines for verification */}
-          <div className="flex flex-col gap-1.5">
+          <div ref={sourceRef} tabIndex={-1} role="region" aria-label="原文提取对照" data-import-review-source="true" className="flex min-w-0 flex-col gap-1.5 md:sticky md:top-0 md:self-start">
             <span className="font-semibold text-slate-700">{sourceLabel} {form.sourceKind==='docx'?'正文文字提取对照（非原版式）':'原文提取对照'}</span>
-            <pre className="max-h-[60vh] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700">
+            <pre className="max-h-[48vh] min-h-0 overflow-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700">
               {form.rawText || '（未检测到可提取的文本）'}
             </pre>
           </div>
@@ -229,6 +234,9 @@ export function PdfImportModal({
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs">
           {(needsUnclassifiedDecision || needsDocxReview) && <p role="status" className="mr-auto text-amber-800">{needsDocxReview?'请先确认 DOCX 提取范围。 ':''}{needsUnclassifiedDecision?'请先选择未分类原文的处理方式。':''}</p>}
+          <button type="button" onClick={()=>jump(fieldsRef.current)} className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 md:hidden">定位字段</button>
+          <button type="button" onClick={()=>jump(sourceRef.current)} className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700">定位原文</button>
+          {(needsUnclassifiedDecision||needsDocxReview)&&<button type="button" onClick={()=>jump(needsDocxReview?scopeRef.current:unknownRef.current)} className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-900">定位待确认</button>}
           <button
             type="button"
             onClick={cancel}

@@ -76,12 +76,30 @@ async function run(){
   const raw=await js(()=>document.querySelector('[role="dialog"] pre')?.textContent??'');
   if(!raw.includes('Table Cell A\nTable Cell B')||!raw.includes('Visible link label')||/HEADER_PRIVATE_MARKER_37|FOOTER_PRIVATE_MARKER_37|DO_NOT_FETCH_DOCX_37/.test(raw))throw Error('DOCX extracted body mismatch');
   checks.previewNoWriteAndBodyBoundary=true;await capture('01-docx-review-required');
+  await click('定位待确认');
+  if(!await js(()=>{const e=document.querySelector('[data-import-review-scope]'),s=document.querySelector('[data-import-review-scroll]');return !!e&&!!s&&e.getBoundingClientRect().top>=s.getBoundingClientRect().top-3&&e.getBoundingClientRect().top<s.getBoundingClientRect().bottom;}))throw Error('pending scope navigation failed');
   await field('邮箱','corrected@example.invalid');await field('所在地','Synthetic City');await field('荣誉奖项（逐行）','Corrected Honor');
   await choose(true);if(!await confirmDisabled())throw Error('unclassified choice bypassed DOCX acknowledgement');
   await acknowledge();await until('review acknowledged',review);
   if(await confirmDisabled())throw Error('reviewed candidate still disabled');
   await js(()=>document.querySelector('[role="dialog"] input[name="import-unclassified"]')?.scrollIntoView({block:'center'}));
-  await capture('02-docx-retention-choice');checks.twoIndependentDecisions=true;
+  if(!await js(()=>{const e=document.querySelector('[data-import-review-source]'),s=document.querySelector('[data-import-review-scroll]'),p=e?.querySelector('pre');if(!e||!s||!p)return false;const r=p.getBoundingClientRect(),b=s.getBoundingClientRect();return getComputedStyle(e).position==='sticky'&&Math.min(r.bottom,b.bottom)-Math.max(r.top,b.top)>100&&p.textContent.includes('Alpha Academy');}))throw Error('source comparison no longer visible during lower-field review');
+  checks.stickySourceAtLowerFields=true;await capture('02-docx-retention-choice');checks.twoIndependentDecisions=true;
+  // Test the actual renderer at a narrower emulated viewport. No user-device claim.
+  const debug=win.webContents.debugger;
+  try{
+    debug.attach('1.3');await debug.sendCommand('Emulation.setDeviceMetricsOverride',{width:650,height:800,deviceScaleFactor:1,mobile:false});
+    await until('narrow viewport',()=>js(()=>innerWidth===650));
+    await click('定位原文');
+    if(!await js(()=>{const e=document.querySelector('[data-import-review-source]'),s=document.querySelector('[data-import-review-scroll]');if(!e||!s)return false;const r=e.getBoundingClientRect(),b=s.getBoundingClientRect();return getComputedStyle(e).position!=='sticky'&&Math.min(r.bottom,b.bottom)-Math.max(r.top,b.top)>80;}))throw Error('narrow source jump failed');
+    await capture('02b-narrow-source-jump');
+    await click('定位字段');
+    if(!await js(()=>{const e=[...document.querySelectorAll('[role="dialog"] label')].find(x=>x.querySelector('span')?.textContent==='姓名')?.querySelector('input'),s=document.querySelector('[data-import-review-scroll]');if(!e||!s)return false;const r=e.getBoundingClientRect(),b=s.getBoundingClientRect();return r.top>=b.top-3&&r.bottom<=b.bottom+3;}))throw Error('narrow field jump failed');
+    await capture('02c-narrow-fields-jump');
+    if(count()!==initial||await getField('邮箱')!=='corrected@example.invalid'||!await review())throw Error('navigation mutated reviewed state');
+    checks.narrowSourceAndFieldsNavigation=true;
+  }finally{if(debug.isAttached()){await debug.sendCommand('Emulation.clearDeviceMetricsOverride').catch(()=>{});debug.detach();}}
+  await until('desktop viewport restored',()=>js(()=>innerWidth>=768));
   const prev=await active();
   if(!await js(()=>{const b=[...document.querySelectorAll('[role="dialog"] button')].find(e=>e.innerText.trim()==='创建为新简历版本');if(!b||b.disabled)return false;b.click();b.click();return true;}))throw Error('create missing');
   await until('new DOCX version',async()=>{const slug=await active();if(!slug||slug===prev)return false;try{return(await main.store.getResume(slug)).basic.name==='Demo Candidate';}catch{return false;}});
