@@ -7,7 +7,7 @@ permissions:
 jobs:
   decode:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     defaults:
       run:
         working-directory: resume-studio-validation/app
@@ -39,14 +39,136 @@ jobs:
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-inline-' + [guid]::NewGuid().ToString())
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'inline-portrait'
-          $env:PORTRAIT_EXPECT = 'baseline'
+          $env:PORTRAIT_EXPECT = 'fixed'
           & .\node_modules\.bin\electron.cmd .\validation-inline-portrait.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+      - name: Audit actual inline PDF PNG DOCX HTML files
+        timeout-minutes: 2
+        run: python validation-inline-portrait-audit.py --root (Join-Path $env:GITHUB_WORKSPACE 'inline-portrait') --runner-sha $env:GITHUB_SHA
       - name: Upload actual evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: inline-portrait
           path: inline-portrait/
+          if-no-files-found: error
+          retention-days: 3
+
+  managed:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Final actual managed portrait decoding
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-decode-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'managed-portrait'
+          $env:PORTRAIT_EXPECT = 'fixed'
+          & .\node_modules\.bin\electron.cmd .\validation-portrait-decode.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Previous missing and linked portrait
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-contained-export-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'managed-portrait/previous'
+          & .\node_modules\.bin\electron.cmd .\validation-managed-export.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+      - name: Audit final managed files
+        timeout-minutes: 2
+        run: |
+          python validation-managed-export-audit.py --root (Join-Path $env:GITHUB_WORKSPACE 'managed-portrait/previous') --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python validation-portrait-decode-audit.py --root (Join-Path $env:GITHUB_WORKSPACE 'managed-portrait') --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual managed evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: managed-portrait
+          path: managed-portrait/
+          if-no-files-found: error
+          retention-days: 3
+
+  application:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full Windows unit regression
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'portrait-final-app'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          pnpm exec vitest run --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual full Electron regression
+        timeout-minutes: 5
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('resume-studio-synthetic-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'portrait-final-app/application'
+          & .\node_modules\.bin\electron.cmd .\validation-smoke.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload application evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: portrait-final-app
+          path: portrait-final-app/
           if-no-files-found: error
           retention-days: 3

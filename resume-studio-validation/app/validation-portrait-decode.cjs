@@ -17,17 +17,24 @@ async function run(){
  const broken=Buffer.from('Synthetic non-image bytes for corrupt portrait regression only.','utf8');
  const items=[['good-png','png',png],['good-jpg','jpg',jpg],['corrupt-png','png',broken],['corrupt-jpg','jpg',broken],['empty-png','png',Buffer.alloc(0)]];
  const docs={};
- for(const [label,ext,bytes] of items){
+ async function saveItem([label,ext,bytes]){
    const filename=label+'.'+ext;
    fs.mkdirSync(path.join(main.dataDir,'assets'),{recursive:true});
    fs.writeFileSync(path.join(main.dataDir,'assets',filename),bytes);
    docs[label]=await main.store.saveResume(label,{...fixture,id:'synthetic-decode-'+label,title:'Synthetic decode '+label,templateId:'left-right',menuSections:fixture.menuSections.map(s=>s.id==='basic'?{...s,enabled:true}:s),basic:{...fixture.basic,name:'Synthetic Decode Candidate',photo:'/api/assets/'+filename,photoConfig:{visible:true}}});
    files[filename]={inputHash:crypto.createHash('sha256').update(bytes).digest('hex'),inputBytes:bytes.length,nativeEmpty:nativeImage.createFromBuffer(bytes).isEmpty()};
  }
+ for(const item of items)await saveItem(item);
  await main.registerAssetProtocol();main.registerIpcHandlers();
  const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
  const js=code=>win.webContents.executeJavaScript(code);
  await until('editor',()=>js('!!document.querySelector("#basic-field-name")'));
+ if(fixed){
+   const webp=await js("(()=>{const c=document.createElement('canvas');c.width=80;c.height=120;const x=c.getContext('2d');x.fillStyle='#ff00ff';x.fillRect(0,0,80,120);return c.toDataURL('image/webp',1)})()");
+   assert(webp.startsWith('data:image/webp;base64,'),'Chromium did not create WebP');
+   const additional=[['good-webp','webp',Buffer.from(webp.split(',')[1],'base64')],['corrupt-webp','webp',broken]];
+   for(const item of additional){items.push(item);await saveItem(item);}
+ }
  for(const [label] of items){
    for(const [ext,method] of [['pdf','export'],['png','exportPng'],['docx','exportDocx'],['html','exportHtml']]){
      const options={slug:'',document:docs[label],saveAs:false,skipSave:true,fileNameSuffix:label+'-'+ext};
@@ -39,9 +46,19 @@ async function run(){
      assert(label.startsWith('good-')?!warning:(fixed?!!warning:!warning),'unexpected warning '+name+': '+warning);
    }
  }
- checks.allTwentyActualExports=true;
+ checks.actualExportCount=items.length*4;
+ if(fixed)assert(checks.actualExportCount===28,'incomplete candidate matrix');
  for(const [label,ext,bytes] of items)assert(fs.readFileSync(path.join(main.dataDir,'assets',label+'.'+ext)).equals(bytes),'asset changed '+label);
  checks.allInputsPreserved=true;
+ if(fixed){
+   const bad=docs['corrupt-png'];
+   const hidden={...bad,basic:{...bad.basic,photoConfig:{...bad.basic.photoConfig,visible:false}}};
+   for(const [label,method,doc] of [['hidden','export',hidden],['markdown','exportMarkdown',bad]]){
+     const result=await js('window.resumeDesktop.pdf['+JSON.stringify(method)+']('+JSON.stringify({slug:'',document:doc,saveAs:false,skipSave:true,fileNameSuffix:label})+')');
+     assert(!result.canceled&&!result.contentWarning&&fs.existsSync(result.filePath),'intentional omission warned '+label);
+   }
+   checks.hiddenAndMarkdownDoNotWarn=true;
+ }
  const selector='select[aria-label="快速切换简历版本"]';
  const selected=()=>js('document.querySelector('+JSON.stringify(selector)+')?.value');
  if(await selected()!=='corrupt-png'){
@@ -58,6 +75,13 @@ async function run(){
  files.ui={quick, warned};
  assert(fixed?!quick&&warned:quick&&!warned,'unexpected actual receipt');
  checks.actualReceiptMatchesPhase=true;
+ if(fixed){
+   const original=await main.store.getResume('corrupt-png');
+   assert(original.basic.photo==='/api/assets/corrupt-png.png','stored source portrait changed');
+   const history=await main.store.listSnapshots('corrupt-png');
+   assert(history.length===1,'history not retained');
+   checks.originalPortraitAndHistoryPreserved=true;
+ }
  const shot=await win.webContents.capturePage();assert(!shot.isEmpty(),'empty screenshot');fs.writeFileSync(path.join(out,'corrupt-portrait-receipt.png'),shot.toPNG());
  report();
 }
