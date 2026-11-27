@@ -19,6 +19,9 @@ import { apiClient, localErrorMessage } from '../../lib/apiClient';
 import {
   type PdfImportDraft,
   extractAndParsePdfResume,
+  parseResumeTextFile,
+  RESUME_IMPORT_PDF_MAX_BYTES,
+  RESUME_IMPORT_TEXT_MAX_BYTES,
 } from '../../lib/pdfResumeImporter';
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 import type { ResumeSnapshotMeta } from '../../server/localFsApi';
@@ -70,6 +73,8 @@ export function VersionAndMasterPane({
 }: VersionAndMasterPaneProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+  const parsingImport = useRef(false);
   const [newTitleDraft, setNewTitleDraft] = useState('');
   const [cloneSource, setCloneSource] = useState<'current' | 'master'>('current');
   const [isRenaming, setIsRenaming] = useState(false);
@@ -189,22 +194,25 @@ export function VersionAndMasterPane({
     }
   };
 
-  const handleImportPdfFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleTextualImport = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'pdf'|'text') => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || parsingImport.current || busy || pdfDraft) return;
+    parsingImport.current = true;
     setError(null);
     setBusy(true);
     try {
+      const limit = kind === 'pdf' ? RESUME_IMPORT_PDF_MAX_BYTES : RESUME_IMPORT_TEXT_MAX_BYTES;
+      if (file.size > limit) throw new Error(kind === 'pdf' ? 'PDF 文件超过 20 MiB 上限。' : '文本文件超过 1 MiB 上限。');
       const buffer = await file.arrayBuffer();
-      const draft = await extractAndParsePdfResume(buffer, file.name);
+      const draft = kind === 'pdf' ? await extractAndParsePdfResume(buffer, file.name) : parseResumeTextFile(buffer, file.name);
       setPdfDraft(draft);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'PDF 解析失败，请确认文件未加密损坏');
+      setError(err instanceof Error ? err.message : '本地导入解析失败。');
     } finally {
+      parsingImport.current = false;
       setBusy(false);
-      if (pdfInputRef.current) {
-        pdfInputRef.current.value = '';
-      }
     }
   };
 
@@ -511,13 +519,14 @@ export function VersionAndMasterPane({
             ref={pdfInputRef}
             type="file"
             accept=".pdf,application/pdf"
-            onChange={handleImportPdfFile}
+            onChange={e=>void handleTextualImport(e,'pdf')}
             className="hidden"
           />
+          <input ref={textInputRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={e=>void handleTextualImport(e,'text')} className="hidden" />
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || Boolean(pdfDraft)}
               onClick={() => importInputRef.current?.click()}
               className="inline-flex items-center justify-center gap-1.5 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50"
             >
@@ -525,12 +534,13 @@ export function VersionAndMasterPane({
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || Boolean(pdfDraft)}
               onClick={() => pdfInputRef.current?.click()}
               className="inline-flex items-center justify-center gap-1.5 rounded border border-teal-200 bg-teal-50 py-1.5 font-medium text-teal-800 hover:bg-teal-100"
             >
               <FileText size={13} /> 从旧 PDF 导入
             </button>
+            <button type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">从 TXT / Markdown 导入</button>
           </div>
           <button
             type="button"

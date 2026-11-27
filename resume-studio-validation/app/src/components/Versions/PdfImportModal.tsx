@@ -1,5 +1,5 @@
 import { Check, FileText, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   type PdfImportDraft,
   buildResumeDocumentFromPdfDraft,
@@ -17,6 +17,7 @@ export function PdfImportModal({
 }) {
   const [form, setForm] = useState<PdfImportDraft | null>(draft);
   const [busy, setBusy] = useState(false);
+  const confirming = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,6 +32,8 @@ export function PdfImportModal({
   };
 
   const handleConfirm = async () => {
+    if (confirming.current) return;
+    confirming.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -39,17 +42,20 @@ export function PdfImportModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : '导入创建新版本失败');
     } finally {
+      confirming.current = false;
       setBusy(false);
     }
   };
 
+  const cancel = () => { if (!confirming.current) onCancel(); };
+  const sourceLabel = form.sourceKind === 'text' ? 'TXT / Markdown' : 'PDF';
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="旧版 PDF 简历解析导入确认"
+      aria-label={`${sourceLabel} 简历解析导入确认`}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
-      onClick={onCancel}
+      onClick={cancel}
     >
       <div
         className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-white text-slate-900 shadow-2xl"
@@ -58,16 +64,17 @@ export function PdfImportModal({
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <div>
             <h2 className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-              <FileText size={15} className="text-teal-600" /> 本地离线 PDF 解析导入确认
+              <FileText size={15} className="text-teal-600" /> 本地离线 {sourceLabel} 解析导入确认
             </h2>
             <p className="text-[11px] text-slate-500">
-              纯本地解析提取，可先校准分块内容后另建为独立版本（绝不覆盖现有简历）
+              本地启发式提取，所有字段均为待核对候选。确认原文、归类、联系方式后再新建独立版本；不会覆盖现有简历。
             </p>
           </div>
           <button
             type="button"
-            onClick={onCancel}
-            aria-label="关闭 PDF 导入弹窗"
+            onClick={cancel}
+            disabled={busy}
+            aria-label="关闭导入弹窗"
             className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             <X size={16} />
@@ -82,7 +89,7 @@ export function PdfImportModal({
           )}
 
           {/* Left: Editable parsed blocks */}
-          <div className="space-y-2.5">
+          <fieldset disabled={busy} className="min-w-0 space-y-2.5">
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700">新版本标题</span>
@@ -124,6 +131,14 @@ export function PdfImportModal({
                   className="rounded border border-slate-200 px-2 py-1.5 text-slate-900"
                 />
               </label>
+              {([
+                ['email','邮箱'], ['location','所在地'], ['birthDate','出生日期']
+              ] as const).map(([key,label]) => (
+                <label key={key} className="flex flex-col gap-1">
+                  <span className="font-semibold text-slate-700">{label}</span>
+                  <input type="text" data-native-undo="true" value={form[key]} onChange={e=>updateField(key,e.target.value)} className="rounded border border-slate-200 px-2 py-1.5 text-slate-900" />
+                </label>
+              ))}
             </div>
 
             <label className="flex flex-col gap-1">
@@ -181,13 +196,22 @@ export function PdfImportModal({
                 />
               </label>
             </div>
-          </div>
+            <label className="flex flex-col gap-1">
+              <span className="font-semibold text-slate-700">荣誉奖项（逐行）</span>
+              <textarea rows={3} data-native-undo="true" value={form.honorsText} onChange={e=>updateField('honorsText',e.target.value)} className="rounded border border-slate-200 p-2 text-slate-900" />
+            </label>
+            {Boolean(form.unclassifiedText?.trim()) && <div className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2">
+              <label className="flex items-start gap-2"><input type="checkbox" checked={form.keepUnclassified===true} onChange={e=>updateField('keepUnclassified',e.target.checked)} />保留未分类原文为禁用栏目（可能含个人信息或重复字段）</label>
+              <textarea aria-label="未分类原文" rows={3} data-native-undo="true" value={form.unclassifiedText ?? ''} onChange={e=>updateField('unclassifiedText',e.target.value)} className="w-full rounded border border-slate-200 p-2" />
+              <p>未勾选时，此栏不会写入新版本。可将需要的内容手动放到上方栏目。</p>
+            </div>}
+          </fieldset>
 
-          {/* Right: Raw extracted PDF lines for verification */}
+          {/* Right: Raw extracted lines for verification */}
           <div className="flex flex-col gap-1.5">
-            <span className="font-semibold text-slate-700">PDF 原文坐标行序提取对照</span>
+            <span className="font-semibold text-slate-700">{sourceLabel} 原文提取对照</span>
             <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700">
-              {form.rawText || '（未在 PDF 中检测到可选文本层，可能为纯扫描图片 PDF）'}
+              {form.rawText || '（未检测到可提取的文本）'}
             </pre>
           </div>
         </div>
@@ -195,7 +219,8 @@ export function PdfImportModal({
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={cancel}
+            disabled={busy}
             className="rounded border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-100"
           >
             取消

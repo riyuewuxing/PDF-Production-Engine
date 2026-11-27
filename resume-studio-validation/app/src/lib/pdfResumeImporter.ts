@@ -46,6 +46,9 @@ export interface PdfImportDraft {
   selfEvaluationText: string;
   honorsText: string;
   rawText: string;
+  sourceKind?: 'pdf' | 'text';
+  unclassifiedText?: string;
+  keepUnclassified?: boolean;
 }
 
 /** 姓名候选排除词：这些 2–4 字词块不可能是姓名 */
@@ -248,6 +251,7 @@ export function parseExtractedResumeText(
     honors: [],
   };
 
+  const unclassified: string[] = [];
   let activeBucket: keyof typeof buckets | null = null;
   for (const line of lines) {
     const heading = matchHeadingLine(line);
@@ -261,6 +265,8 @@ export function parseExtractedResumeText(
     }
     if (activeBucket) {
       buckets[activeBucket].push(line);
+    } else {
+      unclassified.push(line);
     }
   }
 
@@ -285,6 +291,7 @@ export function parseExtractedResumeText(
     selfEvaluationText: buckets.selfEvaluation.join('\n'),
     honorsText: buckets.honors.join('\n'),
     rawText,
+    unclassifiedText: unclassified.join('\n'),
   };
 }
 
@@ -382,6 +389,11 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
     }));
   }
 
+  if (draft.keepUnclassified && draft.unclassifiedText?.trim()) {
+    menuSections.push({ id: 'custom-import-unclassified', title: '未分类导入原文（待核对）', icon: 'FileText', enabled: false, order: menuSections.length, pageBreakBefore: false });
+    customData['custom-import-unclassified'] = [{ id: crypto.randomUUID(), title: '未分类原文', subtitle: '', dateRange: '', description: draft.unclassifiedText, visible: true }];
+  }
+
   return ResumeDocumentSchema.parse({
     schemaVersion: 1,
     id: crypto.randomUUID(),
@@ -393,7 +405,7 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
     basic: {
       name: draft.name.trim(),
       title: draft.jobTitle.trim(),
-      employmentStatus: '随时到岗',
+      employmentStatus: '',
       email: draft.email.trim(),
       phone: draft.phone.trim(),
       location: draft.location.trim(),
@@ -482,13 +494,41 @@ export async function extractTextFromPdfArrayBuffer(data: ArrayBuffer): Promise<
   return reconstructLinesWithColumnAwareness(pages).filter(Boolean).join('\n');
 }
 
+export const RESUME_IMPORT_PDF_MAX_BYTES = 20 * 1024 * 1024;
+export const RESUME_IMPORT_TEXT_MAX_BYTES = 1024 * 1024;
+export const RESUME_IMPORT_TEXT_MAX_CHARS = 120_000;
+
+/** UTF-8 only; Markdown is treated as text, never rendered or fetched during import. */
+export function parseResumeTextFile(bytes: ArrayBuffer | Uint8Array, fileName: string): PdfImportDraft {
+  if (!/\.(txt|md|markdown)$/i.test(fileName)) throw new Error('请选择 TXT 或 Markdown 文件。');
+  if (bytes.byteLength > RESUME_IMPORT_TEXT_MAX_BYTES) throw new Error('文本文件超过 1 MiB 上限，没有截断。');
+  let raw: string;
+  try { raw = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch { throw new Error('文本不是有效 UTF-8；请在本地转换编码后重试。'); }
+  if (!raw.trim()) throw new Error('文本文件为空。');
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(raw)) throw new Error('文本包含不支持的控制字符。');
+  if (raw.length > RESUME_IMPORT_TEXT_MAX_CHARS) throw new Error('文本超过 120000 字符上限，没有截断。');
+  return { ...parseExtractedResumeText(raw, fileName.replace(/\.(txt|md|markdown)$/i, '') || '文本导入简历'), sourceKind: 'text' };
+}
+
 export async function extractAndParsePdfResume(
   buffer: ArrayBuffer | Uint8Array,
   fileName: string,
 ): Promise<PdfImportDraft> {
-  const pages = await extractTokensFromPdfArrayBuffer(buffer);
-  const { lines, lineHeights } = reconstructLinesWithHeights(pages);
-  return parseExtractedResumeText(lines.join('\n'), fileName, { lineHeights });
+  if (buffer.byteLength > RESUME_IMPORT_PDF_MAX_BYTES) throw new Error('PDF 文件超过 20 MiB 上限，没有截断。');
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const pages = await Promise.race([
+      extractTokensFromPdfArrayBuffer(buffer, 30, controller.signal, { maxPageTokens: 10_000, maxTotalTokens: 30_000, maxTotalChars: RESUME_IMPORT_TEXT_MAX_CHARS }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('PDF 本地解析超过 30 秒，已请求停止。')); }, 30_000); }),
+    ]);
+    const { lines, lineHeights } = reconstructLinesWithHeights(pages);
+    const text = lines.join('\n');
+    if (!text.trim()) throw new Error('PDF 无可提取文本；扫描件需要先在本地 OCR，不会创建空白简历。');
+    if (text.length > RESUME_IMPORT_TEXT_MAX_CHARS) throw new Error('PDF 重建文本超出字符上限，没有截断。');
+    return { ...parseExtractedResumeText(text, fileName, { lineHeights }), sourceKind: 'pdf' };
+  } finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 /** Rasterize the actual native PDF locally, not a second approximation of the HTML canvas. */
