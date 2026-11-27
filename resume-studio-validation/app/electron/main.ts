@@ -679,6 +679,7 @@ function registerIpcHandlers(): void {
 
   trustedEditorHandle('snapshots:list', (_event, slug: string) => store.listSnapshots(slug));
   trustedEditorHandle('snapshots:inventory',(_event,slug:string)=>store.listSnapshotInventory(slug));
+  trustedEditorHandle('snapshots:getForComparison',(_event,slug:string,id:string)=>store.getSnapshotForComparison(slug,id));
   trustedEditorHandle('snapshots:create', (_event, slug: string, reason: string, expectedRevision: string) => {
     if (typeof expectedRevision !== 'string') throw new Error('快照前必须提供版本标识。');
     return store.createSnapshot(slug, reason, undefined, expectedRevision);

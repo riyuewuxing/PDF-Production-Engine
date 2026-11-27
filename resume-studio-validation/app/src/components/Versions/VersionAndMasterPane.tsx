@@ -26,6 +26,7 @@ import {
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 import type { ResumeSnapshotMeta } from '../../server/localFsApi';
 import { PdfImportModal } from './PdfImportModal';
+import { VersionCompareModal } from './VersionCompareModal';
 import { parseDocxResume, RESUME_IMPORT_DOCX_MAX_BYTES } from '../../lib/docxResumeImporter';
 import { RecycleBinPanel } from './RecycleBinPanel';
 import {WorkspaceBackupPane} from './WorkspaceBackupPane';
@@ -34,6 +35,7 @@ import { isJsonResumeFormat } from '../../lib/jsonResumeAdapter';
 
 interface VersionAndMasterPaneProps {
   activeSlug: string;
+  comparisonDisabled?: boolean;
   activeDoc: ResumeDocument;
   summaries: ResumeSummary[];
   masterSummary: ResumeSummary | null;
@@ -76,6 +78,7 @@ function formatSnapshotTime(iso: string): string {
 
 export function VersionAndMasterPane({
   activeSlug,
+  comparisonDisabled=false,
   activeDoc,
   summaries,
   masterSummary,
@@ -105,6 +108,8 @@ export function VersionAndMasterPane({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pdfDraft, setPdfDraft] = useState<PdfImportDraft | null>(null);
+  const [comparison,setComparison]=useState<{slug:string;snapshotId?:string}|null>(null);
+  useEffect(()=>{setComparison(null);},[activeSlug,comparisonDisabled]);
 
   const [snapshotsOpen, setSnapshotsOpen] = useState(true);
   const [snapshotState,setSnapshotState]=useState<{slug:string;items:ResumeSnapshotMeta[];unreadableCount:number|null;error:string|null}|null>(null);
@@ -330,6 +335,11 @@ export function VersionAndMasterPane({
           )}
         </section>
 
+        <section className="space-y-1">
+          <button type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug})} className="w-full rounded-lg border border-teal-600 bg-teal-50 py-2 font-semibold text-teal-800 disabled:opacity-50">对比版本 / 历史快照</button>
+          {comparisonDisabled&&<p className="text-[11px] text-slate-600">脱敏预览开启时禁止查看原始版本差异。</p>}
+        </section>
+
         {/* Master Bank Actions */}
         {activeSlug !== 'master' && (
           <section>
@@ -465,6 +475,7 @@ export function VersionAndMasterPane({
                         模板：{snap.templateId} · 约 {snap.charCount} 字
                       </div>
                     </div>
+                    <button type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug,snapshotId:snap.id})} aria-label={'对比历史快照 '+formatSnapshotTime(snap.createdAt)} className="shrink-0 rounded border border-slate-300 px-2 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50">对比</button>
                     <button
                       type="button"
                       disabled={busy}
@@ -581,6 +592,7 @@ export function VersionAndMasterPane({
         </section>
       </div>
 
+      {comparison?.slug===activeSlug&&!comparisonDisabled&&<VersionCompareModal key={activeSlug} activeSlug={activeSlug} activeDoc={activeDoc} summaries={summaries} masterSummary={masterSummary} snapshots={snapshots} initialSnapshotId={comparison.snapshotId} onClose={()=>setComparison(null)}/>}
       <PdfImportModal
         draft={pdfDraft}
         onCancel={() => setPdfDraft(null)}

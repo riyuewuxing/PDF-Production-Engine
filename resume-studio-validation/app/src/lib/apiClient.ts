@@ -67,11 +67,11 @@ export const apiClient = {
     return handleJsonResponse<ResumeListResponse>(res);
   },
 
-  async getResume(slug: string): Promise<ResumeDocument> {
+  async getResume(slug: string,signal?:AbortSignal): Promise<ResumeDocument> {
     if (window.resumeDesktop) {
       return window.resumeDesktop.resumes.get(slug);
     }
-    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`);
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`,{signal});
     return handleJsonResponse<ResumeDocument>(res);
   },
 
@@ -140,6 +140,16 @@ export const apiClient = {
     const bridge=window.resumeDesktop?.snapshots;
     if(bridge)return bridge.inventory?bridge.inventory(slug):{items:await bridge.list(slug),unreadableCount:null};
     return handleJsonResponse<ResumeSnapshotInventory>(await fetch(`/api/resumes/${encodeURIComponent(slug)}/snapshot-inventory`));
+  },
+
+  async getSnapshotForComparison(slug:string,id:string,signal?:AbortSignal):Promise<{meta:ResumeSnapshotMeta;document:ResumeDocument}>{
+    if(window.resumeDesktop){
+      const bridge=window.resumeDesktop.snapshots;
+      if(!bridge?.getForComparison)throw new Error('当前桌面桥接不支持只读快照对照，请升级工作台。');
+      return bridge.getForComparison(slug,id);
+    }
+    const response=await fetch('/api/resumes/'+encodeURIComponent(slug)+'/snapshot-preview/'+encodeURIComponent(id),{signal});
+    return handleJsonResponse<{meta:ResumeSnapshotMeta;document:ResumeDocument}>(response);
   },
 
   async createSnapshot(slug: string, reason: string, expectedRevision: string): Promise<ResumeSnapshotMeta> {

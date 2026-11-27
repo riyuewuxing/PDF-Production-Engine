@@ -517,6 +517,7 @@ export default function App() {
               )}
               {activeTab === 'versions' && (
                 <VersionAndMasterPane
+                  comparisonDisabled={isRedacted}
                   activeSlug={activeSlug}
                   activeDoc={activeDoc}
                   summaries={summaries}

@@ -832,6 +832,19 @@ export class LocalResumeStore {
     return {items,unreadableCount};
   }
 
+  /** Read only; do not create directories, backups or restore state for comparison. */
+  async getSnapshotForComparison(rawSlug:string,rawId:string):Promise<{meta:ResumeSnapshotMeta;document:ResumeDocument}>{
+    if(typeof rawSlug!=='string'||typeof rawId!=='string')throw new LocalFsApiError(400,'INVALID_SNAPSHOT','无效的快照对照标识。');
+    const slug=assertSafeSlug(rawSlug),id=assertSafeSnapshotId(rawId);
+    if(slug!==rawSlug||id!==rawId)throw new LocalFsApiError(400,'INVALID_SNAPSHOT','只接受原始版本与快照标识，不接受路径或别名。');
+    const checked=await this.checkedSnapshotDir(slug,false);
+    if(!checked)throw new LocalFsApiError(404,'SNAPSHOT_NOT_FOUND','历史快照不存在。');
+    const current=await this.getResume(slug);
+    const record=await this.readSnapshotRecord(checked.slug,checked.dir,id);
+    if(record.document.id!==current.id)throw new LocalFsApiError(409,'DOCUMENT_ID_CONFLICT','该历史快照属于另一份简历，未展示内容。');
+    return record;
+  }
+
   async restoreSnapshot(rawSlug:string,rawSnapshotId:string,expectedRevision?:string):Promise<ResumeDocument>{
     const snapshotId=assertSafeSnapshotId(rawSnapshotId);
     const {slug,filePath:targetPath}=this.resolveResumePath(rawSlug);
@@ -1190,6 +1203,10 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
         const inventoryMatch=/^([^/]+)\/snapshot-inventory$/.exec(tail);
         if(method==='GET'&&inventoryMatch?.[1]){
           sendJson(res,200,await store.listSnapshotInventory(inventoryMatch[1]));return;
+        }
+        const previewMatch=/^([^/]+)\/snapshot-preview\/([^/]+)$/.exec(tail);
+        if(method==='GET'&&previewMatch?.[1]&&previewMatch?.[2]){
+          sendJson(res,200,await store.getSnapshotForComparison(previewMatch[1],previewMatch[2]));return;
         }
         const snapMatch = /^([^/]+)\/snapshots(\/restore)?$/.exec(tail);
         if (snapMatch && snapMatch[1]) {
