@@ -158,7 +158,7 @@ async function run(){
   await enter('single');await prepare('single');const count=report.calls;
   await js('window.resumeDesktop.ai.saveSettings('+JSON.stringify({...cfgSaved,maxOutputTokens:4000})+')');
   await click(configs.single.confirm);
-  await until('stale saved model refused',()=>has('AI 配置已变化')||has('模型档案已变化')||has('模型配置已变化')||has('档案版本已变化')||has('模型档案版本已变化'));
+  await until('stale saved model refused',async()=> (await has('AI 配置已变化'))||(await has('模型档案已变化'))||(await has('模型配置已变化'))||(await has('档案版本已变化'))||(await has('模型档案版本已变化')));
   assert(report.calls===count,'stale saved profile reached fetch');
   report.checks.staleSavedProfileNoNetwork=true;
   await verifyDisk();write();
