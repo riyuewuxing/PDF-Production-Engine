@@ -116,7 +116,34 @@ export type JobReviewArchive = z.infer<typeof JobReviewArchiveSchema>;
 export const MAX_JOB_REVIEW_ARCHIVES=40;
 export const MAX_JOB_REVIEW_ARCHIVE_CHARS=2000000;
 
-/** Local registration only. Execution states and transitions are a separate gate. */
+/** Local queue: immutable binding plus an independently controlled preparation attempt. */
+export const JOB_QUEUE_RUN_MS=30000;
+export const MAX_JOB_QUEUE_ATTEMPTS=5;
+export const JOB_QUEUE_STATES=['pending','running','paused','canceled','failed','prepared'] as const;
+const canonicalUuid=z.string().uuid().refine(s=>s===s.toLowerCase(),'任务标识必须规范');
+export const JobQueueFailureSchema=z.enum(['local-error','source-changed','timeout','interrupted']);
+export type JobQueueFailure=z.infer<typeof JobQueueFailureSchema>;
+export const JobQueueResultSchema=z.object({
+  kind:z.literal('local-preflight-v1'),
+  jdSha256:z.string().regex(/^[a-f0-9]{64}$/),
+  documentSha256:z.string().regex(/^[a-f0-9]{64}$/),
+  clauseCount:z.number().int().min(1).max(80),
+}).strict();
+export type JobQueueResult=z.infer<typeof JobQueueResultSchema>;
+const JobQueueExecutionSchema=z.object({
+  attempts:z.number().int().min(0).max(MAX_JOB_QUEUE_ATTEMPTS),
+  attemptId:canonicalUuid.nullable(),
+  updatedAt:z.string().datetime(),
+  deadlineAt:z.string().datetime().nullable(),
+  failure:JobQueueFailureSchema.nullable(),
+  result:JobQueueResultSchema.nullable(),
+}).strict();
+export const JobQueueCommandSchema=z.object({
+  taskId:canonicalUuid,
+  ledgerRevision:z.string().regex(/^[a-f0-9]{64}$/),
+  action:z.enum(['start','retry','pause','cancel','recover']),
+}).strict();
+export type JobQueueCommand=z.infer<typeof JobQueueCommandSchema>;
 export const MAX_JOB_QUEUE_TASKS=30;
 export const MAX_JOB_QUEUE_BYTES=600000;
 export const MAX_JOB_QUEUE_JD_CHARS=20000;
@@ -132,12 +159,21 @@ export const JobQueueTaskSchema=z.object({
   documentRevision:z.string().min(1).max(1000),
   documentSha256:z.string().regex(/^[a-f0-9]{64}$/),
   createdAt:z.string().datetime(),
-  status:z.literal('pending'),
+  status:z.enum(JOB_QUEUE_STATES),
+  execution:JobQueueExecutionSchema.optional(),
 }).strict().superRefine((task,ctx)=>{
   try{
     const revision:unknown=JSON.parse(task.documentRevision);
     if(!Array.isArray(revision)||revision.length!==2||revision[0]!==task.docId||typeof revision[1]!=='string'||!revision[1]||JSON.stringify(revision)!==task.documentRevision)throw Error('invalid');
   }catch{ctx.addIssue({code:'custom',path:['documentRevision'],message:'任务文档身份与版本不一致'});}
+  const e=task.execution;
+  const valid=task.status==='pending'?e===undefined:!!e&&
+    (e.attempts===0)===(e.attemptId===null)&&
+    (task.status==='canceled'||e.attempts>0)&&
+    (task.status==='running'?e.deadlineAt!==null&&Date.parse(e.deadlineAt)-Date.parse(e.updatedAt)===JOB_QUEUE_RUN_MS:e.deadlineAt===null)&&
+    (task.status==='failed'?e.failure!==null:e.failure===null)&&
+    (task.status==='prepared'?e.result!==null&&e.result.documentSha256===task.documentSha256:e.result===null);
+  if(!valid)ctx.addIssue({code:'custom',path:['execution'],message:'岗位执行状态、尝试或回执不一致'});
 });
 export type JobQueueTask=z.infer<typeof JobQueueTaskSchema>;
 export function jobQueueBasisKey(task:JobQueueTask):string{
@@ -146,7 +182,11 @@ export function jobQueueBasisKey(task:JobQueueTask):string{
 export const JobQueueSchema=z.array(JobQueueTaskSchema).max(MAX_JOB_QUEUE_TASKS)
   .refine(tasks=>new Set(tasks.map(t=>t.id)).size===tasks.length,'岗位任务标识重复')
   .refine(tasks=>new Set(tasks.map(jobQueueBasisKey)).size===tasks.length,'同一岗位及绑定版本已登记')
-  .refine(tasks=>new TextEncoder().encode(JSON.stringify(tasks)).byteLength<=MAX_JOB_QUEUE_BYTES,'岗位队列容量已达上限');
+  .refine(tasks=>tasks.filter(t=>t.status==='running').length<=1,'同一工作区仅允许一项任务运行')
+  .refine(tasks=>{const ids=tasks.flatMap(t=>t.execution?.attemptId?[t.execution.attemptId]:[]);return new Set(ids).size===ids.length;},'执行尝试标识重复')
+  // Execution metadata must not consume the registration quota of a valid legacy queue.
+  .refine(tasks=>new TextEncoder().encode(JSON.stringify(tasks.map(({execution:_execution,...t})=>({...t,status:'pending'})))).byteLength<=MAX_JOB_QUEUE_BYTES,'岗位队列容量已达上限')
+  .refine(tasks=>new TextEncoder().encode(JSON.stringify(tasks)).byteLength<=MAX_JOB_QUEUE_BYTES+30000,'岗位执行数据容量已达上限');
 
 export const ApplicationsStoreSchema = z.object({
   schemaVersion: z.literal(1).default(1),

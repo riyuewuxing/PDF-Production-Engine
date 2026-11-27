@@ -1,9 +1,9 @@
 import { apiClient, localErrorMessage } from './apiClient';
 import {checkpointRecovery,clearRecovery,type Checkpoint} from './recoveryCheckpoint';
-import type { ApplicationsStoreData,ApplicationLogInput,JobApplication } from '../schema/applicationSchema';
+import type { ApplicationsStoreData,ApplicationLogInput,JobApplication,JobQueueCommand } from '../schema/applicationSchema';
 
 type LedgerView={data:ApplicationsStoreData;ready:boolean;loading:boolean;saving:boolean;dirty:boolean;error:string|null;recoveryError:string|null};
-type LedgerApi={getApplications:()=>Promise<ApplicationsStoreData>;saveApplications:(data:ApplicationsStoreData,revision:string)=>Promise<ApplicationsStoreData>;logApplication:(input:ApplicationLogInput)=>Promise<{entry:JobApplication;store:ApplicationsStoreData}>};
+type LedgerApi={getApplications:()=>Promise<ApplicationsStoreData>;saveApplications:(data:ApplicationsStoreData,revision:string)=>Promise<ApplicationsStoreData>;logApplication:(input:ApplicationLogInput)=>Promise<{entry:JobApplication;store:ApplicationsStoreData}>;commandJobQueue?:(command:JobQueueCommand)=>Promise<ApplicationsStoreData>};
 const empty=():ApplicationsStoreData=>({schemaVersion:1,applications:[],coverLetters:[],interviewAnswers:{}});
 function validRevision(data:ApplicationsStoreData):string{
   if(typeof data.revision!=='string'||!data.revision)throw new Error('投递台账缺少版本标识，请升级桌面桥接。');
@@ -79,6 +79,18 @@ export class CareerLedgerSession {
       finally{this.change({loading:false});}
     })();
     this.loadingTask=work;try{await work;}finally{if(this.loadingTask===work)this.loadingTask=null;}
+  };
+  controlQueue=async(command:JobQueueCommand):Promise<void>=>{
+    if(!this.api.commandJobQueue)throw Error('岗位任务执行需要升级桌面工作台。');
+    if(!this.state.ready||this.state.dirty||this.state.saving||this.state.loading||this.state.error||this.logTask||this.inFlight||this.loadingTask||this.baseRevision!==command.ledgerRevision)throw Error('台账状态已变化，请刷新后操作。');
+    this.change({loading:true,error:null});
+    const work=(async()=>{
+      try{const saved=await this.api.commandJobQueue!(command);this.adopt(saved);}
+      catch(err){this.change({error:localErrorMessage(err,'岗位任务操作未确认，请刷新磁盘台账。')});throw err;}
+      finally{this.change({loading:false});}
+    })();
+    this.loadingTask=work;
+    try{await work;}finally{if(this.loadingTask===work)this.loadingTask=null;}
   };
   log=async(input:ApplicationLogInput):Promise<JobApplication>=>{
     if(this.logTask)throw new Error('已有投递归档正在进行。');

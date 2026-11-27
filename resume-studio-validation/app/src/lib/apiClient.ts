@@ -12,6 +12,7 @@ import type {
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
+  JobQueueCommand,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
 import type { ResumeSnapshotMeta, ResumeSnapshotInventory, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
@@ -199,6 +200,11 @@ export const apiClient = {
     return handleJsonResponse<ApplicationsStoreData>(res);
   },
 
+  async commandJobQueue(command:JobQueueCommand):Promise<ApplicationsStoreData>{
+    const method=window.resumeDesktop?.applications?.commandJobQueue;
+    if(!method)throw Error('岗位任务执行仅支持已升级的桌面工作台。');
+    return method(command);
+  },
   async logApplication(input:ApplicationLogInput):Promise<{entry:JobApplication;store:ApplicationsStoreData}>{
     if(window.resumeDesktop){if(!window.resumeDesktop.applications.log)throw new Error('桌面桥接版本过旧。');return window.resumeDesktop.applications.log(input);}
     return handleJsonResponse<{entry:JobApplication;store:ApplicationsStoreData}>(await fetch('/api/applications/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)}));

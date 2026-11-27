@@ -11,6 +11,7 @@ import type {
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
+  JobQueueCommand,
   CoverLetterPdfPayload,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
@@ -102,6 +103,7 @@ export interface ResumeDesktopBridge {
   applications: {
     get: () => Promise<ApplicationsStoreData>;
     save: (data: ApplicationsStoreData,revision:string) => Promise<ApplicationsStoreData>;
+    commandJobQueue?: (command:JobQueueCommand)=>Promise<ApplicationsStoreData>;
     log?: (input:ApplicationLogInput)=>Promise<{entry:JobApplication;store:ApplicationsStoreData}>;
     saveSnapshot: (input: SaveApplicationSnapshotInput) => Promise<ApplicationSnapshotMeta>;
     getSnapshot: (snapshotId: string) => Promise<ApplicationSnapshotRecord>;

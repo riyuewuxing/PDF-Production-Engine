@@ -36,6 +36,7 @@ const bridge: ResumeDesktopBridge = {
   applications: {
     get: () => ipcRenderer.invoke('applications:get'),
     save: (data,revision) => ipcRenderer.invoke('applications:save', data,revision),
+    commandJobQueue: command=>ipcRenderer.invoke('applications:commandJobQueue',command),
     log: input=>ipcRenderer.invoke('applications:log',input),
     saveSnapshot: (input: SaveApplicationSnapshotInput) =>
       ipcRenderer.invoke('applications:saveSnapshot', input),

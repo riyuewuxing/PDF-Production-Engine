@@ -5,7 +5,7 @@ import os from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 import { ZodError } from 'zod';
-import {restoreArchivedJobReview,sameJobReviewDocument} from '../lib/jobRequirements';
+import {restoreArchivedJobReview,sameJobReviewDocument,splitJobRequirements} from '../lib/jobRequirements';
 import {jobQueueDocumentText,jobQueueBindingMatches} from '../lib/jobQueueBinding';
 import { adaptResumeOrLegacy } from '../schema/legacyAdapter';
 import {
@@ -20,6 +20,8 @@ import {
   type JobApplication,
   type ApplicationLogInput,
   type ApplicationsStoreData,
+  JobQueueCommandSchema,JobQueueTaskSchema,JobQueueResultSchema,JobQueueFailureSchema,JOB_QUEUE_RUN_MS,MAX_JOB_QUEUE_ATTEMPTS,
+  type JobQueueTask,type JobQueueResult,type JobQueueFailure,
 } from '../schema/applicationSchema';
 import {
   ResumeDocument,
@@ -1065,6 +1067,97 @@ export class LocalResumeStore {
     });
   }
 
+  /** Used only by registration and trusted local executor. No renderer-provided path or result. */
+  private async readBoundJobQueueDocument(task:JobQueueTask):Promise<ResumeDocument>{
+    try{
+      const {filePath}=this.resolveResumePath(task.slug);
+      await checkWorkspaceFile(this.dataDir,filePath);
+      if(!(await fs.readdir(path.dirname(filePath),{withFileTypes:true})).some(e=>e.name===path.basename(filePath)&&e.isFile()))throw Error('source missing or aliased');
+      const doc=await this.getResume(task.slug);
+      if(!jobQueueBindingMatches(task,doc,createHash('sha256').update(jobQueueDocumentText(doc)).digest('hex')))throw Error('binding changed');
+      return doc;
+    }catch{
+      throw new LocalFsApiError(409,'JOB_QUEUE_STALE','岗位任务绑定的磁盘简历已变化、缺失或无法核验；未登记任务或执行。');
+    }
+  }
+
+  /** Explicit command; the only user-facing route to state transitions. All writes
+   * are under the same workspace lock and against an acknowledged ledger revision. */
+  async commandJobQueue(raw:unknown):Promise<{store:ApplicationsStoreData;started?:JobQueueTask}>{
+    const parsed=JobQueueCommandSchema.safeParse(raw);
+    if(!parsed.success)throw new LocalFsApiError(422,'JOB_QUEUE_COMMAND','无效岗位任务操作。');
+    const {taskId,ledgerRevision,action}=parsed.data;
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.getApplications();
+      if(current.revision!==ledgerRevision)throw new LocalFsApiError(409,'APPLICATION_CONFLICT','投递台账已变化，请刷新后重新操作。');
+      const rows=current.jobQueue??[],task=rows.find(t=>t.id===taskId);
+      if(!task)throw new LocalFsApiError(404,'JOB_QUEUE_NOT_FOUND','岗位任务不存在。');
+      const old=task.execution;
+      const now=Date.now(),updatedAt=new Date(now).toISOString();
+      const stateError=()=>new LocalFsApiError(409,'JOB_QUEUE_STATE','当前任务状态不允许此操作，请刷新核对。');
+      let next:JobQueueTask;
+      if(action==='start'||action==='retry'){
+        if(task.status==='running')return {store:current}; // idempotent; never dispatch a second attempt
+        if(action==='start'?task.status!=='pending':task.status!=='paused'&&task.status!=='failed')throw stateError();
+        if(rows.some(t=>t.status==='running'))throw new LocalFsApiError(409,'JOB_QUEUE_BUSY','同一工作区仅允许一项任务运行。');
+        if((old?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS)throw new LocalFsApiError(409,'JOB_QUEUE_ATTEMPT_LIMIT','任务尝试次数已达上限，不自动重试。');
+        await this.readBoundJobQueueDocument(task);
+        const startedAt=Date.now();
+        next={...task,status:'running',execution:{attempts:(old?.attempts??0)+1,attemptId:randomUUID(),updatedAt:new Date(startedAt).toISOString(),deadlineAt:new Date(startedAt+JOB_QUEUE_RUN_MS).toISOString(),failure:null,result:null}};
+      }else if(action==='pause'){
+        if(task.status==='paused')return {store:current};
+        if(task.status!=='running'||!old)throw stateError();
+        next={...task,status:'paused',execution:{...old,updatedAt,deadlineAt:null,failure:null,result:null}};
+      }else if(action==='cancel'){
+        if(task.status==='canceled')return {store:current};
+        if(task.status==='prepared')throw stateError();
+        next={...task,status:'canceled',execution:{attempts:old?.attempts??0,attemptId:old?.attemptId??null,updatedAt,deadlineAt:null,failure:null,result:null}};
+      }else{
+        if(task.status==='failed'&&old?.failure==='interrupted')return {store:current};
+        if(task.status!=='running'||!old?.deadlineAt||now<Date.parse(old.deadlineAt))throw stateError();
+        next={...task,status:'failed',execution:{...old,updatedAt,deadlineAt:null,failure:'interrupted',result:null}};
+      }
+      next=JobQueueTaskSchema.parse(next);
+      const saved=await this.writeApplications({...current,jobQueue:rows.map(t=>t.id===taskId?next:t)});
+      return {store:saved,...(next.status==='running'?{started:next}:{})};
+    });
+  }
+
+  /** Read-only preparation. The existing deterministic clause parser is reused;
+   * no eligibility judgment, evidence review, AI, or external effect. */
+  async prepareJobQueueAttempt(task:JobQueueTask,signal:AbortSignal):Promise<JobQueueResult>{
+    signal.throwIfAborted();
+    await this.readBoundJobQueueDocument(task);
+    signal.throwIfAborted();
+    const clauses=splitJobRequirements(task.jdText);
+    if(!clauses.length)throw Error('no local clauses');
+    return JobQueueResultSchema.parse({kind:'local-preflight-v1',jdSha256:createHash('sha256').update(task.jdText).digest('hex'),documentSha256:task.documentSha256,clauseCount:clauses.length});
+  }
+
+  /** Internal completion only. A stale/paused/canceled/superseded attempt cannot
+   * write anything, even if a worker or IPC reply arrives after its deadline. */
+  async finishJobQueueAttempt(taskId:string,attemptId:string,outcome:{result:JobQueueResult}|{failure:JobQueueFailure}):Promise<ApplicationsStoreData>{
+    return withResumeWriteLock(this.dataDir,async()=>{
+      const current=await this.getApplications(),rows=current.jobQueue??[],task=rows.find(t=>t.id===taskId),old=task?.execution;
+      if(!task||task.status!=='running'||!old?.deadlineAt||old.attemptId!==attemptId)return current;
+      let failure:JobQueueFailure|null=null,result:JobQueueResult|null=null;
+      const expired=()=>Date.now()>=Date.parse(old.deadlineAt!);
+      if(expired())failure='timeout';
+      else if('failure' in outcome)failure=JobQueueFailureSchema.parse(outcome.failure);
+      else{
+        try{
+          await this.readBoundJobQueueDocument(task);
+          const r=JobQueueResultSchema.parse(outcome.result);
+          if(r.documentSha256!==task.documentSha256||r.jdSha256!==createHash('sha256').update(task.jdText).digest('hex')||r.clauseCount!==splitJobRequirements(task.jdText).length)throw Error('result mismatch');
+          result=r;
+        }catch(err){failure=err instanceof LocalFsApiError&&err.code==='JOB_QUEUE_STALE'?'source-changed':'local-error';}
+        if(expired())failure='timeout';
+      }
+      const next=JobQueueTaskSchema.parse({...task,status:failure?'failed':'prepared',execution:{...old,updatedAt:new Date().toISOString(),deadlineAt:null,failure,result:failure?null:result}});
+      return this.writeApplications({...current,jobQueue:rows.map(t=>t.id===taskId?next:t)});
+    });
+  }
+
   async saveApplications(payload: unknown,expectedRevision?:string): Promise<ApplicationsStoreData> {
     let validated: ApplicationsStoreData;
     try {
@@ -1087,9 +1180,7 @@ export class LocalResumeStore {
         if(!old&&a.pdfReceipt&&!a.snapshotId)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','PDF 凭证不能添加到无永久快照的记录。');
         if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug||!samePdfReceipt(snap.meta.pdfReceipt,a.pdfReceipt)||(a.pdfReceipt&&(snap.meta.exportedFilePath!==a.exportedFilePath||a.pdfReceipt.documentSha256!==createHash('sha256').update(JSON.stringify(snap.document)).digest('hex'))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
       }
-      // Preserve registrations from older clients and all ordinary ledger writes.
-      // Until the execution state machine is introduced, registrations are immutable,
-      // including their presence: absence cannot silently cancel or remove a task.
+      // Generic saves never transition, overwrite, or remove a registered task.
       if(validated.jobQueue===undefined&&current.jobQueue!==undefined)validated={...validated,jobQueue:current.jobQueue};
       const queue=validated.jobQueue??[];
       for(const old of current.jobQueue??[]){
@@ -1098,18 +1189,10 @@ export class LocalResumeStore {
       }
       for(const task of queue){
         if(current.jobQueue?.some(t=>t.id===task.id))continue;
+        if(task.status!=='pending'||task.execution!==undefined)throw new LocalFsApiError(409,'JOB_QUEUE_IMMUTABLE','普通台账保存只能登记未运行的任务。');
         // Verify the exact persisted source under the existing workspace write lock.
         // A stale historical registration remains readable and does not block unrelated edits.
-        try{
-          const {filePath}=this.resolveResumePath(task.slug);
-          await checkWorkspaceDirectory(this.dataDir,path.dirname(filePath));
-          if(!(await fs.readdir(path.dirname(filePath),{withFileTypes:true})).some(e=>e.name===path.basename(filePath)&&e.isFile()))throw Error('source missing or aliased');
-          const doc=await this.getResume(task.slug);
-          const digest=createHash('sha256').update(jobQueueDocumentText(doc)).digest('hex');
-          if(!jobQueueBindingMatches(task,doc,digest))throw Error('binding changed');
-        }catch{
-          throw new LocalFsApiError(409,'JOB_QUEUE_STALE','岗位任务绑定的磁盘简历已变化、缺失或无法核验；未登记任务。');
-        }
+        await this.readBoundJobQueueDocument(task);
       }
       // Older clients omitting the optional field cannot silently erase local review archives.
       if(validated.jobReviews===undefined&&current.jobReviews!==undefined)validated={...validated,jobReviews:current.jobReviews};

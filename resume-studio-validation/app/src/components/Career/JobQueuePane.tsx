@@ -3,7 +3,7 @@ import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {jobQueueBindingMatches,jobQueueDocumentHash,prepareJobQueueTask} from '../../lib/jobQueueBinding';
 import {sameJobReviewDocument} from '../../lib/jobRequirements';
-import {JobQueueSchema,MAX_JOB_QUEUE_TASKS,MAX_JOB_QUEUE_JD_CHARS,type JobQueueTask} from '../../schema/applicationSchema';
+import {JobQueueSchema,MAX_JOB_QUEUE_TASKS,MAX_JOB_QUEUE_JD_CHARS,MAX_JOB_QUEUE_ATTEMPTS,type JobQueueTask,type JobQueueCommand} from '../../schema/applicationSchema';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 
 type Candidate={task:JobQueueTask;title:string;revision:string;source:ResumeDocument};
@@ -16,7 +16,9 @@ function assertQueue(tasks:JobQueueTask[]){
   if(!result.success)throw Error(result.error.issues[0]?.message||'岗位队列校验失败。');
 }
 
-/** No scheduler, AI call, resume write, or application status mutation here. */
+const stateLabels:Record<JobQueueTask['status'],string>={pending:'待处理',running:'本地准备中',paused:'已暂停',canceled:'已取消',failed:'准备失败',prepared:'本地准备完成'};
+const failureLabels={ 'local-error':'本地解析或写入前核验失败','source-changed':'绑定简历发生变化','timeout':'执行超时','interrupted':'中断后已显式恢复为失败' };
+/** The renderer requests explicit commands only; no worker or AI request here. */
 export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;activeDoc:ResumeDocument;redacted:boolean}){
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const tasks=ledger.data.jobQueue??[];
@@ -24,13 +26,22 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const [company,setCompany]=useState(''),[role,setRole]=useState(''),[jd,setJd]=useState('');
   const [candidate,setCandidate]=useState<Candidate|null>(null);
   const [check,setCheck]=useState<Check|null>(null);
-  const [busy,setBusy]=useState<'prepare'|'check'|'save'|null>(null);
+  const [busy,setBusy]=useState<'prepare'|'check'|'save'|'execute'|null>(null);
   const [message,setMessage]=useState<{error:boolean;text:string}|null>(null);
   const readRef=useRef<Job|null>(null),writeRef=useRef(false),mounted=useRef(false);
   const scope=useRef({activeSlug,activeDoc,redacted,revision:ledger.data.revision});
   scope.current={activeSlug,activeDoc,redacted,revision:ledger.data.revision};
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;readRef.current?.cancel();};},[]);
   useEffect(()=>{readRef.current?.cancel();setCandidate(null);setCheck(null);if(!writeRef.current)setMessage(null);},[activeSlug,activeDoc,redacted,ledger.data.revision]);
+  const supportsExecution=!!window.resumeDesktop?.applications?.commandJobQueue;
+  const hasRunning=tasks.some(t=>t.status==='running');
+  // Read-only refresh of acknowledged disk state while this panel is visible.
+  // Never overwrite a dirty draft, start work, or auto-retry on restart.
+  useEffect(()=>{
+    if(!supportsExecution||!hasRunning||!ready||redacted||busy!==null)return;
+    const timer=setTimeout(()=>{if(!writeRef.current&&!readRef.current)void careerLedger.load().catch(()=>{});},750);
+    return()=>clearTimeout(timer);
+  },[supportsExecution,hasRunning,ready,redacted,busy,ledger.data,ledger.loading]);
   const isReady=(revision:string)=>{
     const now=careerLedger.getSnapshot();
     return now.ready&&!now.loading&&!now.saving&&!now.dirty&&!now.error&&now.data.revision===revision;
@@ -110,14 +121,24 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
       }
     }
   };
+  const execute=async(task:JobQueueTask,action:JobQueueCommand['action'])=>{
+    if(!supportsExecution||!ready||redacted||readRef.current||writeRef.current||candidate||!ledger.data.revision||!isReady(ledger.data.revision))return;
+    writeRef.current=true;setBusy('execute');setMessage(null);setCheck(null);
+    try{
+      await careerLedger.controlQueue({taskId:task.id,ledgerRevision:ledger.data.revision,action});
+      if(mounted.current&&!scope.current.redacted)setMessage({error:false,text:'任务操作已获本地台账回执。当前状态以任务列表为准。'});
+    }catch(err){if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:localErrorMessage(err,'任务操作未确认，请刷新磁盘台账。')});}
+    finally{writeRef.current=false;if(mounted.current)setBusy(null);}
+  };
   if(redacted)return <p className="rounded border bg-slate-50 p-3 text-slate-700">脱敏预览开启时隐藏岗位队列原文和登记操作。</p>;
   const locked=!ready||busy!==null;
   return <section aria-label="本地岗位任务队列" className="space-y-3">
     <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-3 space-y-1">
       <h3 className="font-bold text-teal-900">本地岗位任务队列</h3>
-      <p className="text-slate-700">逐岗位登记，绑定当前已保存的简历版本。仅保存待处理任务，不会自动运行 AI、修改简历、生成投递记录或发送材料。</p>
+      <p className="text-slate-700">逐岗位登记，绑定已保存的简历版本。显式开始后只做本地原文条款准备与版本核验；不会自动运行 AI、修改简历、生成投递记录或发送材料。</p>
       <p className="text-[10px] text-slate-600">已登记 {tasks.length}/{MAX_JOB_QUEUE_TASKS} · 原文每项最多 {MAX_JOB_QUEUE_JD_CHARS} 字 · 队列为本地台账的一部分；备份与恢复沿用台账机制。</p>
     </div>
+    {!supportsExecution&&<p className="text-slate-600">执行控制仅支持已升级的桌面工作台；当前仍可登记和核验。</p>}
     {!ready&&<p role="status" className="text-amber-800">请先完成台账保存或重新读取磁盘台账，再进行登记和核验。</p>}
     <div className="rounded-lg border border-slate-200 p-3 space-y-2">
       <h4 className="font-semibold">登记新岗位</h4>
@@ -137,19 +158,32 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
         <p className="text-[10px]">原文 {candidate.task.jdText.length} 字；确认后固定绑定，不会自动替换为其他版本。</p>
         <div className="flex flex-wrap gap-2"><button type="button" disabled={locked} onClick={()=>void confirm()} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-40">确认登记岗位任务</button><button type="button" className={button} onClick={()=>setCandidate(null)}>取消本次登记</button></div>
       </div>}
-      {busy&&<p role="status">{busy==='prepare'?'读取磁盘绑定…':busy==='check'?'核验绑定…':'保存台账…'}{busy!=='save'&&<button type="button" className={button+' ml-2'} onClick={()=>readRef.current?.cancel()}>取消读取</button>}</p>}
+      {busy&&<p role="status">{busy==='prepare'?'读取磁盘绑定…':busy==='check'?'核验绑定…':busy==='execute'?'等待任务台账确认…':'保存台账…'}{(busy==='prepare'||busy==='check')&&<button type="button" className={button+' ml-2'} onClick={()=>readRef.current?.cancel()}>取消读取</button>}</p>}
       {message&&<p role={message.error?'alert':'status'} className={'break-words '+(message.error?'text-red-700':'text-teal-800')}>{message.text}</p>}
     </div>
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">已登记任务</h4><button type="button" className={button} disabled={locked||!!candidate} onClick={()=>void careerLedger.load().catch(()=>{})}>刷新岗位队列</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">已登记任务</h4><button type="button" className={button} disabled={ledger.dirty||ledger.saving||ledger.loading||busy!==null||!!candidate} onClick={()=>void careerLedger.load().catch(()=>{})}>刷新岗位队列</button></div>
       {!tasks.length&&<p className="text-slate-500">暂无待处理岗位。</p>}
       {tasks.map(task=>{
         const status=check?.id===task.id&&check.revision===ledger.data.revision?check:null;
         return <article key={task.id} aria-label={'岗位任务 '+task.company+' '+task.role} className="rounded-lg border border-slate-200 p-3 space-y-2">
-          <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h5 className="font-semibold break-words">{task.company} · {task.role}</h5><p className="text-[10px] break-all text-slate-600">{task.slug} · {task.documentRevision}</p></div><span className="rounded bg-slate-100 px-2 py-1">{ledger.dirty?'待保存草稿':'待处理'}</span></div>
+          <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h5 className="font-semibold break-words">{task.company} · {task.role}</h5><p className="text-[10px] break-all text-slate-600">{task.slug} · {task.documentRevision}</p></div><span className="rounded bg-slate-100 px-2 py-1">{ledger.dirty?'待保存草稿':stateLabels[task.status]}</span></div>
           <details><summary className="cursor-pointer text-slate-700">查看岗位原文（{task.jdText.length} 字）与绑定详情</summary><pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-50 p-2 font-sans text-[11px]">{task.jdText}</pre><p className="mt-1 break-all text-[10px]">任务 ID：{task.id}</p><p className="break-all text-[10px]">SHA-256：{task.documentSha256}</p></details>
           <div className="flex flex-wrap items-center gap-2"><button type="button" aria-label={'核验岗位绑定 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void verify(task)}>核验绑定</button><span className={status?.status==='same'?'text-teal-700':status?'text-amber-800':'text-slate-500'}>{status?.status==='same'?'绑定一致（核验时）':status?.status==='stale'?'版本已变化，原任务不得沿用':status?.status==='unavailable'?'绑定不可核验，不得沿用':'未核验当前版本'}</span></div>
           {status&&<p className="text-[10px] text-slate-500">核验时间 {status.at}；不会自动更新任务或启动操作。</p>}
+          {task.execution&&<div className="rounded bg-slate-50 p-2 text-[11px] break-words">
+            <p>执行尝试 {task.execution.attempts}/{MAX_JOB_QUEUE_ATTEMPTS} · {task.execution.updatedAt}</p>
+            {task.execution.deadlineAt&&<p>本地准备期限：{task.execution.deadlineAt}；超期可显式恢复为失败，不自动重试。</p>}
+            {task.execution.failure&&<p role="status" className="text-amber-800">{failureLabels[task.execution.failure]}</p>}
+            {task.execution.result&&<p className="text-teal-800">本地候选条款 {task.execution.result.clauseCount} 条；尚未人工核对，不代表符合招聘条件。</p>}
+          </div>}
+          {supportsExecution&&<div className="flex flex-wrap gap-2">
+            {task.status==='pending'&&<button type="button" aria-label={'开始岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning} onClick={()=>void execute(task,'start')}>开始本地准备</button>}
+            {(task.status==='paused'||task.status==='failed')&&<button type="button" aria-label={'重试岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning||(task.execution?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS} onClick={()=>void execute(task,'retry')}>{task.status==='paused'?'继续准备（新尝试）':'重试准备'}</button>}
+            {task.status==='running'&&<><button type="button" aria-label={'暂停岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void execute(task,'pause')}>暂停</button>
+              <button type="button" aria-label={'恢复中断岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||!task.execution?.deadlineAt||Date.now()<Date.parse(task.execution.deadlineAt)} onClick={()=>void execute(task,'recover')}>恢复中断为失败</button></>}
+            {task.status!=='canceled'&&task.status!=='prepared'&&<button type="button" aria-label={'取消岗位 '+task.company+' '+task.role} className={button+' text-red-700'} disabled={locked||!!candidate} onClick={()=>void execute(task,'cancel')}>取消任务（保留记录）</button>}
+          </div>}
         </article>;
       })}
     </div>

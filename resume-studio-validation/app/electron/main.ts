@@ -23,6 +23,7 @@ import { buildResumeExportFilename, formatLocalDate, sanitizeFilePart } from '..
 import type { CoverLetterPdfPayload, ApplicationLogInput, ApplicationSnapshotLink,ApplicationPdfCheck,SubmissionPackageResult } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
 import { LocalResumeStore, LocalFsApiError, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
+import {JobQueueExecutor} from '../src/server/jobQueueExecutor';
 import type {
   PdfExportOptions,
   SaveApplicationSnapshotInput,
@@ -72,6 +73,7 @@ async function reportLaunch(status:'ready'|'failed',message?:string){
   try{await task;}finally{if(launchReceiptTask===task)launchReceiptTask=null;}
 }
 const store = new LocalResumeStore(dataDir);
+const jobQueueExecutor=new JobQueueExecutor(store);
 const recoveryDrafts=new RecoveryDraftStore(rootDir,store);
 const facts=new FactBankStore(store);
 const evidence=new EvidenceStore(store,facts);
@@ -710,6 +712,7 @@ function registerIpcHandlers(): void {
 
   trustedEditorHandle('applications:get', () => store.getApplications());
   trustedEditorHandle('applications:save', (_event, data: unknown,revision:string) => store.saveApplications(data,revision));
+  trustedEditorHandle('applications:commandJobQueue',(_event,command:unknown)=>jobQueueExecutor.command(command));
   trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>{
     if(input?.pdfReceiptToken===undefined)return store.logApplication(input);
     return boundedPdfCheck(async signal=>{
