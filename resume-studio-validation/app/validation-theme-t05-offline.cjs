@@ -19,7 +19,8 @@ async function run(){
  await main.registerAssetProtocol();main.registerIpcHandlers();
  const win=await main.createMainWindow(),js=s=>win.webContents.executeJavaScript(s),q=sel=>'document.querySelector('+JSON.stringify(sel)+')';
  const src='textarea[placeholder^="例如：招聘高中物理教师"]',notice='[aria-label="招聘公告 PDF 本地导入"]',imgSel='img[alt="公告 PDF 第 1 页实际渲染"]',scrollSel='[aria-label="公告原件滚动预览"]';
- const scopes={jd:'[data-studio-region="diagnose-jd"]',ai:'[data-studio-region="diagnose-ai"]'};
+ const scopes={jd:'[data-t05-audit-root="jd"]',ai:'[data-t05-audit-root="ai"]'};
+ async function markAuditRoot(field,id){assert(await js('(()=>{const e='+q(field)+'?.closest(".overflow-y-auto");if(!e)return false;e.setAttribute("data-t05-audit-root",'+JSON.stringify(id)+');return true})()'));}
  const themes=['classic','dark','light','warm'];
  const bgs={dark:'rgb(17, 24, 39)',light:'rgb(255, 255, 255)',warm:'rgb(251, 247, 238)'};
  const fields={dark:'rgb(15, 23, 42)',light:'rgb(248, 250, 252)',warm:'rgb(255, 253, 248)'};
@@ -50,7 +51,7 @@ async function run(){
  await until('editor ready',()=>js('document.querySelector("#basic-field-name")?.value==="演示候选人"'));
  win.unmaximize();win.setSize(1440,920);win.focus();await sleep(350);
  const disk=path.join(main.store.resumesDir,'runner-fixture.json');assert(!path.relative(root,disk).startsWith('..'));const original=sha(fs.readFileSync(disk));
- await click('诊断优化');await click('JD 雷达');await until('JD field',()=>js('!!'+q(src)));
+ await click('诊断优化');await click('JD 雷达');await until('JD field',()=>js('!!'+q(src)));await markAuditRoot(src,'jd');
  const seed='合成岗位原始草稿；本科及以上学历。';await setText(src,seed);
  // Generate an actual local A4 PDF with selectable Chinese text, not a mocked image.
  const html=path.join(root,'synthetic-notice.html');fs.writeFileSync(html,'<!doctype html><meta charset="utf-8"><style>body{font-family:"Microsoft YaHei",SimSun,sans-serif;margin:45px;font-size:18px}h1{font-size:24px}</style><h1>合成学校招聘公告</h1><p>须持高中物理教师资格证；</p><p>硕士研究生优先。</p>','utf8');
@@ -70,7 +71,7 @@ async function run(){
    await screenshot(id+'-jd',src);const paper=await imageProof(id);
    await screenshot(id+'-notice',scrollSel);
    if(id!=='classic')assert.deepEqual(paper,results.themes.classic.paper,'announcement original changed '+id);
-   results.themes[id]={jd,paper};results.themes[id].noticeContrast=await auditContrast(win,phase==='candidate'?scopes.jd:notice,id+'-notice');write();
+   results.themes[id]={jd,paper};results.themes[id].noticeContrast=await auditContrast(win,scopes.jd,id+'-notice');write();
  }
  checks.announcementExact=true;checks.unreviewedCannotImport=true;
  await checkBox('确认已对照 PDF 第 1 页');assert.equal(await enabled('确认导入所选公告页'),false);
@@ -88,18 +89,20 @@ async function run(){
  for(const id of themes){
    await theme(id);assert.deepEqual(await js('Array.from(('+q('select[aria-label="岗位候选条款"]')+').options).map(e=>({value:e.value,text:e.innerText}))'),clauses);
    assert.equal(await js(q(src)+'.value'),imported);assert.equal(await js(q('[aria-label="当前公告来源"]')+'.innerText'),sourceState);
-   await screenshot(id+'-requirements','[aria-label="岗位条款原文"]');results.themes[id].requirementsContrast=await auditContrast(win,phase==='candidate'?scopes.jd:'[aria-label="岗位原文与证据核对"]',id+'-requirements');
+   await screenshot(id+'-requirements','[aria-label="岗位条款原文"]');results.themes[id].requirementsContrast=await auditContrast(win,scopes.jd,id+'-requirements');
  }
  checks.provenanceAndClausesExact=true;checks.confirmationRevocation=true;
  await click('AI 润色 Diff');
  const openConfig=await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("去配置")||b.innerText.includes("已启用 · 修改"));if(e){e.click();return true}return false})()');
  // Model field is local; do not save credentials or contact provider.
- const aiField='input[aria-label="模型名"]';await until('AI configuration visible',()=>js('!!'+q(aiField)));
- for(const id of themes){await theme(id);results.themes[id].ai=await state(scopes.ai,aiField,id);await screenshot(id+'-ai',aiField);if(phase==='candidate')results.themes[id].aiContrast=await auditContrast(win,scopes.ai,id+'-ai');write()}
+ const aiField='input[aria-label="模型名"]';await until('AI configuration visible',()=>js('!!'+q(aiField)));await markAuditRoot(aiField,'ai');
+ for(const id of themes){await theme(id);results.themes[id].ai=await state(scopes.ai,aiField,id);await screenshot(id+'-ai',aiField);results.themes[id].aiContrast=await auditContrast(win,scopes.ai,id+'-ai');write()}
  checks.aiThemeForms=true;
  // Report all actual contrasts first; this diagnostic does not hide or discard failures.
  results.contrastSummary=Object.fromEntries(themes.map(id=>[id,Object.fromEntries(['noticeContrast','requirementsContrast','aiContrast'].filter(k=>results.themes[id][k]).map(k=>[k,{count:results.themes[id][k].count,failed:results.themes[id][k].failures.length,min:results.themes[id][k].minRatio,scrollbars:results.themes[id][k].scrollbars}]))]));
  write();
+ if(phase==='candidate')for(const id of ['dark','light','warm'])for(const key of ['noticeContrast','requirementsContrast','aiContrast'])assert.equal(results.themes[id][key].failures.length,0,'nonclassic contrast failure '+id+' '+key);
+ checks.nonclassicContrastExact=phase==='candidate';
  win.setSize(1080,720);await sleep(300);await screenshot('minimum-ai',aiField);
  await click('JD 雷达');await screenshot('minimum-jd',src);
  assert.equal(sha(fs.readFileSync(disk)),original);assert.equal(providerCalls,0);checks.diskUnchanged=true;checks.noProviderCalls=true;write();
