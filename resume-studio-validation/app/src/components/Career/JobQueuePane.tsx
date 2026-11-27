@@ -3,7 +3,10 @@ import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {jobQueueBindingMatches,jobQueueDocumentHash,prepareJobQueueTask} from '../../lib/jobQueueBinding';
 import {sameJobReviewDocument} from '../../lib/jobRequirements';
-import {JobQueueSchema,MAX_JOB_QUEUE_TASKS,MAX_JOB_QUEUE_JD_CHARS,MAX_JOB_QUEUE_ATTEMPTS,type JobQueueTask,type JobQueueCommand} from '../../schema/applicationSchema';
+import {verifyQueueWorkflowOpen} from '../../lib/jobQueueWorkflow';
+import {parsePracticeKey} from '../../lib/interviewPractice';
+import {JobQueueWorkflowPane} from './JobQueueWorkflowPane';
+import {JobQueueSchema,MAX_JOB_QUEUE_TASKS,MAX_JOB_QUEUE_JD_CHARS,MAX_JOB_QUEUE_ATTEMPTS,type JobQueueTask,type JobQueueCommand,type JobQueueOpenResult} from '../../schema/applicationSchema';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 
 type Candidate={task:JobQueueTask;title:string;revision:string;source:ResumeDocument};
@@ -25,6 +28,8 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const ready=ledger.ready&&!ledger.loading&&!ledger.saving&&!ledger.dirty&&!ledger.error&&typeof ledger.data.revision==='string'&&/^[a-f0-9]{64}$/.test(ledger.data.revision);
   const [company,setCompany]=useState(''),[role,setRole]=useState(''),[jd,setJd]=useState('');
   const [candidate,setCandidate]=useState<Candidate|null>(null);
+  const [workflowCandidate,setWorkflowCandidate]=useState<JobQueueOpenResult|null>(null);
+  const [opened,setOpened]=useState<{reply:JobQueueOpenResult;active:ResumeDocument}|null>(null);
   const [check,setCheck]=useState<Check|null>(null);
   const [busy,setBusy]=useState<'prepare'|'check'|'save'|'execute'|null>(null);
   const [message,setMessage]=useState<{error:boolean;text:string}|null>(null);
@@ -33,8 +38,10 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const scope=useRef({activeSlug,activeDoc,redacted,revision:ledger.data.revision});
   scope.current={activeSlug,activeDoc,redacted,revision:ledger.data.revision};
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;readRef.current?.cancel();};},[]);
-  useEffect(()=>{readRef.current?.cancel();setCandidate(null);setCheck(null);if(!writeRef.current)setMessage(null);},[activeSlug,activeDoc,redacted,ledger.data.revision]);
+  useEffect(()=>{readRef.current?.cancel();setCandidate(null);setWorkflowCandidate(null);setCheck(null);if(!writeRef.current)setMessage(null);},[activeSlug,activeDoc,redacted,ledger.data.revision]);
+  useEffect(()=>{setOpened(null);},[activeSlug,activeDoc,redacted]);
   const supportsExecution=!!window.resumeDesktop?.applications?.commandJobQueue;
+  const supportsWorkflow=!!window.resumeDesktop?.applications?.openPreparedJobQueue;
   const hasRunning=tasks.some(t=>t.status==='running');
   // Read-only refresh of acknowledged disk state while this panel is visible.
   // Never overwrite a dirty draft, start work, or auto-retry on restart.
@@ -141,8 +148,19 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
     }catch(err){if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:localErrorMessage(err,'任务操作未确认，请刷新磁盘台账。')});}
     finally{clearTimeout(watchdog);writeRef.current=false;if(mounted.current)setBusy(null);}
   };
+  const openWorkflow=async(task:JobQueueTask,confirm=false)=>{
+    if(!supportsWorkflow||!ready||redacted||candidate||readRef.current||writeRef.current||!ledger.data.revision||task.status!=='prepared'||task.slug!==activeSlug||task.docId!==activeDoc.id)return;
+    const revision=ledger.data.revision,source=activeDoc;
+    if(confirm&&(!workflowCandidate||workflowCandidate.ledgerRevision!==revision||JSON.stringify(workflowCandidate.task)!==JSON.stringify(task)))return;
+    setMessage(null);setCheck(null);setWorkflowCandidate(null);
+    try{
+      const reply=await runRead('check',revision,async()=>verifyQueueWorkflowOpen(await apiClient.openPreparedJobQueue({taskId:task.id,ledgerRevision:revision}),task,revision,activeSlug,source));
+      if(mounted.current&&!scope.current.redacted){if(confirm)setOpened({reply,active:source});else setWorkflowCandidate(reply);}
+    }catch(e){if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:localErrorMessage(e,'岗位流程绑定核验失败')});}
+  };
   if(redacted)return <p className="rounded border bg-slate-50 p-3 text-slate-700">脱敏预览开启时隐藏岗位队列原文和登记操作。</p>;
-  const locked=!ready||busy!==null;
+  if(opened&&opened.active===activeDoc&&opened.reply.task.slug===activeSlug&&JSON.stringify(tasks.find(t=>t.id===opened.reply.task.id))===JSON.stringify(opened.reply.task))return <JobQueueWorkflowPane key={opened.reply.task.id} opened={opened.reply} activeDoc={activeDoc} onExit={()=>setOpened(null)}/>;
+  const locked=!ready||busy!==null||!!workflowCandidate;
   return <section aria-label="本地岗位任务队列" className="space-y-3">
     <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-3 space-y-1">
       <h3 className="font-bold text-teal-900">本地岗位任务队列</h3>
@@ -171,6 +189,11 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
         <div className="flex flex-wrap gap-2"><button type="button" disabled={locked} onClick={()=>void confirm()} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-40">确认登记岗位任务</button><button type="button" className={button} onClick={()=>setCandidate(null)}>取消本次登记</button></div>
       </div>}
       {busy&&<p role="status">{busy==='prepare'?'读取磁盘绑定…':busy==='check'?'核验绑定…':busy==='execute'?'等待任务台账确认…':'保存台账…'}{(busy==='prepare'||busy==='check')&&<button type="button" className={button+' ml-2'} onClick={()=>readRef.current?.cancel()}>取消读取</button>}</p>}
+      {workflowCandidate&&<div role="region" aria-label="确认固定岗位流程" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2">
+        <p className="font-semibold break-words">确认进入：{workflowCandidate.task.company} · {workflowCandidate.task.role}</p><p>绑定简历：{workflowCandidate.document.title} · {workflowCandidate.task.slug}</p>
+        <p>本地准备回执 {workflowCandidate.task.execution?.result?.clauseCount} 条。仅加载此岗位材料流程，不修改当前简历，不发送材料。</p>
+        <button type="button" className={button} disabled={!ready||busy!==null} onClick={()=>void openWorkflow(workflowCandidate.task,true)}>确认进入该岗位流程</button> <button type="button" className={button} onClick={()=>setWorkflowCandidate(null)}>取消进入流程</button>
+      </div>}
       {message&&<p role={message.error?'alert':'status'} className={'break-words '+(message.error?'text-red-700':'text-teal-800')}>{message.text}</p>}
     </div>
     <div className="space-y-2">
@@ -192,6 +215,17 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
             </>}
             {task.execution.failure&&<p role="status" className="text-amber-800">{failureLabels[task.execution.failure]}</p>}
             {task.execution.result&&<p className="text-teal-800">本地候选条款 {task.execution.result.clauseCount} 条；尚未人工核对，不代表符合招聘条件。后续使用前仍需核验绑定版本。</p>}
+          </div>}
+          {task.status==='prepared'&&<div className="space-y-1 rounded bg-teal-50 p-2">
+            <button type="button" aria-label={'核对岗位流程 '+task.company+' '+task.role} className={button} disabled={!supportsWorkflow||locked||!!candidate||task.slug!==activeSlug||task.docId!==activeDoc.id} onClick={()=>void openWorkflow(task)}>核对并进入岗位流程</button>
+            {(task.slug!==activeSlug||task.docId!==activeDoc.id)&&<p>请先在顶部切换到绑定简历；不自动切换或保存其他版本。</p>}
+            {!supportsWorkflow&&<p>需要升级桌面桥接才可进入流程。</p>}
+            <details><summary>该岗位已保存历史（只读，不代表当前依据）</summary>
+              {(ledger.data.jobReviews??[]).filter(a=>a.queueTaskId===task.id).map(a=><p key={a.id}>核对档案：{a.createdAt} · {a.rows.length} 条人工记录；{a.rows.map(r=>r.clauseId+' '+r.review.outcome).join('；')}</p>)}
+              {ledger.data.coverLetters.filter(l=>l.queueTaskId===task.id).map(l=><details key={l.id}><summary>自荐信：{l.title}</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words">{l.bodyText}</pre></details>)}
+              {Object.entries(ledger.data.interviewAnswers).filter(([key])=>parsePracticeKey(key)?.queueTaskId===task.id).map(([key,answer])=><details key={key}><summary>历史练习：{parsePracticeKey(key)?.question}</summary><p className="whitespace-pre-wrap">{answer}</p></details>)}
+              {ledger.data.applications.filter(a=>a.queueTaskId===task.id).map(a=><p key={a.id}>投递台账：{a.status} · {a.snapshotId}（到投递追踪复盘）</p>)}
+            </details>
           </div>}
           {supportsExecution&&<div className="flex flex-wrap gap-2">
             {task.status==='pending'&&<button type="button" aria-label={'开始岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning} onClick={()=>void execute(task,'start')}>开始本地准备</button>}

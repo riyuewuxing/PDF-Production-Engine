@@ -13,9 +13,9 @@ import {splitJobRequirements,collectLocalJobEvidence,evidenceKeywordHints,blankR
 const priorityLabel:Record<RequirementPriority,string>={unknown:'待判定',mandatory:'硬条件',preferred:'优先条件','not-requirement':'非招聘条件'};
 const outcomeLabel:Record<RequirementOutcome,string>={unchecked:'待核对',supported:'本人核对：已有自述依据',gap:'本人标记：存在缺口'};
 function historicalClauses(a:JobReviewArchive){try{return new Map(splitJobRequirements(a.source).map(c=>[c.id,c]));}catch{return new Map<string,RequirementClause>();}}
-type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string;rewriteActions?:AiTextReviewActions;queueTask?:JobQueueTask};
+type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string;rewriteActions?:AiTextReviewActions;queueTask?:JobQueueTask;queueReadBasis?:()=>Promise<ResumeDocument>};
 type Session={source:string;pdfOrigin?:JobPdfOrigin;doc:ResumeDocument;slug:string;clauses:RequirementClause[]};
-export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision,rewriteActions,queueTask}:Props){
+export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision,rewriteActions,queueTask,queueReadBasis}:Props){
   const desktop=isDesktopMode();
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const [applicationId,setApplicationId]=useState('');
@@ -100,9 +100,10 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
   };
   const readDiskBasis=async(s:Session,wantsFacts:boolean)=>{
     if(!desktop||!s.slug)throw new Error('本地档案仅支持桌面工作台。');
-    await onFlush();
+    if(!queueTask)await onFlush();
     if(!stillCurrent(s))throw new Error('岗位原文或当前简历已变化。');
-    const revision=getRevision(),doc=await apiClient.getResume(s.slug);
+    const revision=getRevision(),doc=queueTask?(queueReadBasis?await queueReadBasis():undefined):await apiClient.getResume(s.slug);
+    if(!doc)throw Error('缺少岗位流程绑定核验。');
     if(resumeRevision(doc)!==revision||!sameJobReviewDocument(s.doc,doc))throw new Error('磁盘简历与当前编辑版本不一致，请重载后重新核对。');
     const fresh=wantsFacts?await loadLocalFactBank():null;
     if(!stillCurrent(s)||getRevision()!==revision)throw new Error('核对期间简历或岗位已变化。');
