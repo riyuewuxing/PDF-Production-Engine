@@ -56,7 +56,7 @@ async function run(){
   });
   await main.registerAssetProtocol();main.registerIpcHandlers();
   const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
-  const js=code=>win.webContents.executeJavaScript(code);
+  const js=async code=>{try{return await win.webContents.executeJavaScript(code)}catch(e){throw Error('renderer operation failed (fixture): '+code.slice(0,100))}};
   const has=t=>js('document.body.innerText.includes('+JSON.stringify(t)+')');
   const button=t=>js('[...document.querySelectorAll("button")].some(b=>b.innerText.trim()==='+JSON.stringify(t)+'&&!b.disabled)');
   const click=async t=>assert(await js('(()=>{const b=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==='+JSON.stringify(t)+');if(!b||b.disabled)return false;b.click();return true})()'),'control absent '+t);
@@ -67,7 +67,7 @@ async function run(){
   let settings=await js('window.resumeDesktop.ai.getSettings()');
   assert(settings.apiKey===''&&settings.hasApiKey&&settings.deepseekThinking===undefined&&!JSON.stringify(settings).includes(key),'renderer settings exposed credential or silently migrated mode');
   await click('已启用 · 修改');
-  await until('thinking configuration',()=>js('document.querySelector("select[aria-label=\"DeepSeek 思考模式\"]")?.value==="provider-default"'));
+  await until('thinking configuration',()=>js('document.querySelector('+JSON.stringify('select[aria-label="DeepSeek 思考模式"]')+')?.value==="provider-default"'));
   await setValue('select[aria-label="DeepSeek 思考模式"]','disabled');await click('保存本地配置');
   await until('saved settings',()=>has('配置已保存；密钥由系统加密保护'));
   settings=await js('window.resumeDesktop.ai.getSettings()');
@@ -84,17 +84,17 @@ async function run(){
   await capture('02-real-connection');finishCase();report.checks.realProbe=true;
   await click('收起设置');await click('AI 自由任务');await click('协作改写');
   await setValue('textarea[aria-label="AI 自由任务目标"]','精简这段教师岗位经历，保留协助组织30课时、未独立承担教学的事实限定，不增添成果或证书。');
-  assert(await js('(()=>{const s=document.querySelector("section[aria-label=\"简历 AI 自由任务\"]");const clear=[...s.querySelectorAll("button")].find(b=>b.innerText.trim()==="清空");clear.click();return true})()'),'clear selection missing');
-  assert(await js('(()=>{const s=document.querySelector("section[aria-label=\"简历 AI 自由任务\"]");const l=[...s.querySelectorAll("label")].find(l=>l.innerText.includes("工作经历 ·"));const b=l?.querySelector("input[type=checkbox]");if(!b)return false;if(!b.checked)b.click();return true})()'),'experience selector missing');
+  assert(await js('(()=>{const s=document.querySelector('+JSON.stringify('section[aria-label="简历 AI 自由任务"]')+');const clear=[...s.querySelectorAll("button")].find(b=>b.innerText.trim()==="清空");clear.click();return true})()'),'clear selection missing');
+  assert(await js('(()=>{const s=document.querySelector('+JSON.stringify('section[aria-label="简历 AI 自由任务"]')+');const l=[...s.querySelectorAll("label")].find(l=>l.innerText.includes("工作经历 ·"));const b=l?.querySelector("input[type=checkbox]");if(!b)return false;if(!b.checked)b.click();return true})()'),'experience selector missing');
   await click('预览 AI 自由任务');await until('teacher outbound preview',()=>has('自由任务发送前确认'));
-  const approved=await js('Array.from(document.querySelectorAll("section[aria-label=\"自由任务发送预览\"] pre")).map((e,i)=>({role:i===0?"system":"user",content:e.textContent}))');
+  const approved=await js('Array.from(document.querySelectorAll('+JSON.stringify('section[aria-label="自由任务发送预览"] pre')+')).map((e,i)=>({role:i===0?"system":"user",content:e.textContent}))');
   assert(approved.length===2&&approved[1].content.includes('30课时')&&!privateMarkers.some(m=>JSON.stringify(approved).includes(m))&&calls===1,'incorrect outbound preview');
   const teacher=startCase('teacher-ui',approved);
   await capture('03-teacher-outbound','section[aria-label="自由任务发送预览"]');
   await click('确认发送自由任务');
   await until('teacher response sent',()=>teacher.sent,5000);
   await until('teacher response completed',()=>button('预览 AI 自由任务'),35000);
-  teacher.uiProposal=await js('!!document.querySelector("section[aria-label=\"简历 AI 自由任务\"] [aria-label=\"自由任务正文提案\"] article")');
+  teacher.uiProposal=await js('!!document.querySelector('+JSON.stringify('section[aria-label="简历 AI 自由任务"] [aria-label="自由任务正文提案"] article')+')');
   const exp=adapter.collectEditableBlocks(original).find(b=>b.key.startsWith('exp:'));
   const edu=adapter.collectEditableBlocks(original).find(b=>b.key.startsWith('edu:'));
   const proj=adapter.collectEditableBlocks(original).find(b=>b.key.startsWith('proj:'));
@@ -115,7 +115,7 @@ async function run(){
       await capture('04-teacher-proposal','[aria-label="自由任务正文提案"]');
     }
     if(teacher.uiProposal&&teacher.validSingle&&teacher.factsPreserved&&teacher.citationsValid&&teacher.changed){
-      assert(await js('(()=>{const e=document.querySelector("[aria-label=\"自由任务正文提案\"] article label input");if(!e||e.disabled)return false;e.click();return true})()'),'review checkbox missing');
+      assert(await js('(()=>{const e=document.querySelector('+JSON.stringify('[aria-label="自由任务正文提案"] article label input')+');if(!e||e.disabled)return false;e.click();return true})()'),'review checkbox missing');
       assert(!await button('应用已核对提案（1）'),'apply enabled without PDF');
       await click('试渲染已选正文提案');
       await until('teacher actual PDF comparison',()=>has('真实 PDF 前后对照（本地试渲染）'),45000);
