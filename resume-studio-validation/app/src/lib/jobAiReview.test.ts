@@ -9,7 +9,7 @@ const doc=ResumeDocumentSchema.parse({
   education:[{id:'edu-secret-id',school:'合成大学',major:'物理学',degree:'硕士',description:'参与整理12份实验记录；未独立主持课题。'}],
   experience:[{id:'exp-secret-id',company:'合成学校',position:'教学助理',description:'协助组织30课时教学活动，未独立主讲。联系人 PRIVATE_PERSON private@example.invalid PRIVATE_BASIC_MARKER。'},{id:'hidden-exp',company:'HIDDEN_SCHOOL',description:'HIDDEN_EXP',visible:false}],
   projects:[{id:'proj-secret-id',name:'示例软件',role:'成员',description:'使用 Python 清洗数据；参与小组开发。'}],
-  skillContent:'HIDDEN_SKILL',
+  skillContent:'HIDDEN_SKILL',globalSettings:{},
 });
 const source='须持高中物理教师资格证；硕士优先。\n必须具备独立主讲经验；不要求班主任经历。';
 const prepare=(jd=source)=>prepareJobAiReview({document:doc,source:jd,clauseIds:splitJobRequirements(jd).map(c=>c.id),evidenceIds:collectJobAiEvidence(doc).map(e=>e.id)});
