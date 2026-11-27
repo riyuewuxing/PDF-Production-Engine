@@ -114,7 +114,7 @@ describe('explicit queue execution renderer',()=>{
     fireEvent.click(start());expect(start()).toBeDisabled();fireEvent.click(start());
     expect(session.controlQueue).toHaveBeenCalledExactlyOnceWith({taskId:task.id,ledgerRevision:revision,action:'start'});
     await act(async()=>release());
-    expect(screen.getByText('本地准备中')).toBeTruthy();
+    expect(screen.getByText('准备尝试未结算')).toBeTruthy();expect(screen.getByText(/不保证进程仍在运行/)).toBeTruthy();
     expect(screen.getByRole('button',{name:'开始岗位 另一合成单位 物理教师'})).toBeDisabled();
     expect(screen.getByRole('button',{name:'暂停岗位 合成单位 物理教师'})).not.toBeDisabled();
     expect(session.update).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled();expect(ai).not.toHaveBeenCalled();

@@ -16,7 +16,7 @@ function assertQueue(tasks:JobQueueTask[]){
   if(!result.success)throw Error(result.error.issues[0]?.message||'岗位队列校验失败。');
 }
 
-const stateLabels:Record<JobQueueTask['status'],string>={pending:'待处理',running:'本地准备中',paused:'已暂停',canceled:'已取消',failed:'准备失败',prepared:'本地准备完成'};
+const stateLabels:Record<JobQueueTask['status'],string>={pending:'待处理',running:'准备尝试未结算',paused:'已暂停',canceled:'已取消',failed:'准备失败',prepared:'本地准备完成'};
 const failureLabels={ 'local-error':'本地解析或写入前核验失败','source-changed':'绑定简历发生变化','timeout':'执行超时','interrupted':'中断后已显式恢复为失败' };
 /** The renderer requests explicit commands only; no worker or AI request here. */
 export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;activeDoc:ResumeDocument;redacted:boolean}){
@@ -185,7 +185,11 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
           {status&&<p className="text-[10px] text-slate-500">核验时间 {status.at}；不会自动更新任务或启动操作。</p>}
           {task.execution&&<div className="rounded bg-slate-50 p-2 text-[11px] break-words">
             <p>执行尝试 {task.execution.attempts}/{MAX_JOB_QUEUE_ATTEMPTS} · {task.execution.updatedAt}</p>
-            {task.execution.deadlineAt&&<p>本地准备期限：{task.execution.deadlineAt}；超期可显式恢复为失败，不自动重试。</p>}
+            {task.execution.deadlineAt&&<>
+              <p>本地准备期限：{task.execution.deadlineAt}</p>
+              <p className="text-slate-600">这是台账未结算状态，不保证进程仍在运行；重启不会自动继续。</p>
+              <p className="text-amber-800">{clock>=Date.parse(task.execution.deadlineAt)?'期限已过，可显式恢复为失败。':'期限内可暂停或取消。'}不会自动重试。</p>
+            </>}
             {task.execution.failure&&<p role="status" className="text-amber-800">{failureLabels[task.execution.failure]}</p>}
             {task.execution.result&&<p className="text-teal-800">本地候选条款 {task.execution.result.clauseCount} 条；尚未人工核对，不代表符合招聘条件。后续使用前仍需核验绑定版本。</p>}
           </div>}

@@ -58,7 +58,7 @@ async function run(){
  await click('求职面试');await click('岗位队列');await until('queue',()=>has('本地岗位任务队列'));
  if(phase==='control'){
    assert(calls.length===0&&ledgerHash()===initialLedgerHash,'startup dispatched or wrote');
-   await click(label('开始',0));await status(0,'running','本地准备中');await until('worker held',()=>held.has(tasks[0].id));
+   await click(label('开始',0));await status(0,'running','准备尝试未结算');await until('worker held',()=>held.has(tasks[0].id));
    const running=await byIndex(0),rev=(await store.getApplications()).revision,beforeDup=ledgerHash();
    assert(!await enabled(label('开始',1)),'second job start enabled while first running');
    const duplicate=await js(async command=>{try{await window.resumeDesktop.applications.commandJobQueue(command);return true}catch{return false}},{taskId:tasks[0].id,ledgerRevision:rev,action:'start'});
@@ -75,19 +75,19 @@ async function run(){
    await click(label('重试',0));await status(0,'prepared','本地准备完成');
    const done=await byIndex(0);assert(done.execution.attempts===3&&done.execution.attemptId!==failed.execution.attemptId&&done.execution.result.clauseCount===2&&done.execution.result.jdSha256===sha(Buffer.from(jds[0]))&&done.execution.result.documentSha256===tasks[0].documentSha256,'retry receipt wrong');
    await untouched([1,2]);checks.explicitRetryProducesRealReceipt=true;await capture('04-prepared',0);
-   await click(label('开始',1));await status(1,'running','本地准备中');await until('second worker held',()=>held.has(tasks[1].id));
+   await click(label('开始',1));await status(1,'running','准备尝试未结算');await until('second worker held',()=>held.has(tasks[1].id));
    await click(label('取消',1));await status(1,'canceled','已取消');
    const canceledRow=await byIndex(1),canceledHash=ledgerHash();assert(held.get(tasks[1].id).signal.aborted,'cancel did not signal worker');
    held.get(tasks[1].id).resolve();held.delete(tasks[1].id);await sleep(250);
    assert(ledgerHash()===canceledHash&&!await enabled(label('重试',1)),'late cancellation changed ledger or restarted');
    checks.cancelLateReplyIgnored=true;await capture('05-canceled',1);
-   await click(label('开始',2));await status(2,'running','本地准备中');await until('third worker held',()=>held.has(tasks[2].id));
+   await click(label('开始',2));await status(2,'running','准备尝试未结算');await until('third worker held',()=>held.has(tasks[2].id));
    const timeoutStart=await byIndex(2);
    await status(2,'failed','执行超时',40000);
    const timed=await byIndex(2),timedHash=ledgerHash();assert(timed.execution.failure==='timeout'&&timed.execution.attemptId===timeoutStart.execution.attemptId&&timed.execution.result===null&&held.get(tasks[2].id).signal.aborted,'watchdog failure missing');
    held.get(tasks[2].id).resolve();held.delete(tasks[2].id);await sleep(250);
    assert(ledgerHash()===timedHash,'late timeout reply changed ledger');checks.actualThirtySecondWatchdogAndLateReply=true;await capture('06-timeout',2);
-   await click(label('重试',2));await status(2,'running','本地准备中');await until('third retry held',()=>held.has(tasks[2].id));
+   await click(label('重试',2));await status(2,'running','准备尝试未结算');await until('third retry held',()=>held.has(tasks[2].id));
    const doc=await store.getResume(slugs[2]),file=store.resolveResumePath(slugs[2]).filePath;
    fs.writeFileSync(file,JSON.stringify({...doc,title:'同修订号外部改动'}));const changedHash=sourceHash(slugs[2]);
    held.get(tasks[2].id).resolve();held.delete(tasks[2].id);await status(2,'failed','绑定简历发生变化');
@@ -100,7 +100,7 @@ async function run(){
    checks.redaction=true;await capture('08-redacted');
    observations.calls=calls;observations.finishCalls=finishCalls;
  }else if(phase==='interrupt'){
-   await click(label('开始',0));await status(0,'running','本地准备中');await until('completion write fault',()=>finishFaults===1);
+   await click(label('开始',0));await status(0,'running','准备尝试未结算');await until('completion write fault',()=>finishFaults===1);
    const task=await byIndex(0);
    assert(task.status==='running'&&task.execution.result===null&&calls.length===1,'completion failure created false success');
    await untouched([1,2]);sourceUnchanged();
@@ -109,7 +109,7 @@ async function run(){
  }else{
    const expected=JSON.parse(fs.readFileSync(path.join(out,'interrupt-expected.json'),'utf8'));
    assert(initialLedgerHash===expected.ledgerHash&&JSON.stringify(initial.jobQueue)===JSON.stringify(expected.rows)&&JSON.stringify(sourceHashes)===JSON.stringify(expected.sourceHashes),'restart bytes changed');
-   await status(0,'running','本地准备中');assert(calls.length===0&&ledgerHash()===initialLedgerHash,'restart automatically ran or wrote');
+   await status(0,'running','准备尝试未结算');assert(await rowText(0,'不保证进程仍在运行')&&await rowText(0,'重启不会自动继续'),'restart liveness label ambiguous');assert(calls.length===0&&ledgerHash()===initialLedgerHash,'restart automatically ran or wrote');
    await capture('10-restart-running',0);checks.coldRestartNoAutomaticExecution=true;
    await until('recover after deadline',()=>enabled(label('恢复中断',0)),40000);
    await click(label('恢复中断',0));await status(0,'failed','中断后已显式恢复为失败');
