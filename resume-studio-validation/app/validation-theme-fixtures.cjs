@@ -188,19 +188,21 @@ async function run() {
     await capture(id+'-scroll');
     const sheet=await captureSheet(id+'-scroll');
     const exp=await exportNative(id);
+    const preStatus=await js(`document.querySelector('[aria-label="预估页数"]')?.parentElement?.innerText`);
     await clickByAria('双页并排总览');
     await until('spread selected',()=>js(`!!document.querySelector('button[aria-label="切回单列滚动"]')`));
     await sleep(350);
     const spread=await spreadProof();
     assert.ok(spread.length>=1);
     assert.ok(spread.every(x=>x.markers===0),'studio marker inside spread paper');
-    if(kind==='manual'||kind==='natural')assert.ok(spread.length>=2,'missing second preview page');
     await capture(id+'-spread');
+    const postStatus=await js(`document.querySelector('[aria-label="预估页数"]')?.parentElement?.innerText`);
+    if(phase==='candidate'&&(kind==='manual'||kind==='natural'))assert.ok(spread.length>=2,'missing second preview page');
     const spreadHash=sha(JSON.stringify(spread));
     await clickByAria('切回单列滚动');
     await until('scroll selected',()=>js(`!!document.querySelector('button[aria-label="双页并排总览"]')`));
     await sleep(350);
-    results[id]={sheet,export:exp,spreadHash,spreadPageCount:spread.length};
+    results[id]={sheet,export:exp,spreadHash,spreadPageCount:spread.length,preStatus,postStatus};
     if(id!=='classic'){
       assert.equal(sheet.styleHash,results.classic.sheet.styleHash,'paper computed layout changed');
       assert.equal(exp.pngPixels,results.classic.export.pngPixels,'native PNG changed');

@@ -38,6 +38,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck and full regression after measurement fix
+        if: matrix.phase == 'candidate'
+        timeout-minutes: 4
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build actual Electron app
         timeout-minutes: 3
         run: |
@@ -61,5 +69,5 @@ jobs:
         with:
           name: theme-t02-fixtures-${{ matrix.phase }}
           path: theme-t02-fixtures/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 3
