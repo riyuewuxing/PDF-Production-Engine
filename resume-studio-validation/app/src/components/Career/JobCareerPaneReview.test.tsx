@@ -198,8 +198,11 @@ describe('fixed queue archive refresh lifecycle',()=>{
   fireEvent.click(await screen.findByRole('button',{name:'导出岗位原稿 PDF'}));
   fireEvent.click(await screen.findByRole('button',{name:'核对并归档岗位 PDF'}));
   const dlg=await screen.findByRole('dialog',{name:'记入投递并锁定永久快照'});
-  fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'}));
+  await within(dlg).findByDisplayValue('合成队列单位');
+  await within(dlg).findByDisplayValue(jd);
+  await act(async()=>fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'})));
   const refresh=await within(dlg).findByRole('button',{name:'刷新岗位归档台账'});
+  expect(session.log.mock.calls.length,dlg.textContent??'').toBe(1);
   const first=session.log.mock.calls[0]![0] as ApplicationLogInput;
   let release!:()=>void;
   session.load.mockImplementationOnce(async()=>{publish({loading:true});await new Promise<void>(r=>{release=r});publish({loading:false,error:null,data:{...session.state.data,revision:'b'.repeat(64),jobQueue:[JSON.parse(JSON.stringify(task))]}});});
