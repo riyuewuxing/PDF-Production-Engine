@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient, localErrorMessage } from '../../lib/apiClient';
+import type { StudioThemeId } from '../../studio-theme/presets';
+import { surfaceStyle } from '../../studio-theme/surfaces';
 import {
   type PdfImportDraft,
   extractAndParsePdfResume,
@@ -34,6 +36,7 @@ import { WriteLockPanel } from './WriteLockPanel';
 import { isJsonResumeFormat } from '../../lib/jsonResumeAdapter';
 
 interface VersionAndMasterPaneProps {
+  studioThemeId?: StudioThemeId;
   activeSlug: string;
   comparisonDisabled?: boolean;
   activeDoc: ResumeDocument;
@@ -77,6 +80,7 @@ function formatSnapshotTime(iso: string): string {
 }
 
 export function VersionAndMasterPane({
+  studioThemeId = 'classic',
   activeSlug,
   comparisonDisabled=false,
   activeDoc,
@@ -264,23 +268,23 @@ export function VersionAndMasterPane({
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-slate-200 px-4 py-2.5">
-        <div className="text-xs font-bold text-slate-900">版本与母库管理</div>
-        <div className="text-[11px] text-slate-500">管理不同岗位版本、母库合并与本地历史快照</div>
+    <div className="flex h-full flex-col bg-white studio-ui-surface">
+      <div data-studio-region="versions-header" data-studio-surface="panel" data-studio-theme={studioThemeId} style={surfaceStyle(studioThemeId, 'panel')} className="border-b border-slate-200 studio-ui-border px-4 py-2.5">
+        <div className="text-xs font-bold text-slate-900 studio-ui-primary">版本与母库管理</div>
+        <div className="text-[11px] text-slate-500 studio-ui-muted">管理不同岗位版本、母库合并与本地历史快照</div>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto p-4 text-xs">
+      <div data-studio-region="versions-body" data-studio-surface="panel" data-studio-theme={studioThemeId} style={surfaceStyle(studioThemeId, 'panel')} className="flex-1 space-y-5 overflow-y-auto p-4 text-xs">
         {error && (
-          <div className="rounded border border-red-200 bg-red-50 p-2.5 text-red-700">{error}</div>
+          <div className="rounded border border-red-200 studio-ui-error-border bg-red-50 studio-ui-error-surface p-2.5 text-red-700 studio-ui-error">{error}</div>
         )}
 
         {/* Active Version Title */}
-        <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-          <div className="text-[11px] font-medium text-slate-500">当前编辑版本</div>
+        <section className="rounded-lg border border-slate-200 studio-ui-border bg-slate-50/60 studio-ui-raised p-3">
+          <div className="text-[11px] font-medium text-slate-500 studio-ui-muted">当前编辑版本</div>
           {isRenaming ? (
             <div className="mt-1.5 flex items-center gap-1">
-              <input
+              <input data-studio-control="true"
                 type="text"
                 autoFocus
                 data-native-undo="true"
@@ -295,9 +299,9 @@ export function VersionAndMasterPane({
                   }
                   if (e.key === 'Escape') setIsRenaming(false);
                 }}
-                className="min-w-0 flex-1 rounded border border-slate-400 bg-white px-2 py-1 text-xs text-slate-900"
+                className="min-w-0 flex-1 rounded border border-slate-400 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-xs text-slate-900 studio-ui-primary"
               />
-              <button
+              <button data-studio-control="true"
                 type="button"
                 aria-label="确认重命名"
                 onClick={() => {
@@ -305,29 +309,29 @@ export function VersionAndMasterPane({
                   if (trimmed) onRenameVersion(trimmed);
                   setIsRenaming(false);
                 }}
-                className="rounded bg-slate-900 p-1 text-white"
+                className="rounded bg-slate-900 studio-ui-fill p-1 text-white studio-ui-on-fill"
               >
                 <Check size={12} />
               </button>
-              <button
+              <button data-studio-control="true"
                 type="button"
                 aria-label="取消重命名"
                 onClick={() => setIsRenaming(false)}
-                className="rounded border border-slate-200 bg-white p-1 text-slate-600"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface p-1 text-slate-600 studio-ui-muted"
               >
                 <X size={12} />
               </button>
             </div>
           ) : (
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-bold text-slate-900">{activeDoc.title}</span>
-              <button
+              <span className="truncate text-sm font-bold text-slate-900 studio-ui-primary">{activeDoc.title}</span>
+              <button data-studio-control="true"
                 type="button"
                 onClick={() => {
                   setRenameDraft(activeDoc.title);
                   setIsRenaming(true);
                 }}
-                className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-50"
+                className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-[11px] text-slate-600 studio-ui-muted hover:bg-slate-50 studio-ui-hover"
               >
                 <Pencil size={11} /> 重命名
               </button>
@@ -336,18 +340,18 @@ export function VersionAndMasterPane({
         </section>
 
         <section className="space-y-1">
-          <button type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug})} className="w-full rounded-lg border border-teal-600 bg-teal-50 py-2 font-semibold text-teal-800 disabled:opacity-50">对比版本 / 历史快照</button>
-          {comparisonDisabled&&<p className="text-[11px] text-slate-600">脱敏预览开启时禁止查看原始版本差异。</p>}
+          <button data-studio-control="true" type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug})} className="w-full rounded-lg border border-teal-600 studio-ui-selected-border bg-teal-50 studio-ui-selected py-2 font-semibold text-teal-800 studio-ui-selected-text disabled:opacity-50">对比版本 / 历史快照</button>
+          {comparisonDisabled&&<p className="text-[11px] text-slate-600 studio-ui-muted">脱敏预览开启时禁止查看原始版本差异。</p>}
         </section>
 
         {/* Master Bank Actions */}
         {activeSlug !== 'master' && (
           <section>
-            <button
+            <button data-studio-control="true"
               type="button"
               disabled={busy}
               onClick={onOpenMasterMerge}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-teal-600 studio-ui-selected-border bg-teal-50 studio-ui-selected py-2 text-xs font-semibold text-teal-800 studio-ui-selected-text hover:bg-teal-100 studio-ui-selected-hover disabled:opacity-50"
             >
               <BookMarked size={14} /> 从母库 (master.json) 挑选经历合并到当前版本
             </button>
@@ -356,7 +360,7 @@ export function VersionAndMasterPane({
 
         {/* Saved Versions List */}
         <section>
-          <div className="mb-2 font-semibold text-slate-800">本地简历文件列表</div>
+          <div className="mb-2 font-semibold text-slate-800 studio-ui-primary">本地简历文件列表</div>
           <div className="space-y-1.5">
             {summaries.map((item) => {
               const isCurrent = item.slug === activeSlug;
@@ -364,26 +368,26 @@ export function VersionAndMasterPane({
                 <div
                   key={item.slug}
                   className={`flex items-center justify-between gap-2 rounded-md border p-2.5 ${
-                    isCurrent ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white hover:bg-slate-50'
+                    isCurrent ? 'border-slate-900 studio-ui-selected-border bg-slate-50 studio-ui-selected' : 'border-slate-200 studio-ui-border bg-white studio-ui-surface hover:bg-slate-50 studio-ui-hover'
                   }`}
                 >
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     onClick={() => onSwitchVersion(item.slug)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <div className="truncate font-semibold text-slate-900">{item.title}</div>
-                    <div className="mt-0.5 truncate font-mono text-[10px] text-slate-400">
+                    <div className="truncate font-semibold text-slate-900 studio-ui-primary">{item.title}</div>
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-slate-400 studio-ui-muted">
                       data/resumes/{item.slug}.json
                     </div>
                   </button>
                   {(summaries.length > 1 || masterSummary) && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       disabled={busy}
                       onClick={() => void handleDelete(item.slug, item.title)}
                       aria-label={`删除${item.title}`}
-                      className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -396,19 +400,19 @@ export function VersionAndMasterPane({
               <div
                 className={`flex items-center justify-between gap-2 rounded-md border p-2.5 ${
                   activeSlug === 'master'
-                    ? 'border-amber-600 bg-amber-50/70'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                    ? 'border-amber-600 studio-ui-warning-border bg-amber-50/70 studio-ui-warning-surface'
+                    : 'border-slate-200 studio-ui-border bg-white studio-ui-surface hover:bg-slate-50 studio-ui-hover'
                 }`}
               >
-                <button
+                <button data-studio-control="true"
                   type="button"
                   onClick={() => onSwitchVersion('master')}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <div className="truncate font-semibold text-slate-900">
+                  <div className="truncate font-semibold text-slate-900 studio-ui-primary">
                     母库：{masterSummary.title}
                   </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-slate-400">data/master.json</div>
+                  <div className="mt-0.5 font-mono text-[10px] text-slate-400 studio-ui-muted">data/master.json</div>
                 </button>
               </div>
             )}
@@ -420,67 +424,67 @@ export function VersionAndMasterPane({
         <WorkspaceBackupPane onFlush={onFlushBeforeMutation}/>
 
         {/* Local Disk Time Machine Snapshots */}
-        <section className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 space-y-2.5">
+        <section className="rounded-lg border border-slate-200 studio-ui-border bg-slate-50/50 studio-ui-raised p-3 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={() => setSnapshotsOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 font-semibold text-slate-800"
+              className="inline-flex items-center gap-1.5 font-semibold text-slate-800 studio-ui-primary"
             >
               {snapshotsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              <History size={13} className="text-teal-700" />
+              <History size={13} className="text-teal-700 studio-ui-selected-text" />
               <span>历史快照回滚 {snapshotView?.error?'（检查失败）':!snapshotView?'（检查中）':`(${snapshots.length}/15)`}</span>
             </button>
-            <button
+            <button data-studio-control="true"
               type="button"
               disabled={busy}
               onClick={() => void handleCreateManualSnapshot()}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+              className="rounded border border-slate-300 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-[11px] font-medium text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover disabled:opacity-40"
             >
               手动创建快照
             </button>
           </div>
 
           {snapshotStatus && (
-            <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700">
+            <div className="rounded border border-emerald-200 studio-ui-success-border bg-emerald-50 studio-ui-success-surface px-2 py-1 text-[11px] text-emerald-700 studio-ui-success">
               {snapshotStatus}
             </div>
           )}
 
-          {snapshotView?.error&&<p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-[11px] text-red-800">历史快照检查失败：{snapshotView.error} 未确认磁盘历史记录数量。</p>}
-          {!snapshotView?.error&&typeof snapshotView?.unreadableCount==='number'&&snapshotView.unreadableCount>0&&<p role="alert" className="rounded border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900">有 {snapshotView.unreadableCount} 份异常快照，原文件保留，不计入 15 份有效快照上限。请在本地核对原件或备份。</p>}
-          {snapshotView&&!snapshotView.error&&snapshotView.unreadableCount===null&&<p className="text-[11px] text-slate-600">当前桥接版本无法检查异常快照数量。</p>}
+          {snapshotView?.error&&<p role="alert" className="rounded border border-red-200 studio-ui-error-border bg-red-50 studio-ui-error-surface p-2 text-[11px] text-red-800 studio-ui-error">历史快照检查失败：{snapshotView.error} 未确认磁盘历史记录数量。</p>}
+          {!snapshotView?.error&&typeof snapshotView?.unreadableCount==='number'&&snapshotView.unreadableCount>0&&<p role="alert" className="rounded border border-amber-200 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface p-2 text-[11px] text-amber-900 studio-ui-warning">有 {snapshotView.unreadableCount} 份异常快照，原文件保留，不计入 15 份有效快照上限。请在本地核对原件或备份。</p>}
+          {snapshotView&&!snapshotView.error&&snapshotView.unreadableCount===null&&<p className="text-[11px] text-slate-600 studio-ui-muted">当前桥接版本无法检查异常快照数量。</p>}
           {snapshotsOpen && (
             <div className="space-y-1.5">
-              {!snapshotView ? <p className="text-[11px] text-slate-500">正在检查磁盘快照…</p> : snapshotView.error ? null : snapshots.length === 0 ? (
-                <div className="rounded border border-dashed border-slate-200 bg-white p-3 text-center text-[11px] text-slate-400">
+              {!snapshotView ? <p className="text-[11px] text-slate-500 studio-ui-muted">正在检查磁盘快照…</p> : snapshotView.error ? null : snapshots.length === 0 ? (
+                <div className="rounded border border-dashed border-slate-200 studio-ui-border bg-white studio-ui-surface p-3 text-center text-[11px] text-slate-400 studio-ui-muted">
                   暂无磁盘快照。导出 PDF/DOCX、母库合并或点击右上角“手动创建快照”时将自动留存（最多滚动保留 15 份）。
                 </div>
               ) : (
                 snapshots.map((snap) => (
                   <div
                     key={snap.id}
-                    className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white p-2"
+                    className="flex items-center justify-between gap-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface p-2"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[10px] font-semibold text-slate-700">
+                        <span className="font-mono text-[10px] font-semibold text-slate-700 studio-ui-primary">
                           {formatSnapshotTime(snap.createdAt)}
                         </span>
-                        <span className="truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                        <span className="truncate rounded bg-slate-100 studio-ui-raised px-1.5 py-0.5 text-[10px] text-slate-600 studio-ui-muted">
                           {snap.reason}
                         </span>
                       </div>
-                      <div className="mt-0.5 truncate text-[10px] text-slate-400">
+                      <div className="mt-0.5 truncate text-[10px] text-slate-400 studio-ui-muted">
                         模板：{snap.templateId} · 约 {snap.charCount} 字
                       </div>
                     </div>
-                    <button type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug,snapshotId:snap.id})} aria-label={'对比历史快照 '+formatSnapshotTime(snap.createdAt)} className="shrink-0 rounded border border-slate-300 px-2 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50">对比</button>
-                    <button
+                    <button data-studio-control="true" type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug,snapshotId:snap.id})} aria-label={'对比历史快照 '+formatSnapshotTime(snap.createdAt)} className="shrink-0 rounded border border-slate-300 studio-ui-border px-2 py-1 text-[10px] font-semibold text-slate-700 studio-ui-primary disabled:opacity-50">对比</button>
+                    <button data-studio-control="true"
                       type="button"
                       disabled={busy}
                       onClick={() => void handleRestoreSnapshot(snap)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-1 text-[10px] font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-40"
+                      className="inline-flex shrink-0 items-center gap-1 rounded border border-teal-200 studio-ui-selected-border bg-teal-50 studio-ui-selected px-2 py-1 text-[10px] font-semibold text-teal-800 studio-ui-selected-text hover:bg-teal-100 studio-ui-selected-hover disabled:opacity-40"
                     >
                       <RotateCcw size={10} /> 回滚
                     </button>
@@ -492,28 +496,28 @@ export function VersionAndMasterPane({
         </section>
 
         {/* Create / Clone New Version */}
-        <section className="rounded-lg border border-slate-200 p-3 space-y-2.5">
-          <div className="font-semibold text-slate-800">新建 / 复制新岗位版本</div>
+        <section className="rounded-lg border border-slate-200 studio-ui-border p-3 space-y-2.5">
+          <div className="font-semibold text-slate-800 studio-ui-primary">新建 / 复制新岗位版本</div>
           <div className="flex gap-1.5">
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={() => setCloneSource('current')}
               className={`flex-1 rounded border py-1 font-medium ${
                 cloneSource === 'current'
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 text-slate-700'
+                  ? 'border-slate-900 studio-ui-selected-border bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                  : 'border-slate-200 studio-ui-border text-slate-700 studio-ui-primary'
               }`}
             >
               基于当前版本
             </button>
             {masterSummary && (
-              <button
+              <button data-studio-control="true"
                 type="button"
                 onClick={() => setCloneSource('master')}
                 className={`flex-1 rounded border py-1 font-medium ${
                   cloneSource === 'master'
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 text-slate-700'
+                    ? 'border-slate-900 studio-ui-selected-border bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                    : 'border-slate-200 studio-ui-border text-slate-700 studio-ui-primary'
                 }`}
               >
                 从母库派生
@@ -521,19 +525,19 @@ export function VersionAndMasterPane({
             )}
           </div>
           <div className="flex gap-2">
-            <input
+            <input data-studio-control="true"
               type="text"
               data-native-undo="true"
               value={newTitleDraft}
               onChange={(e) => setNewTitleDraft(e.target.value)}
               placeholder="输入新岗位名称，如：物理教研员"
-              className="min-w-0 flex-1 rounded border border-slate-200 px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none"
+              className="min-w-0 flex-1 rounded border border-slate-200 studio-ui-border px-2.5 py-1.5 text-xs text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
             />
-            <button
+            <button data-studio-control="true"
               type="button"
               disabled={busy}
               onClick={() => void handleCreate()}
-              className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 px-2.5 py-1.5 font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+              className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 studio-ui-fill px-2.5 py-1.5 font-medium text-white studio-ui-on-fill hover:bg-slate-800 studio-ui-fill-hover disabled:opacity-40"
             >
               <CopyPlus size={13} /> 创建
             </button>
@@ -541,51 +545,51 @@ export function VersionAndMasterPane({
         </section>
 
         {/* Import / Export JSON & Legacy PDF */}
-        <section className="space-y-2 border-t border-slate-100 pt-3">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+        <section className="space-y-2 border-t border-slate-100 studio-ui-divider pt-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-800 studio-ui-primary">
             <FileJson size={14} /> 导入简历与本地备份
           </div>
-          <input
+          <input data-studio-control="true"
             ref={importInputRef}
             type="file"
             accept=".json,application/json"
             onChange={handleImportFile}
             className="hidden"
           />
-          <input
+          <input data-studio-control="true"
             ref={pdfInputRef}
             type="file"
             accept=".pdf,application/pdf"
             onChange={e=>void handleTextualImport(e,'pdf')}
             className="hidden"
           />
-          <input ref={textInputRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={e=>void handleTextualImport(e,'text')} className="hidden" />
-          <input ref={docxInputRef} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e=>void handleTextualImport(e,'docx')} className="hidden" />
+          <input data-studio-control="true" ref={textInputRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={e=>void handleTextualImport(e,'text')} className="hidden" />
+          <input data-studio-control="true" ref={docxInputRef} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e=>void handleTextualImport(e,'docx')} className="hidden" />
           <div className="grid grid-cols-2 gap-2">
-            <button
+            <button data-studio-control="true"
               type="button"
               disabled={busy || Boolean(pdfDraft)}
               onClick={() => importInputRef.current?.click()}
-              className="inline-flex items-center justify-center gap-1.5 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover"
             >
               <Upload size={13} /> 导入 JSON
             </button>
-            <button
+            <button data-studio-control="true"
               type="button"
               disabled={busy || Boolean(pdfDraft)}
               onClick={() => pdfInputRef.current?.click()}
-              className="inline-flex items-center justify-center gap-1.5 rounded border border-teal-200 bg-teal-50 py-1.5 font-medium text-teal-800 hover:bg-teal-100"
+              className="inline-flex items-center justify-center gap-1.5 rounded border border-teal-200 studio-ui-selected-border bg-teal-50 studio-ui-selected py-1.5 font-medium text-teal-800 studio-ui-selected-text hover:bg-teal-100 studio-ui-selected-hover"
             >
               <FileText size={13} /> 从旧 PDF 导入
             </button>
-            <button type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">从 TXT / Markdown 导入</button>
-            <button type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>docxInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">从 DOCX 导入</button>
+            <button data-studio-control="true" type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover disabled:opacity-40">从 TXT / Markdown 导入</button>
+            <button data-studio-control="true" type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>docxInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover disabled:opacity-40">从 DOCX 导入</button>
           </div>
-          {parsingTextualImport && <button type="button" onClick={()=>parsingImport.current?.abort()} className="w-full rounded border border-amber-300 bg-amber-50 py-1.5 text-amber-900">取消本地解析</button>}
-          <button
+          {parsingTextualImport && <button data-studio-control="true" type="button" onClick={()=>parsingImport.current?.abort()} className="w-full rounded border border-amber-300 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface py-1.5 text-amber-900 studio-ui-warning">取消本地解析</button>}
+          <button data-studio-control="true"
             type="button"
             onClick={handleExportJson}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover"
           >
             <Download size={13} /> 导出备份 JSON
           </button>

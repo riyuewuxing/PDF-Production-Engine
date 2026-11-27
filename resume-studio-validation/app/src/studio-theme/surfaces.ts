@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { DEFAULT_STUDIO_THEME, isStudioThemeId, resolveChromeTokens, type ChromeTokens, type StudioThemeId } from './presets';
 
-export type StudioSurfaceZone = 'panel' | 'preview';
+export type StudioSurfaceZone = 'panel' | 'preview' | 'gallery';
 export type PreviewBacking = 'follow' | 'dark' | 'light';
 export interface StudioSurfaceTokens extends ChromeTokens {
   successSurface: string;
@@ -32,7 +32,8 @@ export function resolveSurfaceTokens(value: unknown, zone: StudioSurfaceZone): S
   const status = palette.scheme === 'dark' ? darkStatus : lightStatus;
   const panelSurface = id === 'dark' ? '#111827' : id === 'warm' ? '#fbf7ee' : '#ffffff';
   const previewSurface = id === 'dark' ? '#182234' : id === 'warm' ? '#f4eee1' : palette.surface;
-  return { ...palette, ...status, surface: zone === 'panel' ? panelSurface : previewSurface };
+  const gallerySurface = id === 'classic' ? '#141922' : id === 'dark' ? '#0b1120' : id === 'warm' ? '#f4eee1' : '#f8fafc';
+  return { ...palette, ...status, surface: zone === 'panel' ? panelSurface : zone === 'gallery' ? gallerySurface : previewSurface };
 }
 
 export function surfaceStyle(id: unknown, zone: StudioSurfaceZone): CSSProperties {

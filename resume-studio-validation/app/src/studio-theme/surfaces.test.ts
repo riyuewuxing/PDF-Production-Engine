@@ -16,7 +16,7 @@ function contrast(a: string, b: string) {
 
 describe('Scoped panel/preview surface tokens', () => {
   it.each(STUDIO_THEME_IDS)('checks scoped token contrast for %s', id => {
-    for (const zone of ['panel', 'preview'] as const) {
+    for (const zone of ['panel', 'preview', 'gallery'] as const) {
       const t = resolveSurfaceTokens(id, zone);
       for (const [key, value] of Object.entries(t)) {
         if (key !== 'scheme') expect(value, id + '/' + zone + '/' + key).toMatch(/^#[a-f0-9]{6}$/i);
@@ -48,7 +48,7 @@ describe('Scoped panel/preview surface tokens', () => {
   });
   it('exports only studio-scoped CSS custom properties', () => {
     for (const id of STUDIO_THEME_IDS) {
-      for (const zone of ['panel', 'preview'] as const) {
+      for (const zone of ['panel', 'preview', 'gallery'] as const) {
         const style = surfaceStyle(id, zone);
         expect(Object.keys(style).every(key => key.startsWith('--studio-'))).toBe(true);
         expect(style).not.toHaveProperty('color');
@@ -76,5 +76,19 @@ describe('Preview backing is a UI-only override, not paper styling', () => {
     expect(resolvePreviewBacking('dark', 'light')).toEqual(resolvePreviewBacking('warm', 'light'));
     expect(resolvePreviewBacking('warm', 'dark')).toEqual(resolvePreviewBacking('classic', 'dark'));
     expect(resolvePreviewBacking('not-a-preset', 'follow')).toEqual(resolvePreviewBacking('classic', 'follow'));
+  });
+});
+
+
+describe('Gallery chrome is independent of paper', () => {
+  it('preserves classic dark gallery with a light editor', () => {
+    expect(resolveSurfaceTokens('classic', 'gallery').surface).toBe('#141922');
+    expect(resolveSurfaceTokens('classic', 'gallery').scheme).toBe('dark');
+    expect(resolveSurfaceTokens('classic', 'panel').scheme).toBe('light');
+  });
+  it.each(STUDIO_THEME_IDS)('gallery root style exposes only custom properties for %s', id => {
+    const css = surfaceStyle(id, 'gallery');
+    expect(Object.keys(css).every(k => k.startsWith('--studio-'))).toBe(true);
+    for (const key of ['color','colorScheme','fontFamily','filter','transform','opacity','zoom']) expect(css).not.toHaveProperty(key);
   });
 });

@@ -38,25 +38,25 @@ export function RecycleBinPanel({onRestore,refreshKey=0}:{onRestore:(id:string,r
     catch(err){setError(err instanceof Error?err.message:'永久删除失败。');}
     finally{setBusy(false);}
   };
-  return <section className="rounded-lg border border-slate-200 bg-white p-3 text-left text-xs text-slate-800 space-y-2" aria-label="本地版本回收站">
-    <button type="button" onClick={()=>setOpen(v=>!v)} aria-expanded={open} className="flex w-full items-center justify-between font-semibold">
+  return <section className="rounded-lg border border-slate-200 studio-ui-border bg-white studio-ui-surface p-3 text-left text-xs text-slate-800 studio-ui-primary space-y-2" aria-label="本地版本回收站">
+    <button data-studio-control="true" type="button" onClick={()=>setOpen(v=>!v)} aria-expanded={open} className="flex w-full items-center justify-between font-semibold">
       <span className="inline-flex items-center gap-1.5"><Trash2 size={13}/>本地版本回收站{data?'（'+data.items.length+'）':''}</span><span>{open?'收起':'展开'}</span>
     </button>
     {open&&<>
-      <p className="text-[11px] text-slate-500">移入回收站的版本不会自动清理。恢复原版本保留原标识；另存副本不覆盖任何文件。母库及投递历史独立保护。</p>
-      <button type="button" onClick={()=>void refresh()} disabled={busy||loading} className="rounded border border-slate-300 px-2 py-1">刷新回收站</button>
+      <p className="text-[11px] text-slate-500 studio-ui-muted">移入回收站的版本不会自动清理。恢复原版本保留原标识；另存副本不覆盖任何文件。母库及投递历史独立保护。</p>
+      <button data-studio-control="true" type="button" onClick={()=>void refresh()} disabled={busy||loading} className="rounded border border-slate-300 studio-ui-border px-2 py-1">刷新回收站</button>
       {loading&&<p>正在读取本地归档…</p>}
-      {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-700">{error}</div>}
-      {notice&&<div role="status" className="rounded bg-emerald-50 p-2 text-emerald-800">{notice}</div>}
-      {!!data?.unreadableCount&&<div className="rounded bg-amber-50 p-2 text-amber-800">{data.unreadableCount} 条归档无法读取，文件未修改，请检查 data/.trash。</div>}
-      {data?.items.length===0&&!loading&&<p className="text-slate-500">回收站为空。</p>}
-      {data?.items.map(item=><div key={item.id} className="space-y-1.5 rounded border border-slate-200 p-2">
+      {error&&<div role="alert" className="rounded bg-red-50 studio-ui-error-surface p-2 text-red-700 studio-ui-error">{error}</div>}
+      {notice&&<div role="status" className="rounded bg-emerald-50 studio-ui-success-surface p-2 text-emerald-800 studio-ui-success">{notice}</div>}
+      {!!data?.unreadableCount&&<div className="rounded bg-amber-50 studio-ui-warning-surface p-2 text-amber-800 studio-ui-warning">{data.unreadableCount} 条归档无法读取，文件未修改，请检查 data/.trash。</div>}
+      {data?.items.length===0&&!loading&&<p className="text-slate-500 studio-ui-muted">回收站为空。</p>}
+      {data?.items.map(item=><div key={item.id} className="space-y-1.5 rounded border border-slate-200 studio-ui-border p-2">
         <div className="break-words font-semibold">{item.title}</div>
-        <div className="break-all text-[10px] text-slate-500">{item.slug} · {new Date(item.deletedAt).toLocaleString()}</div>
+        <div className="break-all text-[10px] text-slate-500 studio-ui-muted">{item.slug} · {new Date(item.deletedAt).toLocaleString()}</div>
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" disabled={busy} onClick={()=>void restore(item,false)} className="inline-flex items-center gap-1 rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50"><RotateCcw size={11}/>恢复原版本</button>
-          <button type="button" disabled={busy} onClick={()=>void restore(item,true)} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50">另存恢复副本</button>
-          <button type="button" disabled={busy} onClick={()=>void purge(item)} className="rounded border border-red-200 px-2 py-1 text-red-700 disabled:opacity-50">永久删除归档</button>
+          <button data-studio-control="true" type="button" disabled={busy} onClick={()=>void restore(item,false)} className="inline-flex items-center gap-1 rounded border border-teal-300 studio-ui-selected-border px-2 py-1 text-teal-800 studio-ui-selected-text disabled:opacity-50"><RotateCcw size={11}/>恢复原版本</button>
+          <button data-studio-control="true" type="button" disabled={busy} onClick={()=>void restore(item,true)} className="rounded border border-slate-300 studio-ui-border px-2 py-1 disabled:opacity-50">另存恢复副本</button>
+          <button data-studio-control="true" type="button" disabled={busy} onClick={()=>void purge(item)} className="rounded border border-red-200 studio-ui-error-border px-2 py-1 text-red-700 studio-ui-error disabled:opacity-50">永久删除归档</button>
         </div>
       </div>)}
     </>}

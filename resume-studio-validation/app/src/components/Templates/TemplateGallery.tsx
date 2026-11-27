@@ -13,8 +13,11 @@ import { SAMPLE_PREVIEW_DOCUMENT, withPreviewDemoPhoto } from '../../lib/sampleR
 import type { ResumeDocument, TemplateId } from '../../schema/resumeSchema';
 import { TEMPLATE_REGISTRY } from '../../templates/registry';
 import type { TemplateMetadata } from '../../templates/types';
+import type { StudioThemeId } from '../../studio-theme/presets';
+import { surfaceStyle } from '../../studio-theme/surfaces';
 
 interface TemplateGalleryProps {
+  studioThemeId?: StudioThemeId;
   activeDocument: ResumeDocument;
   onSelectTemplate: (templateId: TemplateId, applyRecommendedColor?: string) => void;
 }
@@ -182,10 +185,11 @@ function LiveThumbnailCard({
 
   return (
     <div
-      className={`group flex flex-col overflow-hidden rounded-lg border bg-[#1b222e] transition ${
+      data-studio-gallery-card={meta.id}
+      className={`group flex flex-col overflow-hidden rounded-lg border bg-[#1b222e] studio-ui-raised transition ${
         isActive
-          ? 'border-teal-400 ring-2 ring-teal-400/40'
-          : 'border-slate-700/80 hover:border-teal-500/70'
+          ? 'border-teal-400 studio-ui-selected-border ring-2 ring-teal-400/40 studio-ui-ring'
+          : 'border-slate-700/80 studio-ui-border hover:border-teal-500/70 studio-ui-hover-border'
       }`}
     >
       {/* Full-bleed adaptive A4 Thumbnail Surface */}
@@ -195,6 +199,7 @@ function LiveThumbnailCard({
       >
         {mounted ? (
           <div
+            data-studio-paper="thumbnail"
             className="pointer-events-none origin-top-left select-none"
             style={{
               width: '794px',
@@ -210,7 +215,7 @@ function LiveThumbnailCard({
         )}
 
         {isActive && (
-          <span className="pointer-events-none absolute top-2 left-2 z-20 inline-flex items-center gap-1 rounded-full bg-teal-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+          <span className="pointer-events-none absolute top-2 left-2 z-20 inline-flex items-center gap-1 rounded-full bg-teal-600 studio-ui-fill px-2 py-0.5 text-[10px] font-semibold text-white studio-ui-on-fill shadow">
             <Check size={10} /> 使用中
           </span>
         )}
@@ -221,7 +226,7 @@ function LiveThumbnailCard({
           </span>
         )}
 
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={(e) => {
             e.stopPropagation();
@@ -240,7 +245,7 @@ function LiveThumbnailCard({
 
         {/* Glassmorphic hover/focus action overlay */}
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-slate-950/60 opacity-0 backdrop-blur-[1.5px] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={onSelect}
             className="inline-flex items-center gap-1.5 rounded-full bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-teal-400"
@@ -248,7 +253,7 @@ function LiveThumbnailCard({
             <Check size={13} />
             一键应用
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={onInspect}
             className="inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-slate-900/80 px-3.5 py-1.5 text-xs font-medium text-white shadow hover:bg-slate-800"
@@ -260,7 +265,7 @@ function LiveThumbnailCard({
       </div>
 
       {/* Compact single-line footer */}
-      <div className="flex items-center justify-between gap-2 border-t border-slate-800 bg-[#171d28] px-2.5 py-2 text-slate-100">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-800 studio-ui-border bg-[#171d28] studio-ui-surface px-2.5 py-2 text-slate-100 studio-ui-primary">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-xs font-semibold" title={meta.subtitle}>
             {meta.name}
@@ -322,51 +327,51 @@ function TemplateLightboxModal({
       onClick={onClose}
     >
       <div
-        className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-[#141922] text-slate-100 shadow-2xl"
+        className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-700 studio-ui-border bg-[#141922] studio-ui-surface text-slate-100 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#19202c] px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 studio-ui-border bg-[#19202c] studio-ui-raised studio-ui-primary px-5 py-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-sm font-bold text-white">{meta.name}</h2>
+              <h2 className="truncate text-sm font-bold text-white studio-ui-primary">{meta.name}</h2>
               {meta.tags.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
-                  className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300"
+                  className="rounded bg-slate-800 studio-ui-raised px-1.5 py-0.5 text-[10px] text-slate-300 studio-ui-muted"
                 >
                   {tag}
                 </span>
               ))}
             </div>
-            <p className="mt-0.5 truncate text-[11px] text-slate-400">{meta.subtitle}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-400 studio-ui-muted">{meta.subtitle}</p>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={onToggleFavorite}
               className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
                 isFavorite
-                  ? 'border-amber-400 bg-amber-400/15 text-amber-300'
-                  : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  ? 'border-amber-400 studio-ui-warning-border bg-amber-400/15 studio-ui-warning-surface text-amber-300 studio-ui-warning'
+                  : 'border-slate-700 studio-ui-border bg-slate-900 studio-ui-raised text-slate-300 studio-ui-muted hover:bg-slate-800 studio-ui-hover'
               }`}
             >
               <Star size={12} fill={isFavorite ? 'currentColor' : 'none'} />
               {isFavorite ? '已收藏' : '收藏'}
             </button>
 
-            <div className="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1">
-              <span className="text-[11px] text-slate-400">试色：</span>
+            <div className="flex items-center gap-1.5 rounded-full border border-slate-700 studio-ui-border bg-slate-900 studio-ui-raised px-2.5 py-1">
+              <span className="text-[11px] text-slate-400 studio-ui-muted">试色：</span>
               {colorPalette.map((hex) => (
-                <button
+                <button data-studio-control="true"
                   key={hex}
                   type="button"
                   onClick={() => setTrialColor(hex)}
                   aria-label={`试色 ${hex}`}
                   className={`h-4 w-4 rounded-full border transition ${
                     trialColor.toLowerCase() === hex.toLowerCase()
-                      ? 'scale-110 ring-2 ring-white border-white'
+                      ? 'scale-110 ring-2 ring-white studio-ui-ring border-white'
                       : 'border-white/30 hover:scale-110'
                   }`}
                   style={{ backgroundColor: hex }}
@@ -374,19 +379,19 @@ function TemplateLightboxModal({
               ))}
             </div>
 
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={() => onApply(trialColor)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
+              className="inline-flex items-center gap-1.5 rounded-md bg-teal-600 studio-ui-fill px-3.5 py-1.5 text-xs font-semibold text-white studio-ui-on-fill hover:bg-teal-500 studio-ui-fill-hover"
             >
               <Check size={13} /> 应用此模板并开始编辑
             </button>
 
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={onClose}
               aria-label="关闭大图对比"
-              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+              className="rounded-md p-1.5 text-slate-400 studio-ui-muted hover:bg-slate-800 studio-ui-hover hover:text-white studio-ui-hover-primary"
             >
               <X size={16} />
             </button>
@@ -394,9 +399,9 @@ function TemplateLightboxModal({
         </div>
 
         {/* High-res Scrollable Sheet Area */}
-        <div className="flex-1 overflow-auto bg-[#1b2230] p-6">
+        <div className="flex-1 overflow-auto bg-[#1b2230] studio-ui-raised p-6">
           <div className="mx-auto w-[794px] max-w-full origin-top shadow-2xl ring-1 ring-black/40">
-            <div className="a4-sheet bg-white">
+            <div data-studio-paper="lightbox" className="a4-sheet bg-white">
               <TemplateComponent document={modalDoc} />
             </div>
           </div>
@@ -407,6 +412,7 @@ function TemplateLightboxModal({
 }
 
 export function TemplateGallery({
+  studioThemeId = 'classic',
   activeDocument,
   onSelectTemplate,
 }: TemplateGalleryProps) {
@@ -450,22 +456,22 @@ export function TemplateGallery({
   );
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col bg-[#141922] text-slate-100">
+    <div data-studio-surface="gallery" data-studio-theme={studioThemeId} style={surfaceStyle(studioThemeId, 'gallery')} className="flex min-w-0 flex-1 flex-col bg-[#141922] text-slate-100">
       {/* Gallery Filter & Tools Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-800 bg-[#181e29] px-5 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-800 studio-ui-border bg-[#181e29] studio-ui-raised studio-ui-primary px-5 py-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {CATEGORY_TABS.map((tab) => {
             const count = TEMPLATE_REGISTRY.filter((t) => tab.match(t, favorites)).length;
             const active = category === tab.id;
             return (
-              <button
+              <button data-studio-control="true"
                 key={tab.id}
                 type="button"
                 onClick={() => setCategory(tab.id)}
                 className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
                   active
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
+                    ? 'bg-teal-600 studio-ui-fill text-white studio-ui-on-fill'
+                    : 'bg-slate-800/80 studio-ui-raised text-slate-300 studio-ui-muted hover:bg-slate-700 studio-ui-hover'
                 }`}
               >
                 {tab.label} ({count})
@@ -476,62 +482,62 @@ export function TemplateGallery({
 
         <div className="flex flex-wrap items-center gap-2.5 text-[11px]">
           <label className="relative flex items-center">
-            <Search size={12} className="pointer-events-none absolute left-2.5 text-slate-400" />
-            <input
+            <Search size={12} className="pointer-events-none absolute left-2.5 text-slate-400 studio-ui-muted" />
+            <input data-studio-control="true"
               type="search"
               data-native-undo="true"
               aria-label="搜索模板"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索突出 / 波浪 / 侧栏..."
-              className="w-40 rounded-md border border-slate-700 bg-slate-900 py-1 pr-2 pl-7 text-[11px] text-slate-100 placeholder:text-slate-500 focus:border-teal-500 focus:outline-none"
+              className="w-40 rounded-md border border-slate-700 studio-ui-border bg-slate-900 studio-ui-raised py-1 pr-2 pl-7 text-[11px] text-slate-100 studio-ui-primary placeholder:text-slate-500 focus:border-teal-500 studio-ui-focus-border focus:outline-none"
             />
           </label>
 
-          <div className="inline-flex overflow-hidden rounded-md border border-slate-700 bg-slate-900 p-0.5">
-            <button
+          <div className="inline-flex overflow-hidden rounded-md border border-slate-700 studio-ui-border bg-slate-900 studio-ui-raised p-0.5">
+            <button data-studio-control="true"
               type="button"
               onClick={() => setPreviewMode('mine')}
               className={`rounded px-2 py-1 transition ${
                 previewMode === 'mine'
-                  ? 'bg-slate-700 font-medium text-white'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-slate-700 studio-ui-selected font-medium text-white studio-ui-selected-text'
+                  : 'text-slate-400 studio-ui-muted hover:text-slate-200 studio-ui-hover-primary'
               }`}
             >
               用我的简历预览
             </button>
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={() => setPreviewMode('sample')}
               className={`inline-flex items-center gap-1 rounded px-2 py-1 transition ${
                 previewMode === 'sample'
-                  ? 'bg-slate-700 font-medium text-white'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-slate-700 studio-ui-selected font-medium text-white studio-ui-selected-text'
+                  : 'text-slate-400 studio-ui-muted hover:text-slate-200 studio-ui-hover-primary'
               }`}
             >
               <Sparkles size={11} /> 示例数据
             </button>
           </div>
 
-          <label className="inline-flex cursor-pointer items-center gap-1 text-slate-300">
-            <input
+          <label className="inline-flex cursor-pointer items-center gap-1 text-slate-300 studio-ui-muted">
+            <input data-studio-control="true"
               type="checkbox"
               checked={fillDemoAvatar}
               onChange={(e) => setFillDemoAvatar(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-800"
+              className="rounded border-slate-600 studio-ui-border bg-slate-800 studio-ui-raised"
             />
-            <UserCheck size={12} className="text-sky-400" />
+            <UserCheck size={12} className="text-sky-400 studio-ui-info" />
             <span>无照片时补示范头像预览</span>
           </label>
 
-          <label className="inline-flex cursor-pointer items-center gap-1 text-slate-300">
-            <input
+          <label className="inline-flex cursor-pointer items-center gap-1 text-slate-300 studio-ui-muted">
+            <input data-studio-control="true"
               type="checkbox"
               checked={applyRecommendedColor}
               onChange={(e) => setApplyRecommendedColor(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-800"
+              className="rounded border-slate-600 studio-ui-border bg-slate-800 studio-ui-raised"
             />
-            <Palette size={12} className="text-teal-400" />
+            <Palette size={12} className="text-teal-400 studio-ui-selected-text" />
             <span>切换时应用推荐配色</span>
           </label>
         </div>
@@ -540,7 +546,7 @@ export function TemplateGallery({
       {/* High-density 4-5 Column Live Thumbnail Grid */}
       <div className="flex-1 overflow-y-auto p-5">
         {filtered.length === 0 ? (
-          <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+          <div className="flex h-48 items-center justify-center text-sm text-slate-400 studio-ui-muted">
             {category === 'favorites'
               ? '暂无收藏模板，点击卡片右上角星标即可快速收藏。'
               : `未找到匹配“${searchQuery}”的模板，试试清空筛选条件。`}

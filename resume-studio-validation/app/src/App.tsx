@@ -503,7 +503,7 @@ function StudioApp() {
         </nav>
 
         {activeTab === 'templates' ? (
-          <TemplateGallery activeDocument={previewDoc ?? activeDoc} onSelectTemplate={handleSelectTemplate} />
+          <TemplateGallery studioThemeId={themeId} activeDocument={previewDoc ?? activeDoc} onSelectTemplate={handleSelectTemplate} />
         ) : (
           <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
             <aside data-studio-surface={activeTab === 'edit' || activeTab === 'style' ? 'panel' : undefined}
@@ -536,6 +536,7 @@ function StudioApp() {
               )}
               {activeTab === 'versions' && (
                 <VersionAndMasterPane
+                  studioThemeId={themeId}
                   comparisonDisabled={isRedacted}
                   activeSlug={activeSlug}
                   activeDoc={activeDoc}
@@ -555,6 +556,7 @@ function StudioApp() {
               )}
               {activeTab === 'diagnose' && (
                 <DiagnoseAndMatchPane
+                  studioThemeId={themeId}
                   key={activeSlug}
                   document={activeDoc}
                   activeSlug={activeSlug}
