@@ -23,6 +23,20 @@ public static class NativeDialog {
   [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
   [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
+  [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr h);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="SendMessageTimeoutW")] static extern IntPtr SetMessage(IntPtr h,uint m,IntPtr w,string text,uint flags,uint timeout,out IntPtr result);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="SendMessageTimeoutW")] static extern IntPtr GetMessageText(IntPtr h,uint m,IntPtr w,StringBuilder text,uint flags,uint timeout,out IntPtr result);
+  public static bool IsFilenameEdit(Win w){
+    if(!w.Visible||!w.Enabled||w.Class!="Edit")return false;
+    var parent=Describe(GetParent(w.Handle));
+    var grand=Describe(GetParent(parent.Handle));
+    return w.Id==1001||w.Id==1148||parent.Id==1148||grand.Id==1148||parent.Class=="ComboBox"&&grand.Class=="ComboBoxEx32";
+  }
+  public static bool SetFilename(IntPtr h,string value){
+    IntPtr result; if(SetMessage(h,0x000C,IntPtr.Zero,value,2,3000,out result)==IntPtr.Zero)return false;
+    var b=new StringBuilder(4096);if(GetMessageText(h,0x000D,new IntPtr(b.Capacity),b,2,3000,out result)==IntPtr.Zero)return false;
+    return b.ToString()==value;
+  }
   public class Win {public IntPtr Handle;public uint Pid;public uint OwnerPid;public string Name;public string Class;public int Id;public bool Visible;public bool Enabled;}
   static uint Pid(IntPtr h){uint p=0;if(h!=IntPtr.Zero)GetWindowThreadProcessId(h,out p);return p;}
   static Win Describe(IntPtr h){var b=new StringBuilder(2048);GetWindowText(h,b,b.Capacity);string n=b.ToString();b.Clear();GetClassName(h,b,b.Capacity);return new Win{Handle=h,Pid=Pid(h),OwnerPid=Pid(GetWindow(h,4)),Name=n,Class=b.ToString(),Id=GetDlgCtrlID(h),Visible=IsWindowVisible(h),Enabled=IsWindowEnabled(h)};}
@@ -43,20 +57,26 @@ do {
     $window=$target[0]
     $children=[NativeDialog]::Children($window.Handle)
     if($File -ne ''){
-      # Exact native dialog + standard filename edit, no clipboard or arbitrary keypress.
-      $element=$AE::FromHandle($window.Handle)
-      $editCondition=[System.Windows.Automation.PropertyCondition]::new($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::Edit)
-      $edits=@($element.FindAll($scope,$editCondition)|Where-Object {$_.Current.IsEnabled -and ($_.Current.AutomationId -eq '1001' -or $_.Current.AutomationId -eq '1148' -or $_.Current.Name -match '^File name:?' -or $_.Current.Name -match '^文件名')})
-      if($edits.Count -eq 1){
-        $val=$null
-        if($edits[0].TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$val) -and -not $val.Current.IsReadOnly){
-          $val.SetValue($File)
-          if($val.Current.Value -ne $File){throw 'Filename value did not read back exactly'}
-          Write-Output ('Filename field verified in '+$Title)
-        }else{throw 'Native filename field has no writable ValuePattern'}
-      }else{throw ('Native filename field missing or ambiguous; count='+$edits.Count+'; edits='+(@($element.FindAll($scope,$editCondition)|ForEach-Object {$_.Current.Name+' / '+$_.Current.AutomationId}) -join ' | '))}
+      # Common-item dialog's classic filename combo/edit is available in Win32 even
+      # when UIA exposes only Explorer's search field. Never set search or arbitrary edit.
+      $classic=@($children|Where-Object {[NativeDialog]::IsFilenameEdit($_)})
+      if($classic.Count -eq 1){
+        if(-not [NativeDialog]::SetFilename($classic[0].Handle,$File)){throw 'Win32 filename exact readback failed'}
+        Write-Output ('Win32 filename verified in '+$Title)
+      }else{
+        $element=$AE::FromHandle($window.Handle)
+        $editCondition=[System.Windows.Automation.PropertyCondition]::new($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::Edit)
+        $edits=@($element.FindAll($scope,$editCondition)|Where-Object {$_.Current.IsEnabled -and ($_.Current.AutomationId -eq '1001' -or $_.Current.AutomationId -eq '1148' -or $_.Current.Name -match '^File name:?' -or $_.Current.Name -match '^文件名')})
+        if($edits.Count -eq 1){
+          $val=$null
+          if($edits[0].TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$val) -and -not $val.Current.IsReadOnly){
+            $val.SetValue($File)
+            if($val.Current.Value -ne $File){throw 'Filename value did not read back exactly'}
+            Write-Output ('UIA filename verified in '+$Title)
+          }else{throw 'Native filename field has no writable ValuePattern'}
+        }else{throw ('Native filename field missing or ambiguous; classic count='+$classic.Count+' UIA count='+$edits.Count+' Win32 classes='+(@($children|Where-Object {$_.Visible}|ForEach-Object {$_.Class+':'+$_.Id+':'+$_.Name}) -join ' | '))}
+      }
     }
-
     $buttons=@($children|Where-Object {$_.Visible -and $_.Enabled -and $_.Class -eq 'Button' -and ($_.Name.Replace('&','') -eq $Button -or ($ButtonId -ne 'none' -and $_.Id.ToString() -eq $ButtonId))})
     if($buttons.Count -eq 1){
       if(-not [NativeDialog]::Click($buttons[0].Handle)){throw 'Win32 button dispatch failed'}
