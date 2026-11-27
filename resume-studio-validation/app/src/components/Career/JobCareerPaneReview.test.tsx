@@ -2,7 +2,7 @@ import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/reac
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {JobCareerPane} from './JobCareerPane';
 import {comparisonFixture,changedComparisonFixture} from '../../lib/comparisonSyntheticFixture';
-import {JobApplicationSchema,type ApplicationsStoreData,type ApplicationSnapshotRecord,type ApplicationPdfCheck} from '../../schema/applicationSchema';
+import {JobApplicationSchema,type ApplicationsStoreData,type ApplicationSnapshotRecord,type ApplicationPdfCheck,type SubmissionPackageResult} from '../../schema/applicationSchema';
 import type {ResumeSummary} from '../../schema/resumeSchema';
 import type {ResumeDesktopBridge} from '../../types/electron';
 type State={data:ApplicationsStoreData;ready:boolean;loading:boolean;saving:boolean;dirty:boolean;error:string|null;recoveryError:string|null};
@@ -15,7 +15,7 @@ vi.mock('./CareerAiPanel',()=>({CareerAiPanel:()=>null}));
 vi.mock('./InterviewPracticePane',()=>({InterviewPracticePane:()=>null}));
 const entry=JobApplicationSchema.parse({id:'application-39',company:'合成学校',role:'物理教师',resumeSlug:'origin',snapshotId:'app-archive-39',exportedFilePath:'C:/synthetic/old.pdf',atsScore:63});
 const manual=JobApplicationSchema.parse({id:'manual-39',company:'手工合成记录',role:'物理教师',resumeSlug:'current'});
-const read=vi.fn(),rawRead=vi.fn(),save=vi.fn(),clone=vi.fn(),openPath=vi.fn(),checkPdf=vi.fn();
+const read=vi.fn(),rawRead=vi.fn(),save=vi.fn(),clone=vi.fn(),openPath=vi.fn(),checkPdf=vi.fn(),exportPackage=vi.fn();
 const revision='a'.repeat(64);
 function sourceRecord():ApplicationSnapshotRecord{
  const doc=comparisonFixture();return {meta:{id:entry.snapshotId,applicationId:entry.id,resumeSlug:entry.resumeSlug,exportedFilePath:entry.exportedFilePath,atsScore:entry.atsScore,createdAt:'2026-01-01T00:00:00Z',title:doc.title,templateId:doc.templateId},document:doc};
@@ -32,7 +32,7 @@ beforeEach(()=>{
  session.state={data:{schemaVersion:1,revision,applications:[entry,manual],coverLetters:[],interviewAnswers:{}},ready:true,loading:false,saving:false,dirty:false,error:null,recoveryError:null};
  session.load.mockResolvedValue(undefined);session.flush.mockResolvedValue(undefined);
  read.mockResolvedValue(sourceRecord());clone.mockResolvedValue(undefined);
- window.resumeDesktop={isDesktop:true,applications:{getLinkedSnapshot:read,getSnapshot:rawRead,checkPdf},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
+ window.resumeDesktop={isDesktop:true,applications:{getLinkedSnapshot:read,getSnapshot:rawRead,checkPdf,exportPackage},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
  Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:vi.fn()});
 });
 afterEach(()=>{cleanup();delete window.resumeDesktop;Reflect.deleteProperty(HTMLElement.prototype,'scrollTo');vi.useRealTimers();});
@@ -126,5 +126,50 @@ describe('PDF receipt row lifecycle',()=>{
  it('keeps legacy unknown and does not invent a browser file-check route',()=>{
   render(<JobCareerPane {...props()}/>);expect(screen.getByText(/历史 PDF 路径 · 无字节凭证/)).toBeTruthy();expect(screen.queryByRole('button',{name:'核验 PDF 合成学校'})).toBeNull();
   cleanup();seed();delete window.resumeDesktop;render(<JobCareerPane {...props()}/>);expect(screen.getByText('文件字节核验仅支持桌面工作台。')).toBeTruthy();expect(checkPdf).not.toHaveBeenCalled();
+ });
+});
+
+describe('scoped submission ZIP renderer lifecycle',()=>{
+ const receipt={sha256:'a'.repeat(64),documentSha256:'b'.repeat(64),sizeBytes:123,exportedAt:'2026-01-01T00:00:00Z'};
+ const result:SubmissionPackageResult={canceled:false,filePath:'C:/synthetic/result.zip',sha256:'c'.repeat(64),entries:[{name:'resume.pdf',sizeBytes:123,sha256:receipt.sha256}]};
+ const button=()=>screen.getByRole('button',{name:'制作投递包 合成学校'});
+ function seed(){session.state={...session.state,data:{...session.state.data,applications:[{...entry,pdfReceipt:receipt},manual]}};}
+ it('requires explicit initiation and shows only the returned local receipt without mutating the ledger',async()=>{
+  seed();exportPackage.mockResolvedValue(result);
+  render(<JobCareerPane {...props()}/>);expect(exportPackage).not.toHaveBeenCalled();expect(screen.queryByRole('button',{name:'制作投递包 手工合成记录'})).toBeNull();
+  fireEvent.click(button());await screen.findByText('本地投递包 ZIP 已生成（未发送）');
+  expect(exportPackage).toHaveBeenCalledExactlyOnceWith({applicationId:entry.id,snapshotId:entry.snapshotId,ledgerRevision:revision});
+  expect(screen.getByText(result.filePath)).toBeTruthy();expect(screen.getByText('SHA256 '+result.sha256)).toBeTruthy();
+  expect(session.update).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled();expect(openPath).not.toHaveBeenCalled();
+ });
+ it('distinguishes canceled from successful output and re-enables the operation',async()=>{
+  seed();exportPackage.mockResolvedValueOnce({canceled:true});
+  render(<JobCareerPane {...props()}/>);fireEvent.click(button());await screen.findByText('已取消制作投递包。');
+  expect(button()).not.toBeDisabled();expect(screen.queryByText('本地投递包 ZIP 已生成（未发送）')).toBeNull();
+ });
+ it('serializes package and PDF operations while an OS dialog is pending',async()=>{
+  seed();let finish!:(v:SubmissionPackageResult)=>void;exportPackage.mockImplementationOnce(()=>new Promise(r=>{finish=r}));
+  render(<JobCareerPane {...props()}/>);fireEvent.click(button());expect(button()).toBeDisabled();
+  const check=screen.getByRole('button',{name:'核验 PDF 合成学校'});expect(check).toBeDisabled();
+  fireEvent.click(check);fireEvent.click(button());expect(exportPackage).toHaveBeenCalledTimes(1);expect(checkPdf).not.toHaveBeenCalled();
+  await act(async()=>finish({canceled:true}));expect(button()).not.toBeDisabled();expect(check).not.toBeDisabled();
+ });
+ it('ignores late success after a ledger revision changes',async()=>{
+  seed();let finish!:(v:SubmissionPackageResult)=>void;exportPackage.mockImplementationOnce(()=>new Promise(r=>{finish=r}));
+  render(<JobCareerPane {...props()}/>);fireEvent.click(button());
+  act(()=>publish({data:{...session.state.data,revision:'d'.repeat(64)}}));
+  await act(async()=>finish(result));expect(screen.queryByText(result.filePath)).toBeNull();expect(button()).not.toBeDisabled();
+ });
+ it('does not redisplay an old result after redaction is enabled then disabled',async()=>{
+  seed();let finish!:(v:SubmissionPackageResult)=>void;exportPackage.mockImplementationOnce(()=>new Promise(r=>{finish=r}));
+  const p=props(),v=render(<JobCareerPane {...p}/>);fireEvent.click(button());
+  v.rerender(<JobCareerPane {...p} comparisonDisabled/>);expect(button()).toBeDisabled();
+  v.rerender(<JobCareerPane {...p}/>);await act(async()=>finish(result));expect(screen.queryByText(result.filePath)).toBeNull();expect(button()).not.toBeDisabled();
+ });
+ it('disables packaging on dirty or saving ledger, older desktop bridge, and never offers browser fallback',()=>{
+  seed();render(<JobCareerPane {...props()}/>);act(()=>publish({dirty:true}));expect(button()).toBeDisabled();
+  act(()=>publish({dirty:false,saving:true}));expect(button()).toBeDisabled();cleanup();
+  session.state={...session.state,saving:false};delete window.resumeDesktop!.applications.exportPackage;render(<JobCareerPane {...props()}/>);expect(button()).toBeDisabled();cleanup();
+  delete window.resumeDesktop;render(<JobCareerPane {...props()}/>);expect(screen.queryByRole('button',{name:'制作投递包 合成学校'})).toBeNull();expect(exportPackage).not.toHaveBeenCalled();
  });
 });
