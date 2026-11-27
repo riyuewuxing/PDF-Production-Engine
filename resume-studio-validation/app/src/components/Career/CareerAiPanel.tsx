@@ -48,10 +48,11 @@ export function CareerAiPanel(props:Props){
     if(window.resumeDesktop)void apiClient.listAiProfiles().then(c=>{if(mounted.current){setCatalog(c);setProfileId(c.activeProfileId);}}).catch(err=>{if(mounted.current)setError(localErrorMessage(err,'读取模型档案失败'));});
     return ()=>{mounted.current=false;controller.current?.abort();};
   },[]);
-  const isCurrent=(b:Basis)=>{
+  const sameTextScope=(b:Basis)=>{
     const now=current.current;
-    return mounted.current&&now.props.document===b.document&&now.props.slug===b.slug&&now.props.company===b.company&&now.props.role===b.role&&now.props.jdText===b.jdText&&now.kind===b.kind&&now.props.drafts[b.kind]===b.draftText&&now.selected?.profileId===b.settings.profileId&&now.selected?.revision===b.settings.revision&&JSON.stringify(now.factIds)===JSON.stringify(b.selection.records.map(r=>r.id))&&(!b.selection.binding||now.bank?.revision===b.selection.binding.bankRevision);
+    return mounted.current&&now.props.document===b.document&&now.props.slug===b.slug&&now.props.company===b.company&&now.props.role===b.role&&now.props.jdText===b.jdText&&now.kind===b.kind&&now.props.drafts[b.kind]===b.draftText&&now.selected?.profileId===b.settings.profileId&&now.selected?.revision===b.settings.revision;
   };
+  const isCurrent=(b:Basis)=>{const now=current.current;return sameTextScope(b)&&JSON.stringify(now.factIds)===JSON.stringify(b.selection.records.map(r=>r.id))&&(!b.selection.binding||now.bank?.revision===b.selection.binding.bankRevision);};
   const assertFresh=async(b:Basis)=>{
     try{await assertFreshFactSelection(b.document,b.selection,loadLocalFactBank);}
     catch(err){if(isCurrent(b)&&b.selection.records.length){setFactIds([]);setBank(null);clearApprovals();}throw err;}
@@ -81,7 +82,7 @@ export function CareerAiPanel(props:Props){
       if(!isCurrent(p.basis))throw new Error('原文已变化，已丢弃旧模型建议。');
       await assertFresh(p.basis);if(ctrl.signal.aborted)return;
       setProposal({...p,...restoreCareerRefine(response.text,p.request)});setAttempt({basis:p.basis,value:receivedAiTask(response)});
-    }catch(err){if(mounted.current&&!ctrl.signal.aborted){if(isCurrent(p.basis))setAttempt({basis:p.basis,value:failedAiTask(response)});setError(localErrorMessage(err,'文案精修失败'));}}
+    }catch(err){if(sameTextScope(p.basis)&&!ctrl.signal.aborted){if(isCurrent(p.basis))setAttempt({basis:p.basis,value:failedAiTask(response)});setError(localErrorMessage(err,'文案精修失败'));}}
     finally{if(controller.current===ctrl){if(ctrl.signal.aborted&&isCurrent(p.basis))setAttempt({basis:p.basis,value:{status:'cancelled'}});controller.current=null;if(mounted.current)setBusy(false);}}
   };
   const apply=async()=>{
@@ -109,7 +110,7 @@ export function CareerAiPanel(props:Props){
     {busy&&<div className="flex items-center justify-between"><span>模型正在处理…</span><button type="button" onClick={()=>controller.current?.abort()} className="rounded border px-2 py-1">取消文案请求</button></div>}
     {attempt&&isCurrent(attempt.basis)&&<AiTaskReceiptView label="文案调用回执" attempt={attempt.value}/>}
     {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800">{error}</div>}
-    {preview&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2">
+    {preview&&isCurrent(preview.basis)&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2">
       <div className="font-bold text-amber-900">文案发送前确认（尚未调用模型）</div>
       <p className="break-all">接收方：{validateByokBaseUrl(preview.basis.settings.baseUrl).baseUrl}/chat/completions</p>
       <p>模型：{preview.basis.settings.model} · {preview.basis.settings.providerLabel}</p><p>{describeAiRequest(preview.basis.settings,preview.request.options)}</p>
@@ -118,7 +119,7 @@ export function CareerAiPanel(props:Props){
       <div className="max-h-64 space-y-1 overflow-auto rounded bg-slate-100 p-2"><p className="font-semibold">系统指令</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.systemPrompt}</pre><p className="font-semibold">发送内容</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.userPrompt}</pre></div>
       <div className="flex flex-wrap gap-2"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送文案给模型</button><button type="button" onClick={()=>setPreview(null)} className="rounded border px-2 py-1">取消文案发送</button></div>
     </section>}
-    {proposal&&<section aria-label="文案 AI 审核" className="space-y-2 rounded border border-slate-300 bg-white p-2">
+    {proposal&&isCurrent(proposal.basis)&&<section aria-label="文案 AI 审核" className="space-y-2 rounded border border-slate-300 bg-white p-2">
       <div className="flex items-center gap-1 font-bold"><ShieldCheck size={13}/>原文与候选文案</div>
       <div className="space-y-1 max-h-72 overflow-auto"><p className="font-semibold text-slate-600">原文</p><pre className="whitespace-pre-wrap break-words rounded bg-slate-100 p-2">{proposal.request.original}</pre><p className="font-semibold text-teal-800">候选文案（本地还原）</p><pre className="whitespace-pre-wrap break-words rounded bg-teal-50 p-2">{proposal.text}</pre></div>
       {proposal.request.providedFacts.length>0&&<div className="rounded bg-amber-50 p-2 break-words"><p>已提供的事实（纯文本结果不能证明模型实际引用）：</p>{proposal.basis.selection.records.map((r,i)=><div key={r.id}>record-{i+1} · {r.assertion}<div>本地证据：{r.evidenceRef}</div></div>)}</div>}

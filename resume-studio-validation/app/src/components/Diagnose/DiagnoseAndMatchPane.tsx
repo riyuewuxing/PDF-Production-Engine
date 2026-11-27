@@ -211,6 +211,7 @@ export function DiagnoseAndMatchPane({
   };
   const clearTextApprovals=()=>{
     setPendingRequest(null);setSuggestedText(null);setPolishRiskConfirmed(false);setSingleAttempt(null);setWholeAttempt(null);
+    polishBasisRef.current=null;tailorBasisRef.current=null;
     setTailorProposals([]);setTailorSources({});setTailorNotice(null);setTailorEditingKey(null);
     polishAbortRef.current?.abort();tailorAbortRef.current?.abort();
   };
@@ -466,7 +467,7 @@ export function DiagnoseAndMatchPane({
       await assertFactsFresh(basis);
       if (controller.signal.aborted || tailorAbortRef.current !== controller || !isCurrent(basis)) return;
       const res=analyzePreparedTailorResponse(response.text,request.prepared);
-      setWholeAttempt(receivedAiTask(response));
+      setWholeAttempt(res.proposals.length?receivedAiTask(response):failedAiTask(response));
       setTailorProposals(res.proposals);
       setTailorSources(res.sourceMap);
       setTailorNotice((res.proposals.length===0?'模型没有返回可用的改写提案；这不代表岗位要求已经全部匹配。 ':'')+formatProposalDiagnostics(res.diagnostics));
