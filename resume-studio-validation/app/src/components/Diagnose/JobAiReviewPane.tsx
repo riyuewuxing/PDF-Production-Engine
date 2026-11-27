@@ -86,12 +86,12 @@ export function JobAiReviewPane(props:Props){
       <div className="flex gap-2"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送岗位 AI 分析</button><button type="button" onClick={()=>setPending(null)} className="rounded border px-2 py-1">取消岗位发送</button></div>
     </section>}
     {result&&current(result.request.basis)&&<section aria-label="岗位 AI 分析结果" className="space-y-2 rounded border border-teal-200 bg-teal-50/50 p-2">
-      <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong><div className="flex flex-wrap gap-1">{Object.entries(JOB_AI_ASSESSMENTS).map(([key,label])=><span key={key} className="rounded border bg-white px-1.5 py-1">{label} {result.rows.filter(r=>r.assessment===key).length}</span>)}</div>
+      <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong><div className="flex flex-wrap gap-1">{Object.entries(JOB_AI_ASSESSMENTS).map(([key,label])=><span key={key} className="rounded border bg-white px-1.5 py-1">{label} {result.rows.filter(r=>r.reviewAssessment===key).length}</span>)}</div>
       <p aria-label="岗位 AI 调用回执" className="break-all text-slate-600">{formatAiCompletionReceipt(result.receipt)}</p>
       <p>逐字引用仅证明文字存在，不证明事实真实或满足招聘条件。未选中的自述、事实库和完整公告可能改变判断。请回到下方人工核对逐项确认。</p>
-      {result.rows.map((r,i)=><article key={r.clause.id} aria-label={'岗位 AI 建议 '+(i+1)} className="space-y-1 rounded border bg-white p-2">
+      {result.rows.map((r,i)=><article key={r.clause.id} aria-label={'岗位 AI 建议 '+(i+1)} data-model-assessment={r.assessment} data-review-assessment={r.reviewAssessment} className="space-y-1 rounded border bg-white p-2">
         <p className="font-semibold">第 {r.clause.line} 行 · {r.clause.quote}</p>
-        <p className="font-semibold text-teal-900">模型建议：{JOB_AI_ASSESSMENTS[r.assessment]}</p>
+        <p className="font-semibold text-teal-900">模型建议：{JOB_AI_ASSESSMENTS[r.assessment]}</p>{r.reviewAssessment!==r.assessment&&<p className="rounded bg-amber-100 p-1 font-semibold text-amber-900">本地提醒：引文可能截掉否定或角色限定，本条只计入待核实，不计入支持线索。请核对完整原文。</p>}
         <p className="whitespace-pre-wrap break-words">模型理由（未验证）：{r.reason}</p>
         {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote><details className="rounded border p-1"><summary className="cursor-pointer">引文上下文（发送版本，节选；出现 {c.occurrences} 次）</summary><p className="whitespace-pre-wrap break-words">{c.context}</p></details>{c.caution&&<p className="text-amber-800">该来源含可能的否定、角色或范围限定，即使逐字引用也须特别核对。<span className="block whitespace-pre-wrap">{c.context}</span></p>}</div>)}
         {!!r.missing.length&&<div><p className="font-semibold">待补／待核实</p>{r.missing.map((m,j)=><p key={j}>· {m}</p>)}</div>}

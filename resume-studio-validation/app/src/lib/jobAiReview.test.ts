@@ -63,8 +63,9 @@ describe('source grounded job AI evidence suggestions',()=>{
 it('exposes a negation hidden by a literal substring citation rather than trusting the positive fragment',()=>{
   const p=prepare('必须具备独立主讲经验');
   const out=parseJobAiReview(JSON.stringify([row('R1','supported',[{evidenceId:'E2',quote:'独立主讲'}])]),p);
-  expect(out[0]?.citations[0]).toMatchObject({quote:'独立主讲',occurrences:1,caution:true});
+  expect(out[0]?.citations[0]).toMatchObject({quote:'独立主讲',occurrences:1,caution:true,qualifierClipped:true});
   expect(out[0]?.citations[0]?.context).toContain('未独立主讲');
   // The model suggestion remains explicitly unverified; no eligibility or write result is produced.
   expect(out[0]?.assessment).toBe('supported');
+  expect(out[0]?.reviewAssessment).toBe('uncertain');
 });

@@ -53,18 +53,22 @@ const RowSchema=z.object({
   reason:z.string().trim().min(1).max(300),
   missing:z.array(z.string().trim().min(1).max(180)).max(3),
 }).strict();
-export type JobAiCitation={evidence:LocalJobEvidence;quote:string;context:string;occurrences:number;caution:boolean};
-export type JobAiRow={clause:RequirementClause;assessment:JobAiAssessment;reason:string;missing:string[];citations:JobAiCitation[]};
+export type JobAiCitation={evidence:LocalJobEvidence;quote:string;context:string;occurrences:number;caution:boolean;qualifierClipped:boolean};
+export type JobAiRow={clause:RequirementClause;assessment:JobAiAssessment;reviewAssessment:JobAiAssessment;reason:string;missing:string[];citations:JobAiCitation[]};
 const LIMITATION=/尚未|未取得|未持有|未独立|未曾|尚无|没有|不具备|无[^，。；\n]{0,12}(?:经验|经历|证书|资格)|协助|辅助|仅参与|实习|待核实|\b(?:not|never|without|assisted|intern)\b/i;
 /** Show adjacent text even when an exact substring hides a negation or scope qualifier.
  * Count repeated matches; the preview shows the first location, not a verified semantic interpretation. */
 function locateCitation(text:string,quote:string){
   const start=text.indexOf(quote);
-  let occurrences=0;
-  for(let at=start;at>=0;at=text.indexOf(quote,at+quote.length))occurrences++;
+  let occurrences=0,qualifierClipped=false;
+  for(let at=start;at>=0;at=text.indexOf(quote,at+quote.length)){
+    occurrences++;
+    const prefix=text.slice(Math.max(0,at-24),at);
+    if(/(?:尚未|尚无|并未|从未|未曾|未|没有|不|无|协助|辅助|仅参与|参与|仅)(?:独立|单独|正式|直接)?\s*$/u.test(prefix)||/\b(?:not|never|without|assisted|helped)\s*$/i.test(prefix))qualifierClipped=true;
+  }
   const end=start+quote.length, left=Math.max(0,start-120),right=Math.min(text.length,end+120);
   const context=(left>0?'…':'')+text.slice(left,right)+(right<text.length?'…':'');
-  return {context,occurrences,caution:LIMITATION.test(text)};
+  return {context,occurrences,caution:LIMITATION.test(text)||qualifierClipped,qualifierClipped};
 }
 export function parseJobAiReview(raw:string,prepared:PreparedJobAiReview):JobAiRow[]{
   const clean=raw.trim().replace(/^\x60\x60\x60(?:json)?\s*/i,'').replace(/\s*\x60\x60\x60$/,'').trim();
@@ -92,6 +96,7 @@ export function parseJobAiReview(raw:string,prepared:PreparedJobAiReview):JobAiR
       seen.add(key);
       return {evidence:prepared.evidence[index]!,quote:c.quote,...locateCitation(prepared.sources[index]!.text,c.quote)};
     });
-    return {clause:prepared.clauses[i]!,assessment:row.assessment,reason:row.reason,missing:row.missing,citations};
+    const reviewAssessment=(row.assessment==='supported'||row.assessment==='partial')&&citations.some(c=>c.qualifierClipped)?'uncertain':row.assessment;
+    return {clause:prepared.clauses[i]!,assessment:row.assessment,reviewAssessment,reason:row.reason,missing:row.missing,citations};
   });
 }
