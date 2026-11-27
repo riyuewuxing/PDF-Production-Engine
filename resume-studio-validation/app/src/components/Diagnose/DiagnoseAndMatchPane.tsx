@@ -54,6 +54,7 @@ import {FactBankPane} from './FactBankPane';
 import type {JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
 import {JobNoticePdfPane} from './JobNoticePdfPane';
 import {JobRequirementsPane} from './JobRequirementsPane';
+import {sameJobReviewDocument} from '../../lib/jobRequirements';
 import type {FactBank} from '../../schema/factBankSchema';
 import {prepareFactSelection,assertFreshFactSelection,loadLocalFactBank,type FactSelection} from '../../lib/factSelection';
 import {TextPdfReviewGate} from './TextPdfReviewGate';
@@ -96,7 +97,7 @@ export function DiagnoseAndMatchPane({
   getCurrentRevision: () => string;
 }) {
   const [subTab, setSubTab] = useState<DiagnoseSubTab>('hr');
-  const [jobRewriteApplied,setJobRewriteApplied]=useState<{slug:string;docId:string;source:string}|null>(null);
+  const [jobRewriteApplied,setJobRewriteApplied]=useState<{slug:string;document:ResumeDocument;source:string}|null>(null);
   const [internalJobSource,setInternalJobSource]=useState<{text:string;pdfOrigin?:JobPdfOrigin}>({text:''});
   const jdText=controlledJdText??internalJobSource.text;
   useEffect(()=>{setJobRewriteApplied(null);},[activeSlug,document.id,jdText]);
@@ -674,8 +675,8 @@ export function DiagnoseAndMatchPane({
             </label>
 
             <JobNoticePdfPane jdText={jdText} origin={pdfOrigin} onConfirm={setJdText}/>
-            {jobRewriteApplied?.slug===activeSlug&&jobRewriteApplied.docId===document.id&&jobRewriteApplied.source===jdText&&<p role="status" className="rounded border border-teal-200 bg-teal-50 p-2 text-teal-900">已将核对后的岗位定向正文修改提交至编辑器；保存以工作台状态为准。原岗位核对会话因简历变化失效，请重新分析。可使用 Ctrl+Z 撤回正文修改。</p>}
-            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} pdfOrigin={pdfOrigin} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision} rewriteActions={{overflowPx,onFlushBeforeApply,getCurrentRevision,onImmediateChange:next=>{onImmediateChange(next);setJobRewriteApplied({slug:activeSlug,docId:next.id,source:jdText});}}}/>
+            {jobRewriteApplied?.slug===activeSlug&&jobRewriteApplied.source===jdText&&sameJobReviewDocument(jobRewriteApplied.document,document)&&<p role="status" className="rounded border border-teal-200 bg-teal-50 p-2 text-teal-900">已将核对后的岗位定向正文修改提交至编辑器；保存以工作台状态为准。原岗位核对会话因简历变化失效，请重新分析。可使用 Ctrl+Z 撤回正文修改。</p>}
+            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} pdfOrigin={pdfOrigin} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision} rewriteActions={{overflowPx,onFlushBeforeApply,getCurrentRevision,onImmediateChange:next=>{onImmediateChange(next);setJobRewriteApplied({slug:activeSlug,document:next,source:jdText});}}}/>
             {jdResult.totalKeywords > 0 ? (
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex items-center justify-between">

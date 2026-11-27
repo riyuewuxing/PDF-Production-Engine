@@ -144,6 +144,10 @@ async function run(){
       const receipt=await js(q('[aria-label="岗位 AI 调用回执"]')+'?.innerText||""');
       if(obs.usage?.total!==null)assert(receipt.includes('合计 '+obs.usage.total+' tokens'),'receipt usage mismatch');
       report.checks.receiptAndRowsMatch=true;
+      const actualTargets=await js('Array.from(('+q(result)+').querySelectorAll("article")).map(a=>Array.from(a.querySelectorAll("button")).filter(b=>b.innerText.startsWith("准备本段定向改写")).map(b=>b.innerText))');
+      const expectedTargets=rows.map(r=>adapter.jobRewriteTargets(before,r).map(t=>'准备本段定向改写 · '+t.label));
+      assert(JSON.stringify(actualTargets)===JSON.stringify(expectedTargets),'recorded job-to-rewrite eligibility differs from actual UI');
+      obs.rewriteTargetCounts=expectedTargets.map(t=>t.length);report.checks.rewriteTargetsMatch=true;
       const pendingList=await js(q('[aria-label="岗位待补材料清单"]')+'?.innerText||""');
       const gapRows=rows.filter(r=>['gap','partial','uncertain'].includes(r.reviewAssessment));
       assert(pendingList.includes('待补材料与待核实项 · '+gapRows.length+' 条')&&gapRows.every(r=>pendingList.includes(r.clause.quote)&&r.missing.every(m=>pendingList.includes(m))),'action list differs from grounded rows');

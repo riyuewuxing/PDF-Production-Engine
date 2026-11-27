@@ -118,15 +118,16 @@ export function JobAiReviewPane(props:Props){
           <button type="button" disabled={locked} onClick={()=>props.onReview(r.clause.id)} className="rounded border px-2 py-1">核对此项原文</button>
         </div>)}
       </section>
-      {result.rows.map((r,i)=><article key={r.clause.id} aria-label={'岗位 AI 建议 '+(i+1)} data-model-assessment={r.assessment} data-review-assessment={r.reviewAssessment} className="space-y-1 rounded border bg-white p-2">
+      {result.rows.map((r,i)=>{const targets=jobRewriteTargets(document,r);return <article key={r.clause.id} aria-label={'岗位 AI 建议 '+(i+1)} data-model-assessment={r.assessment} data-review-assessment={r.reviewAssessment} className="space-y-1 rounded border bg-white p-2">
         <p className="font-semibold">第 {r.clause.line} 行 · {r.clause.quote}</p><p className="text-slate-600">本地提示：{priorityHints[r.clause.priorityHint]}（未经人工判定）</p>
         <p className="font-semibold text-teal-900">模型建议：{JOB_AI_ASSESSMENTS[r.assessment]}</p>{r.reviewAssessment!==r.assessment&&<p className="rounded bg-amber-100 p-1 font-semibold text-amber-900">本地提醒：引文可能截掉否定或角色限定，本条只计入待核实，不计入支持线索。请核对完整原文。</p>}
         <p className="whitespace-pre-wrap break-words">模型理由（未验证）：{r.reason}</p>
         {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote><details className="rounded border p-1"><summary className="cursor-pointer">引文上下文（发送版本，节选；出现 {c.occurrences} 次）</summary><p className="whitespace-pre-wrap break-words">{c.context}</p></details>{c.caution&&<p className="text-amber-800">来源含可能的否定、角色或范围限定，请核对上下文。{c.qualifierClipped&&<span className="block whitespace-pre-wrap">{c.context}</span>}</p>}</div>)}
         {!!r.missing.length&&<div><p className="font-semibold">待补／待核实</p>{r.missing.map((m,j)=><p key={j}>· {m}</p>)}</div>}
         <button type="button" disabled={locked} onClick={()=>props.onReview(r.clause.id)} className="rounded border px-2 py-1">定位到人工核对</button>
-        {jobRewriteTargets(document,r).map(t=><button type="button" key={t.blockKey} disabled={locked} onClick={()=>openRewrite(r,t.blockKey)} className="block rounded border border-teal-300 px-2 py-1 text-teal-800">准备本段定向改写 · {t.label}</button>)}
-      </article>)}
+        {targets.map(t=><button type="button" key={t.blockKey} disabled={locked} onClick={()=>openRewrite(r,t.blockKey)} className="block rounded border border-teal-300 px-2 py-1 text-teal-800">准备本段定向改写 · {t.label}</button>)}
+        {!targets.length&&r.reviewAssessment!=='not-requirement'&&<p className="text-slate-600">{['gap','uncertain'].includes(r.reviewAssessment)?'先核对缺口或完整依据；本条不提供改写入口。':'本条没有当前可改写正文的逐字依据；学历、证书、标题等固定字段请人工核对，不通过正文补资质。'}</p>}
+      </article>})}
     </section>}
     {rewrite&&current(rewrite.request.basis)&&<section ref={rewriteElement} aria-label="岗位定向改写工作区" className="space-y-2 rounded border-2 border-teal-300 bg-teal-50 p-2">
       <div className="flex items-start justify-between gap-2"><strong>岗位定向改写 · 独立任务</strong><button type="button" onClick={()=>setRewrite(null)} className="shrink-0 rounded border px-2 py-1">关闭定向改写</button></div>

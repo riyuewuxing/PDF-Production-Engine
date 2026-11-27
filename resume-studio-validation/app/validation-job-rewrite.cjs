@@ -60,7 +60,7 @@ async function run(){
   const setValue=async(sel,value)=>assert(await js('(()=>{const e='+q(sel)+';if(!e)return false;const p=e.tagName==="SELECT"?HTMLSelectElement.prototype:HTMLTextAreaElement.prototype;Object.getOwnPropertyDescriptor(p,"value").set.call(e,'+JSON.stringify(value)+');e.dispatchEvent(new Event(e.tagName==="SELECT"?"change":"input",{bubbles:true}));return true})()'),'input missing '+sel);
   const capture=async(name,sel)=>{await js(q(sel)+'?.scrollIntoView({block:"start",behavior:"instant"})');await sleep(200);const shot=await win.webContents.capturePage();assert(!shot.isEmpty(),'empty screenshot');fs.writeFileSync(path.join(out,name+'.png'),shot.toPNG())};
   const checkLabel=async(part,scope)=>assert(await js('(()=>{const l=[...('+q(scope)+').querySelectorAll("label")].find(e=>e.innerText.includes('+JSON.stringify(part)+'));const b=l?.querySelector("input[type=checkbox]");if(!b||b.disabled)return false;if(!b.checked)b.click();return true})()'),'checkbox unavailable '+part);
-  const panel='details[aria-label="岗位 AI 证据分析"]',result='section[aria-label="岗位 AI 分析结果"]',preview='section[aria-label="岗位 AI 发送预览"]',rewrite='section[aria-label="岗位定向改写工作区"]',draftScope='[aria-label="岗位定向改写范围"]',rp='section[aria-label="自由任务发送预览"]',proposal='[aria-label="自由任务正文提案"]',receipt='[aria-label="自由任务调用回执"]',sourceSel='textarea[placeholder^="例如：招聘高中物理教师"]';
+  const panel='details[aria-label="岗位 AI 证据分析"]',result='section[aria-label="岗位 AI 分析结果"]',preview='section[aria-label="岗位 AI 发送预览"]',rewrite='section[aria-label="岗位定向改写工作区"]',draftScope='[aria-label="岗位定向改写范围"]',rp='section[aria-label="岗位改写发送预览"]',proposal='[aria-label="岗位改写正文提案"]',receipt='[aria-label="岗位改写调用回执"]',sourceSel='textarea[placeholder^="例如：招聘高中物理教师"]';
   const applyDisabled=()=>js('[...('+q(rewrite)+').querySelectorAll("button")].find(b=>b.innerText.includes("应用已核对提案"))?.disabled===true');
   await until('editor',()=>js('document.querySelector("#basic-field-name")?.value==='+JSON.stringify(markers[0])));
   const before=await main.store.getResume('runner-fixture');
@@ -97,7 +97,7 @@ async function run(){
     await capture(name+'-draft',rewrite);
   };
   const prepare=async name=>{
-    const n=report.calls;await click('预览 AI 自由任务',rewrite);await until('rewrite preview',()=>js('!!'+q(rp)));assert(report.calls===n,'rewrite sent before confirmation');
+    const n=report.calls;await click('预览本段定向改写',rewrite);await until('rewrite preview',()=>js('!!'+q(rp)));assert(report.calls===n,'rewrite sent before confirmation');
     const messages=await getMessages(rp),u=JSON.parse(messages[1].content),s=scenarios[name];
     assert(messages.length===2&&u.mode==='co-create'&&u.jdText===s.source.split('；')[0]+'；'&&u.toolResults.list_visible_blocks.length===1&&u.toolResults.list_visible_blocks[0].text===s.body&&u.toolResults.inspect_block_facts.length===1&&u.toolResults.inspect_block_facts[0].sources.every(f=>f.scope!=='record'),'preview scope mismatch');
     assert(!markers.some(m=>JSON.stringify(messages).includes(m)),'preview privacy leak or untrusted carry-over');
@@ -108,7 +108,7 @@ async function run(){
   };
   const send=async(name,mode,expected)=>{
     const a=start(name,'rewrite',mode,expected);
-    await click('确认发送自由任务',rp);await until('rewrite actual dispatch',()=>a.sent);
+    await click('确认发送本段改写',rp);await until('rewrite actual dispatch',()=>a.sent);
     return a;
   };
   const close=()=>click('关闭定向改写',rewrite);
@@ -134,35 +134,65 @@ async function run(){
   await until('manual original',()=>js(q('[aria-label="岗位条款原文"]')+'?.innerText.includes("高中物理教师资格证")'));
   await setValue('select[aria-label="岗位核对结果"]','gap');await setValue('textarea[aria-label="岗位核对说明"]','合成人工核对说明');
   await click('记录本条人工核对');await until('manual record',()=>has('已记录 1 条'));
-  await open('teacher');let messages=await prepare('teacher');const n=report.calls;await click('取消预览',rp);assert(report.calls===n&&!await js('!!'+q(rp)),'cancel preview sent');await close();
+  await open('teacher');let messages=await prepare('teacher');const n=report.calls;await click('取消改写预览',rp);assert(report.calls===n&&!await js('!!'+q(rp)),'cancel preview sent');await close();
   assert(await has('已记录 1 条')&&await has('合成人工核对说明'),'manual session lost on close');report.checks.manualReviewPreserved=true;
-  await open('teacher');messages=await prepare('teacher');let a=await send('teacher','cancel',messages);await click('取消自由任务',rewrite);
+  await open('teacher');messages=await prepare('teacher');let a=await send('teacher','cancel',messages);await click('取消本段改写',rewrite);
   await until('cancel receipt',()=>js(q(receipt)+'?.dataset.attemptState==="cancelled"'));assert(a.aborted&&!await js('!!'+q(proposal)),'cancelled result or fetch still active');await capture('teacher-cancelled',receipt);finish(a);await close();await noWrite();report.checks.cancelAbortsActualRequest=true;
   await open('teacher');await success('teacher','unauthorized-only');await close();
-  await analyze('research');await open('research');messages=await prepare('research');a=await send('research','stale-source',messages);
+  await analyze('research');await open('research');await success('research');await close();await open('research');messages=await prepare('research');a=await send('research','stale-source',messages);
   await setValue(sourceSel,scenarios.research.source+'附加新条款');await until('source invalidates workspace',()=>js('!'+q(rewrite)));await until('stale fetch aborted',()=>a.aborted);
   finish(a);await noWrite();report.checks.staleSourceAbortsAndDiscards=true;
   await analyze('general');await open('general');await success('general');await pdfReview('general');
   const saved=await js('window.resumeDesktop.ai.getSettings()');await js('window.resumeDesktop.ai.saveSettings('+JSON.stringify({...saved,maxOutputTokens:1500})+')');
   const beforeStale=report.calls;await click('应用已核对提案（1）',rewrite);
   await until('stale settings blocked apply',()=>has('岗位定向改写的已保存模型档案已变化'));assert(report.calls===beforeStale&&await applyDisabled(),'stale profile allowed application');await capture('general-stale-profile',rewrite);await noWrite();report.checks.staleProfileBlocksApply=true;await close();
+  await open('general');await prepare('general');const oldCalls=report.calls;await click('确认发送本段改写',rp);
+  await until('stale model refused before network',()=>has('岗位定向改写的已保存模型档案已变化'));
+  assert(report.calls===oldCalls&&await js(q(receipt)+'?.dataset.attemptState==="unconfirmed"'),'stale profile reached network or produced a result');await noWrite();report.checks.staleProfileBlocksSend=true;await close();
   // Reanalyse with current profile; approved rewrite changes exactly one body and creates a real prewrite snapshot.
   await analyze('teacher');await open('teacher');await success('teacher');await pdfReview('teacher');const beforeApplyCalls=report.calls;
   // A new unsaved manual draft must require explicit confirmation before it can be invalidated.
   await setValue('textarea[aria-label="岗位核对说明"]','尚未记录的合成人工草稿');
-  await js('window.__guidedConfirm=[];window.confirm=s=>{window.__guidedConfirm.push(s);return false}');
+  await js('window.__guidedConfirm=[];window.confirm=s=>{window.__guidedConfirm.push(s);return false};true');
   await click('应用已核对提案（1）',rewrite);await until('manual invalidation confirmation',()=>js('window.__guidedConfirm.some(s=>s.includes("未记录草稿"))'));
   assert(await button('应用已核对提案（1）',rewrite)&&await js(q('textarea[aria-label="岗位核对说明"]')+'?.value==="尚未记录的合成人工草稿"'),'cancelled confirmation lost draft or candidate');
   await noWrite();report.checks.manualDraftInvalidationRequiresConfirmation=true;
-  await js('window.confirm=s=>{window.__guidedConfirm.push(s);return true}');
+  await js('window.confirm=s=>{window.__guidedConfirm.push(s);return true};true');
+  // Let a real prewrite snapshot complete, then change the manual review before the IPC result.
+  // This must discard the old body application even though the explicitly authorized backup exists.
+  const originalSnapshot=main.store.createSnapshot.bind(main.store);
+  let snapshotReached=false,releaseSnapshot;
+  main.store.createSnapshot=async(...args)=>{
+    const v=await originalSnapshot(...args);
+    if(args[1]==='岗位定向改写前快照'&&!snapshotReached){
+      snapshotReached=true;
+      await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('snapshot test watchdog')),10000);releaseSnapshot=()=>{clearTimeout(timer);resolve()};});
+    }
+    return v;
+  };
+  await click('应用已核对提案（1）',rewrite);await until('actual prewrite snapshot',()=>snapshotReached&&!!releaseSnapshot);
+  await setValue('textarea[aria-label="岗位核对说明"]','在快照过程中变化的人工草稿');
+  releaseSnapshot();main.store.createSnapshot=originalSnapshot;
+  await until('changed manual draft blocks apply',()=>has('人工岗位核对已变化或仍在保存'));
+  assert(JSON.stringify(await main.store.getResume('runner-fixture'))===JSON.stringify(before)&&await js(q('textarea[aria-label="岗位核对说明"]')+'?.value==="在快照过程中变化的人工草稿"')&&report.calls===beforeApplyCalls,'manual review race changed body or lost draft');
+  const afterRaceSnapshots=await main.store.listSnapshots('runner-fixture');
+  assert(afterRaceSnapshots.length===snapshots.length+1,'expected one authorized backup for interrupted application');
+  report.checks.manualDraftRaceRejectsBodyWrite=true;await capture('teacher-manual-race',rewrite);
   await click('应用已核对提案（1）',rewrite);
   await until('saved guided body',async()=> (await main.store.getResume('runner-fixture')).experience[0].description===scenarios.teacher.next,30000);
   const after=await main.store.getResume('runner-fixture'),expected={...before,updatedAt:after.updatedAt,experience:before.experience.map((x,i)=>i===0?{...x,description:scenarios.teacher.next}:x)};
   assert(JSON.stringify(after)===JSON.stringify(expected),'protected or unrelated fields changed');
-  const finalSnapshots=await main.store.listSnapshots('runner-fixture');assert(finalSnapshots.length===snapshots.length+1&&finalSnapshots.some(s=>s.reason==='岗位定向改写前快照'),'missing prewrite snapshot');
+  const finalSnapshots=await main.store.listSnapshots('runner-fixture');assert(finalSnapshots.length===snapshots.length+2&&finalSnapshots.filter(s=>s.reason==='岗位定向改写前快照').length===2,'missing prewrite snapshot');
+  for(const s of finalSnapshots.filter(s=>s.reason==='岗位定向改写前快照')){const record=JSON.parse(fs.readFileSync(path.join(main.store.backupsDir,'runner-fixture',s.id+'.json'),'utf8'));assert(JSON.stringify(record.document)===JSON.stringify(before),'snapshot bytes differ from original baseline');}
+  report.checks.actualSnapshotContentVerified=true;
   assert(JSON.stringify(await main.store.getApplications())===JSON.stringify(ledger)&&JSON.stringify(await js('window.resumeDesktop.facts.get()'))===JSON.stringify(bank)&&report.calls===beforeApplyCalls,'apply changed ledger/facts or called provider');
   assert(!await js('!!'+q(rewrite))&&await has('原岗位核对会话因简历变化失效'),'stale workspace or missing editor submission feedback');
   await capture('teacher-applied','[role="status"]');
+  // Real Undo of the authorized edit must restore the original content and remove stale success feedback.
+  await js('window.dispatchEvent(new KeyboardEvent("keydown",{key:"z",code:"KeyZ",ctrlKey:true,bubbles:true,cancelable:true}));true');
+  await until('guided edit undo',async()=> (await main.store.getResume('runner-fixture')).experience[0].description===scenarios.teacher.body,30000);
+  const undone=await main.store.getResume('runner-fixture');assert(JSON.stringify({...undone,updatedAt:before.updatedAt})===JSON.stringify(before)&&!await has('原岗位核对会话因简历变化失效'),'undo or status scope incorrect');
+  report.checks.realUndoRestoresBodyAndClearsFeedback=true;
   report.checks.exactSingleBodyWrite=true;report.checks.prewriteSnapshotCreated=true;report.checks.applyInvalidatesOldReview=true;
   report.checks.noRealNetwork=true;write();
 }
