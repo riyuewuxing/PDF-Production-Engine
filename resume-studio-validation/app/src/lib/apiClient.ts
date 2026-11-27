@@ -7,6 +7,7 @@ import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
   ApplicationSnapshotLink,
+  ApplicationPdfCheck,
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
@@ -240,6 +241,12 @@ export const apiClient = {
     }
     const query=new URLSearchParams({applicationId:link.applicationId,snapshotId:link.snapshotId,ledgerRevision:link.ledgerRevision});
     return handleJsonResponse<ApplicationSnapshotRecord>(await fetch('/api/application-snapshot-review?'+query.toString(),{signal,cache:'no-store'}));
+  },
+
+  async checkApplicationPdf(link:ApplicationSnapshotLink,action:'check'|'open'|'choose'):Promise<ApplicationPdfCheck>{
+    const method=window.resumeDesktop?.applications?.checkPdf;
+    if(!method)throw new Error('PDF 字节核验需要新版桌面工作台。');
+    return method(link,action);
   },
 
   async deleteApplicationSnapshot(snapshotId: string): Promise<{ deleted: boolean }> {

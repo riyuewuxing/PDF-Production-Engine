@@ -7,6 +7,7 @@ import {
   APPLICATION_STATUS_META,
   type ApplicationStatus,
   type JobApplication,
+  type PdfArtifactReceipt,
 } from '../../schema/applicationSchema';
 import type { ResumeDocument } from '../../schema/resumeSchema';
 
@@ -15,6 +16,8 @@ export interface FrozenPdfExportSnapshot {
   filePath: string;
   document: ResumeDocument;
   isRedacted: boolean;
+  pdfReceipt:PdfArtifactReceipt;
+  pdfReceiptToken:string;
 }
 
 interface QuickLogApplicationModalProps {
@@ -94,7 +97,8 @@ export function QuickLogApplicationModal({
         atsScore: defaultAtsScore,
         updatedAt: now,
       };
-      const saved=await careerLedger.log({entry,document:snapshot.document});
+      if(snapshot.isRedacted||!snapshot.pdfReceiptToken)throw Error('当前导出没有可用的原稿字节凭证，请重新导出。');
+      const saved=await careerLedger.log({entry,document:snapshot.document,pdfReceiptToken:snapshot.pdfReceiptToken});
       onLogged(saved);
       onClose();
     } catch (err) {
@@ -139,6 +143,8 @@ export function QuickLogApplicationModal({
           <div className="mt-1 truncate text-emerald-300/90" title={snapshot.filePath}>
             PDF：{snapshot.filePath}
           </div>
+          <div className="mt-1 break-all text-emerald-200/90">SHA256：{snapshot.pdfReceipt.sha256} · {snapshot.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>
+          <div className="mt-1 text-slate-300">封存前将重新核验 PDF 字节；不证明实际发送或送达。</div>
         </div>
 
         {errorMsg && (

@@ -20,7 +20,7 @@ import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/doc
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
 import { buildResumeExportFilename, formatLocalDate, sanitizeFilePart } from '../src/lib/resumeExportNaming';
-import type { CoverLetterPdfPayload, ApplicationLogInput } from '../src/schema/applicationSchema';
+import type { CoverLetterPdfPayload, ApplicationLogInput, ApplicationSnapshotLink,ApplicationPdfCheck } from '../src/schema/applicationSchema';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
 import { LocalResumeStore, LocalFsApiError, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
 import type {
@@ -31,6 +31,7 @@ import type {
 } from '../src/types/electron';
 import { resolveAppPaths, resolveUniqueExportPath } from './paths';
 import { isLoopbackDevEntry, isPathInside, isSafeExportFileName, isTrustedRendererFrame, rendererEntryUrl } from './securityPolicy';
+import {PdfReceiptVault,readPdfFingerprint,checkFingerprint,canCheckRecordedPdf} from './pdfReceipt';
 
 const execFileAsync = promisify(execFile);
 
@@ -538,6 +539,17 @@ function getTrustedPrintJob(event:IpcMainInvokeEvent,jobId:string):PendingPrintJ
 
 // File paths explicitly produced in this app session, including Save As outside exports.
 const authorizedOutputPaths=new Map<string,string>();
+const pdfReceipts=new PdfReceiptVault();
+let pdfReceiptBusy=false;
+async function boundedPdfCheck<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
+  if(pdfReceiptBusy)throw Error('已有 PDF 字节核验或归档操作正在进行，请稍后重试。');
+  pdfReceiptBusy=true;const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),8000);
+  try{return await work(controller.signal);}finally{clearTimeout(timer);pdfReceiptBusy=false;}
+}
+function requireRecordedPath(filePath:string):void {
+  if(!canCheckRecordedPdf(filePath,exportsDir,authorizedOutputPaths))throw Error('PDF 路径不在导出目录或本次明确授权的文件内，请重新导出或选择文件核验。');
+}
 async function rememberOutput(filePath:string):Promise<void> {
   if(isSafeExportFileName(filePath))authorizedOutputPaths.set(path.resolve(filePath),await fs.realpath(filePath));
 }
@@ -691,7 +703,50 @@ function registerIpcHandlers(): void {
 
   trustedEditorHandle('applications:get', () => store.getApplications());
   trustedEditorHandle('applications:save', (_event, data: unknown,revision:string) => store.saveApplications(data,revision));
-  trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>store.logApplication(input));
+  trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>{
+    if(input?.pdfReceiptToken===undefined)return store.logApplication(input);
+    return boundedPdfCheck(async signal=>{
+      const receipt=pdfReceipts.resolve(input.pdfReceiptToken,input.entry.exportedFilePath,input.entry.resumeSlug,input.document);
+      requireRecordedPath(input.entry.exportedFilePath);
+      const result=checkFingerprint(await readPdfFingerprint(input.entry.exportedFilePath,signal),receipt);
+      if(result.status!=='verified')throw new Error('PDF 已变更、缺失或无法核验；未封存投递记录，请重新导出。');
+      signal.throwIfAborted();
+      return store.logApplication(input,receipt);
+    });
+  });
+  trustedEditorHandle('applications:checkPdf',async(event,link:ApplicationSnapshotLink,action:unknown):Promise<ApplicationPdfCheck>=>{
+    if(action!=='check'&&action!=='open'&&action!=='choose')throw Error('无效 PDF 核验操作。');
+    // Native chooser is explicitly user initiated. Never read a path supplied by
+    // the renderer, including a historical path outside the authorized roots.
+    const record=await store.getLinkedApplicationSnapshot(link);
+    const receipt=record.meta.pdfReceipt;
+    if(!receipt)return {status:'unknown',checkedAt:new Date().toISOString()};
+    let file=record.meta.exportedFilePath;
+    if(action==='choose'){
+      const owner=mainWindow;
+      if(!owner||owner.isDestroyed())throw Error('工作台已关闭。');
+      if(pdfReceiptBusy)throw Error('已有 PDF 核验正在进行。');
+      const result=await dialog.showOpenDialog(owner,{title:'选择待核验的原 PDF（不修改台账关联）',filters:[{name:'PDF 文件',extensions:['pdf']}],properties:['openFile']});
+      assertTrustedEditor(event);
+      if(result.canceled||result.filePaths.length!==1)return {status:'unavailable',checkedAt:new Date().toISOString()};
+      file=result.filePaths[0]!;
+    }else if(!canCheckRecordedPdf(file,exportsDir,authorizedOutputPaths))return {status:'unavailable',checkedAt:new Date().toISOString()};
+    return boundedPdfCheck(async signal=>{
+      const read=await readPdfFingerprint(file,signal);
+      const result=checkFingerprint(read,receipt);
+      signal.throwIfAborted();
+      // Recheck the persisted association before reporting or opening.
+      const after=await store.getLinkedApplicationSnapshot(link);
+      if(after.meta.pdfReceipt?.sha256!==receipt.sha256||after.meta.exportedFilePath!==record.meta.exportedFilePath)throw Error('PDF 关联已变化，请刷新台账。');
+      assertTrustedEditor(event);signal.throwIfAborted();
+      if(action==='open'&&result.status==='verified'&&read.status==='read'){
+        const error=await shell.openPath(read.fingerprint.realPath);
+        if(error)throw Error('已核验 PDF，但系统未能打开文件。');
+        return {...result,opened:true};
+      }
+      return result;
+    });
+  });
   trustedEditorHandle('applications:getLinkedSnapshot',(_event,input:Parameters<typeof store.getLinkedApplicationSnapshot>[0])=>store.getLinkedApplicationSnapshot(input));
   trustedEditorHandle('writeLock:inspect',()=>inspectResumeWriteLock(store.dataDir));
   trustedEditorHandle('writeLock:recover',(_event,token:string,confirmation:unknown)=>recoverResumeWriteLock(store.dataDir,token,confirmation));
@@ -768,7 +823,8 @@ function registerIpcHandlers(): void {
     const contentWarning = prepared.warning;
     const content = await spec.produce(prepared.document);
     const writtenPath = explicitPath ? await writeFileSafely(targetPath, content) : await writeUniqueExportFile(targetPath, content);
-    await rememberOutput(writtenPath);
+    let outputWarning:string|undefined;
+    try{await rememberOutput(writtenPath);}catch(error){if(spec.ext!=='pdf')throw error;outputWarning='PDF 文件已写出，但无法确认本地输出路径。';}
 
     let snapshotWarning:string|undefined;
     if ((spec.ext === 'pdf' || spec.ext === 'docx') && options.slug) {
@@ -788,12 +844,21 @@ function registerIpcHandlers(): void {
       }
     }
 
+    let receiptResult:Awaited<ReturnType<PdfReceiptVault['issue']>>|undefined;
+    let receiptWarning=outputWarning;
+    if(spec.ext==='pdf'&&options.skipSave!==true&&options.slug&&!snapshotWarning&&!contentWarning&&!receiptWarning){
+      try{
+        receiptResult=await boundedPdfCheck(signal=>pdfReceipts.issue(writtenPath,options.slug!,targetDoc,Buffer.isBuffer(content)?content:Buffer.from(content),signal));
+      }catch{receiptWarning='PDF 文件已写出，但无法确认字节凭证；请重新导出后再封存投递。';}
+    }
     return {
       canceled: false,
       filePath: writtenPath,
       fileName: path.basename(writtenPath),
       ...(snapshotWarning?{snapshotWarning}:{}),
       ...(contentWarning?{contentWarning}:{}),
+      ...(receiptWarning?{receiptWarning}:{}),
+      ...receiptResult,
     };
   }
 

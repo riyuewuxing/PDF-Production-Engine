@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type RefObject } from 'react';
 import type { FrozenPdfExportSnapshot } from '../components/Career/QuickLogApplicationModal';
+import {PdfArtifactReceiptSchema} from '../schema/applicationSchema';
 import { apiClient } from '../lib/apiClient';
 import { buildResumeExportStem } from '../lib/resumeExportNaming';
 import { exportToJsonResume } from '../lib/jsonResumeAdapter';
@@ -155,20 +156,26 @@ export function useResumeExport({
                     : 'Markdown 文档 (.md)';
 
         if (result.filePath) {
-          if(!sameVersion()||result.snapshotWarning||result.contentWarning){
+          const receipt=PdfArtifactReceiptSchema.safeParse(result.pdfReceipt);
+          const rawPdf=format==='pdf'&&!isRedacted;
+          const validReceipt=receipt.success&&typeof result.pdfReceiptToken==='string'&&result.pdfReceiptToken.length>0;
+          const receiptWarning=result.receiptWarning||(rawPdf&&!validReceipt?'缺少有效的桌面 PDF 字节凭证，未启用投递封存；请升级或重新导出。':undefined);
+          if(!sameVersion()||result.snapshotWarning||result.contentWarning||receiptWarning){
             setLastExportedPdfSnapshot(null);
             setExportStatus({
               type:'warn',filePath:result.filePath,
-              text:`已导出${formatLabel}：${result.filePath}。${!sameVersion()?'文件属于此前版本，未关联当前简历。':''}${result.snapshotWarning?'自动历史快照未确认完成：'+result.snapshotWarning+'。':''}${result.contentWarning??''}`,
+              text:`已导出${formatLabel}：${result.filePath}。${!sameVersion()?'文件属于此前版本，未关联当前简历。':''}${result.snapshotWarning?'自动历史快照未确认完成：'+result.snapshotWarning+'。':''}${result.contentWarning??''}${receiptWarning??''}`,
             });
             return;
           }
-          if (format === 'pdf') {
+          if (rawPdf&&validReceipt&&receipt.success) {
             setLastExportedPdfSnapshot({
               slug: activeSlug,
               filePath: result.filePath,
               document: structuredClone(savedRealDoc),
               isRedacted,
+              pdfReceipt:receipt.data,
+              pdfReceiptToken:result.pdfReceiptToken!,
             });
           } else {
             setLastExportedPdfSnapshot(null);
