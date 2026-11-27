@@ -40,4 +40,20 @@ describe('career ledger renderer queue',()=>{
     expect(session.update(d=>({...d,interviewAnswers:{q:'draft'}}))).toBe(false);
     expect(session.getSnapshot().ready).toBe(false);
   });
+  it('serializes an explicit queue command with clean ledger state, never uses generic save, and requires refresh on uncertainty',async()=>{
+    let finish!:(v:ApplicationsStoreData)=>void;
+    const commandJobQueue=vi.fn().mockImplementationOnce(()=>new Promise(r=>{finish=r;})).mockRejectedValueOnce(Error('合成命令失败'));
+    const saveApplications=vi.fn(),session=new CareerLedgerSession({getApplications:async()=>data(),saveApplications,logApplication:vi.fn(),commandJobQueue});
+    await session.load();
+    const command={taskId:'synthetic',ledgerRevision:'r0',action:'start' as const};
+    const running=session.controlQueue(command);
+    expect(session.getSnapshot().loading).toBe(true);expect(session.update(d=>d)).toBe(false);
+    await expect(session.controlQueue(command)).rejects.toThrow(/状态已变化/);
+    finish(data('r1'));await running;
+    expect(session.getSnapshot().data.revision).toBe('r1');expect(saveApplications).not.toHaveBeenCalled();
+    await expect(session.controlQueue({...command,ledgerRevision:'r1'})).rejects.toThrow('合成命令失败');
+    expect(session.getSnapshot().error).toContain('合成命令失败');expect(session.getSnapshot().dirty).toBe(false);
+    await session.load();expect(session.getSnapshot().error).toBeNull();
+    expect(commandJobQueue).toHaveBeenCalledTimes(2);
+  });
 });
