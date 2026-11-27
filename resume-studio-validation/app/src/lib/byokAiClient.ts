@@ -173,13 +173,22 @@ export function describeAiRequest(settings:ByokAiSettings,options:ByokCompletion
   const l=resolveAiRequestLimits(settings,options);
   return '本次上限：'+l.maxOutputTokens+' 输出 tokens · '+l.timeoutMs/1000+' 秒 · '+aiThinkingLabel(settings);
 }
-export function formatAiCompletionReceipt(r:AiCompletionReceipt|null){
-  if(!r)return '此网关未返回调用回执。';
+export function describeAiCompletionReceipt(r:AiCompletionReceipt|null):string[]{
+  if(!r)return ['此网关未返回调用回执。'];
   const n=(v:number|undefined)=>v===undefined?'未报告':String(v);
   const model=r.reportedModel??'未报告';
   const mismatch=r.reportedModel&&r.reportedModel!==r.requestedModel?'（与请求不同；服务商报告值）':'';
-  return '请求：'+r.requestedModel+' · 返回模型：'+model+mismatch+'；输入 '+n(r.promptTokens)+' / 输出 '+n(r.completionTokens)+' / 合计 '+n(r.totalTokens)+' tokens；缓存命中输入 '+n(r.cachedInputTokens)+'；耗时 '+r.latencyMs+' ms；实际请求上限 '+r.maxOutputTokens+' 输出 tokens / '+r.timeoutMs/1000+' 秒；思考：'+(r.thinking==='enabled'?'开启（显式）':r.thinking==='disabled'?'关闭（显式）':'服务商默认')+'。用量以服务商报告为准，非账单金额。';
+  return [
+    '请求：'+r.requestedModel+' · 返回模型：'+model+mismatch,
+    '输入 '+n(r.promptTokens)+' / 输出 '+n(r.completionTokens)+' / 合计 '+n(r.totalTokens)+' tokens',
+    '缓存命中输入 '+n(r.cachedInputTokens)+' · 耗时 '+r.latencyMs+' ms',
+    '实际请求上限 '+r.maxOutputTokens+' 输出 tokens / '+r.timeoutMs/1000+' 秒',
+    '思考：'+(r.thinking==='enabled'?'开启（显式）':r.thinking==='disabled'?'关闭（显式）':'服务商默认'),
+    '用量以服务商报告为准，非账单金额。',
+  ];
 }
+export function formatAiCompletionReceipt(r:AiCompletionReceipt|null){return describeAiCompletionReceipt(r).join('；');}
+
 export async function requestByokCompletion(params:CompletionParams):Promise<string>{
   return (await requestByokCompletionWithReceipt(params)).text;
 }
@@ -290,7 +299,11 @@ export async function requestByokCompletionDirectWithReceipt(params:CompletionPa
     const receipt:AiCompletionReceipt={requestedModel,reportedModel:safeModel,promptTokens:token(usage?.prompt_tokens),completionTokens:token(usage?.completion_tokens),totalTokens:token(usage?.total_tokens),cachedInputTokens:token(usage?.prompt_cache_hit_tokens)??token(usage?.prompt_tokens_details?.cached_tokens),latencyMs:Math.max(0,Math.round(performance.now()-started)),maxOutputTokens:outputBudget,timeoutMs:deadlineMs,thinking};
     // Preserve safe provider metadata for a received JSON reply even when its text cannot be used.
     // Raw partial text and reasoning never travel in an error outcome.
-    if(payload?.choices?.[0]?.finish_reason==='length')throw new AiGatewayError('LIMIT','模型输出达到长度上限，未返回完整结果。',receipt);
+    const finishReason=payload?.choices?.[0]?.finish_reason;
+    if(finishReason==='length')throw new AiGatewayError('LIMIT','模型输出达到长度上限，未返回完整结果。',receipt);
+    if(finishReason==='content_filter')throw new AiGatewayError('FORMAT','服务商标记内容被过滤，未采用不完整输出。',receipt);
+    if(finishReason==='tool_calls'||finishReason==='function_call')throw new AiGatewayError('FORMAT','服务商返回未授权的工具调用，未执行或采用输出。',receipt);
+    if(finishReason==='insufficient_system_resource')throw new AiGatewayError('FORMAT','服务商标记资源不足，未采用不完整输出。',receipt);
     if (!result) throw new AiGatewayError('FORMAT','模型未返回有效文本内容。',receipt);
     return {text:result,receipt};
   } catch(err){

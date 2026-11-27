@@ -28,12 +28,13 @@ global.fetch=async(url,init)=>{
   const user=JSON.parse(body.messages[1].content);
   let content;
   if(kind==='single')content=mode==='reject'?'【隐私已省略】':'- 合成实验记录已复核。';
+  if(kind==='connection')content='OK';
   if(kind==='whole')content=mode==='reject'?'非 JSON 文本':mode==='empty'?'[]':JSON.stringify([{blockKey:user.blocks[0].blockKey,suggestedText:user.blocks[0].text+'\n- 合成资料复核。',reason:'合成候选',factIds:[user.blocks[0].sources[0].id]}]);
   if(kind==='layout')content=mode==='reject'?'非法版式格式':JSON.stringify({reason:'合成微调',changes:{pagePadding:24,baseFontSize:14,lineHeight:1.2}});
   if(kind==='career')content=mode==='reject'?'【隐私已省略】':'感谢审阅。\n'+user.draftText;
   if(kind==='assistant')content=mode==='reject'?'无效 JSON':JSON.stringify([{blockKey:user.toolResults.list_visible_blocks[0].blockKey,suggestedText:user.toolResults.list_visible_blocks[0].text+'\n- 合成资料复核。',reason:'合成自由任务候选',factIds:[user.toolResults.inspect_block_facts[0].sources[0].id]}]);
   const usage=mode==='unknown'?{}:{prompt_tokens:321,completion_tokens:123,total_tokens:444,prompt_tokens_details:{cached_tokens:32}};
-  return new Response(JSON.stringify({model:mode==='unknown'?undefined:'synthetic-returned-model',usage,choices:[{finish_reason:mode==='limit'?'length':'stop',message:{content}}]}),{status:200});
+  return new Response(JSON.stringify({model:mode==='unknown'?undefined:'synthetic-returned-model',usage,choices:[{finish_reason:mode==='limit'?'length':mode==='filter'?'content_filter':'stop',message:{content}}]}),{status:200});
 };
 async function until(label,fn,ms=15000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label)}
 const configs={
@@ -90,7 +91,7 @@ async function run(){
     if(mode==='cancel'){await click(c.cancel);}
     if(mode==='stale'){await click('JD 雷达');await until('stale request aborted',()=>active.aborted);await sleep(100);assert(!await js('!!'+q(sel)),'stale result visible after leaving scope');await click('AI 润色 Diff');await click(c.tab);await until('task ready after stale response',()=>button(c.prepare));assert(!await js('!!'+q(sel)),'old receipt reappeared');report.checks.staleScopeDiscarded=true;}
     else{
-      const state=mode==='cancel'?'cancelled':mode==='http'?'unconfirmed':mode==='reject'||mode==='empty'||mode==='limit'?'rejected':'received';
+      const state=mode==='cancel'?'cancelled':mode==='http'?'unconfirmed':mode==='reject'||mode==='empty'||mode==='limit'||mode==='filter'?'rejected':'received';
       await until('receipt '+kind+' '+mode,()=>js(q(sel)+'?.dataset.attemptState==='+JSON.stringify(state)));
       const rendered=await js(q(sel)+'?.innerText||""');
       obs.state=state;obs.receipt=rendered;
@@ -103,7 +104,7 @@ async function run(){
       if(state!=='received')assert(!await has(c.candidate),'rejected/cancelled candidate still displayed');
       if(state==='received')await until('candidate '+kind,()=>has(c.candidate));
       if(mode==='cancel')assert(active.aborted,'cancel did not reach actual main-process fetch');
-      if(['success','reject','cancel','unknown','http','limit','empty'].includes(mode))await capture(kind+'-'+mode,sel);
+      if(['success','reject','cancel','unknown','http','limit','empty','filter'].includes(mode))await capture(kind+'-'+mode,sel);
       await until('task ready',()=>button(c.prepare));
     }
     assert(report.calls===n+1&&active.calls===1,'unexpected retry or duplicate dispatch');
@@ -118,9 +119,48 @@ async function run(){
     report.checks[kind+'States']=true;
     const n=report.calls;await prepare(kind);await click(configs[kind].cancelPreview);assert(report.calls===n&&!await js('!!'+q('[aria-label="'+configs[kind].receipt+'"]')),'preview cancellation retained receipt or sent');
   }
-  await enter('single');await evaluate('single','unknown');await evaluate('single','http');await evaluate('single','limit');await evaluate('single','stale');
+  await enter('single');await evaluate('single','unknown');await evaluate('single','http');await evaluate('single','limit');await evaluate('single','filter');await evaluate('single','stale');
   await enter('whole');await evaluate('whole','empty');
   report.checks.unknownMetadata=true;report.checks.httpUnconfirmedAndLengthReceipt=true;report.checks.noRetry=true;report.checks.zeroCandidateRejected=true;
+  await enter('single');
+  if(!await button('收起设置'))await click('已启用 · 修改');
+  const probeMessages=[{role:'system',content:'Connectivity probe. Reply only OK.'},{role:'user',content:JSON.stringify({task:'connection-probe',message:'synthetic data only'})}];
+  const probeSel='[aria-label="连接测试调用回执"]';
+  for(const mode of ['success','limit','cancel','http']){
+    const obs={kind:'connection',mode,calls:0};report.cases.push(obs);active={...obs,expected:probeMessages};
+    const n=report.calls;await click('测试模型连接');await until('actual probe sent',()=>active.sent);
+    if(mode==='cancel')await click('取消连接测试');
+    const state=mode==='success'?'received':mode==='limit'?'rejected':mode==='cancel'?'cancelled':'unconfirmed';
+    await until('probe receipt '+mode,()=>js(q(probeSel)+'?.dataset.attemptState==='+JSON.stringify(state)));
+    const receipt=await js(q(probeSel)+'?.innerText||""');
+    assert(report.calls===n+1&&active.calls===1,'probe retried');
+    if(mode==='success'||mode==='limit')assert(receipt.includes('合计 444 tokens')&&receipt.includes('实际请求上限 64 输出 tokens'),'probe receipt lost actual budget');
+    if(mode==='cancel')assert(active.aborted,'probe did not cancel main request');
+    if(mode!=='success')assert(!await has('连接成功 · 合成探针返回 OK'),'old probe success survived a failed request');
+    obs.state=state;obs.receipt=receipt;obs.calls=active.calls;obs.aborted=!!active.aborted;
+    await capture('connection-'+mode,probeSel);active=null;await until('probe settled',()=>button('测试模型连接'));write();
+  }
+  report.checks.connectionStates=true;
+  await click('收起设置');
+  const cfgSaved=await js('window.resumeDesktop.ai.getSettings()');
+  const request={profile:{profileId:cfgSaved.profileId,revision:cfgSaved.revision,baseUrl:cfgSaved.baseUrl,model:cfgSaved.model},systemPrompt:probeMessages[0].content,userPrompt:probeMessages[1].content,temperature:0,maxTokens:64,timeoutMs:25000};
+  for(const method of ['requestCompletion','requestCompletionWithReceipt','requestCompletionWithReceipt']){
+    const mode=method==='requestCompletion'?'success':report.checks.legacyReceiptSuccess?'limit':'success';
+    const obs={kind:'legacy-ipc',mode,method,calls:0};report.cases.push(obs);active={...obs,kind:'connection',expected:probeMessages};
+    const n=report.calls;
+    const v=await js('window.resumeDesktop.ai['+JSON.stringify(method)+']('+JSON.stringify({...request,requestId:crypto.randomUUID()})+').then(value=>({ok:true,value}),error=>({ok:false,message:String(error.message)}))');
+    assert(report.calls===n+1&&active.calls===1,'legacy IPC retried');
+    if(method==='requestCompletion'){assert(v.ok&&v.value==='OK','legacy string contract changed');report.checks.legacyStringSuccess=true;}
+    else if(mode==='success'){assert(v.ok&&v.value.text==='OK'&&v.value.receipt.totalTokens===444,'legacy success receipt changed');report.checks.legacyReceiptSuccess=true;}
+    else{assert(!v.ok&&v.message.includes('输出达到长度上限'),'legacy rejection contract changed');report.checks.legacyReceiptStillRejects=true;}
+    obs.calls=active.calls;obs.ok=v.ok;active=null;write();
+  }
+  await enter('single');await prepare('single');const count=report.calls;
+  await js('window.resumeDesktop.ai.saveSettings('+JSON.stringify({...cfgSaved,maxOutputTokens:4000})+')');
+  await click(configs.single.confirm);
+  await until('stale saved model refused',()=>has('AI 配置已变化')||has('模型档案已变化')||has('模型配置已变化')||has('档案版本已变化')||has('模型档案版本已变化'));
+  assert(report.calls===count,'stale saved profile reached fetch');
+  report.checks.staleSavedProfileNoNetwork=true;
   await verifyDisk();write();
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e?.message||'fixture failure').split(key).join('[redacted]').slice(0,400);write();app.exit(1)});

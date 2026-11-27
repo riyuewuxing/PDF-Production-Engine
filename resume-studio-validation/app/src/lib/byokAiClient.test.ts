@@ -130,3 +130,18 @@ describe('failure receipt compatibility',()=>{
     expect(legacy).toHaveBeenCalledTimes(1);
   });
 });
+
+it('rejects known non-completion finish reasons with the safe received metadata and never runs a tool',async()=>{
+  const f=vi.fn();
+  for(const finish_reason of ['content_filter','tool_calls','function_call','insufficient_system_resource']){
+    f.mockResolvedValueOnce(new Response(JSON.stringify({model:'mock',usage:{total_tokens:7},choices:[{finish_reason,message:{content:'UNUSABLE_PARTIAL',tool_calls:[{function:{name:'unauthorized'}}]}}]})));
+  }
+  vi.stubGlobal('fetch',f);
+  for(let i=0;i<4;i++){
+    const error=await requestByokCompletionDirectWithReceipt(options).catch(e=>e);
+    expect(error).toMatchObject({code:'FORMAT',receipt:{totalTokens:7}});
+    expect(JSON.stringify(error)).not.toContain('UNUSABLE_PARTIAL');
+    expect(JSON.stringify(error)).not.toContain('unauthorized');
+  }
+  expect(f).toHaveBeenCalledTimes(4);
+});

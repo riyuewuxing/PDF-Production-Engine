@@ -21,7 +21,7 @@ const safeNumber=v=>Number.isSafeInteger(v)&&v>=0?v:null;
 const mockRow=(requirementId,assessment,citations,missing=[])=>({requirementId,assessment,citations,reason:'合成核对建议',missing});
 global.fetch=async(url,init)=>{
   const body=JSON.parse(String(init?.body||'{}')),payload=JSON.stringify(body.messages);
-  assert(active&&String(url)===endpoint&&init.method==='POST'&&init.redirect==='error'&&new Headers(init.headers).get('authorization')==='Bearer '+key&&body.model===model&&(!real||body.thinking?.type==='disabled')&&Number.isInteger(body.max_tokens)&&body.max_tokens>0&&body.max_tokens<=1200&&calls<(real||replay?3:2)&&tokenBudget+body.max_tokens<=(real||replay?3600:2400)&&payload===JSON.stringify(active.expected)&&!payload.includes(key)&&!privateMarkers.some(m=>payload.includes(m)),'fixture outbound policy rejected');
+  assert(active&&String(url)===endpoint&&init.method==='POST'&&init.redirect==='error'&&new Headers(init.headers).get('authorization')==='Bearer '+key&&body.model===model&&(!real||body.thinking?.type==='disabled')&&Number.isInteger(body.max_tokens)&&body.max_tokens>0&&body.max_tokens<=1200&&calls<3&&tokenBudget+body.max_tokens<=3600&&payload===JSON.stringify(active.expected)&&!payload.includes(key)&&!privateMarkers.some(m=>payload.includes(m)),'fixture outbound policy rejected');
   calls++;tokenBudget+=body.max_tokens;active.sent=true;active.requestedTokens=body.max_tokens;
   const started=Date.now();let response;
   if(real)response=await fetchActual(url,init);
@@ -30,6 +30,7 @@ global.fetch=async(url,init)=>{
     assert(record&&crypto.createHash('sha256').update(record.content).digest('hex')===record.sha256,'recorded live response hash differs');
     response=new Response(JSON.stringify({model:recorded.model,usage:{prompt_tokens:record.usage.input,completion_tokens:record.usage.output,total_tokens:record.usage.total,prompt_tokens_details:{cached_tokens:record.usage.cached}},choices:[{finish_reason:'stop',message:{content:record.content}}]}),{status:200});
   }else{
+    if(active.id==='cancel-job')await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,2500);const stop=()=>{clearTimeout(timer);active.aborted=true;reject(new DOMException('aborted','AbortError'))};if(init.signal.aborted)stop();else init.signal.addEventListener('abort',stop,{once:true});});
     const u=JSON.parse(body.messages[1].content);
     assert(u.task==='job-evidence-v1'&&u.requirements.length===3&&u.sources.length===2,'unexpected mock task scope');
     const rows=[
@@ -128,6 +129,9 @@ async function run(){
     obs.uiResult=await js('!!'+q(result));obs.uiError=await js(q(panel)+'.querySelector("[role=alert]")?.innerText||""');
     if(expectBad){
       assert(!obs.uiResult&&obs.uiError.includes('逐字原文'),'invalid citation was not rejected');
+      const receipt=await js(q('[aria-label="岗位 AI 调用回执"]')+'?.innerText||""');
+      assert(receipt.includes('未形成可用结果')&&receipt.includes('合计 680 tokens'),'invalid citation lost the received receipt');
+      report.checks.rejectedReceiptPreserved=true;
       report.checks.badQuoteRejected=true;await capture(id+'-rejected',panel);await verifyReadOnly();endCase();return;
     }
     if(obs.uiResult){
@@ -184,9 +188,14 @@ async function run(){
     await click('读取已保存岗位 AI 模型');await until('reloaded model',()=>button('预览岗位 AI 分析'));
     await evaluate(s,'valid-mock');
     await evaluate(s,'bad-quote',true);
+    const {messages}=await getPreview(s);const cancelled={id:'cancel-job',expected:messages,sent:false};active=cancelled;report.observations.push(cancelled);const beforeCancel=calls;
+    await click('确认发送岗位 AI 分析');await until('job actual dispatch',()=>cancelled.sent);await click('取消岗位 AI 分析');
+    await until('job cancelled receipt',()=>js(q('[aria-label="岗位 AI 调用回执"]')+'?.dataset.attemptState==="cancelled"'));
+    assert(cancelled.aborted&&calls===beforeCancel+1&&!await js('!!'+q(result)),'cancelled job result or retry');
+    report.checks.cancelledJobReceipt=true;await capture('cancel-job-receipt','[aria-label="岗位 AI 调用回执"]');endCase();
     await setValue('textarea[placeholder^="例如：招聘高中物理教师"]',s.source+'新条件');
     await until('source invalidates panel',()=>js('!'+q(panel)));report.checks.sourceInvalidatesResult=true;
-    assert(calls===2,'mock call count mismatch');
+    assert(calls===3,'mock call count mismatch');
   }
   await verifyReadOnly();
   report.calls=calls;report.requestedOutputBudget=tokenBudget;write();
