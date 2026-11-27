@@ -6,7 +6,7 @@ import os from 'node:os';
 import {afterEach,describe,expect,it} from 'vitest';
 import {LocalResumeStore} from './localFsApi';
 import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
-import {JobQueueSchema,JobQueueTaskSchema,JobApplicationSchema,type JobQueueTask} from '../schema/applicationSchema';
+import {JobQueueSchema,JobQueueTaskSchema,JobApplicationSchema} from '../schema/applicationSchema';
 import {ResumeDocumentSchema,resumeRevision,type ResumeDocument} from '../schema/resumeSchema';
 import {jobQueueDocumentText,jobQueueDocumentHash,jobQueueBindingMatches,prepareJobQueueTask} from '../lib/jobQueueBinding';
 const dirs:string[]=[];

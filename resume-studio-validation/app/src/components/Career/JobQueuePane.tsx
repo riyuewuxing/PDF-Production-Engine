@@ -6,7 +6,7 @@ import {sameJobReviewDocument} from '../../lib/jobRequirements';
 import {JobQueueSchema,MAX_JOB_QUEUE_TASKS,MAX_JOB_QUEUE_JD_CHARS,type JobQueueTask} from '../../schema/applicationSchema';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 
-type Candidate={task:JobQueueTask;title:string;revision:string};
+type Candidate={task:JobQueueTask;title:string;revision:string;source:ResumeDocument};
 type Check={id:string;revision:string;status:'same'|'stale'|'unavailable';at:string};
 type Job={controller:AbortController;cancel:()=>void};
 const field='w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900 disabled:opacity-60';
@@ -26,7 +26,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const scope=useRef({activeSlug,activeDoc,redacted,revision:ledger.data.revision});
   scope.current={activeSlug,activeDoc,redacted,revision:ledger.data.revision};
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;readRef.current?.cancel();};},[]);
-  useEffect(()=>{readRef.current?.cancel();setCandidate(null);setCheck(null);setMessage(null);},[activeSlug,activeDoc,redacted,ledger.data.revision]);
+  useEffect(()=>{readRef.current?.cancel();setCandidate(null);setCheck(null);if(!writeRef.current)setMessage(null);},[activeSlug,activeDoc,redacted,ledger.data.revision]);
   const isReady=(revision:string)=>{
     const now=careerLedger.getSnapshot();
     return now.ready&&!now.loading&&!now.saving&&!now.dirty&&!now.error&&now.data.revision===revision;
@@ -63,7 +63,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
         if(!sameJobReviewDocument(doc,source.activeDoc))throw Error('当前编辑与磁盘版本不同，请先完成保存或重载后再登记。');
         const task=await prepareJobQueueTask({id:crypto.randomUUID(),company,role,jdText:jd,slug:source.activeSlug,createdAt:new Date().toISOString()},doc);
         JobQueueSchema.parse([...tasks,task]);
-        return {task,title:doc.title,revision};
+        return {task,title:doc.title,revision,source:source.activeDoc};
       });
       if(mounted.current&&!scope.current.redacted)setCandidate(result);
     }catch(err){if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:localErrorMessage(err,'读取岗位绑定失败')});}
@@ -71,7 +71,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
   const confirm=async()=>{
     if(!candidate||redacted||!ready||readRef.current||writeRef.current||!isReady(candidate.revision))return;
     const {task,revision}=candidate;
-    if(task.slug!==activeSlug||task.docId!==activeDoc.id)return;
+    if(task.slug!==activeSlug||task.docId!==activeDoc.id||candidate.source!==activeDoc){setCandidate(null);setMessage({error:true,text:'当前简历已变化，请重新核对绑定。'});return;}
     writeRef.current=true;setBusy('save');setMessage(null);setCandidate(null);setCheck(null);
     try{
       const current=careerLedger.getSnapshot();
@@ -141,10 +141,10 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
       {!tasks.length&&<p className="text-slate-500">暂无待处理岗位。</p>}
       {tasks.map(task=>{
         const status=check?.id===task.id&&check.revision===ledger.data.revision?check:null;
-        return <article key={task.id} aria-label={'岗位任务 '+task.company} className="rounded-lg border border-slate-200 p-3 space-y-2">
+        return <article key={task.id} aria-label={'岗位任务 '+task.company+' '+task.role} className="rounded-lg border border-slate-200 p-3 space-y-2">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h5 className="font-semibold break-words">{task.company} · {task.role}</h5><p className="text-[10px] break-all text-slate-600">{task.slug} · {task.documentRevision}</p></div><span className="rounded bg-slate-100 px-2 py-1">{ledger.dirty?'待保存草稿':'待处理'}</span></div>
           <details><summary className="cursor-pointer text-slate-700">查看岗位原文（{task.jdText.length} 字）与绑定详情</summary><pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-50 p-2 font-sans text-[11px]">{task.jdText}</pre><p className="mt-1 break-all text-[10px]">任务 ID：{task.id}</p><p className="break-all text-[10px]">SHA-256：{task.documentSha256}</p></details>
-          <div className="flex flex-wrap items-center gap-2"><button type="button" aria-label={'核验岗位绑定 '+task.company} className={button} disabled={locked||!!candidate} onClick={()=>void verify(task)}>核验绑定</button><span className={status?.status==='same'?'text-teal-700':status?'text-amber-800':'text-slate-500'}>{status?.status==='same'?'绑定一致（核验时）':status?.status==='stale'?'版本已变化，原任务不得沿用':status?.status==='unavailable'?'绑定不可核验，不得沿用':'未核验当前版本'}</span></div>
+          <div className="flex flex-wrap items-center gap-2"><button type="button" aria-label={'核验岗位绑定 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void verify(task)}>核验绑定</button><span className={status?.status==='same'?'text-teal-700':status?'text-amber-800':'text-slate-500'}>{status?.status==='same'?'绑定一致（核验时）':status?.status==='stale'?'版本已变化，原任务不得沿用':status?.status==='unavailable'?'绑定不可核验，不得沿用':'未核验当前版本'}</span></div>
           {status&&<p className="text-[10px] text-slate-500">核验时间 {status.at}；不会自动更新任务或启动操作。</p>}
         </article>;
       })}

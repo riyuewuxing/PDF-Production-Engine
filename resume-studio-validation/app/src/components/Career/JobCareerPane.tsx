@@ -410,7 +410,7 @@ export function JobCareerPane({
           </div>
           {saveTip && <span className={'text-[10px] '+(ledger.dirty?'text-amber-700':'text-emerald-600')}>{saveTip}</span>}
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium sm:grid-cols-4">
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium">
           <button
             type="button"
             onClick={() => setSubTab('tracker')}

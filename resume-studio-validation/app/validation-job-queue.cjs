@@ -46,10 +46,10 @@ async function run(){
    assert(rows.every(r=>r.status==='pending'&&r.slug==='runner-fixture'&&r.docId===doc.id&&r.documentRevision===JSON.stringify([doc.id,doc.updatedAt])&&/^[a-f0-9]{64}$/.test(r.documentSha256)),'disk binding mismatch');
    assert(ledger.applications.length===1&&ledger.applications[0].company==='合成原始台账'&&sha(fs.readFileSync(source))===beforeDoc,'queue changed original data');
    checks.twoTasksPersistedIsolated=true;checks.originalUnchanged=true;
-   await click('核验岗位绑定 合成第一学校');await until('verified',()=>has('绑定一致（核验时）'));await capture('02-queue-verified');
+   await click('核验岗位绑定 合成第一学校 物理教师');await until('verified',()=>has('绑定一致（核验时）'));await capture('02-queue-verified');
    const savedHash=sha(fs.readFileSync(store.applicationsPath));
    await store.saveResume('runner-fixture',{...doc,title:'外部变更后的合成简历'});
-   await click('核验岗位绑定 合成第二研究所');await until('stale',()=>has('版本已变化，原任务不得沿用'));await capture('03-queue-stale');
+   await click('核验岗位绑定 合成第二研究所 研究员');await until('stale',()=>has('版本已变化，原任务不得沿用'));await capture('03-queue-stale');
    assert(sha(fs.readFileSync(store.applicationsPath))===savedHash,'verify changed ledger');checks.staleReadNoWrite=true;
    await click('隐私脱敏');await until('redaction',()=>has('脱敏预览开启时隐藏岗位队列原文和登记操作。'));assert(!await has('合成第一学校')&&!await has('合成第二研究所')&&!await enabled('核对任务绑定'),'queue exposed in redaction');await capture('04-queue-redacted');checks.redactionGate=true;
    fs.writeFileSync(path.join(out,'restart-expected.json'),JSON.stringify({ledgerHash:savedHash,sourceHash:sha(fs.readFileSync(source)),rows,applicationCount:ledger.applications.length},null,2));
@@ -58,7 +58,7 @@ async function run(){
    assert(beforeLedger===expected.ledgerHash&&beforeDoc===expected.sourceHash&&JSON.stringify(ledger.jobQueue)===JSON.stringify(expected.rows),'restart changed persisted data');
    assert(ledger.applications.length===expected.applicationCount&&ledger.jobQueue.every(r=>r.status==='pending'),'unexpected execution');
    await until('reopened records',()=>has('合成第一学校')&&has('合成第二研究所')&&has('未核验当前版本'));checks.coldRestartPending=true;
-   await click('核验岗位绑定 合成第一学校');await until('reopened stale',()=>has('版本已变化，原任务不得沿用'));await capture('05-queue-reopened');
+   await click('核验岗位绑定 合成第一学校 物理教师');await until('reopened stale',()=>has('版本已变化，原任务不得沿用'));await capture('05-queue-reopened');
    assert(sha(fs.readFileSync(store.applicationsPath))===beforeLedger&&sha(fs.readFileSync(source))===beforeDoc,'restart verify wrote data');checks.coldRestartStaleNoWrite=true;
    win.setSize(680,820);await sleep(500);await capture('06-queue-narrow');checks.narrowRendered=true;
  }
