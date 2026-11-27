@@ -156,7 +156,7 @@ describe('T47 credential containment and cooperative cross-instance updates',()=
     await fs.writeFile(file,original);
     await expect(store.getPublicSettings()).rejects.toThrow();
     await expect(store.create(profile)).rejects.toThrow();
-    expect(await fs.readFile(file)).toEqual(original);
+    expect((await fs.readFile(file)).equals(original)).toBe(true);
   });
   it('allows exactly one same-revision writer across separate store instances',async()=>{
     const {store,file,codec}=await setup();
