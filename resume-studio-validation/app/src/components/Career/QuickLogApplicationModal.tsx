@@ -54,7 +54,7 @@ export function QuickLogApplicationModal({
   const submitting=useRef(false);
   const refreshingRef=useRef(false);
   const [refreshing,setRefreshing]=useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{kind:'error'|'success'|'warn';message:string} | null>(null);
 
   useEffect(() => {
     if (!isOpen || !snapshot) return;
@@ -66,7 +66,7 @@ export function QuickLogApplicationModal({
     setStatus(queueTask?'wishlist':'applied');
     setJdText(queueTask?.jdText??defaultJdText);
     setNotes('');
-    setErrorMsg(null);
+    setFeedback(null);
   }, [defaultJdText, isOpen, snapshot,queueTask,queueRequestId]);
 
   const refreshQueueLedger=async()=>{
@@ -74,12 +74,13 @@ export function QuickLogApplicationModal({
     refreshingRef.current=true;setRefreshing(true);
     let watchdog:ReturnType<typeof setTimeout>|undefined;
     try{
-      watchdog=setTimeout(()=>setErrorMsg('读取台账超过10秒，仍未确认；请勿重复提交。'),10000);
+      setFeedback({kind:'warn',message:'正在读取磁盘台账，尚未确认；请勿重复提交。'});
+      watchdog=setTimeout(()=>setFeedback({kind:'warn',message:'读取台账超过10秒，仍未确认；请勿重复提交。'}),10000);
       await careerLedger.load();
       const now=careerLedger.getSnapshot();
       if(!now.ready||now.loading||now.saving||now.dirty||now.error||!now.data.revision)throw Error('台账读取尚未确认，未继续归档。');
-      setErrorMsg('已刷新磁盘台账，请核验后重试同一请求。');
-    }catch(e){setErrorMsg(localErrorMessage(e,'刷新失败'));}
+      setFeedback({kind:'success',message:'已刷新磁盘台账，请核验后重试同一请求。'});
+    }catch(e){setFeedback({kind:'error',message:localErrorMessage(e,'刷新失败')});}
     finally{if(watchdog!==undefined)clearTimeout(watchdog);refreshingRef.current=false;setRefreshing(false);}
   };
   if (!isOpen || !snapshot) return null;
@@ -88,12 +89,12 @@ export function QuickLogApplicationModal({
     e.preventDefault();
     if(submitting.current||refreshingRef.current)return;
     if (!company.trim()) {
-      setErrorMsg('请填写投递单位或学校名称。');
+      setFeedback({kind:'error',message:'请填写投递单位或学校名称。'});
       return;
     }
     submitting.current=true;
     setSaving(true);
-    setErrorMsg(null);
+    setFeedback(null);
     try {
       if(queueTask){if(!beforeSubmit)throw Error('缺少岗位流程重新核验。');await beforeSubmit();}
       const now = new Date().toISOString();
@@ -125,7 +126,7 @@ export function QuickLogApplicationModal({
       onLogged(saved);
       onClose();
     } catch (err) {
-      setErrorMsg(localErrorMessage(err,'保存投递快照失败'));
+      setFeedback({kind:'error',message:localErrorMessage(err,'保存投递快照失败')});
     } finally {
       submitting.current=false;
       setSaving(false);
@@ -171,9 +172,9 @@ export function QuickLogApplicationModal({
           {queueTask&&<p className="mt-1 break-words">固定岗位：{queueTask.company} · {queueTask.role}。默认待投递，须本人确认实际状态；不发送材料。</p>}
         </div>
 
-        {errorMsg && (
-          <div className="rounded border border-red-500/40 bg-red-950/60 px-3 py-2 text-[11px] text-red-200">
-            {errorMsg}
+        {feedback && (
+          <div role={feedback.kind==='error'?'alert':'status'} className={`rounded border px-3 py-2 text-[11px] ${feedback.kind==='success'?'border-emerald-500/40 bg-emerald-950/60 text-emerald-200':feedback.kind==='warn'?'border-amber-500/40 bg-amber-950/60 text-amber-200':'border-red-500/40 bg-red-950/60 text-red-200'}`}>
+            {feedback.message}
             {queueTask&&<button type="button" disabled={saving||refreshing} className="ml-2 rounded border px-2 py-1" onClick={()=>void refreshQueueLedger()}>{refreshing?'读取台账中…':'刷新岗位归档台账'}</button>}
           </div>
         )}

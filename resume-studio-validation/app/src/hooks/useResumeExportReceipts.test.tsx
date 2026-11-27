@@ -52,6 +52,8 @@ describe('export receipts remain bound to the selected document',()=>{
     expect(result.current.exportStatus).toMatchObject({type:'warn',filePath:'written.pdf'});
     expect(result.current.exportStatus?.text).toContain('历史目录不安全');
     expect(result.current.exportStatus?.text).toContain('可见的本地头像资源无法读取');
+    expect(result.current.exportStatus?.text).toContain('此成品未启用投递封存');
+    expect(result.current.exportStatus?.text).not.toContain('请升级');
     expect(result.current.lastExportedPdfSnapshot).toBeNull();
   });
   it('keeps a written artifact but disallows sealing a missing or invalid native byte receipt',async()=>{
@@ -60,6 +62,7 @@ describe('export receipts remain bound to the selected document',()=>{
     const {result}=renderHook(()=>useResumeExport(options(ref)));
     await act(async()=>{await result.current.handleExportFormat('pdf')});
     expect(result.current.exportStatus).toMatchObject({type:'warn',filePath:'written.pdf'});expect(result.current.lastExportedPdfSnapshot).toBeNull();
+    expect(result.current.exportStatus?.text).toContain('请升级或重新导出');
     await act(async()=>{await result.current.handleExportFormat('pdf')});
     expect(result.current.exportStatus).toMatchObject({type:'warn',filePath:'bad.pdf'});expect(result.current.lastExportedPdfSnapshot).toBeNull();expect(ipc).toHaveBeenCalledTimes(2);
   });

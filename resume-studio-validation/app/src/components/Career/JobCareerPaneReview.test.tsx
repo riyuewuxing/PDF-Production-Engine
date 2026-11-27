@@ -202,6 +202,7 @@ describe('fixed queue archive refresh lifecycle',()=>{
   await within(dlg).findByDisplayValue(jd);
   await act(async()=>fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'})));
   const refresh=await within(dlg).findByRole('button',{name:'刷新岗位归档台账'});
+  expect(within(dlg).getByRole('alert').className).toContain('border-red-500/40');
   expect(session.log.mock.calls.length,dlg.textContent??'').toBe(1);
   const first=session.log.mock.calls[0]![0] as ApplicationLogInput;
   let release!:()=>void;
@@ -214,6 +215,8 @@ describe('fixed queue archive refresh lifecycle',()=>{
   expect(session.log).toHaveBeenCalledTimes(1);
   await act(async()=>release());
   await within(dlg).findByText(/已刷新磁盘台账/);
+  expect(within(dlg).getByRole('status').className).toContain('border-emerald-500/40');
+  expect(within(dlg).queryByRole('alert')).toBeNull();
   fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'}));
   await waitFor(()=>expect(screen.queryByRole('dialog',{name:'记入投递并锁定永久快照'})).toBeNull());
   const second=session.log.mock.calls[1]![0] as ApplicationLogInput;

@@ -159,7 +159,11 @@ export function useResumeExport({
           const receipt=PdfArtifactReceiptSchema.safeParse(result.pdfReceipt);
           const rawPdf=format==='pdf'&&!isRedacted;
           const validReceipt=receipt.success&&typeof result.pdfReceiptToken==='string'&&result.pdfReceiptToken.length>0;
-          const receiptWarning=result.receiptWarning||(rawPdf&&!validReceipt?'缺少有效的桌面 PDF 字节凭证，未启用投递封存；请升级或重新导出。':undefined);
+          const receiptWarning=result.receiptWarning||(rawPdf&&!validReceipt
+            ? (result.snapshotWarning||result.contentWarning
+              ? '此成品未启用投递封存；请按上述提示处理后重新导出。'
+              : '缺少有效的桌面 PDF 字节凭证，未启用投递封存；请升级或重新导出。')
+            : undefined);
           if(!sameVersion()||result.snapshotWarning||result.contentWarning||receiptWarning){
             setLastExportedPdfSnapshot(null);
             setExportStatus({
