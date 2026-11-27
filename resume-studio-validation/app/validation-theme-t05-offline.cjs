@@ -7,6 +7,7 @@ app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleratio
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
 let providerCalls=0;
 global.fetch=async()=>{providerCalls++;throw Error('unexpected external request in offline fixture')};
+const auditContrast=require('./validation-theme-t05-contrast.cjs');
 const checks={},results={phase,runnerSha:process.env.GITHUB_SHA,checks,themes:{},providerCalls:0};
 function write(){results.providerCalls=providerCalls;fs.writeFileSync(path.join(out,'offline-'+phase+'.json'),JSON.stringify(results,null,2));}
 const timer=setTimeout(()=>{results.error='offline application watchdog';write();app.exit(2)},220000);
@@ -68,7 +69,7 @@ async function run(){
    await screenshot(id+'-jd',src);const paper=await imageProof(id);
    await screenshot(id+'-notice',scrollSel);
    if(id!=='classic')assert.deepEqual(paper,results.themes.classic.paper,'announcement original changed '+id);
-   results.themes[id]={jd,paper};write();
+   results.themes[id]={jd,paper};results.themes[id].noticeContrast=await auditContrast(win,phase==='candidate'?scopes.jd:notice,id+'-notice');write();
  }
  checks.announcementExact=true;checks.unreviewedCannotImport=true;
  await checkBox('确认已对照 PDF 第 1 页');assert.equal(await enabled('确认导入所选公告页'),false);
@@ -86,15 +87,18 @@ async function run(){
  for(const id of themes){
    await theme(id);assert.deepEqual(await js('Array.from(('+q('select[aria-label="岗位候选条款"]')+').options).map(e=>({value:e.value,text:e.innerText}))'),clauses);
    assert.equal(await js(q(src)+'.value'),imported);assert.equal(await js(q('[aria-label="当前公告来源"]')+'.innerText'),sourceState);
-   await screenshot(id+'-requirements','[aria-label="岗位条款原文"]');
+   await screenshot(id+'-requirements','[aria-label="岗位条款原文"]');results.themes[id].requirementsContrast=await auditContrast(win,phase==='candidate'?scopes.jd:'[aria-label="岗位原文与证据核对"]',id+'-requirements');
  }
  checks.provenanceAndClausesExact=true;checks.confirmationRevocation=true;
  await click('AI 润色 Diff');
  const openConfig=await js('(()=>{const e=[...document.querySelectorAll("button")].find(b=>b.innerText.includes("去配置")||b.innerText.includes("已启用 · 修改"));if(e){e.click();return true}return false})()');
  // Model field is local; do not save credentials or contact provider.
  const aiField='input[aria-label="模型名"]';await until('AI configuration visible',()=>js('!!'+q(aiField)));
- for(const id of themes){await theme(id);results.themes[id].ai=await state(scopes.ai,aiField,id);await screenshot(id+'-ai',aiField);write()}
+ for(const id of themes){await theme(id);results.themes[id].ai=await state(scopes.ai,aiField,id);await screenshot(id+'-ai',aiField);if(phase==='candidate')results.themes[id].aiContrast=await auditContrast(win,scopes.ai,id+'-ai');write()}
  checks.aiThemeForms=true;
+ // Report all actual contrasts first; this diagnostic does not hide or discard failures.
+ results.contrastSummary=Object.fromEntries(themes.map(id=>[id,Object.fromEntries(['noticeContrast','requirementsContrast','aiContrast'].filter(k=>results.themes[id][k]).map(k=>[k,{count:results.themes[id][k].count,failed:results.themes[id][k].failures.length,min:results.themes[id][k].minRatio,scrollbars:results.themes[id][k].scrollbars}]))]));
+ write();
  win.setSize(1080,720);await sleep(300);await screenshot('minimum-ai',aiField);
  await click('JD 雷达');await screenshot('minimum-jd',src);
  assert.equal(sha(fs.readFileSync(disk)),original);assert.equal(providerCalls,0);checks.diskUnchanged=true;checks.noProviderCalls=true;write();
