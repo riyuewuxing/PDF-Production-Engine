@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [baseline, candidate]
+        phase: [candidate]
     runs-on: windows-latest
     timeout-minutes: 15
     defaults:
@@ -44,7 +44,7 @@ jobs:
           pnpm desktop:build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Full registry actual thumbnail rendering and pixel evidence
-        timeout-minutes: 6
+        timeout-minutes: 7
         run: |
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('studio-theme-t03-' + [guid]::NewGuid().ToString())

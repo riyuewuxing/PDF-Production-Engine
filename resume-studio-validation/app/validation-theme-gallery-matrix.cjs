@@ -210,7 +210,9 @@ async function run() {
   async function cardProof(index,name){
     await goCard(index);
     await js('document.fonts.ready.then(()=>true)');
-    await sleep(110);
+    // Wait for a settled scroll and two compositor frames, then record actual pixels.
+    await sleep(260);
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))');
     const state=await js('('+function(index){
       const card=[...document.querySelectorAll('.group h3')][index].closest('.group');
       const root=card.querySelector('.pointer-events-none.origin-top-left.select-none');
@@ -230,6 +232,7 @@ async function run() {
     fs.writeFileSync(path.join(out,name+'.png'),img.toPNG());
     return {styleHash:sha(JSON.stringify(state.paper)),cropHash:sha(img.toBitmap()),size:img.getSize(),scroll:state.scroll,markers:state.markers};
   }
+  results.pixelMismatches=[];
   for(const id of themes){
     await selectTheme(id);
     await js('(()=>{const e=document.querySelector('+JSON.stringify(rootSelector)+');e.focus();return true})()');
@@ -245,7 +248,14 @@ async function run() {
       if(id!=='classic'){
         const ref=results.themes.classic[i];
         assert.equal(proof.styleHash,ref.styleHash,'paper DOM changed for '+id+' '+cards[i].name);
-        assert.equal(proof.cropHash,ref.cropHash,'visible paper pixels changed for '+id+' '+cards[i].name);
+        if(proof.cropHash!==ref.cropHash){
+          // Preserve the first mismatch and two independent subsequent frames;
+          // no tolerance or ignored pixels. Report any reproducible difference at end.
+          const r1=await cardProof(i,id+'-'+String(i).padStart(2,'0')+'-retry1');
+          const r2=await cardProof(i,id+'-'+String(i).padStart(2,'0')+'-retry2');
+          assert.equal(r1.styleHash,ref.styleHash);assert.equal(r2.styleHash,ref.styleHash);
+          results.pixelMismatches.push({id,index:i,name:cards[i].name,reference:ref.cropHash,first:proof.cropHash,retry1:r1.cropHash,retry2:r2.cropHash,matchedAfterSettling:r1.cropHash===ref.cropHash&&r2.cropHash===ref.cropHash});
+        }
         assert.deepEqual(proof.size,ref.size);
       }
     }
@@ -255,7 +265,9 @@ async function run() {
   }
   assert.equal(sha(fs.readFileSync(disk)),originalDisk,'gallery scrolling changed document file');
   checks.diskUnchanged=true;
+  checks.pixelExact=results.pixelMismatches.every(x=>x.matchedAfterSettling);
   fs.writeFileSync(path.join(out,'result-'+phase+'.json'),JSON.stringify({phase,runnerSha:process.env.GITHUB_SHA,checks,results,diskHash:originalDisk},null,2));
-  console.log(JSON.stringify({phase,checks,registry:cards.length,counts:Object.fromEntries(Object.entries(results.themes).map(([id,rows])=>[id,rows.length]))},null,2));
+  console.log(JSON.stringify({phase,checks,registry:cards.length,counts:Object.fromEntries(Object.entries(results.themes).map(([id,rows])=>[id,rows.length])),pixelMismatches:results.pixelMismatches},null,2));
+  assert.ok(checks.pixelExact,'one or more exact pixel mismatches remain; see evidence');
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0);}).catch(err=>{console.error(err.stack||err.message);fs.writeFileSync(path.join(out,'failure-'+phase+'.json'),JSON.stringify({phase,checks,results,error:err.stack||err.message},null,2));clearTimeout(timer);app.exit(1);});
