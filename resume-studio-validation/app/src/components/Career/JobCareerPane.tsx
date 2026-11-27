@@ -93,6 +93,7 @@ export function JobCareerPane({
   const [clonePhase,setClonePhase]=useState<'reading'|'writing'|null>(null);
   const [pdfCheck,setPdfCheck]=useState<{id:string;revision:string;action:'check'|'open'|'choose';result?:ApplicationPdfCheck;error?:string}|null>(null);
   const pdfTask=useRef<symbol|null>(null);
+  const pdfEpoch=useRef(0);
   const pdfScope=useRef({revision:storeData.revision,comparisonDisabled,subTab,activeSlug});pdfScope.current={revision:storeData.revision,comparisonDisabled,subTab,activeSlug};
   const cloneRead=useRef<{controller:AbortController;cancel:()=>void;phase:'reading'|'writing'}|null>(null);
   const cloneScope=useRef({activeSlug,activeDocId:activeDoc.id,comparisonDisabled,subTab});cloneScope.current={activeSlug,activeDocId:activeDoc.id,comparisonDisabled,subTab};
@@ -103,7 +104,7 @@ export function JobCareerPane({
   const reviewValid=Boolean(review&&canReview&&subTab==='tracker'&&review.activeSlug===activeSlug&&review.activeDocId===activeDoc.id&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
   useEffect(()=>{if(!reviewValid)setReview(null);},[reviewValid]);
   useEffect(()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();},[activeSlug,activeDoc.id,comparisonDisabled,subTab]);
-  useEffect(()=>{setPdfCheck(null);},[activeSlug,comparisonDisabled,subTab,storeData.revision,ledger.dirty,ledger.loading,ledger.saving]);
+  useEffect(()=>{pdfEpoch.current++;setPdfCheck(null);},[activeSlug,activeDoc.id,comparisonDisabled,subTab,storeData.revision,ledger.dirty,ledger.loading,ledger.saving,ledger.error]);
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');
@@ -174,11 +175,11 @@ export function JobCareerPane({
 
   const handlePdfCheck=async(item:JobApplication,action:'check'|'open'|'choose')=>{
     if(!canReview||!desktop||!item.snapshotId||!item.pdfReceipt||!storeData.revision||pdfTask.current)return;
-    const revision=storeData.revision,slug=activeSlug,token=Symbol('pdf-check');
+    const revision=storeData.revision,slug=activeSlug,token=Symbol('pdf-check'),epoch=pdfEpoch.current;
     pdfTask.current=token;
     setPdfCheck({id:item.id,revision,action});
     let timer:ReturnType<typeof setTimeout>|undefined;
-    const alive=()=>mounted.current&&pdfTask.current===token&&pdfScope.current.revision===revision&&!pdfScope.current.comparisonDisabled&&pdfScope.current.subTab==='tracker'&&pdfScope.current.activeSlug===slug&&!careerLedger.getSnapshot().dirty&&!careerLedger.getSnapshot().saving&&!careerLedger.getSnapshot().loading;
+    const alive=()=>mounted.current&&pdfTask.current===token&&pdfEpoch.current===epoch&&pdfScope.current.revision===revision&&!pdfScope.current.comparisonDisabled&&pdfScope.current.subTab==='tracker'&&pdfScope.current.activeSlug===slug&&!careerLedger.getSnapshot().dirty&&!careerLedger.getSnapshot().saving&&!careerLedger.getSnapshot().loading&&!careerLedger.getSnapshot().error;
     try{
       // Native file picker may remain open until the user chooses/cancels. No
       // fabricated cancellation of a system dialog; byte hashing has its own

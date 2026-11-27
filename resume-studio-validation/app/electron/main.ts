@@ -541,6 +541,7 @@ function getTrustedPrintJob(event:IpcMainInvokeEvent,jobId:string):PendingPrintJ
 const authorizedOutputPaths=new Map<string,string>();
 const pdfReceipts=new PdfReceiptVault();
 let pdfReceiptBusy=false;
+let pdfPickerBusy=false;
 async function boundedPdfCheck<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
   if(pdfReceiptBusy)throw Error('已有 PDF 字节核验或归档操作正在进行，请稍后重试。');
   pdfReceiptBusy=true;const controller=new AbortController();
@@ -725,8 +726,9 @@ function registerIpcHandlers(): void {
     if(action==='choose'){
       const owner=mainWindow;
       if(!owner||owner.isDestroyed())throw Error('工作台已关闭。');
-      if(pdfReceiptBusy)throw Error('已有 PDF 核验正在进行。');
-      const result=await dialog.showOpenDialog(owner,{title:'选择待核验的原 PDF（不修改台账关联）',filters:[{name:'PDF 文件',extensions:['pdf']}],properties:['openFile']});
+      if(pdfReceiptBusy||pdfPickerBusy)throw Error('已有 PDF 核验或选择文件窗口正在进行。');
+      pdfPickerBusy=true;
+      const result=await dialog.showOpenDialog(owner,{title:'选择待核验的原 PDF（不修改台账关联）',filters:[{name:'PDF 文件',extensions:['pdf']}],properties:['openFile']}).finally(()=>{pdfPickerBusy=false;});
       assertTrustedEditor(event);
       if(result.canceled||result.filePaths.length!==1)return {status:'unavailable',checkedAt:new Date().toISOString()};
       file=result.filePaths[0]!;

@@ -31,7 +31,7 @@ describe('actual PDF byte fingerprint and export receipt',()=>{
  it('detects same-length replacement, non-PDF, deletion and identical recovered bytes',async()=>{
   const {file,issued}=await fixture(),r=issued.pdfReceipt;
   expect(checkFingerprint(await readPdfFingerprint(file),r).status).toBe('verified');
-  const modified=Buffer.from(bytes);modified[12]^=1;await fs.writeFile(file,modified);
+  const modified=Buffer.from(bytes);modified[12]=modified[12]!^1;await fs.writeFile(file,modified);
   expect(checkFingerprint(await readPdfFingerprint(file),r).status).toBe('changed');
   await fs.writeFile(file,Buffer.alloc(bytes.length,65));expect(checkFingerprint(await readPdfFingerprint(file),r).status).toBe('changed');
   await fs.rm(file);expect(checkFingerprint(await readPdfFingerprint(file),r).status).toBe('missing');
