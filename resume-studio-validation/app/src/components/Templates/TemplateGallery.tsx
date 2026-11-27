@@ -8,7 +8,7 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SAMPLE_PREVIEW_DOCUMENT, withPreviewDemoPhoto } from '../../lib/sampleResumeData';
 import type { ResumeDocument, TemplateId } from '../../schema/resumeSchema';
 import { TEMPLATE_REGISTRY } from '../../templates/registry';
@@ -299,7 +299,46 @@ function TemplateLightboxModal({
   onApply: (color: string) => void;
 }) {
   const [trialColor, setTrialColor] = useState(initialColor);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const TemplateComponent = meta.component;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')).filter(el => el.tabIndex >= 0 && el.getClientRects().length > 0);
+    const focusInitial = () => (dialog.querySelector<HTMLElement>('[aria-label="关闭大图对比"]') ?? focusable()[0] ?? dialog).focus({ preventScroll: true });
+    focusInitial();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const controls = focusable();
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      const active = document.activeElement;
+      if (!first || !last) { event.preventDefault(); dialog.focus(); return; }
+      if (!active || !dialog.contains(active) || active === dialog || (event.shiftKey ? active === first : active === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      if (event.target instanceof Node && !dialog.contains(event.target)) focusInitial();
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('focusin', onFocusIn);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('focusin', onFocusIn);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [onClose]);
 
   const modalDoc: ResumeDocument = useMemo(
     () => ({
@@ -320,6 +359,8 @@ function TemplateLightboxModal({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label={`模板大图对比：${meta.name}`}
@@ -422,6 +463,7 @@ export function TemplateGallery({
   const [fillDemoAvatar, setFillDemoAvatar] = useState(true);
   const [applyRecommendedColor, setApplyRecommendedColor] = useState(true);
   const [inspectMeta, setInspectMeta] = useState<TemplateMetadata | null>(null);
+  const closeInspect = useCallback(() => setInspectMeta(null), []);
   const [favorites, setFavorites] = useState<Set<string>>(() => loadFavoriteTemplates());
 
   const toggleFavorite = (id: string) => {
@@ -586,7 +628,7 @@ export function TemplateGallery({
           }
           isFavorite={favorites.has(inspectMeta.id)}
           onToggleFavorite={() => toggleFavorite(inspectMeta.id)}
-          onClose={() => setInspectMeta(null)}
+          onClose={closeInspect}
           onApply={(chosenColor) => {
             onSelectTemplate(inspectMeta.id, chosenColor);
             setInspectMeta(null);

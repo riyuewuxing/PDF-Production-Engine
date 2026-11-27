@@ -191,25 +191,44 @@ async function run() {
   const dpi=await js('devicePixelRatio');assert.ok(Math.abs(dpi-1.25)<0.01,'actual renderer DPI factor mismatch '+dpi);
   await selectTheme('warm');await nav('模板库(');await search('vip-cyber-dark');
   await until('keyboard card mounted',()=>js('!!document.querySelector('+JSON.stringify(thumbSelector)+')'));
-  function press(keyCode,modifiers=[]){win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});}
+  win.webContents.focus();
+  await js(`(()=>{window.__nativeKeyTrace=[];for(const type of ['keydown','keypress','keyup','click','focusin'])document.addEventListener(type,e=>{const el=e.target;window.__nativeKeyTrace.push({type,key:e.key??null,code:e.code??null,trusted:e.isTrusted,text:el?.innerText?.trim()?.slice(0,80),label:el?.getAttribute?.('aria-label')??null});},true);return true;})()`);
+  async function press(keyCode,modifiers=[]){win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});await sleep(90);win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await sleep(120);}
   async function focused(){return js('(()=>{const e=document.activeElement;return {label:e.getAttribute("aria-label"),text:e.innerText?.trim(),inDialog:!!e.closest("[role=dialog]"),outline:getComputedStyle(e).outlineStyle}})()');}
   assert.ok(await js('(()=>{const e=document.querySelector(\'.group button[aria-label^="收藏 "]\');e.focus();return document.activeElement===e})()'));
-  await capture('dpi125-favorite-focused');press('Tab');await until('native Tab reaches apply',async()=> (await focused()).text==='一键应用');
-  await capture('dpi125-apply-focused');press('Tab');await until('native Tab reaches inspect',async()=> (await focused()).text==='大图放大对比');
-  await capture('dpi125-inspect-focused');press('Enter');
-  await until('native Enter opened lightbox',()=>js('!!document.querySelector('+JSON.stringify(modalSelector)+')'));
-  const initial=await focused();await capture('dpi125-dialog-after-enter');
-  press('Tab');await sleep(250);const afterTab=await focused();await capture('dpi125-dialog-after-tab');
-  press('Escape');await sleep(300);const escapeClosed=await js('!document.querySelector('+JSON.stringify(modalSelector)+')');
+  await capture('dpi125-favorite-focused');await press('Tab');await until('native Tab reaches apply',async()=> (await focused()).text==='一键应用');
+  await capture('dpi125-apply-focused');await press('Tab');await until('native Tab reaches inspect',async()=> (await focused()).text==='大图放大对比');
+  await capture('dpi125-inspect-focused');
+  results.beforeEnter=await focused();results.documentHasFocus=await js('document.hasFocus()');
+  await press('Enter');await sleep(300);
+  results.enterOpened=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')');
+  results.traceAfterEnter=await js('window.__nativeKeyTrace');
+  await capture('dpi125-enter-result');
+  if(!results.enterOpened){
+    // Preserve the native failure separately; Space is a distinct native path, not a substitute for Enter.
+    await press('Space');await sleep(300);results.spaceAfterEnterFailure=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')');
+    results.traceAfterSpace=await js('window.__nativeKeyTrace');
+    await capture('dpi125-space-result');
+    if(!results.spaceAfterEnterFailure){await clickText('大图放大对比',false,'.group');results.domClickOpened=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')');}
+  }
+  const initial=await focused();await capture('dpi125-dialog-after-open');
+  await press('Tab');const afterTab=await focused();await capture('dpi125-dialog-after-tab');
+  await press('Tab',['shift']);const afterShiftTab=await focused();
+  await press('Escape');const escapeClosed=await js('!document.querySelector('+JSON.stringify(modalSelector)+')');
   const focusAfterEscape=await focused();
   if(!escapeClosed)await clickByAria('关闭大图对比');
-  const report={dpi,initial,afterTab,escapeClosed,focusAfterEscape};
+  const report={dpi,initial,afterTab,afterShiftTab,escapeClosed,focusAfterEscape};
   results.keyboard=report;
-  checks.nativeTabAndEnter=true;
+  checks.nativeTabAndEnter=results.enterOpened;
   checks.initialFocusInside=initial.inDialog;
   checks.tabInside=afterTab.inDialog;
+  checks.shiftTabInside=afterShiftTab.inDialog;
   checks.escapeClosed=escapeClosed;
-  // This diagnostic deliberately records the existing accessibility deficiency; it is not an acceptance gate.
+  checks.focusRestored=focusAfterEscape.text==='大图放大对比';
+  if(escapeClosed&&checks.focusRestored){await press('Space');checks.nativeSpace=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')');if(checks.nativeSpace)await press('Escape');}
+  results.trace=await js('window.__nativeKeyTrace');
+  await capture('dpi125-closed');
+  if(isCandidate)for(const name of ['nativeTabAndEnter','initialFocusInside','tabInside','shiftTabInside','escapeClosed','focusRestored','nativeSpace'])assert.equal(checks[name],true,'keyboard gate '+name);
   assert.equal(sha(fs.readFileSync(disk)),originalDisk);
   win.setSize(1080,720);await sleep(350);await capture('dpi125-minimum-gallery');
   fs.writeFileSync(path.join(out,'result-'+phase+'.json'),JSON.stringify({phase,checks,results,runnerSha:process.env.GITHUB_SHA},null,2));
