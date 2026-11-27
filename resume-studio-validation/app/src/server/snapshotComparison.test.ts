@@ -69,9 +69,16 @@ describe('read-only historical comparison endpoint',()=>{
     try{
       const addr=server.address();if(!addr||typeof addr==='string')throw Error('port missing');
       const base='http://127.0.0.1:'+addr.port+'/api/resumes/synthetic/snapshot-preview/';
-      const good=await fetch(base+snapshot.id);expect(good.status).toBe(200);expect((await good.json()).document).toEqual(doc);
+      const good=await fetch(base+snapshot.id);expect(good.status).toBe(200);expect(good.headers.get('cache-control')).toBe('no-store');expect(good.headers.get('cross-origin-resource-policy')).toBe('same-origin');expect((await good.json()).document).toEqual(doc);
       for(const url of [base+snapshot.id+'.json',base+'%2e%2e%2fsecret',base+'missing'])expect((await fetch(url)).ok).toBe(false);
-      expect((await fetch(base+snapshot.id,{method:'POST'})).ok).toBe(false);
+      const post=await fetch(base+snapshot.id,{method:'POST'});expect(post.status).toBe(405);expect(post.headers.get('allow')).toBe('GET');
+      for(const headers of [{Origin:'https://example.invalid'},{'Sec-Fetch-Site':'cross-site'},{Origin:'null'}]){
+        const remote=await fetch(base+snapshot.id,{headers});expect(remote.status).toBe(403);expect(remote.headers.get('cache-control')).toBe('no-store');expect(await remote.text()).not.toContain(doc.basic.email);
+      }
+      const foreignHost=await new Promise<number>((resolve,reject)=>{const request=http.get(base+snapshot.id,{headers:{Host:'example.invalid'}},res=>{res.resume();resolve(res.statusCode??0);});request.on('error',reject);});
+      expect(foreignHost).toBe(403);
+      const localOrigin=await fetch(base+snapshot.id,{headers:{Origin:'http://127.0.0.1:'+addr.port,'Sec-Fetch-Site':'same-origin'}});
+      expect(localOrigin.status).toBe(200);
       expect(await fs.readFile(file)).toEqual(before);expect(await fs.readdir(dir)).toEqual(names);
     }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));}
   });

@@ -71,7 +71,7 @@ export const apiClient = {
     if (window.resumeDesktop) {
       return window.resumeDesktop.resumes.get(slug);
     }
-    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`,{signal});
+    const res = await fetch(`/api/resumes/${encodeURIComponent(slug)}`,signal?{signal,cache:'no-store'}:undefined);
     return handleJsonResponse<ResumeDocument>(res);
   },
 
@@ -148,7 +148,7 @@ export const apiClient = {
       if(!bridge?.getForComparison)throw new Error('当前桌面桥接不支持只读快照对照，请升级工作台。');
       return bridge.getForComparison(slug,id);
     }
-    const response=await fetch('/api/resumes/'+encodeURIComponent(slug)+'/snapshot-preview/'+encodeURIComponent(id),{signal});
+    const response=await fetch('/api/resumes/'+encodeURIComponent(slug)+'/snapshot-preview/'+encodeURIComponent(id),{signal,cache:'no-store'});
     return handleJsonResponse<{meta:ResumeSnapshotMeta;document:ResumeDocument}>(response);
   },
 
