@@ -62,7 +62,7 @@ async function run(){
  // Exercise actual OS-owned dialogs from the packaged executable, not a mocked IPC.
  const nativeClick=(title,button,id='')=>execFileSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve('validation-native-dialog.ps1'),'-OwnerPid',String(child.pid),'-Title',title,'-Button',button,'-ButtonId',id||'none'],{encoding:'utf8',timeout:24000,windowsHide:true});
  const zipBefore=fs.readdirSync(exports).filter(n=>n.endsWith('.zip'));
- await rowClick('制作投递包 ZIP 打包凭证学校');
+ await rowClick('制作投递包 打包凭证学校');
  nativeClick('选择投递包内容','仅封存简历');
  nativeClick('确认投递包文件清单','确认清单并另存');
  nativeClick('另存投递包 ZIP（不覆盖现有文件）','Save','1');
@@ -77,7 +77,7 @@ async function run(){
  const altered=Buffer.from(bytes);altered[altered.length-10]^=1;fs.writeFileSync(file,altered);
  await rowClick('核验 PDF 打包凭证学校');await until('changed',()=>has('文件字节与封存凭证不一致'));await capture('04-packaged-changed');report.checks.detectsSameSizeReplacement=true;unchanged();
  fs.rmSync(file);await rowClick('核验 PDF 打包凭证学校');await until('missing',()=>has('记录文件缺失'));await capture('05-packaged-missing');report.checks.detectsMissing=true;unchanged();
- await click('隐私脱敏');await until('redaction',()=>js(q(row('核验 PDF 打包凭证学校'))+'?.disabled===true'));report.checks.redactionGate=true;assert(await js(q(row('制作投递包 ZIP 打包凭证学校'))+'?.disabled===true'),'package privacy gate');report.checks.packageRedactionGate=true;
+ await click('隐私脱敏');await until('redaction',()=>js(q(row('核验 PDF 打包凭证学校'))+'?.disabled===true'));report.checks.redactionGate=true;assert(await js(q(row('制作投递包 打包凭证学校'))+'?.disabled===true'),'package privacy gate');report.checks.packageRedactionGate=true;
  report.checks.originalArchiveAndLedgerUnchanged=true;write();
 }
 run().then(()=>{clearTimeout(watchdog);cleanup();process.exit(0)}).catch(e=>{clearTimeout(watchdog);report.error=String(e?.message||'package fixture error').slice(0,500);write();cleanup();process.exit(1)});
