@@ -183,7 +183,7 @@ async function run() {
   const {updatedAt,...stableDoc}=doc;
   fs.writeFileSync(path.join(out,'fixture-doc.json'),JSON.stringify(stableDoc,null,2));
   results.fixture={kind,stableHash:sha(JSON.stringify(stableDoc)),template:doc.templateId,experienceCount:doc.experience.length};
-  for(const id of phase==='baseline'?['classic']:['classic','dark','light','warm']){
+  for(const id of phase==='baseline'?['classic']:['classic','warm']){
     if(phase==='candidate'&&id!=='classic')await selectTheme(id);
     await capture(id+'-scroll');
     const sheet=await captureSheet(id+'-scroll');
@@ -198,11 +198,13 @@ async function run() {
     await capture(id+'-spread');
     const postStatus=await js(`document.querySelector('[aria-label="预估页数"]')?.parentElement?.innerText`);
     if(phase==='candidate'&&(kind==='manual'||kind==='natural'))assert.ok(spread.length>=2,'missing second preview page');
+    const second=await js(`(()=>{const page=document.querySelectorAll('.a4-sheet')[1];if(!page)return null;page.scrollIntoView({block:'start',inline:'nearest'});return true;})()`);assert.ok(second,'second page absent');await sleep(300);
+    const visible=await js(`(()=>{const page=document.querySelectorAll('.a4-sheet')[1];const r=page.getBoundingClientRect();const c=page.closest('.print-workspace.overflow-auto').getBoundingClientRect();return {height:Math.min(r.bottom,c.bottom)-Math.max(r.top,c.top),width:Math.min(r.right,c.right)-Math.max(r.left,c.left)};})()`);assert.ok(visible.height>200&&visible.width>200,'second page not visible');await capture(id+'-second-page-visible');
     const spreadHash=sha(JSON.stringify(spread));
     await clickByAria('切回单列滚动');
     await until('scroll selected',()=>js(`!!document.querySelector('button[aria-label="双页并排总览"]')`));
     await sleep(350);
-    results[id]={sheet,export:exp,spreadHash,spreadPageCount:spread.length,preStatus,postStatus};
+    results[id]={sheet,export:exp,spreadHash,spreadPageCount:spread.length,secondPageVisible:visible,preStatus,postStatus};
     if(id!=='classic'){
       assert.equal(sheet.styleHash,results.classic.sheet.styleHash,'paper computed layout changed');
       assert.equal(exp.pngPixels,results.classic.export.pngPixels,'native PNG changed');

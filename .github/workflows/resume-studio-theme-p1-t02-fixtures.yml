@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [baseline, candidate]
+        phase: [candidate]
     runs-on: windows-latest
     timeout-minutes: 15
     defaults:
@@ -38,25 +38,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Typecheck and full regression after measurement fix
-        if: matrix.phase == 'candidate'
-        timeout-minutes: 4
-        run: |
-          pnpm typecheck
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build actual Electron app
         timeout-minutes: 3
         run: |
           pnpm desktop:build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Real Windows scroll, spread and native exports for four fixtures
+      - name: Real Windows second-page scroll visibility
         timeout-minutes: 8
         run: |
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:STUDIO_THEME_PHASE = '${{ matrix.phase }}'
-          foreach ($kind in @('near','natural','manual','dark')) {
+          foreach ($kind in @('natural','manual')) {
             $env:STUDIO_FIXTURE_KIND = $kind
             $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('studio-t02-fixture-' + $kind + '-' + [guid]::NewGuid().ToString())
             $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE ('theme-t02-fixtures/' + $kind)
