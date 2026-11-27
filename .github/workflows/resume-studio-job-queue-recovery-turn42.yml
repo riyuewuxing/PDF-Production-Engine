@@ -1,0 +1,57 @@
+name: Resume Studio Turn42 real Electron checkpoint recovery
+on:
+  push:
+    branches: ['resume-studio/v6-job-queue-recovery-turn42']
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Inject write failure and cold restart into explicit recovery
+        timeout-minutes: 8
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          foreach ($mode in @('recover','stale')) {
+            $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-queue-recovery-' + [guid]::NewGuid().ToString())
+            $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE "queue-recovery-evidence/$mode"
+            $env:QUEUE_PHASE = 'fail'
+            & .\node_modules\.bin\electron.cmd .\validation-job-queue-recovery.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $env:QUEUE_PHASE = $mode
+            & .\node_modules\.bin\electron.cmd .\validation-job-queue-recovery.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: queue-recovery-evidence
+          path: queue-recovery-evidence/
+          if-no-files-found: warn
+          retention-days: 3
