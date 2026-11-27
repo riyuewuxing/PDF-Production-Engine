@@ -225,10 +225,11 @@ async function run() {
   checks.shiftTabInside=afterShiftTab.inDialog;
   checks.escapeClosed=escapeClosed;
   checks.focusRestored=focusAfterEscape.text==='大图放大对比';
-  if(escapeClosed&&checks.focusRestored){await press('Space');checks.nativeSpace=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')');if(checks.nativeSpace)await press('Escape');}
+  if(escapeClosed&&checks.focusRestored){await press('Space');checks.nativeSpace=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')');if(checks.nativeSpace){if(isCandidate){await press('K',['control']);checks.modalBlocksPalette=await js('!!document.querySelector('+JSON.stringify(modalSelector)+')&&!document.querySelector(\'[role="dialog"][aria-label="全局命令面板"]\')');checks.focusRetainedAfterShortcut=(await focused()).inDialog;await capture('dpi125-modal-shortcut-isolation');}await press('Escape');}}
+  if(isCandidate){await press('K',['control']);checks.paletteAvailableAfterClose=await js('!!document.querySelector(\'[role="dialog"][aria-label="全局命令面板"]\')');await capture('dpi125-palette-after-close');await press('Escape');}
   results.trace=await js('window.__nativeKeyTrace');
   await capture('dpi125-closed');
-  if(isCandidate)for(const name of ['nativeTabAndEnter','initialFocusInside','tabInside','shiftTabInside','escapeClosed','focusRestored','nativeSpace'])assert.equal(checks[name],true,'keyboard gate '+name);
+  if(isCandidate)for(const name of ['nativeTabAndEnter','initialFocusInside','tabInside','shiftTabInside','escapeClosed','focusRestored','nativeSpace','modalBlocksPalette','focusRetainedAfterShortcut','paletteAvailableAfterClose'])assert.equal(checks[name],true,'keyboard gate '+name);
   assert.equal(sha(fs.readFileSync(disk)),originalDisk);
   win.setSize(1080,720);await sleep(350);await capture('dpi125-minimum-gallery');
   fs.writeFileSync(path.join(out,'result-'+phase+'.json'),JSON.stringify({phase,checks,results,runnerSha:process.env.GITHUB_SHA},null,2));
