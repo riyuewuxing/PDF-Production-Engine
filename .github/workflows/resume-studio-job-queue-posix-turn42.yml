@@ -1,0 +1,39 @@
+name: Resume Studio Turn42 POSIX containment and queue tests
+on:
+  push:
+    branches: ['resume-studio/v6-job-queue-posix-turn42']
+permissions:
+  contents: read
+jobs:
+  posix-containment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 3
+        run: |
+          npm install --global pnpm@10.30.0
+          pnpm install --frozen-lockfile
+      - name: Verify POSIX containment and final queue storage
+        timeout-minutes: 2
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/queue-posix-evidence"
+          pnpm exec vitest run src/server/workspaceContainment.test.ts src/server/jobQueue.test.ts --reporter=json --outputFile="$GITHUB_WORKSPACE/queue-posix-evidence/vitest.json"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: queue-posix-evidence
+          path: queue-posix-evidence/
+          if-no-files-found: warn
+          retention-days: 3
