@@ -193,7 +193,7 @@ async function run() {
   await until('keyboard card mounted',()=>js('!!document.querySelector('+JSON.stringify(thumbSelector)+')'));
   win.webContents.focus();
   await js(`(()=>{window.__nativeKeyTrace=[];for(const type of ['keydown','keypress','keyup','click','focusin'])document.addEventListener(type,e=>{const el=e.target;window.__nativeKeyTrace.push({type,key:e.key??null,code:e.code??null,trusted:e.isTrusted,text:el?.innerText?.trim()?.slice(0,80),label:el?.getAttribute?.('aria-label')??null});},true);return true;})()`);
-  async function press(keyCode,modifiers=[]){win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});await sleep(90);win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await sleep(120);}
+  async function press(keyCode,modifiers=[]){win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});await sleep(45);if(keyCode==='Enter')win.webContents.sendInputEvent({type:'char',keyCode,modifiers});await sleep(45);win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await sleep(120);}
   async function focused(){return js('(()=>{const e=document.activeElement;return {label:e.getAttribute("aria-label"),text:e.innerText?.trim(),inDialog:!!e.closest("[role=dialog]"),outline:getComputedStyle(e).outlineStyle}})()');}
   assert.ok(await js('(()=>{const e=document.querySelector(\'.group button[aria-label^="收藏 "]\');e.focus();return document.activeElement===e})()'));
   await capture('dpi125-favorite-focused');await press('Tab');await until('native Tab reaches apply',async()=> (await focused()).text==='一键应用');
@@ -219,7 +219,7 @@ async function run() {
   if(!escapeClosed)await clickByAria('关闭大图对比');
   const report={dpi,initial,afterTab,afterShiftTab,escapeClosed,focusAfterEscape};
   results.keyboard=report;
-  checks.nativeTabAndEnter=results.enterOpened;
+  checks.nativeTabAndEnter=results.enterOpened&&results.traceAfterEnter.some(e=>e.type==='click'&&e.trusted&&e.text==='大图放大对比');
   checks.initialFocusInside=initial.inDialog;
   checks.tabInside=afterTab.inDialog;
   checks.shiftTabInside=afterShiftTab.inDialog;
