@@ -107,7 +107,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
       <p className="font-semibold">{task.company} · {task.role}</p>
       <p>绑定简历：{document.title} · {task.slug}</p>
       <p className="text-[10px] break-all">任务 ID：{task.id} · 原稿 SHA-256：{task.documentSha256}</p>
-      <p>本地准备完成 ≠ 招聘资格、人工核对或已投递。本流程不自动调用 AI、不修改简历、不发送材料。</p>
+      <p>本地准备完成 ≠ 招聘资格、人工核对或已投递。原稿为进入时核验的磁盘版本；切换模块、保存或导出前重新核验。本流程不自动调用 AI、不修改简历、不发送材料。</p>
       <details><summary>固定 JD 原文（{task.jdText.length} 字）</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px]">{task.jdText}</pre></details>
       <p className="text-[11px] text-slate-700">已保存核对档案 {archiveCount} · 自荐信 {letters.length} · PDF归档 {applications.length}。这些是记录数量，不是流程通过率。离开或切换模块会丢弃未归档的核对会话；保存的历史保留。</p>
     </div>
@@ -122,7 +122,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
     {!invalid&&tab==='letters'&&<div className="rounded border p-3 space-y-2">
       <h4 className="font-semibold">固定岗位自荐信（本地生成，可人工修改）</h4>
       <textarea aria-label="岗位自荐信正文" value={letter} rows={9} disabled={busy} onChange={e=>setLetter(e.target.value)} className="w-full rounded border p-2 text-slate-900"/>
-      <input aria-label="岗位自荐信版本名" value={letterTitle} onChange={e=>setLetterTitle(e.target.value)} disabled={busy} placeholder="选填版本名" className="w-full rounded border p-2"/>
+      <input aria-label="岗位自荐信版本名" maxLength={200} value={letterTitle} onChange={e=>setLetterTitle(e.target.value)} disabled={busy} placeholder="选填版本名" className="w-full rounded border p-2"/>
       <div className="flex flex-wrap gap-2"><button type="button" className={primary} disabled={disabled} onClick={saveLetter}>保存岗位自荐信</button><button type="button" className={btn} disabled={disabled} onClick={exportLetter}>导出岗位自荐信 PDF</button></div>
       {letters.map(l=><div key={l.id} className="rounded border p-2"><p className="font-semibold break-words">{l.title}</p><p>{l.updatedAt}</p><button type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current){setLetter(l.bodyText);setLetterTitle(l.title);}})}>载入此岗位历史自荐信</button></div>)}
       <details><summary>本地邮件及平台话术参考（未发送）</summary><p className="font-semibold mt-2">{bundle.emailSubject}</p><pre className="whitespace-pre-wrap break-words">{bundle.emailBody}</pre><pre className="whitespace-pre-wrap break-words mt-2">{bundle.bossGreeting}</pre></details>

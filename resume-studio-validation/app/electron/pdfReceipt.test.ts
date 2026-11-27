@@ -28,6 +28,15 @@ describe('actual PDF byte fingerprint and export receipt',()=>{
   expect(vault.resolve(issued.pdfReceiptToken,file,'synthetic',doc)).toEqual(r);
   for(const [token,f,slug,d] of [[issued.pdfReceiptToken,file,'other',doc],['wrong',file,'synthetic',doc],[issued.pdfReceiptToken,file+'x','synthetic',doc],[issued.pdfReceiptToken,file,'synthetic',{...doc,title:'changed'}]] as const)expect(()=>vault.resolve(token,f,slug,d)).toThrow();
  });
+ it('keeps queue-scoped PDF capabilities separate from ordinary exports and other same-document jobs',async()=>{
+  const {file,doc,vault,issued}=await fixture(),a=randomUUID(),b=randomUUID();
+  const scoped=await vault.issue(file,'synthetic',doc,bytes,undefined,undefined,a);
+  expect(vault.resolve(scoped.pdfReceiptToken,file,'synthetic',doc,a)).toEqual(scoped.pdfReceipt);
+  expect(()=>vault.resolve(scoped.pdfReceiptToken,file,'synthetic',doc,b)).toThrow();
+  expect(()=>vault.resolve(scoped.pdfReceiptToken,file,'synthetic',doc)).toThrow();
+  expect(()=>vault.resolve(issued.pdfReceiptToken,file,'synthetic',doc,a)).toThrow();
+  expect(vault.resolve(issued.pdfReceiptToken,file,'synthetic',doc)).toEqual(issued.pdfReceipt);
+ });
  it('detects same-length replacement, non-PDF, deletion and identical recovered bytes',async()=>{
   const {file,issued}=await fixture(),r=issued.pdfReceipt;
   expect(checkFingerprint(await readPdfFingerprint(file),r).status).toBe('verified');
