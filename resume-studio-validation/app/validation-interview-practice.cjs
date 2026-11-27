@@ -95,7 +95,7 @@ async function run(){
   // Historical archive deliberately stale after edits: only historical clauses and notes are shown.
   await setValue(basisSel,archiveId);await ready();
   assert(await js('document.querySelectorAll('+JSON.stringify(panel+' article[aria-label^="面试练习题 "]')+').length===2'),'archive nonrequirement became interview question');
-  const archiveRows=await js('Array.from(document.querySelectorAll('+JSON.stringify(panel+' article[aria-label^="面试练习题 "]')+')).map(a=>a.textContent).join("\n")');
+  const archiveRows=await js('Array.from(document.querySelectorAll('+JSON.stringify(panel+' article[aria-label^="面试练习题 "]')+')).map(a=>a.textContent).join(" | ")');
   await capture('05-archive-provenance',panel+' article[aria-label="面试练习题 1"]');
   assert(await has('历史档案原文')&&['当时本人标记存在缺口','当时本人标记已有自述依据','PDF 第 1 页','PDF 第 3 页','待核对证书原件'].every(x=>archiveRows.includes(x))&&!archiveRows.includes('不要求班主任经历。'),'archive provenance wrong '+archiveRows.slice(0,400));
   assert((await activeAnswers()).every(x=>x===''),'archive reused current practice answer');
