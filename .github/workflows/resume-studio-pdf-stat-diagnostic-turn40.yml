@@ -1,0 +1,18 @@
+name: Turn40 Windows stat diagnostic
+on:
+  push:
+    branches: ['resume-studio/v6-pdf-receipt-diagnostic-turn40']
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: windows-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: node resume-studio-validation/app/validation-pdf-stat-diagnostic.cjs
