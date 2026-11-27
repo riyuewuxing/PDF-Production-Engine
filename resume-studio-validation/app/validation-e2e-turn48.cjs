@@ -1,7 +1,7 @@
 const {app,dialog}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT,phase=process.env.QUEUE_PHASE;
-if(!root||!out||!path.basename(root).startsWith('synthetic-queue-workflow-')||!['main','restart'].includes(phase))throw Error('isolated workflow fixture required');
+if(!root||!out||!path.basename(root).startsWith('synthetic-queue-workflow-')||!['main','restart','history'].includes(phase))throw Error('isolated workflow fixture required');
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
 const checks={},observations={},sleep=ms=>new Promise(r=>setTimeout(r,ms)),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -11,7 +11,7 @@ async function until(label,fn,ms=20000){const end=Date.now()+ms;while(Date.now()
 function report(error){fs.writeFileSync(path.join(out,'workflow-'+phase+'.json'),JSON.stringify({runnerSha:process.env.GITHUB_SHA,phase,checks,observations,...(error?{error:String(error)}:{})},null,2))}
 const canonical=doc=>JSON.stringify(doc,(_k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);
 async function run(){
- let slugA=phase==='restart'?JSON.parse(fs.readFileSync(path.join(out,'restart-expected.json'),'utf8')).slugA:'runner-fixture';
+ let slugA=phase!=='main'?JSON.parse(fs.readFileSync(path.join(out,'restart-expected.json'),'utf8')).slugA:'runner-fixture';
  const store=main.store,slugC='queue-c',companies=['合成工作流甲校','合成工作流乙校','合成工作流丙校'],role='物理教师',jd='  必须具备教师资格。\n硕士优先。  ';
  const ledger=()=>store.getApplications(),ledgerBytes=()=>fs.readFileSync(store.applicationsPath),source=slug=>store.resolveResumePath(slug).filePath,sourceHash=slug=>sha(fs.readFileSync(source(slug)));
  const row=async i=>(await ledger()).jobQueue?.find(t=>t.company===companies[i]);
@@ -21,7 +21,12 @@ async function run(){
    await store.saveResume(slugA,{...fixture,id:'synthetic-workflow-a',title:'合成工作流原稿',basic:{...fixture.basic,name:'合成甲乙候选人'}});
    const base=await ledger();await store.saveApplications({...base,applications:[{id:'ordinary-workflow-history',company:'合成通用历史',resumeSlug:slugA}],coverLetters:[{id:'ordinary-letter',title:'合成通用信',company:'合成通用单位',bodyText:'通用历史正文'}]},base.revision);
  }
- let originalHashes=[sourceHash(slugA),sourceHash(slugC)];const initialHash=sha(ledgerBytes()),masterHash=sourceHash('master');
+ if(phase==='history'){
+   const h=JSON.parse(fs.readFileSync(path.join(out,'history-expected.json'),'utf8'));
+   assert(sourceHash(slugA)===h.changedSourceHash,'missing-source injection does not match prior process');
+   fs.renameSync(source(slugA),path.join(root,'missing-version-hold.json'));
+ }
+ let originalHashes=[fs.existsSync(source(slugA))?sourceHash(slugA):null,sourceHash(slugC)];const initialHash=sha(ledgerBytes()),masterHash=sourceHash('master');
  await main.registerAssetProtocol();main.registerIpcHandlers();
  const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
  const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(v=>JSON.stringify(v)).join(',')+')');
@@ -161,7 +166,7 @@ async function run(){
    for(const [name,file] of [['master-final.json',source('master')],['version-final.json',source(slugA)],['ledger-final.json',store.applicationsPath],['snapshot-final.json',snapshotFile]])fs.copyFileSync(file,path.join(out,name));
    fs.writeFileSync(path.join(out,'restart-expected.json'),JSON.stringify({slugA,masterHash,ledgerHash:sha(ledgerBytes()),sourceHashes:originalHashes,taskIds:[a.id,b.id,c.id],applicationId:entry.id,snapshotId:entry.snapshotId,snapshotHash:snapHash},null,2));
    checks.permanentReviewAndOriginalBytes=true;
- }else{
+ }else if(phase==='restart'){
    const expected=JSON.parse(fs.readFileSync(path.join(out,'restart-expected.json'),'utf8'));assert(initialHash===expected.ledgerHash&&masterHash===expected.masterHash&&JSON.stringify(originalHashes)===JSON.stringify(expected.sourceHashes),'restart bytes differ');
    assert(sha(fs.readFileSync(path.join(store.appSnapshotsDir,expected.snapshotId+'.json')))===expected.snapshotHash,'cold restart archive changed');
    await switchTo(slugA);await queue();await until('prepared rows',()=>enabled('核对岗位流程 '+companies[0]+' '+role));assert(!await has('固定岗位材料流程')&&sha(ledgerBytes())===initialHash,'cold restart entered workflow or wrote');
@@ -206,7 +211,42 @@ async function run(){
    const beforeZoom=await js(()=>window.innerWidth);win.webContents.setZoomFactor(1.3);await sleep(300);
    const narrow=await js(()=>({width:window.innerWidth,height:window.innerHeight,scrollWidth:document.documentElement.scrollWidth}));
    assert(narrow.width<beforeZoom,'narrow CSS viewport not exercised');observations.narrowCssViewport=narrow;await capture('13-narrow-viewport','[aria-label="固定岗位材料流程"]');checks.otherVersionStillUsableAndNarrowViewport=true;
+   win.webContents.setZoomFactor(1);await click('返回岗位队列');
+   await click(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim()));
+   await until('tracker ready for explicit edit',()=>enabled('核验 PDF '+companies[0]));
+   const prior=await ledger(),note='合成T48本人手工投递备注，未执行真实发送。';
+   await fill(companies[0]+' 状态','applied');
+   await until('explicit status saved',async()=> (await ledger()).applications.find(e=>e.id===entry.id)?.status==='applied'&&await enabled('核验 PDF '+companies[0]));
+   assert(await js(({company,note})=>{const select=[...document.querySelectorAll('select')].find(e=>e.getAttribute('aria-label')===company+' 状态');const e=select?.closest('div.rounded-lg')?.querySelector('textarea[placeholder="记录笔试真题、试讲课题或面试复盘..."]');if(!e)return false;Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,note);e.dispatchEvent(new Event('input',{bubbles:true}));return true},{company:companies[0],note}),'scoped tracker notes missing');
+   await until('explicit note saved',async()=> (await ledger()).applications.find(e=>e.id===entry.id)?.notes===note&&await enabled('核验 PDF '+companies[0]));
+   const after=await ledger(),newEntry=after.applications.find(e=>e.id===entry.id);
+   const noRevision=x=>{const {revision,applications,...rest}=x;return rest};
+   const omitEdits=x=>{const {status,notes,updatedAt,...rest}=x;return rest};
+   assert(canonical(noRevision(prior))===canonical(noRevision(after))&&canonical(prior.applications.filter(x=>x.id!==entry.id))===canonical(after.applications.filter(x=>x.id!==entry.id))&&canonical(omitEdits(entry))===canonical(omitEdits(newEntry)),'explicit ledger edit changed protected or unrelated data');
+   assert(sha(fs.readFileSync(archiveFile))===expected.snapshotHash&&sha(fs.readFileSync(pdfFile))===entry.pdfReceipt.sha256&&sourceHash(slugA)===changed&&sourceHash(slugC)===originalHashes[1],'manual tracker update changed source/snapshot/PDF');
+   checks.explicitTrackerStatusAndNotesOnly=true;
+   await capture('14-explicit-status-notes','select[aria-label="'+companies[0]+' 状态"]');
+   fs.copyFileSync(store.applicationsPath,path.join(out,'ledger-history.json'));
+   fs.writeFileSync(path.join(out,'history-expected.json'),JSON.stringify({ledgerHash:sha(ledgerBytes()),changedSourceHash:changed,otherSourceHash:originalHashes[1],note,status:'applied',applicationId:entry.id,snapshotId:entry.snapshotId,snapshotHash:expected.snapshotHash,pdfSha:entry.pdfReceipt.sha256,masterHash},null,2));
+ }else{
+   const expected=JSON.parse(fs.readFileSync(path.join(out,'history-expected.json'),'utf8'));
+   assert(initialHash===expected.ledgerHash&&masterHash===expected.masterHash&&originalHashes[0]===null&&originalHashes[1]===expected.otherSourceHash,'third process fixture mismatch');
+   assert(!(await store.listResumes()).resumes.some(s=>s.slug===slugA),'missing source still listed');
+   const entry=(await ledger()).applications.find(e=>e.id===expected.applicationId);
+   assert(entry?.status===expected.status&&entry.notes===expected.note&&entry.snapshotId===expected.snapshotId,'cold tracker edits not persisted');
+   const archiveFile=path.join(store.appSnapshotsDir,expected.snapshotId+'.json');
+   await switchTo(slugC);await queue();
+   assert(!await enabled('核对岗位流程 '+companies[0]+' '+role),'missing source job unexpectedly actionable');
+   await click(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim()));
+   await until('tracker edit readback',()=>js(({company,note,status})=>{const e=[...document.querySelectorAll('select')].find(e=>e.getAttribute('aria-label')===company+' 状态');return e?.value===status&&e.closest('div.rounded-lg')?.querySelector('textarea[placeholder="记录笔试真题、试讲课题或面试复盘..."]')?.value===note},{company:companies[0],note:expected.note,status:expected.status}));
+   await capture('15-cold-tracker-edits','select[aria-label="'+companies[0]+' 状态"]');
+   await click('只读复盘 '+companies[0]);await until('missing source warning',()=>has('关联版本不在当前可用列表'));
+   await click('读取并对比');await until('missing source sealed comparison',()=>js(()=>!!document.querySelector('[aria-label="差异统计"]')&&[...document.querySelectorAll('[data-compare-side="before"]')].some(e=>e.innerText.includes('合成甲乙候选人'))&&[...document.querySelectorAll('[data-compare-side="after"]')].some(e=>e.innerText.includes('合成丙候选人'))));
+   await capture('16-missing-source-sealed-review');await click('关闭版本对照');
+   await click('核验 PDF '+companies[0]);await until('missing source PDF still valid',()=>has('记录路径字节一致'));await capture('17-missing-source-pdf-verified');
+   assert(sha(ledgerBytes())===initialHash&&sha(fs.readFileSync(archiveFile))===expected.snapshotHash&&sha(fs.readFileSync(entry.exportedFilePath))===expected.pdfSha&&!fs.existsSync(source(slugA))&&sourceHash(slugC)===expected.otherSourceHash,'history operation mutated data or restored source');
+   checks.missingSourceColdPermanentReviewAndReceipt=true;
  }
- observations.ledgerSha256=sha(ledgerBytes());observations.masterSha256=sourceHash('master');assert(observations.masterSha256===masterHash,'master changed');observations.sourceSha256=[sourceHash(slugA),sourceHash(slugC)];report();
+ observations.ledgerSha256=sha(ledgerBytes());observations.masterSha256=sourceHash('master');assert(observations.masterSha256===masterHash,'master changed');observations.sourceSha256=[fs.existsSync(source(slugA))?sourceHash(slugA):null,sourceHash(slugC)];report();
 }
 app.whenReady().then(run).then(()=>{clearTimeout(watchdog);app.exit(0)}).catch(e=>{clearTimeout(watchdog);console.error(e);report(e);app.exit(1)});

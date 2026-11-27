@@ -7,7 +7,7 @@ permissions:
 jobs:
   workflow:
     runs-on: windows-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     defaults:
       run:
         working-directory: resume-studio-validation/app
@@ -34,12 +34,12 @@ jobs:
           pnpm desktop:build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Actual multi-job UI, real PDF and ZIP, cold restart
-        timeout-minutes: 9
+        timeout-minutes: 13
         run: |
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-queue-workflow-' + [guid]::NewGuid().ToString())
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'queue-workflow-evidence'
-          foreach ($mode in @('main','restart')) {
+          foreach ($mode in @('main','restart','history')) {
             $env:QUEUE_PHASE = $mode
             & .\node_modules\.bin\electron.cmd .\validation-e2e-turn48.cjs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
