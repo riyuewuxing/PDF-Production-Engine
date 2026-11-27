@@ -18,11 +18,12 @@ import {
   Save,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { apiClient, isDesktopMode, localErrorMessage } from '../../lib/apiClient';
 import { careerLedger } from '../../lib/careerLedgerSession';
 import { CareerAiPanel } from './CareerAiPanel';
 import { InterviewPracticePane } from './InterviewPracticePane';
+import {VersionCompareModal,type ApplicationReviewSource} from '../Versions/VersionCompareModal';
 import {visibleBasicValue} from '../../lib/aiContext';
 import {
   COVER_LETTER_VARIANT_LABELS,
@@ -51,6 +52,8 @@ interface JobCareerPaneProps {
   activeSlug: string;
   activeDoc: ResumeDocument;
   summaries: ResumeSummary[];
+  masterSummary?:ResumeSummary|null;
+  comparisonDisabled?:boolean;
   refreshKey?: number;
   onSwitchToResumeForEdit: (slug: string) => void;
   onCloneSnapshot?: (doc: ResumeDocument, suggestedTitle: string) => Promise<void> | void;
@@ -61,6 +64,8 @@ export function JobCareerPane({
   activeSlug,
   activeDoc,
   summaries,
+  masterSummary=null,
+  comparisonDisabled=false,
   refreshKey = 0,
   onSwitchToResumeForEdit,
   onCloneSnapshot,
@@ -82,6 +87,16 @@ export function JobCareerPane({
   const [statusFilter, setStatusFilter] = useState<'all' | ApplicationStatus>('all');
   const [expandedJdId, setExpandedJdId] = useState<string | null>(null);
   const [cloningId, setCloningId] = useState<string | null>(null);
+  const [review,setReview]=useState<{activeSlug:string;source:ApplicationReviewSource}|null>(null);
+  const cloneRead=useRef<{controller:AbortController;cancel:()=>void}|null>(null);
+  const cloneScope=useRef({activeSlug,comparisonDisabled});cloneScope.current={activeSlug,comparisonDisabled};
+  const mounted=useRef(false);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;cloneRead.current?.cancel();};},[]);
+  const ledgerReviewReady=ledger.ready&&!ledger.loading&&!ledger.saving&&!ledger.dirty&&!ledger.error&&typeof storeData.revision==='string'&&/^[a-f0-9]{64}$/.test(storeData.revision);
+  const canReview=ledgerReviewReady&&!comparisonDisabled;
+  const reviewValid=Boolean(review&&canReview&&review.activeSlug===activeSlug&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
+  useEffect(()=>{if(!reviewValid)setReview(null);},[reviewValid]);
+  useEffect(()=>{if(comparisonDisabled)cloneRead.current?.cancel();},[comparisonDisabled]);
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');
@@ -150,18 +165,39 @@ export function JobCareerPane({
     careerLedger.update(current=>({...current,applications:current.applications.filter(entry=>entry.id!==item.id)}));
   };
 
+  const openApplicationReview=(item:JobApplication)=>{
+    if(!canReview||!item.snapshotId||!storeData.revision)return;
+    setReview({activeSlug,source:{id:item.id,snapshotId:item.snapshotId,resumeSlug:item.resumeSlug,company:item.company,role:item.role,exportedFilePath:item.exportedFilePath,atsScore:item.atsScore,ledgerRevision:storeData.revision}});
+  };
   const handleCloneSnapshotToWorkspace = async (item: JobApplication) => {
-    if (!item.snapshotId || !onCloneSnapshot) return;
+    if (!item.snapshotId || !onCloneSnapshot||!canReview||!storeData.revision||cloneRead.current) return;
+    const revision=storeData.revision,slug=activeSlug;
+    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+    let rejectPending:((err:Error)=>void)|undefined;
+    const cancel=()=>{controller.abort();rejectPending?.(new Error('已取消读取永久快照。'));};
+    const token={controller,cancel};cloneRead.current=token;
     setCloningId(item.id);
     setErrorMsg(null);
     try {
-      const record = await apiClient.getApplicationSnapshot(item.snapshotId);
-      const cleanName = `${item.company}-${item.role || record.document.title}-复盘版`;
+      const record=await Promise.race([
+        apiClient.getLinkedApplicationSnapshot({applicationId:item.id,snapshotId:item.snapshotId,ledgerRevision:revision},controller.signal),
+        new Promise<never>((_,reject)=>{rejectPending=reject;timer=setTimeout(()=>{controller.abort();reject(new Error('读取永久快照超过 10 秒，已停止等待，未克隆。'));},10_000);})
+      ]);
+      if(timer!==undefined)clearTimeout(timer);
+      if(!mounted.current||controller.signal.aborted)return;
+      const current=careerLedger.getSnapshot();
+      if(cloneScope.current.activeSlug!==slug||cloneScope.current.comparisonDisabled||current.dirty||current.saving||current.loading||current.error||current.data.revision!==revision)throw new Error('当前版本或台账状态已变化，未克隆永久快照。');
+      if(record.meta.id!==item.snapshotId.replace(/\.json$/i,'')||record.meta.applicationId!==item.id||record.meta.resumeSlug!==item.resumeSlug||record.meta.exportedFilePath!==item.exportedFilePath||record.meta.atsScore!==item.atsScore||record.meta.title!==record.document.title||record.meta.templateId!==record.document.templateId||!Number.isFinite(Date.parse(record.meta.createdAt)))throw new Error('永久快照关联身份校验失败，未克隆。');
+      const cleanName = item.company+'-'+(item.role||record.document.title)+'-复盘版';
+      // The explicit clone command is a separate, normal version-create operation.
+      // The 10-second deadline applies only to the read, never claims to cancel a write already started.
       await onCloneSnapshot(record.document, cleanName);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : '读取永久快照失败');
+      if(mounted.current)setErrorMsg(localErrorMessage(err,'读取永久快照失败'));
     } finally {
-      setCloningId(null);
+      if(timer!==undefined)clearTimeout(timer);
+      if(cloneRead.current===token)cloneRead.current=null;
+      if(mounted.current)setCloningId(null);
     }
   };
 
@@ -377,6 +413,8 @@ export function JobCareerPane({
             <button type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1">重载磁盘台账</button>
           </div>
         </div>}
+        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时禁止复盘或克隆原始永久快照。</p>}
+        {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 size={16} className="mr-2 animate-spin" /> {ledger.error&&!ledger.loading?'台账尚未成功读取，请先重载。':'正在加载本地求职数据…'}
@@ -543,7 +581,7 @@ export function JobCareerPane({
                                 </span>
                                 {item.snapshotId && (
                                   <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-                                    <Lock size={9} /> 永久快照已锁定
+                                    <Lock size={9} /> 已关联永久快照
                                   </span>
                                 )}
                                 {item.atsScore !== null && item.atsScore !== undefined && (
@@ -587,10 +625,11 @@ export function JobCareerPane({
                             </select>
 
                             <div className="flex flex-wrap items-center gap-1">
+                              {item.snapshotId&&<button type="button" disabled={!canReview||Boolean(cloningId)} onClick={()=>openApplicationReview(item)} aria-label={'只读复盘 '+item.company} className="inline-flex items-center gap-0.5 rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40"><History size={10}/> 只读复盘</button>}
                               {item.snapshotId && onCloneSnapshot && (
                                 <button
                                   type="button"
-                                  disabled={cloningId === item.id}
+                                  disabled={!canReview||Boolean(cloningId)}
                                   onClick={() => void handleCloneSnapshotToWorkspace(item)}
                                   className="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100"
                                 >
@@ -601,10 +640,11 @@ export function JobCareerPane({
                               {item.exportedFilePath && desktop && (
                                 <button
                                   type="button"
+                                  title="台账记录的路径，未核验文件内容与封存时一致；打开前请自行核对。"
                                   onClick={() => void apiClient.openFile(item.exportedFilePath)}
                                   className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
                                 >
-                                  <FileText size={10} /> 原 PDF
+                                  <FileText size={10} /> 关联 PDF
                                 </button>
                               )}
                               {item.resumeSlug && (
@@ -909,6 +949,7 @@ export function JobCareerPane({
           </>
         )}
       </div>
+      {reviewValid&&review&&<VersionCompareModal key={review.source.id+':'+review.source.ledgerRevision+':'+activeSlug} activeSlug={activeSlug} activeDoc={activeDoc} summaries={summaries} masterSummary={masterSummary} snapshots={[]} applicationReview={review.source} onClose={()=>setReview(null)}/>}
     </div>
   );
 }

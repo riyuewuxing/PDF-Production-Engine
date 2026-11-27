@@ -552,6 +552,8 @@ export default function App() {
               )}
               {activeTab === 'career' && (
                 <JobCareerPane
+                  comparisonDisabled={isRedacted}
+                  masterSummary={masterSummary}
                   activeSlug={activeSlug}
                   activeDoc={activeDoc}
                   summaries={summaries}
