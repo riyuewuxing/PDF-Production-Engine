@@ -4,9 +4,10 @@ import type {RequirementClause} from '../../lib/jobRequirements';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {AiTaskReceiptView,receivedAiTask,failedAiTask,type AiTaskReceipt} from './AiTaskReceiptView';
 import {assertAiPreviewSettings,describeAiRequest,requestByokCompletionWithReceipt,validateByokBaseUrl,type AiCompletionResult,type ByokAiSettings} from '../../lib/byokAiClient';
-import {collectJobAiEvidence,prepareJobAiReview,parseJobAiReview,JOB_AI_ASSESSMENTS,JOB_AI_MAX_CLAUSES,JOB_AI_MAX_EVIDENCE,type PreparedJobAiReview,type JobAiRow} from '../../lib/jobAiReview';
+import {collectJobAiEvidence,prepareJobAiReview,parseJobAiReview,JOB_AI_ASSESSMENTS,JOB_AI_MAX_CLAUSES,JOB_AI_MAX_EVIDENCE,jobRewriteTargets,createJobRewriteDraft,type PreparedJobAiReview,type JobAiRow,type JobRewriteDraft} from '../../lib/jobAiReview';
+import {ResumeAiAssistantPane,type AiTextReviewActions} from './ResumeAiAssistantPane';
 
-type Props={document:ResumeDocument;slug:string;source:string;clauses:readonly RequirementClause[];disabled:boolean;onReview:(clauseId:string)=>void};
+type Props={document:ResumeDocument;slug:string;source:string;clauses:readonly RequirementClause[];disabled:boolean;onReview:(clauseId:string)=>void;rewriteActions:AiTextReviewActions};
 type Basis=Pick<Props,'document'|'slug'|'source'|'clauses'>;
 type Pending={basis:Basis;settings:ByokAiSettings;prepared:PreparedJobAiReview};
 type Result={request:Pending;rows:JobAiRow[]};
@@ -24,6 +25,7 @@ export function JobAiReviewPane(props:Props){
   const [settings,setSettings]=useState<ByokAiSettings|null>(null);
   const [pending,setPending]=useState<Pending|null>(null);
   const [result,setResult]=useState<Result|null>(null);
+  const [rewrite,setRewrite]=useState<{draft:JobRewriteDraft;request:Pending}|null>(null);
   const [attempt,setAttempt]=useState<{basis:Basis;value:AiTaskReceipt}|null>(null);
   const [busy,setBusy]=useState<'load'|'send'|null>(null);
   const [error,setError]=useState('');
@@ -32,9 +34,9 @@ export function JobAiReviewPane(props:Props){
   const current=(b:Basis)=>mounted.current&&latest.current.document===b.document&&latest.current.slug===b.slug&&latest.current.source===b.source&&latest.current.clauses===b.clauses;
   const basis=():Basis=>({document,slug,source,clauses});
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;abort.current?.abort();};},[]);
-  useEffect(()=>{abort.current?.abort();setClauseIds([]);setEvidenceIds([]);setSettings(null);setPending(null);setResult(null);setAttempt(null);setError('');},[document,slug,source,clauses]);
-  const clear=()=>{setPending(null);setResult(null);setAttempt(null);setError('');};
-  const locked=!!busy||props.disabled;
+  useEffect(()=>{abort.current?.abort();setClauseIds([]);setEvidenceIds([]);setSettings(null);setPending(null);setResult(null);setAttempt(null);setRewrite(null);setError('');},[document,slug,source,clauses]);
+  const clear=()=>{setPending(null);setResult(null);setAttempt(null);setRewrite(null);setError('');};
+  const locked=!!busy||props.disabled||!!rewrite;
   const load=async()=>{
     if(active.current||props.disabled)return;
     const b=basis();active.current=true;setBusy('load');clear();setSettings(null);
@@ -72,6 +74,11 @@ export function JobAiReviewPane(props:Props){
   const choose=(id:string,checked:boolean,kind:'clause'|'evidence')=>{
     clear();const setter=kind==='clause'?setClauseIds:setEvidenceIds;
     setter(old=>checked?[...old,id]:old.filter(x=>x!==id));
+  };
+  const openRewrite=(row:JobAiRow,blockKey:string)=>{
+    if(locked||!result||!current(result.request.basis)||!result.rows.includes(row))return;
+    try{setError('');setRewrite({draft:createJobRewriteDraft(document,source,row,blockKey),request:result.request});}
+    catch(e){setError(localErrorMessage(e,'无法准备岗位定向改写'));}
   };
   if(!window.resumeDesktop?.ai)return null;
   return <details aria-label="岗位 AI 证据分析" className="space-y-2 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800">
@@ -116,7 +123,13 @@ export function JobAiReviewPane(props:Props){
         {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote><details className="rounded border p-1"><summary className="cursor-pointer">引文上下文（发送版本，节选；出现 {c.occurrences} 次）</summary><p className="whitespace-pre-wrap break-words">{c.context}</p></details>{c.caution&&<p className="text-amber-800">来源含可能的否定、角色或范围限定，请核对上下文。{c.qualifierClipped&&<span className="block whitespace-pre-wrap">{c.context}</span>}</p>}</div>)}
         {!!r.missing.length&&<div><p className="font-semibold">待补／待核实</p>{r.missing.map((m,j)=><p key={j}>· {m}</p>)}</div>}
         <button type="button" disabled={locked} onClick={()=>props.onReview(r.clause.id)} className="rounded border px-2 py-1">定位到人工核对</button>
+        {jobRewriteTargets(document,r).map(t=><button type="button" key={t.blockKey} disabled={locked} onClick={()=>openRewrite(r,t.blockKey)} className="block rounded border border-teal-300 px-2 py-1 text-teal-800">准备本段定向改写 · {t.label}</button>)}
       </article>)}
+    </section>}
+    {rewrite&&current(rewrite.request.basis)&&<section aria-label="岗位定向改写工作区" className="space-y-2 rounded border-2 border-teal-300 bg-teal-50 p-2">
+      <div className="flex items-start justify-between gap-2"><strong>岗位定向改写（尚未发送）</strong><button type="button" onClick={()=>setRewrite(null)} className="shrink-0 rounded border px-2 py-1">关闭定向改写</button></div>
+      <p>仅准备本条公告与本段正文。原模型理由、缺口与核对审批不继承；不新增事实、资质或经历。采纳后简历变化，当前岗位核对会话将失效，请先归档需要保留的人工核对。</p>
+      <ResumeAiAssistantPane {...props.rewriteActions} document={document} slug={slug} settings={rewrite.request.settings} jdText={rewrite.draft.clause.quote} jobScope={rewrite.draft} assertSettings={assertAiPreviewSettings}/>
     </section>}
   </details>;
 }

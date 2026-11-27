@@ -3,6 +3,7 @@ import type {ResumeDocument} from '../schema/resumeSchema';
 import {createAiTextSanitizer,PRIVACY_PLACEHOLDER} from './aiContext';
 import {collectLocalJobEvidence,splitJobRequirements,type LocalJobEvidence,type RequirementClause} from './jobRequirements';
 import type {ByokCompletionOptions} from './byokAiClient';
+import {collectEditableBlocks} from './resumeBlocks';
 
 export const JOB_AI_MAX_CLAUSES=8;
 export const JOB_AI_MAX_EVIDENCE=12;
@@ -99,4 +100,34 @@ export function parseJobAiReview(raw:string,prepared:PreparedJobAiReview):JobAiR
     const reviewAssessment=(row.assessment==='supported'||row.assessment==='partial')&&citations.some(c=>c.qualifierClipped)?'uncertain':row.assessment;
     return {clause:prepared.clauses[i]!,assessment:row.assessment,reviewAssessment,reason:row.reason,missing:row.missing,citations};
   });
+}
+
+/** Local-only handoff. No model reason, missing-material text, citation excerpt or internal ID
+ * becomes a new goal or an independent fact. Only the user's selected clause is JD data. */
+export const JOB_REWRITE_GOAL='针对本次岗位条款优化已有正文的相关表达。保留真实自述、原主体、角色、时间、数值单位、否定与范围限定；不得从公告推导候选人具备的新资质或经历，不补写待核实缺口。若不能安全优化，保留原文并说明。';
+export type JobRewriteDraft={blockKey:string;label:string;clause:RequirementClause;goal:typeof JOB_REWRITE_GOAL};
+export function jobRewriteTargets(document:ResumeDocument,row:JobAiRow):{blockKey:string;label:string}[]{
+  // Gap/uncertain and clipped positive references are not a route to editing a supposed qualification.
+  if(!['supported','partial'].includes(row.reviewAssessment)||!['supported','partial'].includes(row.assessment)||row.clause.priorityHint==='not-requirement')return [];
+  const blocks=collectEditableBlocks(document),evidence=collectJobAiEvidence(document),sanitize=createAiTextSanitizer([document]);
+  const targets=new Map<string,{blockKey:string;label:string}>();
+  for(const citation of row.citations){
+    if(citation.qualifierClipped||citation.quote.includes(PRIVACY_PLACEHOLDER)||citation.quote.trim().length<2||citation.evidence.kind!=='resume')continue;
+    const matches=blocks.filter(b=>'resume:'+b.key===citation.evidence.id);
+    const ev=evidence.filter(e=>e.id===citation.evidence.id);
+    if(matches.length!==1||ev.length!==1||ev[0]!.text!==citation.evidence.text||ev[0]!.label!==citation.evidence.label)continue;
+    const block=matches[0]!;
+    // Metadata-only citations (degree/title/date etc.) cannot be used to seed a body rewrite.
+    if(!sanitize(block.text).includes(citation.quote))continue;
+    targets.set(block.key,{blockKey:block.key,label:block.label});
+  }
+  return [...targets.values()];
+}
+export function createJobRewriteDraft(document:ResumeDocument,source:string,row:JobAiRow,blockKey:string):JobRewriteDraft{
+  const clause=splitJobRequirements(source).find(c=>c.id===row.clause.id);
+  if(!clause||clause.quote!==row.clause.quote||clause.start!==row.clause.start||clause.end!==row.clause.end||source.slice(clause.start,clause.end)!==clause.quote)
+    throw new Error('岗位原文已变化，不能准备旧改写。');
+  const target=jobRewriteTargets(document,row).find(t=>t.blockKey===blockKey);
+  if(!target)throw new Error('所选自述无当前可编辑正文引用，不能准备改写。');
+  return {...target,clause,goal:JOB_REWRITE_GOAL};
 }

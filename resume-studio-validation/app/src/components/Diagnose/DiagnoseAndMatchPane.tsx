@@ -672,7 +672,7 @@ export function DiagnoseAndMatchPane({
             </label>
 
             <JobNoticePdfPane jdText={jdText} origin={pdfOrigin} onConfirm={setJdText}/>
-            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} pdfOrigin={pdfOrigin} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision}/>
+            <JobRequirementsPane document={document} slug={activeSlug} jdText={jdText} pdfOrigin={pdfOrigin} onJdTextChange={setJdText} onFlush={onFlushBeforeApply} getRevision={getCurrentRevision} rewriteActions={{overflowPx,onFlushBeforeApply,getCurrentRevision,onImmediateChange}}/>
             {jdResult.totalKeywords > 0 ? (
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex items-center justify-between">

@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {JobAiReviewPane} from './JobAiReviewPane';
+import type {AiTextReviewActions} from './ResumeAiAssistantPane';
 import {resumeRevision,type ResumeDocument} from '../../schema/resumeSchema';
 import {ApplicationsStoreSchema,JobReviewArchiveSchema,MAX_JOB_REVIEW_ARCHIVES,type JobReviewArchive} from '../../schema/applicationSchema';
 import {jobPdfPageForRange,sameJobPdfOrigin,type JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
@@ -12,9 +13,9 @@ import {splitJobRequirements,collectLocalJobEvidence,evidenceKeywordHints,blankR
 const priorityLabel:Record<RequirementPriority,string>={unknown:'待判定',mandatory:'硬条件',preferred:'优先条件','not-requirement':'非招聘条件'};
 const outcomeLabel:Record<RequirementOutcome,string>={unchecked:'待核对',supported:'本人核对：已有自述依据',gap:'本人标记：存在缺口'};
 function historicalClauses(a:JobReviewArchive){try{return new Map(splitJobRequirements(a.source).map(c=>[c.id,c]));}catch{return new Map<string,RequirementClause>();}}
-type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string};
+type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string;rewriteActions:AiTextReviewActions};
 type Session={source:string;pdfOrigin?:JobPdfOrigin;doc:ResumeDocument;slug:string;clauses:RequirementClause[]};
-export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision}:Props){
+export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision,rewriteActions}:Props){
   const desktop=isDesktopMode();
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const [applicationId,setApplicationId]=useState('');
@@ -199,7 +200,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       </div>})}
     </div>}
     {current&&<>
-      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>
+      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} rewriteActions={rewriteActions} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>
       <div className="flex flex-wrap gap-2 text-slate-700"><span>候选 {session.clauses.length} 条</span><span>已记录 {totals.length} 条</span><span>本人标记硬条件 {totals.filter(r=>r.priority==='mandatory').length}</span><span>自述支持 {totals.filter(r=>r.outcome==='supported').length}</span><span>缺口 {totals.filter(r=>r.outcome==='gap').length}</span></div>
       <button type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1">加载 / 刷新岗位事实依据</button>
       <div className="text-slate-600">{bank?'本地事实版本已读取：'+checkedAt:'尚未加载独立事实库，仅显示简历自述。'} 事实库变化后请刷新；保存核对结果时再次校验已加载的版本。</div>

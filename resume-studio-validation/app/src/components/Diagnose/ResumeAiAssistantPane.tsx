@@ -17,20 +17,22 @@ import {FactBankPane} from './FactBankPane';
 import {renderAiComparison,type AiPdfComparison} from '../../lib/aiPdfComparison';
 import {AiPdfComparisonView} from './AiPdfComparisonView';
 import {WORKFLOW_ACTIONS,createWorkflowSession,isWorkflowCurrent,workflowDocumentContent,workflowStepGoal,beginWorkflowStep,finishWorkflowStep,completeWorkflow,type WorkflowSession} from '../../lib/aiWorkflow';
-type Props={document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void;assertSettings:(settings:ByokAiSettings)=>void};
-type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string;records:FactRecord[];bankRevision:string|null};
+import type {JobRewriteDraft} from '../../lib/jobAiReview';
+export type AiTextReviewActions={overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void};
+type Props=AiTextReviewActions&{document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;assertSettings:(settings:ByokAiSettings)=>void;jobScope?:JobRewriteDraft};
+type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string;records:FactRecord[];bankRevision:string|null;jobScope?:JobRewriteDraft};
 type Pending={basis:Basis;prepared:PreparedAssistantTask};
 type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>};
 export function ResumeAiAssistantPane(props:Props){
   const blocks=useMemo(()=>collectEditableBlocks(props.document),[props.document]);
-  const [mode,setMode]=useState<AssistantMode>('ask');
+  const [mode,setMode]=useState<AssistantMode>(props.jobScope?'co-create':'ask');
   const [workflow,setWorkflow]=useState<WorkflowSession|null>(null);
   const [workflowBusy,setWorkflowBusy]=useState(false);
   const workflowMoveRef=useRef(false);
   const workflowRef=useRef<WorkflowSession|null>(null);workflowRef.current=workflow;
-  const [goal,setGoal]=useState('');
-  const [keys,setKeys]=useState<string[]>(()=>blocks.slice(0,1).map(b=>b.key));
-  const [includeJd,setIncludeJd]=useState(false);
+  const [goal,setGoal]=useState(props.jobScope?.goal??'');
+  const [keys,setKeys]=useState<string[]>(()=>props.jobScope?[props.jobScope.blockKey]:blocks.slice(0,1).map(b=>b.key));
+  const [includeJd,setIncludeJd]=useState(!!props.jobScope);
   const [bank,setBank]=useState<FactBank|null>(null);
   const [factIds,setFactIds]=useState<string[]>([]);
   const [factsBusy,setFactsBusy]=useState(false);
@@ -56,9 +58,13 @@ export function ResumeAiAssistantPane(props:Props){
   useEffect(()=>{setFactIds(prev=>prev.filter(id=>bank?.records.some(r=>r.id===id&&keys.includes(r.blockKey)&&isShareableFact(props.document,r))));},[bank,keys,props.document]);
   const isCurrent=(b:Basis)=>{
     const c=current.current;
-    return mounted.current&&c.props.document===b.document&&c.props.slug===b.slug&&c.props.settings===b.settings&&c.mode===b.mode&&c.goal===b.goal&&JSON.stringify(c.keys)===JSON.stringify(b.keys)&&(c.includeJd?c.props.jdText:undefined)===b.jdText&&c.props.overflowPx===b.overflowPx&&JSON.stringify(c.factIds)===JSON.stringify(b.records.map(r=>r.id))&&(!b.records.length||c.bank?.revision===b.bankRevision);
+    return mounted.current&&c.props.document===b.document&&c.props.slug===b.slug&&c.props.settings===b.settings&&c.props.jobScope===b.jobScope&&c.mode===b.mode&&c.goal===b.goal&&JSON.stringify(c.keys)===JSON.stringify(b.keys)&&(c.includeJd?c.props.jdText:undefined)===b.jdText&&c.props.overflowPx===b.overflowPx&&JSON.stringify(c.factIds)===JSON.stringify(b.records.map(r=>r.id))&&(!b.records.length||c.bank?.revision===b.bankRevision);
   };
   const assertFactsFresh=async(b:Basis)=>{
+    if(b.jobScope){
+      if(JSON.stringify(await apiClient.getAiSettings())!==JSON.stringify(b.settings))throw new Error('岗位定向改写的已保存模型档案已变化，请重新分析并准备。');
+      if(!isCurrent(b))throw new Error('岗位条款或目标正文已变化。');
+    }
     if(!b.records.length)return;
     await assertFreshFactSelection(b.document,{records:b.records,binding:b.bankRevision?{slug:b.slug,docId:b.document.id,bankRevision:b.bankRevision,ids:b.records.map(r=>r.id),selectedKeys:b.keys}:undefined},loadLocalFactBank);
     if(!isCurrent(b))throw new Error('事实选择或简历已变化。');
@@ -69,7 +75,7 @@ export function ResumeAiAssistantPane(props:Props){
     if(pending&&!isCurrent(pending.basis))setPending(null);
     if(attempt&&!isCurrent(attempt.basis))setAttempt(null);
     if(result&&!isCurrent(result.request.basis)){setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);renderAbort.current?.abort();}
-  },[props.document,props.slug,props.settings,props.jdText,props.overflowPx,mode,goal,keys,includeJd,bank,factIds]);
+  },[props.document,props.slug,props.settings,props.jdText,props.overflowPx,props.jobScope,mode,goal,keys,includeJd,bank,factIds]);
   const workflowCurrent=workflow?isWorkflowCurrent(workflow,props.document,props.slug,props.settings,props.jdText):false;
   const canPrepare=(!workflow||workflow.stage==='active')&&(!workflow||workflowCurrent);
   const moveWorkflow=async()=>{
@@ -100,9 +106,11 @@ export function ResumeAiAssistantPane(props:Props){
     if(busy||applying||factsBusy||workflowBusy||!canPrepare)return;reset();
     try{
       props.assertSettings(props.settings);
+      const scope=props.jobScope;
+      if(scope&&(mode!=='co-create'||goal!==scope.goal||keys.length!==1||keys[0]!==scope.blockKey||!includeJd||props.jdText!==scope.clause.quote||factIds.length))throw new Error('岗位定向改写范围已变化，请重新准备。');
       const selection=prepareFactSelection(props.document,props.slug,keys,bank,factIds);
       const records=selection.records;
-      const basis:Basis={document:props.document,slug:props.slug,settings:props.settings,mode,goal,keys:[...keys],jdText:includeJd?props.jdText:undefined,overflowPx:props.overflowPx,requestId:crypto.randomUUID(),records,bankRevision:bank?.revision??null};
+      const basis:Basis={document:props.document,slug:props.slug,settings:props.settings,mode,goal,keys:[...keys],jdText:includeJd?props.jdText:undefined,overflowPx:props.overflowPx,requestId:crypto.randomUUID(),records,bankRevision:bank?.revision??null,jobScope:scope};
       const prepared=prepareAssistantTask(basis);
       if(selection.binding)prepared.options.factBinding=selection.binding;
       assertAiPreviewSettings(props.settings,prepared.options);setPending({basis,prepared});
@@ -190,6 +198,7 @@ export function ResumeAiAssistantPane(props:Props){
   return <section aria-label="简历 AI 自由任务" className="space-y-3 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800">
     <div className="flex items-center gap-1.5 font-bold text-teal-900"><Sparkles size={14}/>AI 协作任务 · {AI_SKILL_VERSION}</div>
     <p>从实际可见段落、事实来源和当前排版测量构建上下文。模型没有磁盘写入权限。问答和计划永远不修改简历。</p>
+    {props.jobScope?<div aria-label="岗位定向改写范围" className="space-y-1 rounded border border-teal-200 bg-teal-50 p-2"><strong>仅一个正文段落 · {props.jobScope.label}</strong><p className="whitespace-pre-wrap">第 {props.jobScope.clause.line} 行 · {props.jobScope.clause.quote}</p><p>{props.jobScope.goal}</p><p className="text-slate-600">仅本条 JD 与本段自述，不外发其他条款、独立事实库或其他段落。先预览，另行确认发送；后续仍需核对事实与真实 PDF。</p></div>:<>
     <div className="grid grid-cols-2 gap-1">{Object.entries(ASSISTANT_MODES).map(([id,label])=><button key={id} type="button" disabled={taskControlsLocked} onClick={()=>{setMode(id as AssistantMode);setFactIds([]);reset();}} className={'rounded border px-1.5 py-1.5 '+(mode===id?'border-teal-700 bg-teal-700 text-white':'bg-slate-50 text-slate-700')}>{label}</button>)}</div>
     <label className="block font-semibold">任务目标<textarea aria-label="AI 自由任务目标" rows={3} disabled={taskControlsLocked} value={goal} onChange={e=>{setGoal(e.target.value);setFactIds([]);reset();}} className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" placeholder="例如：保留科研事实，精简冗余语言；检查教师岗位表达是否明确。"/></label>
     <div className="rounded border border-slate-200 bg-slate-50 p-2 space-y-1">
@@ -197,6 +206,7 @@ export function ResumeAiAssistantPane(props:Props){
       <div className="max-h-36 overflow-auto space-y-1">{blocks.map(b=><label key={b.key} className="flex items-start gap-1"><input type="checkbox" disabled={taskControlsLocked} checked={keys.includes(b.key)} onChange={e=>{setKeys(prev=>e.target.checked?[...prev,b.key]:prev.filter(k=>k!==b.key));reset();}}/><span>{b.label}</span></label>)}</div>
       <label className="flex items-center gap-1"><input type="checkbox" disabled={taskControlsLocked} checked={includeJd} onChange={e=>{setIncludeJd(e.target.checked);setFactIds([]);reset();}}/>同时发送当前岗位 JD（默认关闭）</label>
     </div>
+    </>}
     {workflow&&<section aria-label="受控分步工作" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2">
       <div className="font-bold">受控分步工作 · {workflow.index}/{workflow.steps.length} 步已处理</div>
       <p>每一步重新读取本地简历，事实需重新选择，发送、正文核对与 PDF 审批均单独确认。模型不会自动进入下一步。</p>
@@ -212,7 +222,7 @@ export function ResumeAiAssistantPane(props:Props){
         <button type="button" disabled={locked} onClick={()=>{setWorkflow(null);setFactIds([]);setMode('ask');setGoal(workflow.originalGoal);reset();}} className="rounded border px-2 py-1">{workflow.stage==='done'?'关闭分步记录':'结束本次分步工作'}</button>
       </div>
     </section>}
-    <FactBankPane key={props.slug+':'+props.document.id} document={props.document} slug={props.slug} blocks={blocks} keys={keys} bank={bank} selected={factIds} locked={locked} onBank={b=>{setBank(b);setFactIds([]);reset();}} onSelected={ids=>{setFactIds(ids);reset();}} onBusy={setFactsBusy} onFlush={props.onFlushBeforeApply} getRevision={props.getCurrentRevision}/>
+    {!props.jobScope&&<FactBankPane key={props.slug+':'+props.document.id} document={props.document} slug={props.slug} blocks={blocks} keys={keys} bank={bank} selected={factIds} locked={locked} onBank={b=>{setBank(b);setFactIds([]);reset();}} onSelected={ids=>{setFactIds(ids);reset();}} onBusy={setFactsBusy} onFlush={props.onFlushBeforeApply} getRevision={props.getCurrentRevision}/>}
     <details className="rounded border border-slate-200 p-2"><summary className="cursor-pointer font-semibold"><BookOpen size={12} className="inline"/> 本地工具权限说明</summary>{AI_TOOL_CATALOG.map(tool=><div key={tool.name} className="mt-1"><span className="font-mono text-teal-800">{tool.name}</span> · {tool.description}</div>)}</details>
     <button type="button" disabled={locked||!goal.trim()||!canPrepare} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">预览 AI 自由任务</button>
     {busy&&<div className="flex items-center justify-between"><span>正在运行模型任务…</span><button type="button" onClick={()=>abortRef.current?.abort()} className="rounded border px-2 py-1">取消自由任务</button></div>}
