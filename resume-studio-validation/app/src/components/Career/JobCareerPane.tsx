@@ -462,7 +462,9 @@ export function JobCareerPane({
         {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时隐藏队列关联投递，禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
         {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
         {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"><span className="text-[10px] text-slate-600">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40">刷新磁盘台账</button></div>}
-        {loading ? (
+        {/* Preserve a previously loaded queue session while refreshing the ledger.
+            Its own guards block new reads/writes; other tabs retain the old loading behavior. */}
+        {loading&&!(ledger.ready&&subTab==='queue') ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 size={16} className="mr-2 animate-spin" /> {ledger.error&&!ledger.loading?'台账尚未成功读取，请先重载。':'正在加载本地求职数据…'}
           </div>

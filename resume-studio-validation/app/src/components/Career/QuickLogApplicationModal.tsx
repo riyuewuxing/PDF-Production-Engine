@@ -52,6 +52,8 @@ export function QuickLogApplicationModal({
   const [saving, setSaving] = useState(false);
   const requestId=useRef<string|null>(null);
   const submitting=useRef(false);
+  const refreshingRef=useRef(false);
+  const [refreshing,setRefreshing]=useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,11 +69,24 @@ export function QuickLogApplicationModal({
     setErrorMsg(null);
   }, [defaultJdText, isOpen, snapshot,queueTask,queueRequestId]);
 
+  const refreshQueueLedger=async()=>{
+    if(!queueTask||submitting.current||refreshingRef.current)return;
+    refreshingRef.current=true;setRefreshing(true);
+    let watchdog:ReturnType<typeof setTimeout>|undefined;
+    try{
+      watchdog=setTimeout(()=>setErrorMsg('读取台账超过10秒，仍未确认；请勿重复提交。'),10000);
+      await careerLedger.load();
+      const now=careerLedger.getSnapshot();
+      if(!now.ready||now.loading||now.saving||now.dirty||now.error||!now.data.revision)throw Error('台账读取尚未确认，未继续归档。');
+      setErrorMsg('已刷新磁盘台账，请核验后重试同一请求。');
+    }catch(e){setErrorMsg(localErrorMessage(e,'刷新失败'));}
+    finally{if(watchdog!==undefined)clearTimeout(watchdog);refreshingRef.current=false;setRefreshing(false);}
+  };
   if (!isOpen || !snapshot) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(submitting.current)return;
+    if(submitting.current||refreshingRef.current)return;
     if (!company.trim()) {
       setErrorMsg('请填写投递单位或学校名称。');
       return;
@@ -135,7 +150,7 @@ export function QuickLogApplicationModal({
           </div>
           <button
             type="button"
-            onClick={onClose} disabled={saving}
+            onClick={onClose} disabled={saving||refreshing}
             aria-label="关闭记入投递弹窗"
             className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
           >
@@ -159,7 +174,7 @@ export function QuickLogApplicationModal({
         {errorMsg && (
           <div className="rounded border border-red-500/40 bg-red-950/60 px-3 py-2 text-[11px] text-red-200">
             {errorMsg}
-            {queueTask&&<button type="button" disabled={saving} className="ml-2 rounded border px-2 py-1" onClick={()=>void careerLedger.load().then(()=>setErrorMsg('已刷新磁盘台账，请核验后重试同一请求。')).catch(e=>setErrorMsg(localErrorMessage(e,'刷新失败')))}>刷新岗位归档台账</button>}
+            {queueTask&&<button type="button" disabled={saving||refreshing} className="ml-2 rounded border px-2 py-1" onClick={()=>void refreshQueueLedger()}>{refreshing?'读取台账中…':'刷新岗位归档台账'}</button>}
           </div>
         )}
 
@@ -251,14 +266,14 @@ export function QuickLogApplicationModal({
         <div className="flex items-center justify-end gap-2 pt-1">
           <button
             type="button"
-            onClick={onClose} disabled={saving}
+            onClick={onClose} disabled={saving||refreshing}
             className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800"
           >
             取消
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving||refreshing}
             className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-4 py-1.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <BookmarkCheck size={13} />}

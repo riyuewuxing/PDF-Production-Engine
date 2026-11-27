@@ -90,7 +90,10 @@ async function run(){
    const altered=Buffer.from(pdf.bytes);altered[altered.length-10]^=1;fs.writeFileSync(pdf.file,altered);
    await click('确认记入并锁定快照');await until('changed receipt rejected',()=>has('PDF 已变更、缺失或无法核验'));
    assert(sha(ledgerBytes())===beforeCancel&&await currentModal(),'changed PDF archived');
+   await capture('05b-rejected-tampered-pdf','[role="dialog"]');
    fs.writeFileSync(pdf.file,pdf.bytes);await click('刷新岗位归档台账');await until('refresh ack',()=>has('已刷新磁盘台账'));
+   assert(await currentModal()&&await has(pdf.sha256)&&await has(companies[0])&&sha(ledgerBytes())===beforeCancel,'refresh lost frozen archive context or wrote');
+   await capture('05c-refresh-preserved-dialog','[role="dialog"]');
    await click('确认记入并锁定快照');await until('archive ack',async()=>!await currentModal()&&(await ledger()).applications.some(e=>e.queueTaskId===a.id));
    let current=await ledger(),entry=current.applications.find(e=>e.queueTaskId===a.id),snap=await store.getApplicationSnapshot(entry.snapshotId);
    assert(entry.company===companies[0]&&entry.role===role&&entry.jdText===jd&&entry.status==='wishlist'&&entry.appliedDate===''&&entry.atsScore===null&&entry.pdfReceipt.sha256===pdf.sha256&&snap.meta.queueTaskId===a.id&&sha(Buffer.from(canonical(snap.document)))===a.documentSha256,'incorrect scoped snapshot or receipt');
