@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {requestByokCompletionDirect,type ByokAiSettings} from './byokAiClient';
+import {requestByokCompletionDirect,supportsDeepSeekThinking,connectionProbeOptions,DEFAULT_BYOK_SETTINGS,type ByokAiSettings} from './byokAiClient';
 const settings:ByokAiSettings={enabled:true,providerLabel:'Mock',baseUrl:'https://example.invalid/v1',apiKey:'synthetic-test-key',model:'mock',contextBudgetChars:1000,maxOutputTokens:128,timeoutMs:1000};
 const options={settings,systemPrompt:'system',userPrompt:'synthetic payload',maxTokens:300};
 afterEach(()=>vi.unstubAllGlobals());
@@ -41,4 +41,34 @@ describe('bounded compatible provider gateway',()=>{
     vi.stubGlobal('fetch',vi.fn((_url:string,init:RequestInit)=>new Promise<Response>((_resolve,reject)=>{init.signal?.addEventListener('abort',()=>reject(new Error('aborted')),{once:true});})));
     await expect(requestByokCompletionDirect(options)).rejects.toMatchObject({code:'TIMEOUT'});
   },3000);
+});
+
+describe('official DeepSeek explicit thinking compatibility',()=>{
+  const deep={...settings,baseUrl:'https://api.deepseek.com/v1',model:'deepseek-flash'};
+  it('uses the current default for new profiles without modifying provider-default requests',async()=>{
+    expect(DEFAULT_BYOK_SETTINGS.model).toBe('deepseek-flash');expect(DEFAULT_BYOK_SETTINGS.deepseekThinking).toBe('disabled');
+    const f=vi.fn(async(_url:string,_init:RequestInit)=>new Response(JSON.stringify({choices:[{message:{content:'OK'},finish_reason:'stop'}]})));
+    vi.stubGlobal('fetch',f);
+    await requestByokCompletionDirect({...options,settings:deep});
+    expect(JSON.parse(String(f.mock.calls[0]![1].body))).not.toHaveProperty('thinking');
+    await requestByokCompletionDirect({...options,settings:{...deep,deepseekThinking:'disabled'}});
+    expect(JSON.parse(String(f.mock.calls[1]![1].body))).toMatchObject({model:'deepseek-flash',thinking:{type:'disabled'}});
+    await requestByokCompletionDirect({...options,settings:{...deep,model:'deepseek-v4-pro',deepseekThinking:'enabled'}});
+    expect(JSON.parse(String(f.mock.calls[2]![1].body))).toMatchObject({model:'deepseek-v4-pro',thinking:{type:'enabled'}});
+  });
+  it('never sends the vendor-specific parameter to an arbitrary compatible URL or unsupported model',async()=>{
+    const f=vi.fn();vi.stubGlobal('fetch',f);
+    for(const changed of [{baseUrl:'https://api.deepseek.com.example.invalid/v1'},{baseUrl:'https://api.deepseek.com/beta'},{baseUrl:'https://api.deepseek.com:444/v1'},{model:'deepseek-chat'}]){
+      const next={...deep,...changed,deepseekThinking:'disabled' as const};
+      expect(supportsDeepSeekThinking(next.baseUrl,next.model)).toBe(false);
+      await expect(requestByokCompletionDirect({...options,settings:next})).rejects.toThrow('思考配置');
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+  it('keeps probes synthetic and selects bounded budget according to the saved mode',()=>{
+    expect(connectionProbeOptions({...deep,deepseekThinking:'disabled'}).maxTokens).toBe(64);
+    expect(connectionProbeOptions({...deep,deepseekThinking:'enabled'}).maxTokens).toBe(1024);
+    expect(connectionProbeOptions(deep).maxTokens).toBe(1024);
+    expect(connectionProbeOptions(settings).maxTokens).toBe(64);
+  });
 });

@@ -606,7 +606,7 @@ async function run() {
   await setValue('input[aria-label="模型档案名称"]','第二合成模型');
   await setValue('input[placeholder="OpenAI 兼容 Base URL"]','http://127.0.0.1:'+server.address().port+'/second');
   await setValue('input[type=password]','synthetic-second-key');
-  await setValue('input[placeholder="模型名（如 deepseek-chat）"]','second-model');
+  await setValue('input[aria-label="模型名"]','second-model');
   await js('(()=>{const label=[...document.querySelectorAll("label")].find(e=>e.innerText.includes("启用 AI 原地润色接口"));const b=label?.querySelector("input");if(b&&!b.checked)b.click();return !!b})()');
   await click('保存本地配置');
   await until('profile saved',()=>bodyHas('配置已保存；密钥由系统加密保护'));

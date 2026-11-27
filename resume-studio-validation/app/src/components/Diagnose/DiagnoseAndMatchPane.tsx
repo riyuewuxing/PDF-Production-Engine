@@ -28,6 +28,7 @@ import { apiClient } from '../../lib/apiClient';
 import { type AtsInspectionResult, runLiveAtsInspection } from '../../lib/atsInspector';
 import {
   BYOK_PROVIDER_PRESETS,
+  supportsDeepSeekThinking, aiThinkingLabel, connectionProbeOptions,
   type ByokAiSettings,
   type AiProfileCatalog,
   assertAiPreviewSettings,
@@ -306,7 +307,7 @@ export function DiagnoseAndMatchPane({
     let ctrl:AbortController|undefined;
     const settings=aiSettings;
     try{
-      const options:ByokCompletionOptions={systemPrompt:'Connectivity probe. Reply only OK.',userPrompt:JSON.stringify({task:'connection-probe',message:'synthetic data only'}),temperature:0,maxTokens:64,timeoutMs:25000};
+      const options=connectionProbeOptions(settings);
       assertPreviewSettings(settings,options);
       ctrl=new AbortController();testAbort.current=ctrl;setTestingConnection(true);
       const result=await requestByokCompletion({...options,settings,signal:ctrl.signal});
@@ -906,6 +907,7 @@ export function DiagnoseAndMatchPane({
                             providerLabel: p.label,
                             baseUrl: p.baseUrl,
                             model: p.defaultModel,
+                            deepseekThinking: p.deepseekThinking,
                             apiKey: '',
                             hasApiKey: prev.baseUrl === p.baseUrl && prev.hasApiKey,
                             clearApiKey: false,
@@ -922,7 +924,7 @@ export function DiagnoseAndMatchPane({
                     type="text"
                     data-native-undo="true"
                     value={aiSettings.baseUrl}
-                    onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value, apiKey: '', hasApiKey: false, clearApiKey: false }))}
+                    onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value, deepseekThinking:undefined, apiKey: '', hasApiKey: false, clearApiKey: false }))}
                     placeholder="OpenAI 兼容 Base URL"
                     className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                   />
@@ -939,11 +941,17 @@ export function DiagnoseAndMatchPane({
                       type="text"
                       data-native-undo="true"
                       value={aiSettings.model}
-                      onChange={(e) => setAiSettings((prev) => ({ ...prev, model: e.target.value }))}
-                      placeholder="模型名（如 deepseek-chat）"
+                      onChange={(e) => setAiSettings((prev) => ({ ...prev, model: e.target.value, deepseekThinking:supportsDeepSeekThinking(prev.baseUrl,e.target.value)?prev.deepseekThinking:undefined }))}
+                      aria-label="模型名"
+                      placeholder="模型名（如 deepseek-flash）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                     />
                   </div>
+                  {supportsDeepSeekThinking(aiSettings.baseUrl,aiSettings.model)&&<div className="space-y-1 rounded border border-slate-200 bg-white p-2">
+                    <label className="block text-[11px] font-semibold">DeepSeek 思考模式<select aria-label="DeepSeek 思考模式" value={aiSettings.deepseekThinking??'provider-default'} onChange={e=>setAiSettings(p=>({...p,deepseekThinking:e.target.value as ByokAiSettings['deepseekThinking']}))} className="mt-1 w-full rounded border p-1"><option value="disabled">关闭思考 · 短任务优先</option><option value="enabled">开启思考 · 可能更慢</option><option value="provider-default">服务商默认 · 不额外发送参数</option></select></label>
+                    <p className="text-[10px] text-slate-500">思考与正文共用输出预算；连接测试只发送固定合成文本（显式关闭时64 tokens，其余最多1024且不超过档案上限）。已有档案不会自动换模型。</p>
+                  </div>}
+                  {/^deepseek-(chat|reasoner)$/.test(aiSettings.model.trim())&&/^(https:\/\/api\.deepseek\.com)(\/v1)?\/?$/.test(aiSettings.baseUrl.trim())&&<p className="rounded bg-amber-50 p-2 text-[11px] text-amber-900">旧模型名称已不在当前官方推荐列表。可按需手动改为 deepseek-flash 或 deepseek-v4-pro 后保存；不会自动修改现有档案。</p>}
                   {aiSettings.hasApiKey && (
                     <label className="flex items-center gap-2 text-[11px] text-slate-600">
                       <input type="checkbox" checked={Boolean(aiSettings.clearApiKey)}
@@ -1010,7 +1018,7 @@ export function DiagnoseAndMatchPane({
               <section aria-label="AI 数据发送预览" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] text-slate-800">
                 <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>
                 <p>接收方：{validateByokBaseUrl(pendingRequest.settings.baseUrl).baseUrl}/chat/completions</p>
-                <p>模型：{pendingRequest.settings.model} · 档案：{pendingRequest.settings.providerLabel}</p>
+                <p>模型：{pendingRequest.settings.model} · 档案：{pendingRequest.settings.providerLabel} · {aiThinkingLabel(pendingRequest.settings)}</p>
                  <p>本地上限：{resolveAiLimits(pendingRequest.settings).maxOutputTokens} 输出 tokens；{resolveAiLimits(pendingRequest.settings).timeoutMs/1000} 秒</p>
                 <p>下方是本次实际发送的消息内容。基本联系方式、照片和已识别的隐私内容已尽量省略；仍请检查可见经历或 JD 中是否有其他敏感信息。密钥不在预览中。</p>
                 {pendingRequest.basis.selection.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 bg-white p-2 space-y-1"><div className="font-semibold">本次明确外发 {pendingRequest.basis.selection.records.length} 条本人确认事实（证据位置不外发）</div>{Object.values(pendingRequest.mode==='single'?pendingRequest.basis.sourceMap:pendingRequest.prepared.sourceMap).flat().filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1"><span className="text-teal-800">{s.id} · 本人确认</span><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}

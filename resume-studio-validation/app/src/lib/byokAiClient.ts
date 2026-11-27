@@ -1,4 +1,5 @@
 import type {FactRequestBinding} from '../schema/factBankSchema';
+export type DeepSeekThinking = 'provider-default' | 'disabled' | 'enabled';
 export interface ByokAiSettings {
   enabled: boolean;
   providerLabel: string;
@@ -13,6 +14,8 @@ export interface ByokAiSettings {
   contextBudgetChars?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;
+  /** Explicit per-profile option, only supported by current official DeepSeek models. */
+  deepseekThinking?: DeepSeekThinking;
 }
 
 export interface AiProfileCatalog { activeProfileId:string; profiles:ByokAiSettings[] }
@@ -22,7 +25,8 @@ export const DEFAULT_BYOK_SETTINGS: ByokAiSettings = {
   providerLabel: 'DeepSeek (OpenAI 兼容)',
   baseUrl: 'https://api.deepseek.com/v1',
   apiKey: '',
-  model: 'deepseek-chat',
+  model: 'deepseek-flash',
+  deepseekThinking: 'disabled',
   ...DEFAULT_AI_LIMITS,
 };
 
@@ -31,12 +35,14 @@ export const BYOK_PROVIDER_PRESETS: Array<{
   baseUrl: string;
   defaultModel: string;
   requiresKey: boolean;
+  deepseekThinking?: DeepSeekThinking;
 }> = [
   {
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
+    defaultModel: 'deepseek-flash',
     requiresKey: true,
+    deepseekThinking: 'disabled',
   },
   {
     label: '智谱 GLM',
@@ -121,6 +127,28 @@ export function validateByokBaseUrl(raw: string): { baseUrl: string; isLoopback:
   return { baseUrl: url.toString().replace(/\/+$/, ''), isLoopback };
 }
 
+/** Do not send vendor-specific options to custom gateways, similar hostnames, or other models. */
+export function supportsDeepSeekThinking(baseUrl:string,model:string):boolean {
+  try {
+    const base=validateByokBaseUrl(baseUrl).baseUrl;
+    return (base==='https://api.deepseek.com'||base==='https://api.deepseek.com/v1') && ['deepseek-flash','deepseek-v4-pro'].includes(model.trim());
+  } catch { return false; }
+}
+export function resolveDeepSeekThinking(settings:Pick<ByokAiSettings,'baseUrl'|'model'|'deepseekThinking'>): 'enabled'|'disabled'|undefined {
+  const mode=settings.deepseekThinking;
+  if(mode===undefined||mode==='provider-default')return undefined;
+  if((mode!=='enabled'&&mode!=='disabled')||!supportsDeepSeekThinking(settings.baseUrl,settings.model))throw new Error('该模型或接口不支持所选 DeepSeek 思考配置；请选择服务商默认。');
+  return mode;
+}
+export function aiThinkingLabel(settings:ByokAiSettings):string {
+  const mode=resolveDeepSeekThinking(settings);
+  return mode==='disabled'?'关闭思考（显式）':mode==='enabled'?'开启思考（显式）':'服务商默认';
+}
+export function connectionProbeOptions(settings:ByokAiSettings):ByokCompletionOptions {
+  const budget=supportsDeepSeekThinking(settings.baseUrl,settings.model)&&resolveDeepSeekThinking(settings)!=='disabled'?1024:64;
+  return {systemPrompt:'Connectivity probe. Reply only OK.',userPrompt:JSON.stringify({task:'connection-probe',message:'synthetic data only'}),temperature:0,maxTokens:budget,timeoutMs:25000};
+}
+
 export async function requestByokCompletion(params: ByokCompletionOptions & {
   settings: ByokAiSettings;
   signal?: AbortSignal;
@@ -157,6 +185,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
 }): Promise<string> {
   const { settings, systemPrompt, userPrompt, temperature = 0.35, maxTokens, timeoutMs = 45000, signal } = params;
   const limits=resolveAiLimits(settings);
+  const thinking=resolveDeepSeekThinking(settings);
   if(systemPrompt.length+userPrompt.length>limits.contextBudgetChars)throw new Error('发送内容超出此模型配置的字符预算；请缩小范围后重新确认。');
   const outputBudget=Math.min(maxTokens??limits.maxOutputTokens,limits.maxOutputTokens);
   const deadlineMs=Math.min(timeoutMs,limits.timeoutMs);
@@ -195,6 +224,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
       ],
     };
     bodyPayload.max_tokens=outputBudget;
+    if(thinking!==undefined)bodyPayload.thinking={type:thinking};
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -252,6 +282,7 @@ async function readBoundedJson(response:Response):Promise<unknown>{
 export function assertAiPreviewSettings(settings:ByokAiSettings,options?:ByokCompletionOptions){
   if(!settings.enabled)throw new Error('请先启用并保存模型配置。');
   const {isLoopback}=validateByokBaseUrl(settings.baseUrl);
+  resolveDeepSeekThinking(settings);
   if(!settings.model.trim())throw new Error('缺少模型名。');
   if(typeof window!=='undefined'&&window.resumeDesktop){
     if(settings.apiKey||settings.clearApiKey||!settings.profileId||!settings.revision)throw new Error('请先保存或重新读取模型配置。');

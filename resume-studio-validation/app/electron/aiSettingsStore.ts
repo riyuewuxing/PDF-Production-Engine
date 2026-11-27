@@ -1,10 +1,10 @@
 import {promises as fs} from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {DEFAULT_BYOK_SETTINGS,resolveAiLimits,validateByokBaseUrl,type ByokAiSettings,type AiProfileCatalog} from '../src/lib/byokAiClient';
+import {DEFAULT_BYOK_SETTINGS,resolveAiLimits,resolveDeepSeekThinking,validateByokBaseUrl,type ByokAiSettings,type AiProfileCatalog} from '../src/lib/byokAiClient';
 
 export interface CredentialCodec {available:()=>boolean;encrypt:(text:string)=>Buffer;decrypt:(bytes:Buffer)=>string}
-type Meta=Pick<ByokAiSettings,'enabled'|'providerLabel'|'baseUrl'|'model'|'contextBudgetChars'|'maxOutputTokens'|'timeoutMs'>;
+type Meta=Pick<ByokAiSettings,'enabled'|'providerLabel'|'baseUrl'|'model'|'contextBudgetChars'|'maxOutputTokens'|'timeoutMs'|'deepseekThinking'>;
 type StoredProfile=Meta&{profileId:string;revision:string;encryptedApiKey?:string};
 type Catalog={schemaVersion:2;activeProfileId:string;profiles:StoredProfile[]};
 const DEFAULT_ID='default';
@@ -19,7 +19,10 @@ function metadataFrom(raw:Record<string,unknown>):Meta{
   if(model.length>200||providerLabel.length>200||baseUrl.length>2048)throw new Error('AI 配置字段过长。');
   const num=(k:string)=>{const v=raw[k];if(v!==undefined&&typeof v!=='number')throw new Error('AI 请求预算配置不合法。');return v as number|undefined;};
   const limits=resolveAiLimits({enabled:false,providerLabel,baseUrl,model,apiKey:'',contextBudgetChars:num('contextBudgetChars'),maxOutputTokens:num('maxOutputTokens'),timeoutMs:num('timeoutMs')});
-  return {enabled:raw.enabled===true,model,providerLabel,baseUrl,...limits};
+  const thinking=raw.deepseekThinking;
+  if(thinking!==undefined&&thinking!=='provider-default'&&thinking!=='disabled'&&thinking!=='enabled')throw new Error('DeepSeek 思考配置不合法。');
+  resolveDeepSeekThinking({baseUrl,model,deepseekThinking:thinking});
+  return {enabled:raw.enabled===true,model,providerLabel,baseUrl,...limits,...(thinking!==undefined?{deepseekThinking:thinking}:{})};
 }
 function defaultProfile():StoredProfile{return {...metadataFrom(DEFAULT_BYOK_SETTINGS as unknown as Record<string,unknown>),profileId:DEFAULT_ID,revision:'initial-default'};}
 function parseStored(raw:unknown):StoredProfile{

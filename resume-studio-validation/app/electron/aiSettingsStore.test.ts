@@ -7,7 +7,7 @@ import { validateByokBaseUrl } from '../src/lib/byokAiClient';
 
 const dirs: string[] = [];
 const dummy = 'synthetic-test-key';
-const profile = { enabled: true, providerLabel: 'Mock', baseUrl: 'https://example.invalid/v1', model: 'mock' };
+const profile = { enabled: true, providerLabel: 'Mock', baseUrl: 'https://example.invalid/v1', model: 'mock', deepseekThinking:undefined };
 async function setup(available = true) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'resume-ai-test-'));
   dirs.push(dir);
@@ -102,4 +102,25 @@ describe('AI credential storage', () => {
     expect(await fs.readFile(file,'utf8')).toBe(bad);
   });
 
+});
+
+describe('DeepSeek profile compatibility',()=>{
+  it('uses current defaults only for a fresh profile and does not migrate saved model names',async()=>{
+    const {store,file}=await setup();
+    expect(await store.getPublicSettings()).toMatchObject({model:'deepseek-flash',deepseekThinking:'disabled',enabled:false});
+    await fs.writeFile(file,JSON.stringify({...profile,baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',apiKey:dummy}));
+    const migrated=await store.getPublicSettings();expect(migrated.model).toBe('deepseek-chat');expect(migrated.deepseekThinking).toBeUndefined();
+    expect((await store.getRequestSettings()).apiKey).toBe(dummy);
+  });
+  it('persists explicit thinking options and refuses inconsistent endpoint changes without rewriting',async()=>{
+    const {store,file}=await setup();
+    const saved=await store.save({...await store.getPublicSettings(),enabled:true,apiKey:dummy,deepseekThinking:'enabled'});
+    expect((await store.getRequestSettings(saved.profileId,saved.revision)).deepseekThinking).toBe('enabled');
+    const old=await fs.readFile(file,'utf8');
+    await expect(store.save({...saved,baseUrl:'https://example.invalid/v1'})).rejects.toThrow('思考配置');
+    expect(await fs.readFile(file,'utf8')).toBe(old);
+    const next=await store.save({...saved,deepseekThinking:'provider-default'});
+    expect(next.deepseekThinking).toBe('provider-default');expect(next.revision).not.toBe(saved.revision);
+    await expect(store.getRequestSettings(saved.profileId,saved.revision)).rejects.toThrow('重新预览');
+  });
 });
