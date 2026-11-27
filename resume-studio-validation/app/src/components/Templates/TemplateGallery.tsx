@@ -104,7 +104,6 @@ const LIGHTBOX_SWATCHES = [
 ];
 
 function LiveThumbnailCard({
-  studioThemeId,
   meta,
   previewDoc,
   isActive,
@@ -114,7 +113,6 @@ function LiveThumbnailCard({
   onInspect,
   onToggleFavorite,
 }: {
-  studioThemeId: StudioThemeId;
   meta: TemplateMetadata;
   previewDoc: ResumeDocument;
   isActive: boolean;
@@ -201,7 +199,6 @@ function LiveThumbnailCard({
       >
         {mounted ? (
           <div
-            key={studioThemeId}
             data-studio-paper="thumbnail"
             className="pointer-events-none origin-top-left select-none"
             style={{
@@ -607,7 +604,6 @@ export function TemplateGallery({
             {filtered.map((meta) => (
               <LiveThumbnailCard
                 key={meta.id}
-                studioThemeId={studioThemeId}
                 meta={meta}
                 previewDoc={effectivePreviewDoc}
                 isActive={activeDocument.templateId === meta.id}
