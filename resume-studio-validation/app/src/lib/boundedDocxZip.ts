@@ -80,7 +80,8 @@ export class BoundedDocxZip{
     else{
       if(typeof DecompressionStream==='undefined')throw new Error('当前运行环境不支持本地 DOCX 解压。');
       const out=new Uint8Array(e.size);let length=0;
-      const reader=new Blob([new Uint8Array(data).buffer]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+      const stream=new ReadableStream<Uint8Array<ArrayBuffer>>({start(c){c.enqueue(new Uint8Array(data));c.close();}});
+      const reader=stream.pipeThrough(new DecompressionStream('deflate-raw')).getReader();
       const abort=()=>{void reader.cancel().catch(()=>{});};
       signal?.addEventListener('abort',abort,{once:true});
       try{

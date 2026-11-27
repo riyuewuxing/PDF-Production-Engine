@@ -12,6 +12,8 @@ function xml(bytes:Uint8Array):Document{
   let raw:string;
   try{raw=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{return err('XML 不是有效 UTF-8，请另存为常规 DOCX。');}
   if(/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(raw)||/<\?(?!xml(?:\s|\?>))/i.test(raw))err('不允许 DTD、实体声明或外部处理指令。');
+  const declared=/^\s*<\?xml\s[^?]*\bencoding\s*=\s*(['"])([^'"]+)\1/i.exec(raw)?.[2];
+  if(declared&&declared.toLowerCase()!=='utf-8')err('XML 声明编码不是 UTF-8。');
   const d=new DOMParser().parseFromString(raw,'application/xml');
   if(d.doctype||d.getElementsByTagNameNS('*','parsererror').length||!d.documentElement)err('XML 无效。');
   const pending:{node:Element;depth:number}[]=[{node:d.documentElement,depth:0}];let count=0;
@@ -31,6 +33,18 @@ function validateRootRels(d:Document){
   if(d.documentElement.namespaceURI!==REL_NS||d.documentElement.localName!=='Relationships')err('包关系表无效。');
   const main=[...d.documentElement.children].filter(e=>e.namespaceURI===REL_NS&&e.localName==='Relationship'&&OFFICE_REL.includes(e.getAttribute('Type')??''));
   if(main.length!==1||!['word/document.xml','/word/document.xml'].includes(main[0]!.getAttribute('Target')??'')||!['','Internal'].includes(main[0]!.getAttribute('TargetMode')??''))err('只支持标准本地正文部件，不跟随外部或替代正文路径。');
+}
+function validateBodyStyles(d:Document,zip:BoundedDocxZip){
+  if(d.documentElement.namespaceURI!==REL_NS||d.documentElement.localName!=='Relationships')err('正文关系表无效。');
+  const seen=new Set<string>();
+  for(const e of d.documentElement.children){
+    if(e.namespaceURI!==REL_NS||e.localName!=='Relationship')continue;
+    const type=e.getAttribute('Type')??'', suffix=type.split('/').pop();
+    if(suffix!=='styles'&&suffix!=='stylesWithEffects')continue;
+    const target=suffix+'.xml';
+    if(seen.has(suffix)||!['','Internal'].includes(e.getAttribute('TargetMode')??'')||![target,'/word/'+target].includes(e.getAttribute('Target')??'')||!zip.has('word/'+target))err('不支持外部、缺失或替代样式部件。');
+    seen.add(suffix);
+  }
 }
 function assertClean(d:Document,ns:string){
   for(const tag of ['vanish','webHidden','specVanish','ins','del','delText','moveFrom','moveTo','moveFromRangeStart','moveToRangeStart','rPrChange','pPrChange','tblPrChange','trPrChange','tcPrChange','sectPrChange','cellIns','cellDel','cellMerge']){
@@ -83,7 +97,7 @@ function extractBody(doc:Document,styles:Document|undefined):{paras:Para[];warni
         return;
       }
       if(is(e,'fldSimple')||is(e,'instrText')){note('动态域及缓存结果已跳过；需要时请在原文中核对。');return;}
-      if(is(e,'t')){if(!fieldDepth)parts.push(e.textContent??'');return;}
+      if(is(e,'t')){if(e.children.length)err('正文文字节点包含不支持的结构。');if(!fieldDepth)parts.push(e.textContent??'');return;}
       if(is(e,'tab')){if(!fieldDepth)parts.push('\t');return;}
       if(is(e,'br')||is(e,'cr')){if(!fieldDepth)parts.push('\n');return;}
       if(is(e,'noBreakHyphen')){if(!fieldDepth)parts.push('\u2011');return;}
@@ -110,18 +124,16 @@ function extractBody(doc:Document,styles:Document|undefined):{paras:Para[];warni
 function makeDraft(paras:Para[],fileName:string,warnings:string[]):PdfImportDraft{
   const marked:string[]=[];
   let active:ReturnType<typeof matchHeadingLine>=null;
-  let knownSection=false;
   for(const p of paras){
     const text=p.text;
     const oneLine=!text.includes('\n');
-    const known=oneLine?matchHeadingLine(text):null;
-    if(known){marked.push('## '+text);active=known;knownSection=true;continue;}
-    if(p.level===1&&oneLine){marked.push('## '+text);active=null;knownSection=true;continue;}
+    const known=oneLine&&!/^\s*#/.test(text)?matchHeadingLine(text):null;
+    if(known){marked.push('## '+text);active=known;continue;}
+    if(p.level===1&&oneLine){marked.push('## '+text);active=null;continue;}
     if(p.level!==null&&p.level>=2&&oneLine&&['education','experience','projects'].includes(active??'')){marked.push('### '+text);continue;}
     // Literal Word text is not Markdown syntax; use an invisible guard on lines starting with it.
     const lines=text.split('\n').map(l=>/^\s*(?:#|~{3}|\x60{3})/.test(l)?'\u200b'+l:l);
-    if(!knownSection&&marked.length===0&&oneLine&&!p.level)marked.push('# '+lines[0]);
-    else marked.push(...lines);
+    marked.push(...lines);
   }
   const d=parseExtractedResumeText(marked.join('\n'),fileName.replace(/\.docx$/i,'')||'DOCX 导入简历',undefined,{markdown:true});
   // Keep guards in experience draft until its Markdown splitting step, then remove them.
@@ -141,7 +153,9 @@ export async function parseDocxResume(input:ArrayBuffer|Uint8Array,fileName:stri
     validateTypes(await get('[Content_Types].xml'));
     validateRootRels(await get('_rels/.rels'));
     const main=await get('word/document.xml');
+    if(z.has('word/_rels/document.xml.rels'))validateBodyStyles(await get('word/_rels/document.xml.rels'),z);
     const styles=z.has('word/styles.xml')?await get('word/styles.xml'):undefined;
+    if(z.has('word/stylesWithEffects.xml')){const alternate=await get('word/stylesWithEffects.xml');const ns=main.documentElement.namespaceURI??'';if(alternate.documentElement.namespaceURI!==ns||alternate.documentElement.localName!=='styles')err('替代样式部件无效。');assertClean(alternate,ns);}
     const {paras,warnings}=extractBody(main,styles);
     if(controller.signal.aborted)err('本地解析已取消。');
     return makeDraft(paras,fileName,warnings);
