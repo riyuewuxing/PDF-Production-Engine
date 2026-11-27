@@ -228,3 +228,22 @@ describe('MCP Dispatcher handlers and write guards', () => {
     expect(await store.listSnapshots('synthetic-job')).toHaveLength(1);
   });
 });
+
+describe('T47 malformed request envelope cannot authorize a write',()=>{
+  it.each([true,{},[],Number.POSITIVE_INFINITY])('refuses invalid JSON-RPC id %j before tool dispatch',async(id)=>{
+    const doc=await store.getResume('synthetic-job'),file=store.resolveResumePath('synthetic-job').filePath,original=await fs.readFile(file);
+    const dispatcher=createMcpDispatcher(store,{allowVersionWrite:true});
+    const response=await dispatcher.handleMessage({jsonrpc:'2.0',id,method:'tools/call',params:{name:'upsert_resume_version',arguments:{slug:'synthetic-job',document:{...doc,title:'Malformed request must not write'},expectedRevision:resumeRevision(doc)}}});
+    expect(await fs.readFile(file)).toEqual(original);
+    expect(await store.listSnapshots('synthetic-job')).toHaveLength(0);
+    expect(response).toMatchObject({jsonrpc:'2.0',id:null,error:{code:-32600}});
+  });
+  it('keeps legitimate numeric and string request IDs and no-id notifications unchanged',async()=>{
+    const dispatcher=createMcpDispatcher(store,{allowVersionWrite:true});
+    const doc=await store.getResume('synthetic-job'),file=store.resolveResumePath('synthetic-job').filePath,original=await fs.readFile(file);
+    expect(await dispatcher.handleMessage({jsonrpc:'2.0',id:0,method:'ping'})).toMatchObject({id:0,result:{}});
+    expect(await dispatcher.handleMessage({jsonrpc:'2.0',id:'',method:'ping'})).toMatchObject({id:'',result:{}});
+    expect(await dispatcher.handleMessage({jsonrpc:'2.0',method:'tools/call',params:{name:'upsert_resume_version',arguments:{slug:'synthetic-job',document:{...doc,title:'Notification must not write'},expectedRevision:resumeRevision(doc)}}})).toBeNull();
+    expect(await fs.readFile(file)).toEqual(original);expect(await store.listSnapshots('synthetic-job')).toHaveLength(0);
+  });
+});
