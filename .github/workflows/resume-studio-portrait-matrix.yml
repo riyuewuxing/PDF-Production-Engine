@@ -1,0 +1,65 @@
+name: Resume Studio managed portrait actual template parity
+on:
+  push:
+    branches: ['resume-studio/v6-portrait-matrix-turn30']
+permissions:
+  contents: read
+jobs:
+  portrait-matrix:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        locale: [zh-CN, en-US]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Actual 51 managed exports and inline renderer controls
+        timeout-minutes: 7
+        env:
+          RESUME_MATRIX_LOCALE: ${{ matrix.locale }}
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_MATRIX_SOURCE_SHA = 'a7e0e702fbe2441697c11691c1b9ac890f3d23b6'
+          $env:RESUME_MATRIX_OUT = Join-Path $env:GITHUB_WORKSPACE 'portrait-matrix'
+          & .\node_modules\.bin\electron.cmd .\scripts\qa-managed-portrait-matrix.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+      - name: Audit managed PDF text and pixel parity
+        timeout-minutes: 2
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'portrait-matrix'
+          $source = 'a7e0e702fbe2441697c11691c1b9ac890f3d23b6'
+          python scripts/qa-audit-template-matrix.py --root $out --locale '${{ matrix.locale }}' --modes contacts --source-sha $source --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/qa-managed-portrait-compare.py --root $out --locale '${{ matrix.locale }}' --source-sha $source --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual PDF and screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: portrait-matrix-${{ matrix.locale }}
+          path: portrait-matrix/
+          if-no-files-found: error
+          retention-days: 3
