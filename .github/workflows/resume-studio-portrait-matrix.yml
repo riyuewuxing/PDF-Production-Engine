@@ -30,9 +30,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build actual Electron
+      - name: Build actual Electron and strict typecheck
         timeout-minutes: 3
-        run: pnpm desktop:build
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Actual 51 managed exports and inline renderer controls
         timeout-minutes: 7
         env:
@@ -55,6 +59,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/qa-managed-portrait-compare.py --root $out --locale '${{ matrix.locale }}' --source-sha $source --runner-sha $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record tested production blob
+        timeout-minutes: 1
+        run: |
+          $blob = git rev-parse HEAD:resume-studio-validation/app/electron/main.ts
+          [ordered]@{productionBlob=$blob;runnerSha=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $env:GITHUB_WORKSPACE 'portrait-matrix/source-identity.json')
       - name: Upload actual PDF and screenshot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

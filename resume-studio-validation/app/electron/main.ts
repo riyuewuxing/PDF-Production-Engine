@@ -404,7 +404,8 @@ async function prepareExportPortrait(
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(payload) || payload.length % 4 === 1 ||
         (payload.includes('=') && payload.length % 4 !== 0)) return omit('无法解码');
     buffer = Buffer.from(payload, 'base64');
-    const format = inline[1].toLowerCase();
+    const format = inline[1]?.toLowerCase();
+    if (!format) return omit('无法解码');
     mimeType = 'image/' + (format === 'jpg' ? 'jpeg' : format);
   } else {
     return { document: doc };
