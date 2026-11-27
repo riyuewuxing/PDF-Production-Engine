@@ -287,6 +287,12 @@ export function createMcpDispatcher(store: LocalResumeStore, policy: Readonly<Mc
 
     const msg = rawMsg as Record<string, unknown>;
     const hasId = 'id' in msg && msg.id !== undefined;
+    // Invalid JSON-RPC IDs must not reach any tool, including a locally
+    // authorized write. Retain existing null-ID compatibility.
+    if(hasId&&msg.id!==null&&typeof msg.id!=='string'&&
+       !(typeof msg.id==='number'&&Number.isFinite(msg.id))){
+      return {jsonrpc:'2.0',id:null,error:{code:-32600,message:'Invalid JSON-RPC request id'}};
+    }
     const id = hasId ? (msg.id as string | number | null) : null;
     const method = typeof msg.method === 'string' ? msg.method : '';
 
