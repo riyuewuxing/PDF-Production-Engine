@@ -94,6 +94,7 @@ async function run(){
       await selectTheme(id);assert(await applyDisabled(),'theme switch enabled unapproved apply');assert(report.calls===n,'theme switch caused request');
       const inline=await imageProof(cmpSelector,null);
       await capture('t05-'+id+'-inline',cmpSelector);
+      await js('(()=>{const b=[...document.querySelector('+JSON.stringify(cmpSelector)+').querySelectorAll("button")].find(x=>x.innerText.trim()==="展开全屏 PDF 对照");b.focus();return true})()');
       await click('展开全屏 PDF 对照',cmpSelector);await until('real portal images',()=>js('document.querySelector('+JSON.stringify(portalSelector)+')?.querySelectorAll("img").length===2'));
       await js('Promise.all([...document.querySelector('+JSON.stringify(portalSelector)+').querySelectorAll("img")].map(i=>i.decode())).then(()=>true)');await sleep(250);
       const portal=await surfaceProof(portalSelector,id,expectedBg[id]);assert(portal.bodyParent,'portal not isolated');
@@ -102,10 +103,17 @@ async function run(){
       assert(JSON.stringify(images.map(i=>i.sourceSha))===JSON.stringify(inline.map(i=>i.sourceSha)),'portal source differs from inline');
       if(id!=='classic'){const ref=report.themePortal.classic;assert(JSON.stringify(images)===JSON.stringify(ref.images),'portal source/geometry/pixels changed '+id);assert(JSON.stringify(inline)===JSON.stringify(ref.inline),'inline source/geometry changed '+id);}
       report.themePortal[id]={portal,images,inline,contrast:await auditContrast(win,portalSelector,id+'-portal')};
-      await click('关闭全屏对照',portalSelector);await until('portal closed',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      win.webContents.focus();
+      const press=async(keyCode,modifiers=[])=>{win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});await sleep(60);win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await sleep(150);};
+      const focused=()=>js('(()=>{const e=document.activeElement;return {inside:!!e.closest('+JSON.stringify(portalSelector)+'),text:e.innerText?.trim()?.slice(0,80)||"",tag:e.tagName}})()');
+      const initial=await focused();await press('Tab');const tab=await focused();await press('Tab',['shift']);const reverse=await focused();
+      await press('Escape');const closed=await js('!document.querySelector('+JSON.stringify(portalSelector)+')');const returned=await focused();
+      report.themePortal[id].keyboard={initial,tab,reverse,closed,returned};
+      if(!closed)await click('关闭全屏对照',portalSelector);
+      await until('portal closed',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
       assert(await applyDisabled(),'closing portal enabled approval');await noWrite();
     }
-    await selectTheme('classic');report.checks.themePortalExact=true;write();
+    await selectTheme('classic');report.checks.themePortalExact=true;report.portalKeyboardDiagnostic=themes.map(id=>({id,...report.themePortal[id].keyboard}));write();
   }
   await until('editor',()=>js('document.querySelector("#basic-field-name")?.value==='+JSON.stringify(markers[0])));
   const before=await main.store.getResume('runner-fixture');
