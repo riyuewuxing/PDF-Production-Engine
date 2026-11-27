@@ -50,7 +50,7 @@ function unchanged(s){
   return fs.readFileSync(s.file).equals(s.bytes)&&fs.readFileSync(s.master).equals(s.masterBytes)&&!fs.existsSync(path.join(s.folder,'.backups','synthetic'));
 }
 async function exchange(s,input,{delayRead=0,closeOutput=false,fragments=false,write=true}={}){
-  const child=spawn(process.execPath,[bundle],{env:{...process.env,RESUME_STUDIO_DATA_DIR:s.folder,RESUME_STUDIO_MCP_ALLOW_WRITE:write?'1':'0',RESUME_STUDIO_MCP_ALLOW_MASTER_WRITE:'0'},stdio:['pipe','pipe','pipe'],windowsHide:true});
+  const child=spawn(process.execPath,['--require',path.join(__dirname,'validation-t47-network-deny.cjs'),bundle],{env:{...process.env,T47_NETWORK_SENTINEL:path.join(root,'network-attempts'),RESUME_STUDIO_DATA_DIR:s.folder,RESUME_STUDIO_MCP_ALLOW_WRITE:write?'1':'0',RESUME_STUDIO_MCP_ALLOW_MASTER_WRITE:'0'},stdio:['pipe','pipe','pipe'],windowsHide:true});
   children.add(child);let stdout=[],stderr=[],stdoutBytes=0,stderrBytes=0,inputError=null,readerTimer;
   const done=new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{child.kill();reject(Error('subprocess watchdog for '+path.basename(s.folder)))},15000);
@@ -141,6 +141,19 @@ async function run(){
   else if(process.platform!=='win32')assert.equal(complete,false,'POSIX baseline EOF loss not reproduced');
   checks.largeEofObserved=true;
   if(mode==='candidate'){
+    const malformed=seed('invalid-rpc-id'),template=upsert(malformed),ids=[true,{},[]];
+    const malformedFrames=ids.map((id,i)=>i===1?frame(body({...template,id})):line({...template,id}));
+    const overflow=Buffer.from(JSON.stringify({...template,id:'OVERFLOW_SENTINEL'}).replace('"OVERFLOW_SENTINEL"','1e999'),'utf8');
+    malformedFrames.push(frame(overflow));
+    const notify={...template};delete notify.id;
+    const zero={jsonrpc:'2.0',id:0,method:'ping'},empty={jsonrpc:'2.0',id:'',method:'ping'};
+    const malformedResult=await exchange(malformed,Buffer.concat([...malformedFrames,line(notify),line(zero),frame(body(empty))]));
+    clean(malformedResult);assert.equal(malformedResult.code,0);const mr=messages(malformedResult);
+    assert.equal(mr.length,6);
+    for(const m of mr.slice(0,4)){assert.equal(m.id,null);assert.equal(m.error.code,-32600);}
+    assert.equal(mr[4].id,0);assert.deepEqual(mr[4].result,{});assert.equal(mr[5].id,'');assert.deepEqual(mr[5].result,{});
+    assert.ok(unchanged(malformed),'invalid envelope caused actual disk write');
+    checks.invalidRpcIdsAndNotificationsCannotWrite=true;
     const huge=seed('frameSize');
     const p=req('ping',{padding:''});const base=body(p).length;
     p.params.padding='x'.repeat(MAX-base);
@@ -163,6 +176,7 @@ async function run(){
     clean(d);assert.equal(d.code,0);const dm=messages(d);assert.equal(payload(dm[0]).resumes[0].slug,'synthetic');assert.deepEqual(payload(dm[0]).issues,[{slug:'broken',reason:'CORRUPTED_JSON'}]);
     assert.equal(dm[1].result.isError,true);assert.equal(dm[2].result.isError,true);assert.equal(fs.readFileSync(brokenFile,'utf8'),'{broken');assert.ok(unchanged(damaged));checks.damagedListingAndWriteRefusalPreserved=true;
   }
+  assert(!fs.existsSync(path.join(root,'network-attempts')),'MCP attempted network through guarded Node API');checks.noGuardedNodeNetworkAttempt=true;
   report();
 }
 run().then(()=>{clearTimeout(globalTimer);fs.rmSync(root,{recursive:true,force:true});console.log(mode,process.platform,Object.keys(checks).length,'checks');}).catch(e=>{clearTimeout(globalTimer);for(const c of children)c.kill();report(e);console.error(e);process.exitCode=1;});
