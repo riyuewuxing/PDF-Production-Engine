@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {requestByokCompletionDirect,supportsDeepSeekThinking,connectionProbeOptions,DEFAULT_BYOK_SETTINGS,type ByokAiSettings} from './byokAiClient';
+import {requestByokCompletionDirect,requestByokCompletionDirectWithReceipt,describeAiRequest,formatAiCompletionReceipt,supportsDeepSeekThinking,connectionProbeOptions,DEFAULT_BYOK_SETTINGS,type ByokAiSettings} from './byokAiClient';
 const settings:ByokAiSettings={enabled:true,providerLabel:'Mock',baseUrl:'https://example.invalid/v1',apiKey:'synthetic-test-key',model:'mock',contextBudgetChars:1000,maxOutputTokens:128,timeoutMs:1000};
 const options={settings,systemPrompt:'system',userPrompt:'synthetic payload',maxTokens:300};
 afterEach(()=>vi.unstubAllGlobals());
@@ -70,5 +70,30 @@ describe('official DeepSeek explicit thinking compatibility',()=>{
     expect(connectionProbeOptions({...deep,deepseekThinking:'enabled'}).maxTokens).toBe(1024);
     expect(connectionProbeOptions(deep).maxTokens).toBe(1024);
     expect(connectionProbeOptions(settings).maxTokens).toBe(64);
+  });
+});
+
+describe('bounded completion receipts',()=>{
+  it('reports actual provider model and token counters without recording prompts or reasoning',async()=>{
+    const f=vi.fn(async()=>new Response(JSON.stringify({model:'mock-v2',usage:{prompt_tokens:32,completion_tokens:5,total_tokens:37,prompt_tokens_details:{cached_tokens:0}},choices:[{message:{content:'OK',reasoning_content:'do not retain'},finish_reason:'stop'}]})));
+    vi.stubGlobal('fetch',f);
+    const r=await requestByokCompletionDirectWithReceipt(options);
+    expect(r.text).toBe('OK');
+    expect(r.receipt).toMatchObject({requestedModel:'mock',reportedModel:'mock-v2',promptTokens:32,completionTokens:5,totalTokens:37,cachedInputTokens:0,maxOutputTokens:128,timeoutMs:1000});
+    expect(r.receipt?.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(formatAiCompletionReceipt(r.receipt)).toContain('与请求不同');
+    expect(JSON.stringify(r.receipt)).not.toContain('do not retain');
+    expect(JSON.stringify(r.receipt)).not.toContain('synthetic-test-key');
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(describeAiRequest(settings,options)).toContain('128 输出 tokens · 1 秒');
+  });
+  it('does not invent missing or malformed counters or expose an echoed credential as the model',async()=>{
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({model:'synthetic-test-key',usage:{prompt_tokens:-1,completion_tokens:'2',total_tokens:1.5},choices:[{message:{content:'OK'}}]}))));
+    const r=await requestByokCompletionDirectWithReceipt(options);
+    expect(r.receipt?.reportedModel).toBeUndefined();
+    expect(r.receipt?.promptTokens).toBeUndefined();
+    expect(r.receipt?.completionTokens).toBeUndefined();
+    expect(r.receipt?.totalTokens).toBeUndefined();
+    expect(formatAiCompletionReceipt(r.receipt)).toContain('未报告');
   });
 });

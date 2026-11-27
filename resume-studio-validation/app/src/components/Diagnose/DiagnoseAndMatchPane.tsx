@@ -32,7 +32,9 @@ import {
   type ByokAiSettings,
   type AiProfileCatalog,
   assertAiPreviewSettings,
-  resolveAiLimits,
+  describeAiRequest,
+  requestByokCompletionWithReceipt,
+  formatAiCompletionReceipt,
   DEFAULT_BYOK_SETTINGS,
   type PolishMode,
   computeLineDiff,
@@ -111,6 +113,7 @@ export function DiagnoseAndMatchPane({
   const [profileBusy,setProfileBusy]=useState(false);
   const [testingConnection,setTestingConnection]=useState(false);
   const [connectionTip,setConnectionTip]=useState<string|null>(null);
+  useEffect(()=>{setConnectionTip(null);},[aiSettings]);
   const testAbort=useRef<AbortController|null>(null);
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -310,8 +313,8 @@ export function DiagnoseAndMatchPane({
       const options=connectionProbeOptions(settings);
       assertPreviewSettings(settings,options);
       ctrl=new AbortController();testAbort.current=ctrl;setTestingConnection(true);
-      const result=await requestByokCompletion({...options,settings,signal:ctrl.signal});
-      if(mountedRef.current&&contextRef.current.aiSettings===settings&&!ctrl.signal.aborted)setConnectionTip(result.trim()==='OK'?'连接成功 · 合成探针返回 OK':'连接成功 · 收到非空文本（尚未验证其他能力）');
+      const result=await requestByokCompletionWithReceipt({...options,settings,signal:ctrl.signal});
+      if(mountedRef.current&&contextRef.current.aiSettings===settings&&!ctrl.signal.aborted)setConnectionTip((result.text.trim()==='OK'?'连接成功 · 合成探针返回 OK':'连接成功 · 收到非空文本（尚未验证其他能力）')+'。'+formatAiCompletionReceipt(result.receipt));
     }catch(err){if(mountedRef.current)setSettingsError(err instanceof Error?err.message:'连接测试失败。');}
     finally{if(testAbort.current===ctrl){testAbort.current=null;if(mountedRef.current)setTestingConnection(false);}}
   };
@@ -977,7 +980,7 @@ export function DiagnoseAndMatchPane({
                     </button>
                   </div>
                   <div className="rounded border border-teal-200 bg-white p-2 space-y-1">
-                    <p className="text-[10px] text-slate-500">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），最多64输出 tokens。</p>
+                    <p className="text-[10px] text-slate-500">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），输出上限为64或1024 tokens，并受档案上限约束。</p>
                     <div className="flex items-center gap-2"><button type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50">测试模型连接</button>{testingConnection&&<button type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1">取消连接测试</button>}</div>
                     {connectionTip&&<p role="status" className="text-emerald-700">{connectionTip}</p>}
                   </div>
@@ -1019,7 +1022,7 @@ export function DiagnoseAndMatchPane({
                 <div className="font-bold text-amber-900">发送前确认（尚未调用模型）</div>
                 <p>接收方：{validateByokBaseUrl(pendingRequest.settings.baseUrl).baseUrl}/chat/completions</p>
                 <p>模型：{pendingRequest.settings.model} · 档案：{pendingRequest.settings.providerLabel} · {aiThinkingLabel(pendingRequest.settings)}</p>
-                 <p>本地上限：{resolveAiLimits(pendingRequest.settings).maxOutputTokens} 输出 tokens；{resolveAiLimits(pendingRequest.settings).timeoutMs/1000} 秒</p>
+                 <p>{describeAiRequest(pendingRequest.settings,pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options)}</p>
                 <p>下方是本次实际发送的消息内容。基本联系方式、照片和已识别的隐私内容已尽量省略；仍请检查可见经历或 JD 中是否有其他敏感信息。密钥不在预览中。</p>
                 {pendingRequest.basis.selection.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 bg-white p-2 space-y-1"><div className="font-semibold">本次明确外发 {pendingRequest.basis.selection.records.length} 条本人确认事实（证据位置不外发）</div>{Object.values(pendingRequest.mode==='single'?pendingRequest.basis.sourceMap:pendingRequest.prepared.sourceMap).flat().filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1"><span className="text-teal-800">{s.id} · 本人确认</span><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}
                 <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-amber-200 bg-white p-2">

@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Sparkles,ShieldCheck} from 'lucide-react';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
-import {assertAiPreviewSettings,requestByokCompletion,validateByokBaseUrl,type AiProfileCatalog,type ByokAiSettings} from '../../lib/byokAiClient';
+import {assertAiPreviewSettings,requestByokCompletion,describeAiRequest,validateByokBaseUrl,type AiProfileCatalog,type ByokAiSettings} from '../../lib/byokAiClient';
 import {CAREER_AI_LABELS,prepareCareerRefine,restoreCareerRefine,type CareerAiKind,type CareerRefinePrepared} from '../../lib/careerAi';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {FactBank} from '../../schema/factBankSchema';
@@ -108,7 +108,7 @@ export function CareerAiPanel(props:Props){
     {preview&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2">
       <div className="font-bold text-amber-900">文案发送前确认（尚未调用模型）</div>
       <p className="break-all">接收方：{validateByokBaseUrl(preview.basis.settings.baseUrl).baseUrl}/chat/completions</p>
-      <p>模型：{preview.basis.settings.model} · {preview.basis.settings.providerLabel}</p>
+      <p>模型：{preview.basis.settings.model} · {preview.basis.settings.providerLabel}</p><p>{describeAiRequest(preview.basis.settings,preview.request.options)}</p>
       <p>{preview.request.replacements.length} 类身份字段在本地替换，不发送真实映射。</p>
       {preview.request.providedFacts.length>0&&<div aria-label="文案外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 p-2"><p className="font-semibold">本次外发 {preview.request.providedFacts.length} 条本人确认事实</p>{preview.request.providedFacts.map(r=><div key={r.id} className="border-t py-1 whitespace-pre-wrap break-words">{r.id} · {r.label}<div>{r.facts}</div></div>)}</div>}
       <div className="max-h-64 space-y-1 overflow-auto rounded bg-slate-100 p-2"><p className="font-semibold">系统指令</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.systemPrompt}</pre><p className="font-semibold">发送内容</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.userPrompt}</pre></div>

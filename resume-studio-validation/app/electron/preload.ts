@@ -73,6 +73,7 @@ const bridge: ResumeDesktopBridge = {
     removeProfile:(id,revision,confirmation)=>ipcRenderer.invoke('ai:removeProfile',id,revision,confirmation),
     saveSettings: (settings) => ipcRenderer.invoke('ai:saveSettings', settings),
     requestCompletion: (request) => ipcRenderer.invoke('ai:requestCompletion', request),
+    requestCompletionWithReceipt: request=>ipcRenderer.invoke('ai:requestCompletionWithReceipt',request),
     cancelCompletion: (requestId) => ipcRenderer.invoke('ai:cancelCompletion', requestId),
   },
   shell: {

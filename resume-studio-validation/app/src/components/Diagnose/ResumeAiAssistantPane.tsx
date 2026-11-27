@@ -3,7 +3,7 @@ import {BookOpen,ClipboardList,Sparkles} from 'lucide-react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {collectEditableBlocks} from '../../lib/resumeBlocks';
-import {assertAiPreviewSettings,requestByokCompletion,validateByokBaseUrl,type ByokAiSettings} from '../../lib/byokAiClient';
+import {assertAiPreviewSettings,requestByokCompletionWithReceipt,describeAiRequest,formatAiCompletionReceipt,validateByokBaseUrl,type ByokAiSettings,type AiCompletionReceipt} from '../../lib/byokAiClient';
 import {ASSISTANT_MODES,prepareAssistantTask,parseAssistantReply,type AssistantMode,type PreparedAssistantTask} from '../../lib/aiAssistant';
 import {AI_TOOL_CATALOG,AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
@@ -18,7 +18,7 @@ import {WORKFLOW_ACTIONS,createWorkflowSession,isWorkflowCurrent,workflowDocumen
 type Props={document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void;assertSettings:(settings:ByokAiSettings)=>void};
 type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string;records:FactRecord[];bankRevision:string|null};
 type Pending={basis:Basis;prepared:PreparedAssistantTask};
-type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>};
+type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>;receipt:AiCompletionReceipt|null};
 export function ResumeAiAssistantPane(props:Props){
   const blocks=useMemo(()=>collectEditableBlocks(props.document),[props.document]);
   const [mode,setMode]=useState<AssistantMode>('ask');
@@ -106,12 +106,12 @@ export function ResumeAiAssistantPane(props:Props){
     try{
       await assertFactsFresh(req.basis);
       if(ctrl.signal.aborted||!isCurrent(req.basis))return;
-      const text=await requestByokCompletion({...req.prepared.options,settings:req.basis.settings,signal:ctrl.signal});
+      const response=await requestByokCompletionWithReceipt({...req.prepared.options,settings:req.basis.settings,signal:ctrl.signal});
       if(ctrl.signal.aborted)return;
       if(!isCurrent(req.basis))throw new Error('任务目标或简历已变化，旧结果未采纳。');
       await assertFactsFresh(req.basis);
       if(ctrl.signal.aborted)return;
-      const reply=parseAssistantReply(text,req.prepared);setResult({request:req,reply});setAccepted([]);
+      const reply=parseAssistantReply(response.text,req.prepared);setResult({request:req,reply,receipt:response.receipt});setAccepted([]);
       if(reply.kind==='workflow')setWorkflow(createWorkflowSession({document:req.basis.document,slug:req.basis.slug,settings:req.basis.settings,goal:req.basis.goal,jdText:req.basis.jdText,steps:reply.steps}));
       if(reply.kind==='proposals'&&!reply.proposals.length)setNotice('未返回可用正文提案；不代表简历已达到目标。');
     }catch(err){if(mounted.current)setError(localErrorMessage(err,'AI 任务失败'));}
@@ -206,8 +206,9 @@ export function ResumeAiAssistantPane(props:Props){
     {busy&&<div className="flex items-center justify-between"><span>正在运行模型任务…</span><button type="button" onClick={()=>abortRef.current?.abort()} className="rounded border px-2 py-1">取消自由任务</button></div>}
     {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800">{error}</div>}
     {notice&&<div role="status" className="rounded bg-teal-50 p-2 text-teal-800">{notice}</div>}
+    {result&&<p aria-label="自由任务调用回执" className="break-all rounded border border-slate-200 bg-white p-2 text-[10px] text-slate-600">{formatAiCompletionReceipt(result.receipt)}</p>}
     {pending&&<section aria-label="自由任务发送预览" className="rounded border border-amber-300 bg-amber-50 p-2 space-y-2">
-      <div className="font-bold">自由任务发送前确认</div><div className="break-all">{pending.basis.settings.providerLabel} · {pending.basis.settings.model} · {validateByokBaseUrl(pending.basis.settings.baseUrl).baseUrl}/chat/completions</div>
+      <div className="font-bold">自由任务发送前确认</div><div className="break-all">{pending.basis.settings.providerLabel} · {pending.basis.settings.model} · {validateByokBaseUrl(pending.basis.settings.baseUrl).baseUrl}/chat/completions</div><p>{describeAiRequest(pending.basis.settings,pending.prepared.options)}</p>
       {pending.basis.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto space-y-1 rounded border border-amber-200 bg-white p-2"><div className="font-semibold">本次明确外发 {pending.basis.records.length} 条本人确认事实（证据位置不外发）</div>{pending.prepared.blocks.flatMap(b=>pending.prepared.sourceMap[b.key]??[]).filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1"><div className="font-mono text-teal-800">{s.id} · 本人确认</div><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}
       <div className="max-h-64 overflow-auto rounded bg-white p-2 space-y-1"><pre className="whitespace-pre-wrap break-words">{pending.prepared.options.systemPrompt}</pre><pre className="whitespace-pre-wrap break-words">{pending.prepared.options.userPrompt}</pre></div>
       <div className="flex gap-1"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送自由任务</button><button type="button" onClick={()=>setPending(null)} className="rounded border px-2 py-1">取消预览</button></div>

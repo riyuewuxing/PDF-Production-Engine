@@ -7,7 +7,7 @@ import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,insp
 import {RESTORE_PREFIX} from '../src/schema/workspaceBackupSchema';
 import {readLaunchHandoff,writeLaunchReceipt,launchWorkspace,recordLaunchStage,shouldBootstrapWorkspace} from './workspaceLaunch';
 import { promisify } from 'node:util';
-import { requestByokCompletionDirect, validateByokBaseUrl } from '../src/lib/byokAiClient';
+import { requestByokCompletionDirectWithReceipt, validateByokBaseUrl } from '../src/lib/byokAiClient';
 import { z } from 'zod';
 import { AiSettingsStore } from './aiSettingsStore';
 import {FactBankStore} from '../src/server/factBankStore';
@@ -915,7 +915,7 @@ function registerIpcHandlers(): void {
     return aiSettings.save(rawSettings);
   });
 
-  trustedEditorHandle('ai:requestCompletion', async (_event, raw: unknown) => {
+  const completeAiRequest=async (raw:unknown)=>{
     const parsed = aiCompletionSchema.safeParse(raw);
     if (!parsed.success) throw new Error('AI 请求参数超出许可范围。');
     const { requestId, profile, factBinding, ...options } = parsed.data;
@@ -929,11 +929,13 @@ function registerIpcHandlers(): void {
       if(factBinding)await facts.assertCurrentBinding(factBinding,options.userPrompt);
       else if(hasRecordFactSources(options.userPrompt))throw new Error('事实来源缺少本地授权绑定，拒绝发送。');
       if(controller.signal.aborted)throw new Error('请求已取消。');
-      return await requestByokCompletionDirect({ ...options, settings, signal: controller.signal });
+      return await requestByokCompletionDirectWithReceipt({ ...options, settings, signal: controller.signal });
     } finally {
       aiRequests.delete(requestId);
     }
-  });
+  };
+  trustedEditorHandle('ai:requestCompletion',async (_event,raw:unknown)=>(await completeAiRequest(raw)).text);
+  trustedEditorHandle('ai:requestCompletionWithReceipt',async (_event,raw:unknown)=>completeAiRequest(raw));
 
   trustedEditorHandle('ai:cancelCompletion', (_event, requestId: string) => {
     if (typeof requestId === 'string') aiRequests.get(requestId)?.abort();

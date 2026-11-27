@@ -149,10 +149,39 @@ export function connectionProbeOptions(settings:ByokAiSettings):ByokCompletionOp
   return {systemPrompt:'Connectivity probe. Reply only OK.',userPrompt:JSON.stringify({task:'connection-probe',message:'synthetic data only'}),temperature:0,maxTokens:budget,timeoutMs:25000};
 }
 
-export async function requestByokCompletion(params: ByokCompletionOptions & {
-  settings: ByokAiSettings;
-  signal?: AbortSignal;
-}): Promise<string> {
+export interface AiCompletionReceipt {
+  requestedModel:string;
+  reportedModel?:string;
+  promptTokens?:number;
+  completionTokens?:number;
+  totalTokens?:number;
+  cachedInputTokens?:number;
+  latencyMs:number;
+  maxOutputTokens:number;
+  timeoutMs:number;
+  thinking?:'enabled'|'disabled';
+}
+export interface AiCompletionResult {text:string; receipt:AiCompletionReceipt|null}
+type CompletionParams=ByokCompletionOptions & {settings:ByokAiSettings; signal?:AbortSignal};
+export function resolveAiRequestLimits(settings:ByokAiSettings,options:Pick<ByokCompletionOptions,'maxTokens'|'timeoutMs'>){
+  const limits=resolveAiLimits(settings);
+  return {maxOutputTokens:Math.min(options.maxTokens??limits.maxOutputTokens,limits.maxOutputTokens),timeoutMs:Math.min(options.timeoutMs??45000,limits.timeoutMs)};
+}
+export function describeAiRequest(settings:ByokAiSettings,options:ByokCompletionOptions){
+  const l=resolveAiRequestLimits(settings,options);
+  return '本次上限：'+l.maxOutputTokens+' 输出 tokens · '+l.timeoutMs/1000+' 秒 · '+aiThinkingLabel(settings);
+}
+export function formatAiCompletionReceipt(r:AiCompletionReceipt|null){
+  if(!r)return '此网关未返回调用回执。';
+  const n=(v:number|undefined)=>v===undefined?'未报告':String(v);
+  const model=r.reportedModel??'未报告';
+  const mismatch=r.reportedModel&&r.reportedModel!==r.requestedModel?'（与请求不同；服务商报告值）':'';
+  return '请求：'+r.requestedModel+' · 返回模型：'+model+mismatch+'；输入 '+n(r.promptTokens)+' / 输出 '+n(r.completionTokens)+' / 合计 '+n(r.totalTokens)+' tokens；缓存命中输入 '+n(r.cachedInputTokens)+'；耗时 '+r.latencyMs+' ms。用量以服务商报告为准，非账单金额。';
+}
+export async function requestByokCompletion(params:CompletionParams):Promise<string>{
+  return (await requestByokCompletionWithReceipt(params)).text;
+}
+export async function requestByokCompletionWithReceipt(params:CompletionParams):Promise<AiCompletionResult> {
   const { settings, signal, ...options } = params;
   if (!settings.enabled) throw new Error('请先开启并保存 AI 配置。');
   if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
@@ -160,17 +189,16 @@ export async function requestByokCompletion(params: ByokCompletionOptions & {
   if(!bridge){
     if(options.factBinding)throw new Error('事实库授权必须由桌面主进程核验。');
     if(typeof window!=='undefined'&&window.resumeDesktop)throw new Error('桌面模型网关不可用，未绕过主进程。');
-    return requestByokCompletionDirect(params);
+    return requestByokCompletionDirectWithReceipt(params);
   }
   if (settings.apiKey || settings.clearApiKey || !settings.profileId || !settings.revision) throw new Error('请先保存或重新读取 AI 配置。');
   const requestId = globalThis.crypto.randomUUID();
   const onAbort = () => { void bridge.cancelCompletion(requestId).catch(() => {}); };
   signal?.addEventListener('abort', onAbort, { once: true });
   try {
-    const result = await bridge.requestCompletion({
-      ...options, requestId,
-      profile: { baseUrl: validateByokBaseUrl(settings.baseUrl).baseUrl, model: settings.model.trim(), profileId:settings.profileId,revision:settings.revision },
-    });
+    const request={...options,requestId,profile:{baseUrl:validateByokBaseUrl(settings.baseUrl).baseUrl,model:settings.model.trim(),profileId:settings.profileId,revision:settings.revision}};
+    // Compatibility is decided before calling. Never retry an unsuccessful paid call.
+    const result=bridge.requestCompletionWithReceipt?await bridge.requestCompletionWithReceipt(request):{text:await bridge.requestCompletion(request),receipt:null};
     if (signal?.aborted) throw new DOMException('请求已取消', 'AbortError');
     return result;
   } finally {
@@ -179,16 +207,15 @@ export async function requestByokCompletion(params: ByokCompletionOptions & {
 }
 
 /** Desktop main process transport; browser fallback uses only ephemeral input. */
-export async function requestByokCompletionDirect(params: ByokCompletionOptions & {
-  settings: ByokAiSettings;
-  signal?: AbortSignal;
-}): Promise<string> {
-  const { settings, systemPrompt, userPrompt, temperature = 0.35, maxTokens, timeoutMs = 45000, signal } = params;
+export async function requestByokCompletionDirect(params:CompletionParams):Promise<string>{
+  return (await requestByokCompletionDirectWithReceipt(params)).text;
+}
+export async function requestByokCompletionDirectWithReceipt(params:CompletionParams):Promise<AiCompletionResult> {
+  const { settings, systemPrompt, userPrompt, temperature = 0.35, signal } = params;
   const limits=resolveAiLimits(settings);
   const thinking=resolveDeepSeekThinking(settings);
   if(systemPrompt.length+userPrompt.length>limits.contextBudgetChars)throw new Error('发送内容超出此模型配置的字符预算；请缩小范围后重新确认。');
-  const outputBudget=Math.min(maxTokens??limits.maxOutputTokens,limits.maxOutputTokens);
-  const deadlineMs=Math.min(timeoutMs,limits.timeoutMs);
+  const {maxOutputTokens:outputBudget,timeoutMs:deadlineMs}=resolveAiRequestLimits(settings,params);
   if (!settings.enabled) {
     throw new Error('请先在下方开启并保存 BYOK 大模型配置，再调用 AI 能力。');
   }
@@ -226,6 +253,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
     bodyPayload.max_tokens=outputBudget;
     if(thinking!==undefined)bodyPayload.thinking={type:thinking};
 
+    const started=performance.now();
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
@@ -240,7 +268,7 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
       throw new AiGatewayError('HTTP',hint+` (HTTP ${response.status})`);
     }
 
-    let payload: {choices?:Array<{message?:{content?:unknown};finish_reason?:string}>};
+    let payload: {choices?:Array<{message?:{content?:unknown};finish_reason?:string}>;model?:unknown;usage?:{prompt_tokens?:unknown;completion_tokens?:unknown;total_tokens?:unknown;prompt_cache_hit_tokens?:unknown;prompt_tokens_details?:{cached_tokens?:unknown}}};
     try{payload=await readBoundedJson(response) as typeof payload;}
     catch(err){if(controller.signal.aborted)throw err;throw new AiGatewayError('FORMAT','模型响应格式异常或超过安全大小限制。');}
     const content=payload?.choices?.[0]?.message?.content;
@@ -248,7 +276,12 @@ export async function requestByokCompletionDirect(params: ByokCompletionOptions 
     if(payload?.choices?.[0]?.finish_reason==='length')throw new AiGatewayError('LIMIT','模型输出达到长度上限，未返回完整结果。');
     if (!result) throw new AiGatewayError('FORMAT','模型未返回有效文本内容。');
     if(controller.signal.aborted)throw new Error('aborted');
-    return result;
+    const token=(v:unknown):number|undefined=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0?v:undefined;
+    const requestedModel=settings.model.trim();
+    const reported=payload?.model;
+    const safeModel=typeof reported==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/.test(reported)&&(!settings.apiKey.trim()||!reported.includes(settings.apiKey.trim()))?reported:undefined;
+    const usage=payload?.usage;
+    return {text:result,receipt:{requestedModel,reportedModel:safeModel,promptTokens:token(usage?.prompt_tokens),completionTokens:token(usage?.completion_tokens),totalTokens:token(usage?.total_tokens),cachedInputTokens:token(usage?.prompt_cache_hit_tokens)??token(usage?.prompt_tokens_details?.cached_tokens),latencyMs:Math.max(0,Math.round(performance.now()-started)),maxOutputTokens:outputBudget,timeoutMs:deadlineMs,thinking}};
   } catch(err){
     if(timedOut)throw new AiGatewayError('TIMEOUT','模型请求达到超时上限，已停止等待。');
     if(signal?.aborted||controller.signal.aborted)throw new AiGatewayError('CANCELLED','模型请求已取消。');

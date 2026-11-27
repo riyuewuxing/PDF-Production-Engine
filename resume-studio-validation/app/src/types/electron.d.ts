@@ -1,6 +1,6 @@
 import type {FactBank,AddFactInput,RevokeFactInput,LinkFactInput} from '../schema/factBankSchema';
 import type {EvidenceIndex,AttachEvidenceInput,EvidenceReadInput,DetachEvidenceInput,PurgeEvidenceInput,EvidenceIntegrity,EvidenceVaultAudit} from '../schema/evidenceSchema';
-import type { ByokAiSettings, ByokCompletionRequest, AiProfileCatalog } from '../lib/byokAiClient';
+import type { ByokAiSettings, ByokCompletionRequest, AiProfileCatalog, AiCompletionResult } from '../lib/byokAiClient';
 import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
@@ -137,6 +137,7 @@ export interface ResumeDesktopBridge {
     removeProfile:(id:string,revision:string,confirmation:'DELETE_AI_PROFILE')=>Promise<AiProfileCatalog>;
     saveSettings: (settings: ByokAiSettings) => Promise<ByokAiSettings>;
     requestCompletion: (request: ByokCompletionRequest) => Promise<string>;
+    requestCompletionWithReceipt?: (request:ByokCompletionRequest)=>Promise<AiCompletionResult>;
     cancelCompletion: (requestId: string) => Promise<void>;
   };
   shell: {
