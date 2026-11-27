@@ -152,7 +152,8 @@ async function run(){
  await openTrash();await until('archive persisted',()=>has('恢复原版本'));await capture('06-cold-deletion-preserved','[aria-label="本地版本回收站"]');
  report.checks.deletedLegacyVersionNotResurrected=true;
  await confirm();await click('恢复原版本');await until('restored file',()=>fs.existsSync(versionFile)&&archiveFiles().length===0);
- await until('restored version selected',async()=>await active()==='synthetic-job');
+ await until('restored version available',()=>js('[...document.querySelector('+JSON.stringify(version)+').options].some(o=>o.value==="synthetic-job")'));
+ await switchTo('synthetic-job');
  const restoreDoc=JSON.parse(fs.readFileSync(versionFile,'utf8')),editedDoc=JSON.parse(edited);
  const stable=o=>{const {updatedAt,...rest}=o;return canonical(rest)};
  assert(stable(restoreDoc)===stable(editedDoc),'explicit restore lost document content');
