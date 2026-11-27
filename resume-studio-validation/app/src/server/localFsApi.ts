@@ -321,6 +321,31 @@ function nextUpdatedAt(current: ResumeDocument | null): string {
   return new Date(Math.max(Date.now(), Number.isFinite(previous) ? previous + 1 : 0)).toISOString();
 }
 
+function requireQueueTarget(task:JobQueueTask,target:{company:string;role:string;resumeSlug:string;jdText?:string}){
+  if(target.company!==task.company||target.role!==task.role||target.resumeSlug!==task.slug||(target.jdText!==undefined&&target.jdText!==task.jdText))throw new LocalFsApiError(409,'JOB_QUEUE_LINK','岗位材料与原任务单位、岗位、原文或版本不一致。');
+}
+function requireQueueSnapshotBinding(current:ApplicationsStoreData,entry:JobApplication,doc:ResumeDocument){
+  if(!entry.queueTaskId)return;
+  const task=current.jobQueue?.find(t=>t.id===entry.queueTaskId);
+  if(!task||task.status!=='prepared'||!entry.pdfReceipt||!jobQueueBindingMatches(task,doc,createHash('sha256').update(jobQueueDocumentText(doc)).digest('hex')))throw new LocalFsApiError(409,'JOB_QUEUE_LINK','岗位永久快照与原任务绑定不一致。');
+  requireQueueTarget(task,entry);
+}
+
+/** Pure historical link check shared by review and backup diagnostics.
+ * Deliberately checks archived bytes, not the current editable source or external PDF. */
+export function assertHistoricalSnapshotBinding(current:ApplicationsStoreData,entry:JobApplication,id:string,record:ApplicationSnapshotRecord):void{
+  const slug=assertSafeSlug(entry.resumeSlug);
+  if(slug!==entry.resumeSlug)throw new LocalFsApiError(422,'APPLICATION_SNAPSHOT_LINK','关联简历标识不规范，未读取原稿。');
+  const {meta,document:doc}=record;
+  if(!meta||meta.id!==id||meta.applicationId!==entry.id||meta.queueTaskId!==entry.queueTaskId||meta.resumeSlug!==slug||
+     meta.exportedFilePath!==entry.exportedFilePath||meta.atsScore!==entry.atsScore||!samePdfReceipt(meta.pdfReceipt,entry.pdfReceipt)||
+     (entry.pdfReceipt!==undefined&&entry.pdfReceipt.documentSha256!==createHash('sha256').update(JSON.stringify(doc)).digest('hex'))||
+     meta.title!==doc.title||meta.templateId!==doc.templateId||typeof meta.createdAt!=='string'||!Number.isFinite(Date.parse(meta.createdAt))){
+    throw new LocalFsApiError(409,'APPLICATION_SNAPSHOT_LINK','永久快照与台账身份、导出关联或原稿元数据不一致，未显示原稿；请核对原件或备份。');
+  }
+  requireQueueSnapshotBinding(current,entry,doc);
+}
+
 export class LocalResumeStore {
   readonly dataDir: string;
   readonly masterPath: string;
@@ -968,14 +993,14 @@ export class LocalResumeStore {
         const previous=await this.getApplicationSnapshot(snapshotId);
         if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.queueTaskId!==entry.queueTaskId||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.resumeSlug!==resumeSlug||previous.meta.atsScore!==entry.atsScore||!samePdfReceipt(previous.meta.pdfReceipt,receipt)||!samePdfReceipt(existing.pdfReceipt,receipt))
           throw new LocalFsApiError(409,'APPLICATION_EXISTS','该请求已记入不同投递资料，不会重复写入。');
-        this.requireQueueSnapshotBinding(current,existing,previous.document);
+        requireQueueSnapshotBinding(current,existing,previous.document);
         return {entry:existing,store:current};
       }
       if(entry.queueTaskId){
         if(!receipt)throw new LocalFsApiError(409,'JOB_QUEUE_LINK','岗位任务归档需要实际 PDF 字节凭证。');
         const {task}=await this.requirePreparedQueueTask(current,entry.queueTaskId);
-        this.requireQueueTarget(task,entry);
-        this.requireQueueSnapshotBinding(current,candidate,doc);
+        requireQueueTarget(task,entry);
+        requireQueueSnapshotBinding(current,candidate,doc);
       }
       await checkWorkspaceDirectory(this.dataDir,this.appSnapshotsDir,true);
       const target=resolveContainedPath(this.appSnapshotsDir,snapshotId+'.json');
@@ -1045,13 +1070,7 @@ export class LocalResumeStore {
     try{record=await this.getApplicationSnapshot(id);}
     catch(err){if(err instanceof LocalFsApiError)throw err;throw new LocalFsApiError(422,'APPLICATION_SNAPSHOT_INVALID','永久快照损坏或结构无效，原文件保留，未显示原稿。');}
     const meta=record.meta,doc=record.document;
-    if(!meta||meta.id!==id||meta.applicationId!==entry.id||meta.queueTaskId!==entry.queueTaskId||meta.resumeSlug!==slug||
-       meta.exportedFilePath!==entry.exportedFilePath||meta.atsScore!==entry.atsScore||!samePdfReceipt(meta.pdfReceipt,entry.pdfReceipt)||
-       (entry.pdfReceipt!==undefined&&entry.pdfReceipt.documentSha256!==createHash('sha256').update(JSON.stringify(doc)).digest('hex'))||
-       meta.title!==doc.title||meta.templateId!==doc.templateId||typeof meta.createdAt!=='string'||!Number.isFinite(Date.parse(meta.createdAt))){
-      throw new LocalFsApiError(409,'APPLICATION_SNAPSHOT_LINK','永久快照与台账身份、导出关联或原稿元数据不一致，未显示原稿；请核对原件或备份。');
-    }
-    this.requireQueueSnapshotBinding(current,entry,doc);
+    assertHistoricalSnapshotBinding(current,entry,id,record);
     // A concurrent atomic ledger update must not make a stale association look
     // verified. This is a point-in-time check, not a filesystem transaction.
     const after=await this.getApplications(false);
@@ -1142,15 +1161,6 @@ export class LocalResumeStore {
       signal?.throwIfAborted();
       return {...opened,ledgerRevision:parsed.data.ledgerRevision};
     });
-  }
-  private requireQueueTarget(task:JobQueueTask,target:{company:string;role:string;resumeSlug:string;jdText?:string}){
-    if(target.company!==task.company||target.role!==task.role||target.resumeSlug!==task.slug||(target.jdText!==undefined&&target.jdText!==task.jdText))throw new LocalFsApiError(409,'JOB_QUEUE_LINK','岗位材料与原任务单位、岗位、原文或版本不一致。');
-  }
-  private requireQueueSnapshotBinding(current:ApplicationsStoreData,entry:JobApplication,doc:ResumeDocument){
-    if(!entry.queueTaskId)return;
-    const task=current.jobQueue?.find(t=>t.id===entry.queueTaskId);
-    if(!task||task.status!=='prepared'||!entry.pdfReceipt||!jobQueueBindingMatches(task,doc,createHash('sha256').update(jobQueueDocumentText(doc)).digest('hex')))throw new LocalFsApiError(409,'JOB_QUEUE_LINK','岗位永久快照与原任务绑定不一致。');
-    this.requireQueueTarget(task,entry);
   }
 
   /** Explicit command; the only user-facing route to state transitions. All writes
@@ -1254,7 +1264,7 @@ export class LocalResumeStore {
         if(letters.has(l.id))throw new LocalFsApiError(422,'DUPLICATE_LETTER','自荐信标识重复。');letters.add(l.id);
         const old=current.coverLetters.find(x=>x.id===l.id);
         if(old&&(old.queueTaskId!==l.queueTaskId||(old.queueTaskId&&JSON.stringify(old)!==JSON.stringify(l))))throw new LocalFsApiError(409,'JOB_QUEUE_LINK','岗位自荐信历史不可重新关联或覆盖；请另存。');
-        if(!old&&l.queueTaskId){const {task}=await requirePrepared(l.queueTaskId);this.requireQueueTarget(task,l);}
+        if(!old&&l.queueTaskId){const {task}=await requirePrepared(l.queueTaskId);requireQueueTarget(task,l);}
       }
       for(const [key,answer] of Object.entries(validated.interviewAnswers)){
         if(!key.startsWith(QUEUE_PRACTICE_PREFIX)||current.interviewAnswers[key]===answer)continue;

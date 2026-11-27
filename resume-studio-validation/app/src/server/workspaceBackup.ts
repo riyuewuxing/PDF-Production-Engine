@@ -3,10 +3,10 @@ import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {BACKUP_PREFIX,RESTORE_PREFIX,BACKUP_MANIFEST,MAX_BACKUP_FILES,MAX_BACKUP_FILE_BYTES,MAX_BACKUP_BYTES,WorkspaceBackupManifestSchema,managedBackupPath,type BackupFile,type BackupSummary,type WorkspaceBackupManifest} from '../schema/workspaceBackupSchema';
 import {ResumeDocumentSchema} from '../schema/resumeSchema';
-import {ApplicationsStoreSchema,type ApplicationsStoreData} from '../schema/applicationSchema';
+import {ApplicationsStoreSchema,type ApplicationsStoreData,type ApplicationSnapshotMeta,type ApplicationSnapshotRecord,type JobApplication} from '../schema/applicationSchema';
 import {FactBankSchema} from '../schema/factBankSchema';
 import {EvidenceIndexSchema,type EvidenceIndex} from '../schema/evidenceSchema';
-import {withResumeWriteLock} from './localFsApi';
+import {withResumeWriteLock,assertSafeSnapshotId,assertHistoricalSnapshotBinding} from './localFsApi';
 
 const hash=(b:Buffer)=>createHash('sha256').update(b).digest('hex');
 const missing=(e:unknown)=>(e as NodeJS.ErrnoException)?.code==='ENOENT';
@@ -72,17 +72,28 @@ async function scan(root:string,source:boolean,signal:AbortSignal):Promise<strin
   await walk('');return result.sort();
 }
 function parseJson(bytes:Buffer){return JSON.parse(bytes.toString('utf8')) as unknown;}
-function validateFile(relative:string,bytes:Buffer){
+function validateFile(relative:string,bytes:Buffer):ApplicationSnapshotRecord|undefined{
   if(relative==='master.json'||relative.startsWith('resumes/')||relative.startsWith('.trash/'))ResumeDocumentSchema.parse(parseJson(bytes));
   else if(relative==='applications.json')ApplicationsStoreSchema.parse(parseJson(bytes));
   else if(relative==='.fact-bank-v1.json')FactBankSchema.parse(parseJson(bytes));
   else if(relative==='.evidence-index-v1.json')EvidenceIndexSchema.parse(parseJson(bytes));
   else if(relative.startsWith('.backups/')||relative.startsWith('.application-snapshots/')){
-    const record=parseJson(bytes) as {meta?:{id?:string;slug?:string;resumeSlug?:string};document?:unknown};
-    ResumeDocumentSchema.parse(record.document);
+    const record=parseJson(bytes) as {meta?:ApplicationSnapshotMeta&{slug?:string};document?:unknown};
+    const document=ResumeDocumentSchema.parse(record.document);
     const parts=relative.split('/'),id=parts.at(-1)!.slice(0,-5);
     if(!record.meta||record.meta.id!==id||(relative.startsWith('.backups/')&&record.meta.slug!==parts[1]))throw new Error('快照元数据与文件名不一致：'+relative);
+    if(relative.startsWith('.application-snapshots/'))return {meta:record.meta,document};
   }
+  return undefined;
+}
+// Resolve only a canonical ID or its supported legacy .json suffix, without following paths.
+function snapshotReferencePath(raw:string):string|null{
+  try{
+    const id=assertSafeSnapshotId(raw);
+    if(raw!==id&&raw.slice(0,-5)!==id)return null;
+    const p='.application-snapshots/'+id+'.json';
+    return managedBackupPath(p)?p:null;
+  }catch{return null;}
 }
 async function writeDurable(target:string,data:Buffer|string,signal:AbortSignal){
   check(signal);
@@ -103,18 +114,45 @@ async function verifyFiles(root:string,manifest:WorkspaceBackupManifest,source:b
   const paths=await scan(root,source,signal),expected=manifest.files.map(f=>f.path).sort();
   if(JSON.stringify(paths)!==JSON.stringify(expected))throw new Error('文件清单与备份内容不一致（缺失、额外或未识别文件）。');
   const warnings:string[]=[],counts:Record<string,number>={};let ledger:ApplicationsStoreData|undefined,index:EvidenceIndex|undefined;
-  for(const entry of manifest.files){
+  const linked=new Map<string,JobApplication[]>(),appCounts=new Map<string,number>(),linkWarnings=new Set<string>();
+  const byPath=new Map(manifest.files.map(f=>[f.path,f]));
+  const ledgerFile=byPath.get('applications.json');
+  // Read the verified ledger first so every permanent record can be checked
+  // while its parsed document is in memory. No extra filesystem reads per link.
+  const ordered=ledgerFile?[ledgerFile,...manifest.files.filter(f=>f!==ledgerFile)]:manifest.files;
+  const warnLink=(id:string)=>{if(linkWarnings.size<101)linkWarnings.add('原数据已有永久投递快照关联异常：'+id.slice(0,125));};
+  for(const entry of ordered){
     const bytes=await readBounded(root,entry.path,MAX_BACKUP_FILE_BYTES,signal);
     if(bytes.length!==entry.size||hash(bytes)!==entry.sha256)throw new Error('文件 SHA-256 或大小校验失败：'+entry.path);
-    validateFile(entry.path,bytes);
-    if(entry.path==='applications.json')ledger=ApplicationsStoreSchema.parse(parseJson(bytes));
+    const record=validateFile(entry.path,bytes);
+    if(entry.path==='applications.json'){
+      ledger=ApplicationsStoreSchema.parse(parseJson(bytes));
+      for(const app of ledger.applications){
+        appCounts.set(app.id,(appCounts.get(app.id)??0)+1);
+        if(!app.snapshotId)continue;
+        const target=snapshotReferencePath(app.snapshotId);
+        if(!target){warnLink(app.snapshotId);continue;}
+        const list=linked.get(target)??[];list.push(app);linked.set(target,list);
+      }
+    }
+    if(record&&ledger){
+      for(const app of linked.get(entry.path)??[]){
+        check(signal);
+        try{
+          if(!app.id.trim()||app.id.length>200||appCounts.get(app.id)!==1)throw new Error('invalid application identity');
+          assertHistoricalSnapshotBinding(ledger,app,record.meta.id,record);
+        }catch{warnLink(app.snapshotId);}
+      }
+    }
     if(entry.path==='.evidence-index-v1.json')index=EvidenceIndexSchema.parse(parseJson(bytes));
     const group=entry.path.split('/')[0]!;counts[group]=(counts[group]??0)+1;
   }
-  const byPath=new Map(manifest.files.map(f=>[f.path,f]));
-  for(const id of new Set([...(ledger?.applications??[]).map(a=>a.snapshotId),...(ledger?.jobReviews??[]).map(a=>a.snapshotId)].filter(Boolean))){
-    if(!byPath.has('.application-snapshots/'+id+'.json'))warnings.push('原数据已有缺失的永久投递快照：'+id);
+  for(const id of new Set([...(ledger?.applications??[]).map(a=>a.snapshotId),...(ledger?.jobReviews??[]).map(a=>a.snapshotId)].filter((id):id is string=>!!id))){
+    const target=snapshotReferencePath(id);
+    if(!target)warnLink(id);
+    else if(!byPath.has(target)&&warnings.length<101)warnings.push('原数据已有缺失的永久投递快照：'+id.slice(0,125));
   }
+  warnings.push(...linkWarnings);
   const knownEvidence=new Set((index?.entries??[]).map(e=>'.evidence-files-v1/'+e.id+'.'+e.kind));
   const orphanCount=manifest.files.filter(f=>f.path.startsWith('.evidence-files-v1/')&&!knownEvidence.has(f.path)).length;
   if(orphanCount)warnings.push('原数据已有 '+orphanCount+' 个无索引证据附件，保留字节但无法确认关联。');
