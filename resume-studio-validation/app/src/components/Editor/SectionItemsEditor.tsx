@@ -96,30 +96,30 @@ function MarkdownTextarea({
     <div className={className}>
       <div className="mb-1 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={insertBullet}
-            className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
+            className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1.5 py-0.5 text-[11px] text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
           >
             <List size={11} /> 添加列表项
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={wrapBold}
-            className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+            className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
           >
             <Bold size={11} /> 加粗选中
           </button>
         </div>
-        <span className="text-[10px] text-slate-400">支持 - 列表与 **加粗**</span>
+        <span className="text-[10px] text-slate-400 studio-ui-muted">支持 - 列表与 **加粗**</span>
       </div>
-      <textarea
+      <textarea data-studio-control="true"
         ref={ref}
         rows={rows}
         value={value}
         onChange={(e) => onChangeValue(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded border border-slate-200 bg-white p-2 text-xs leading-relaxed text-slate-900 focus:border-slate-500 focus:outline-none"
+        className="w-full rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface p-2 text-xs leading-relaxed text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
       />
     </div>
   );
@@ -149,64 +149,64 @@ function ItemToolbar({
   onDelete: () => void;
 }) {
   return (
-    <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
+    <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 studio-ui-divider pb-1.5">
       <div className="flex min-w-0 items-center gap-1.5">
         {dragHandleProps && (
           <span
             {...dragHandleProps}
             title="按住拖曳调整顺序"
             aria-label="按住拖曳调整顺序"
-            className="cursor-grab active:cursor-grabbing rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            className="cursor-grab active:cursor-grabbing rounded p-0.5 text-slate-400 studio-ui-muted hover:bg-slate-200 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary"
           >
             <GripVertical size={13} />
           </span>
         )}
-        <span className={`truncate text-xs font-semibold ${visible ? 'text-slate-800' : 'text-slate-400 line-through'}`}>
+        <span className={`truncate text-xs font-semibold ${visible ? 'text-slate-800 studio-ui-primary' : 'text-slate-400 studio-ui-muted line-through'}`}>
           {title || '未命名条目'}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={onDuplicate}
           aria-label="复制一份该条经历"
           title="复制一份插入下方"
-          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-800 studio-ui-hover-primary"
         >
           <Copy size={13} />
         </button>
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={onToggleVisible}
           aria-label={visible ? '隐藏该条经历' : '显示该条经历'}
           title={visible ? '点击隐藏该条经历' : '点击显示该条经历'}
-          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-800 studio-ui-hover-primary"
         >
-          {visible ? <Eye size={14} /> : <EyeOff size={14} className="text-amber-600" />}
+          {visible ? <Eye size={14} /> : <EyeOff size={14} className="text-amber-600 studio-ui-warning" />}
         </button>
-        <button
+        <button data-studio-control="true"
           type="button"
           disabled={index === 0}
           onClick={onMoveUp}
           aria-label="上移条目"
-          className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+          className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover disabled:opacity-30"
         >
           <ArrowUp size={13} />
         </button>
-        <button
+        <button data-studio-control="true"
           type="button"
           disabled={index === total - 1}
           onClick={onMoveDown}
           aria-label="下移条目"
-          className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+          className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover disabled:opacity-30"
         >
           <ArrowDown size={13} />
         </button>
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={onDelete}
           aria-label="删除条目"
-          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+          className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
         >
           <Trash2 size={13} />
         </button>
@@ -302,10 +302,10 @@ export function SectionItemsEditor({
             {...eduDnd.getContainerProps(index)}
             className={`rounded-md border p-3 transition ${
               eduDnd.overIndex === index && eduDnd.draggingIndex !== index
-                ? 'border-t-2 border-t-sky-500 border-sky-400 bg-sky-50/40'
+                ? 'border-t-2 border-t-sky-500 studio-ui-info-top-border border-sky-400 studio-ui-info-border bg-sky-50/40 studio-ui-info-surface'
                 : eduDnd.draggingIndex === index
-                  ? 'border-slate-300 bg-slate-100 opacity-60'
-                  : 'border-slate-200 bg-slate-50/50'
+                  ? 'border-slate-300 studio-ui-border bg-slate-100 studio-ui-raised opacity-60'
+                  : 'border-slate-200 studio-ui-border bg-slate-50/50 studio-ui-raised'
             }`}
           >
             <ItemToolbar
@@ -330,47 +330,47 @@ export function SectionItemsEditor({
               }
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={edu.school}
                 onChange={(e) => updateItem(edu.id, { school: e.target.value })}
                 placeholder="学校名称"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={edu.major}
                 onChange={(e) => updateItem(edu.id, { major: e.target.value })}
                 placeholder="专业"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={edu.degree}
                 onChange={(e) => updateItem(edu.id, { degree: e.target.value })}
                 placeholder="学历（如 硕士）"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={edu.gpa}
                 onChange={(e) => updateItem(edu.id, { gpa: e.target.value })}
                 placeholder="GPA / 排名"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={edu.startDate}
                 onChange={(e) => updateItem(edu.id, { startDate: e.target.value })}
                 placeholder="开始时间"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={edu.endDate}
                 onChange={(e) => updateItem(edu.id, { endDate: e.target.value })}
                 placeholder="结束时间"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
             </div>
             <MarkdownTextarea
@@ -382,10 +382,10 @@ export function SectionItemsEditor({
             />
           </div>
         ))}
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={addItem}
-          className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+          className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
         >
           <Plus size={13} /> 添加教育经历
         </button>
@@ -433,10 +433,10 @@ export function SectionItemsEditor({
             {...expDnd.getContainerProps(index)}
             className={`rounded-md border p-3 transition ${
               expDnd.overIndex === index && expDnd.draggingIndex !== index
-                ? 'border-t-2 border-t-sky-500 border-sky-400 bg-sky-50/40'
+                ? 'border-t-2 border-t-sky-500 studio-ui-info-top-border border-sky-400 studio-ui-info-border bg-sky-50/40 studio-ui-info-surface'
                 : expDnd.draggingIndex === index
-                  ? 'border-slate-300 bg-slate-100 opacity-60'
-                  : 'border-slate-200 bg-slate-50/50'
+                  ? 'border-slate-300 studio-ui-border bg-slate-100 studio-ui-raised opacity-60'
+                  : 'border-slate-200 studio-ui-border bg-slate-50/50 studio-ui-raised'
             }`}
           >
             <ItemToolbar
@@ -461,33 +461,33 @@ export function SectionItemsEditor({
               }
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={exp.company}
                 onChange={(e) => updateItem(exp.id, { company: e.target.value })}
                 placeholder="单位 / 学校名称"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={exp.position}
                 onChange={(e) => updateItem(exp.id, { position: e.target.value })}
                 placeholder="岗位 / 角色"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={exp.startDate}
                 onChange={(e) => updateItem(exp.id, { startDate: e.target.value })}
                 placeholder="开始时间"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={exp.endDate}
                 onChange={(e) => updateItem(exp.id, { endDate: e.target.value })}
                 placeholder="结束时间"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
             </div>
             <MarkdownTextarea
@@ -499,10 +499,10 @@ export function SectionItemsEditor({
             />
           </div>
         ))}
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={addItem}
-          className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+          className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
         >
           <Plus size={13} /> 添加工作/实习经历
         </button>
@@ -549,10 +549,10 @@ export function SectionItemsEditor({
             {...projDnd.getContainerProps(index)}
             className={`rounded-md border p-3 transition ${
               projDnd.overIndex === index && projDnd.draggingIndex !== index
-                ? 'border-t-2 border-t-sky-500 border-sky-400 bg-sky-50/40'
+                ? 'border-t-2 border-t-sky-500 studio-ui-info-top-border border-sky-400 studio-ui-info-border bg-sky-50/40 studio-ui-info-surface'
                 : projDnd.draggingIndex === index
-                  ? 'border-slate-300 bg-slate-100 opacity-60'
-                  : 'border-slate-200 bg-slate-50/50'
+                  ? 'border-slate-300 studio-ui-border bg-slate-100 studio-ui-raised opacity-60'
+                  : 'border-slate-200 studio-ui-border bg-slate-50/50 studio-ui-raised'
             }`}
           >
             <ItemToolbar
@@ -577,40 +577,40 @@ export function SectionItemsEditor({
               }
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={proj.name}
                 onChange={(e) => updateItem(proj.id, { name: e.target.value })}
                 placeholder="项目名称"
-                className="col-span-2 rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={proj.role}
                 onChange={(e) => updateItem(proj.id, { role: e.target.value })}
                 placeholder="担任角色"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={proj.date}
                 onChange={(e) => updateItem(proj.id, { date: e.target.value })}
                 placeholder="时间范围"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={proj.link}
                 onChange={(e) => updateItem(proj.id, { link: e.target.value })}
                 placeholder="相关链接（可选）"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 value={proj.linkLabel}
                 onChange={(e) => updateItem(proj.id, { linkLabel: e.target.value })}
                 placeholder="链接文字（可选）"
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
             </div>
             <MarkdownTextarea
@@ -622,10 +622,10 @@ export function SectionItemsEditor({
             />
           </div>
         ))}
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={addItem}
-          className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+          className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
         >
           <Plus size={13} /> 添加项目经历
         </button>
@@ -663,10 +663,10 @@ export function SectionItemsEditor({
           {...customDnd.getContainerProps(index)}
           className={`rounded-md border p-3 transition ${
             customDnd.overIndex === index && customDnd.draggingIndex !== index
-              ? 'border-t-2 border-t-sky-500 border-sky-400 bg-sky-50/40'
+              ? 'border-t-2 border-t-sky-500 studio-ui-info-top-border border-sky-400 studio-ui-info-border bg-sky-50/40 studio-ui-info-surface'
               : customDnd.draggingIndex === index
-                ? 'border-slate-300 bg-slate-100 opacity-60'
-                : 'border-slate-200 bg-slate-50/50'
+                ? 'border-slate-300 studio-ui-border bg-slate-100 studio-ui-raised opacity-60'
+                : 'border-slate-200 studio-ui-border bg-slate-50/50 studio-ui-raised'
           }`}
         >
           <ItemToolbar
@@ -687,7 +687,7 @@ export function SectionItemsEditor({
             onDelete={() => updateCustomList(list.filter((x) => x.id !== item.id), true)}
           />
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <input
+            <input data-studio-control="true"
               type="text"
               value={item.title}
               onChange={(e) =>
@@ -696,9 +696,9 @@ export function SectionItemsEditor({
                 )
               }
               placeholder="标题"
-              className="col-span-2 rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+              className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
             />
-            <input
+            <input data-studio-control="true"
               type="text"
               value={item.subtitle}
               onChange={(e) =>
@@ -707,9 +707,9 @@ export function SectionItemsEditor({
                 )
               }
               placeholder="副标题（可选）"
-              className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+              className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
             />
-            <input
+            <input data-studio-control="true"
               type="text"
               value={item.dateRange}
               onChange={(e) =>
@@ -718,7 +718,7 @@ export function SectionItemsEditor({
                 )
               }
               placeholder="时间（可选）"
-              className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+              className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
             />
           </div>
           <MarkdownTextarea
@@ -734,7 +734,7 @@ export function SectionItemsEditor({
           />
         </div>
       ))}
-      <button
+      <button data-studio-control="true"
         type="button"
         onClick={() =>
           updateCustomList(
@@ -752,7 +752,7 @@ export function SectionItemsEditor({
             true,
           )
         }
-        className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+        className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
       >
         <Plus size={13} /> 添加条目
       </button>

@@ -1,0 +1,80 @@
+/* P1 explicit editor/style and preview-chrome migration.
+   Legacy classes remain intact for classic. No global palette or inherited
+   properties are applied to the preview-stage ancestor of the actual A4. */
+@media screen {
+  :is([data-studio-surface="panel"], [data-studio-surface="preview"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+    background-color: var(--studio-surface);
+    color: var(--studio-text);
+    border-color: var(--studio-border);
+
+    & .studio-ui-surface { background-color: var(--studio-surface); }
+    & .studio-ui-raised { background-color: var(--studio-raised); }
+    & .studio-ui-primary { color: var(--studio-text); }
+    & .studio-ui-muted { color: var(--studio-muted); }
+    & .studio-ui-border { border-color: var(--studio-border); }
+    & .studio-ui-divider { border-color: var(--studio-divider); }
+    & .studio-ui-hover:hover:not(:disabled) { background-color: var(--studio-hover); }
+    & .studio-ui-hover-primary:hover:not(:disabled) { color: var(--studio-text); }
+    & .studio-ui-hover-border:hover:not(:disabled) { border-color: var(--studio-focus); }
+    & .studio-ui-focus-border:focus { border-color: var(--studio-focus); }
+    & .studio-ui-selected { background-color: var(--studio-selected); }
+    & .studio-ui-selected-text { color: var(--studio-selected-text); }
+    & .studio-ui-selected-border { border-color: var(--studio-selected-border); }
+    & .studio-ui-selected-hover:hover:not(:disabled) { background-color: var(--studio-selected); }
+    & .studio-ui-fill { background-color: var(--studio-accent-fill); color: var(--studio-on-accent); }
+    & .studio-ui-fill-hover:hover:not(:disabled) { background-color: var(--studio-accent-hover); color: var(--studio-on-accent); }
+    & .studio-ui-on-fill { color: var(--studio-on-accent); }
+    & .studio-ui-on-fill-muted { color: var(--studio-on-fill-muted); }
+    & .studio-ui-warning-surface { background-color: var(--studio-warning-surface); color: var(--studio-warning); }
+    & .studio-ui-warning { color: var(--studio-warning); }
+    & .studio-ui-warning-border { border-color: var(--studio-warning); }
+    & .studio-ui-warning-hover:hover:not(:disabled) { background-color: var(--studio-warning-surface); color: var(--studio-warning); }
+    & .studio-ui-error-surface { background-color: var(--studio-danger-surface); color: var(--studio-error); }
+    & .studio-ui-error { color: var(--studio-error); }
+    & .studio-ui-error-border { border-color: var(--studio-error); }
+    & .studio-ui-error-hover:hover:not(:disabled) { background-color: var(--studio-danger-surface); }
+    & .studio-ui-error-hover-text:hover:not(:disabled) { color: var(--studio-error); }
+    & .studio-ui-success-surface { background-color: var(--studio-success-surface); color: var(--studio-success); }
+    & .studio-ui-success { color: var(--studio-success); }
+    & .studio-ui-success-border { border-color: var(--studio-success); }
+    & .studio-ui-success-hover:hover:not(:disabled) { background-color: var(--studio-success-surface); color: var(--studio-success); }
+    & .studio-ui-info-surface { background-color: var(--studio-info-surface); }
+    & .studio-ui-info { color: var(--studio-info); }
+    & .studio-ui-info-border { border-color: var(--studio-info); }
+    & .studio-ui-info-top-border { border-top-color: var(--studio-info); }
+    & .studio-ui-privacy-surface { background-color: var(--studio-privacy-surface); color: var(--studio-privacy-text); }
+    & .studio-ui-privacy { color: var(--studio-privacy-text); }
+    & .studio-ui-privacy-border { border-color: var(--studio-privacy-border); }
+    & .studio-ui-privacy-hover:hover:not(:disabled) { background-color: var(--studio-privacy-surface); }
+    & .studio-ui-ring { --tw-ring-color: var(--studio-focus); }
+    & .studio-ui-warning-ring { --tw-ring-color: var(--studio-warning); }
+    & .studio-ui-error-ring { --tw-ring-color: var(--studio-error); }
+    & .studio-ui-success-ring { --tw-ring-color: var(--studio-success); }
+    & .studio-ui-accent { accent-color: var(--studio-accent-fill); }
+
+    /* Explicit control marker. No broad selectors across the document or
+       unconverted photo crop dialog. Native color swatches keep their color. */
+    & :is(input:not([type="color"]):not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, select)[data-studio-control] {
+      color-scheme: var(--studio-scheme);
+      background-color: var(--studio-field);
+    }
+    & :is(input, textarea)[data-studio-control]::placeholder { color: var(--studio-muted); opacity: 1; }
+    & input[data-studio-control].studio-ui-raised { background-color: var(--studio-raised); }
+    & :is(input[type="range"], input[type="checkbox"], input[type="radio"])[data-studio-control] {
+      color-scheme: var(--studio-scheme);
+      accent-color: var(--studio-accent-fill);
+    }
+    & [data-studio-control]:focus-visible { outline: 2px solid var(--studio-focus); outline-offset: 2px; }
+  }
+
+  /* Only background is set on the stage. Do not set foreground, font,
+     color-scheme, filter, opacity, transform, animation, zoom or layout here. */
+  [data-studio-stage="themed"] { background-color: var(--studio-stage-background); }
+  [data-studio-stage="themed"] [data-studio-stage-label="true"] { color: var(--studio-stage-label); }
+
+  @media (forced-colors: active) {
+    :is([data-studio-surface="panel"], [data-studio-surface="preview"]) [data-studio-control]:focus-visible {
+      outline-color: Highlight;
+    }
+  }
+}

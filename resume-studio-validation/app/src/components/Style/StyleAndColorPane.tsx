@@ -195,17 +195,17 @@ export function StyleAndColorPane({
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5">
+    <div className="flex h-full flex-col bg-white studio-ui-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-200 studio-ui-border px-4 py-2.5">
         <div>
-          <div className="text-xs font-bold text-slate-900">样式与排印引擎</div>
-          <div className="text-[11px] text-slate-500">配色、纸张、中文排印与本机字体覆盖</div>
+          <div className="text-xs font-bold text-slate-900 studio-ui-primary">样式与排印引擎</div>
+          <div className="text-[11px] text-slate-500 studio-ui-muted">配色、纸张、中文排印与本机字体覆盖</div>
         </div>
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={handleReset}
           title="将配色、纸张、字体与字号间距恢复到当前模板默认设定（支持 Ctrl+Z 撤回）"
-          className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+          className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-200 studio-ui-border bg-slate-50 studio-ui-raised px-2 py-1 text-[11px] font-medium text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
         >
           <RotateCcw size={11} /> 恢复模板默认样式
         </button>
@@ -215,8 +215,8 @@ export function StyleAndColorPane({
         {/* Language / Locale Toggle */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-semibold text-slate-800">简历语言（中英模板标签互译）</span>
-            <span className="text-[10px] text-slate-400">可 Ctrl+Z 撤回</span>
+            <span className="font-semibold text-slate-800 studio-ui-primary">简历语言（中英模板标签互译）</span>
+            <span className="text-[10px] text-slate-400 studio-ui-muted">可 Ctrl+Z 撤回</span>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             {(
@@ -227,7 +227,7 @@ export function StyleAndColorPane({
             ).map(([loc, label]) => {
               const active = (settings.locale ?? 'zh-CN') === loc;
               return (
-                <button
+                <button data-studio-control="true"
                   key={loc}
                   type="button"
                   aria-pressed={active}
@@ -240,8 +240,8 @@ export function StyleAndColorPane({
                   }}
                   className={`rounded border px-2.5 py-1.5 font-medium transition ${
                     active
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      ? 'border-slate-900 studio-ui-selected-border bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                      : 'border-slate-200 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover'
                   }`}
                 >
                   {label}
@@ -254,14 +254,14 @@ export function StyleAndColorPane({
         {/* Theme Color */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-semibold text-slate-800">主题主色</span>
-            <span className="font-mono text-[11px] text-slate-500">{settings.themeColor}</span>
+            <span className="font-semibold text-slate-800 studio-ui-primary">主题主色</span>
+            <span className="font-mono text-[11px] text-slate-500 studio-ui-muted">{settings.themeColor}</span>
           </div>
           <div className="grid grid-cols-6 gap-2">
             {COMMERCIAL_THEME_COLORS.map((preset) => {
               const active = settings.themeColor.toLowerCase() === preset.hex;
               return (
-                <button
+                <button data-studio-control="true"
                   key={preset.hex}
                   type="button"
                   onClick={() => patch('themeColor', preset.hex)}
@@ -269,17 +269,17 @@ export function StyleAndColorPane({
                   aria-label={`主题色 ${preset.label}`}
                   className={`flex h-7 items-center justify-center rounded-md border transition ${
                     active
-                      ? 'ring-2 ring-slate-900 ring-offset-1 border-slate-900'
-                      : 'border-slate-200 hover:scale-105'
+                      ? 'ring-2 ring-slate-900 studio-ui-ring ring-offset-1 border-slate-900 studio-ui-selected-border'
+                      : 'border-slate-200 studio-ui-border hover:scale-105'
                   }`}
                   style={{ backgroundColor: preset.hex }}
                 />
               );
             })}
           </div>
-          <label className="mt-2 flex items-center justify-between rounded border border-slate-200 px-2.5 py-1.5 text-slate-600">
+          <label className="mt-2 flex items-center justify-between rounded border border-slate-200 studio-ui-border px-2.5 py-1.5 text-slate-600 studio-ui-muted">
             <span>自定义 HEX 取色</span>
-            <input
+            <input data-studio-control="true"
               type="color"
               aria-label="自定义主题色"
               value={settings.themeColor}
@@ -292,36 +292,36 @@ export function StyleAndColorPane({
         {/* Paper Background */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <span className="font-semibold text-slate-800">纸张底色</span>
-            <span className="font-mono text-[11px] text-slate-500">{settings.paperBackground}</span>
+            <span className="font-semibold text-slate-800 studio-ui-primary">纸张底色</span>
+            <span className="font-mono text-[11px] text-slate-500 studio-ui-muted">{settings.paperBackground}</span>
           </div>
           <div className="grid grid-cols-5 gap-1.5">
             {PAPER_BACKGROUNDS.map((bg) => {
               const active = settings.paperBackground.toLowerCase() === bg.hex;
               return (
-                <button
+                <button data-studio-control="true"
                   key={bg.hex}
                   type="button"
                   onClick={() => patch('paperBackground', bg.hex)}
                   aria-label={`纸张底色 ${bg.label}`}
                   className={`flex flex-col items-center gap-1 rounded border p-1.5 ${
                     active
-                      ? 'border-slate-900 ring-1 ring-slate-900'
-                      : 'border-slate-200 hover:border-slate-400'
+                      ? 'border-slate-900 studio-ui-selected-border ring-1 ring-slate-900 studio-ui-ring'
+                      : 'border-slate-200 studio-ui-border hover:border-slate-400 studio-ui-hover-border'
                   }`}
                 >
                   <span
-                    className="h-5 w-full rounded border border-slate-200"
+                    className="h-5 w-full rounded border border-slate-200 studio-ui-border"
                     style={{ backgroundColor: bg.hex }}
                   />
-                  <span className="text-[10px] text-slate-600">{bg.label}</span>
+                  <span className="text-[10px] text-slate-600 studio-ui-muted">{bg.label}</span>
                 </button>
               );
             })}
           </div>
-          <label className="mt-2 flex items-center justify-between rounded border border-slate-200 px-2.5 py-1.5 text-slate-600">
+          <label className="mt-2 flex items-center justify-between rounded border border-slate-200 studio-ui-border px-2.5 py-1.5 text-slate-600 studio-ui-muted">
             <span>自定义纸张底色</span>
-            <input
+            <input data-studio-control="true"
               type="color"
               aria-label="自定义纸张底色"
               value={settings.paperBackground}
@@ -333,17 +333,17 @@ export function StyleAndColorPane({
 
         {/* Surface Style */}
         <section>
-          <div className="mb-2 font-semibold text-slate-800">侧栏 / 页眉填充模式</div>
+          <div className="mb-2 font-semibold text-slate-800 studio-ui-primary">侧栏 / 页眉填充模式</div>
           <div className="grid grid-cols-2 gap-1.5">
             {SURFACE_STYLES.map((item) => (
-              <button
+              <button data-studio-control="true"
                 key={item.id}
                 type="button"
                 onClick={() => patch('surfaceStyle', item.id)}
                 className={`rounded border px-2.5 py-1.5 font-medium transition ${
                   settings.surfaceStyle === item.id
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-slate-900 studio-ui-selected-border bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                    : 'border-slate-200 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover'
                 }`}
               >
                 {item.label}
@@ -354,17 +354,17 @@ export function StyleAndColorPane({
 
         {/* Heading Style */}
         <section>
-          <div className="mb-2 font-semibold text-slate-800">章节标题风格</div>
+          <div className="mb-2 font-semibold text-slate-800 studio-ui-primary">章节标题风格</div>
           <div className="grid grid-cols-2 gap-1.5">
             {HEADING_STYLES.map((item) => (
-              <button
+              <button data-studio-control="true"
                 key={item.id}
                 type="button"
                 onClick={() => patch('headingStyle', item.id)}
                 className={`rounded border px-2 py-1.5 font-medium transition ${
                   settings.headingStyle === item.id
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-slate-900 studio-ui-selected-border bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                    : 'border-slate-200 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover'
                 }`}
               >
                 {item.label}
@@ -374,14 +374,14 @@ export function StyleAndColorPane({
         </section>
 
         {/* 8 Curated Chinese Font Stacks + Custom OS Font Override */}
-        <section className="space-y-2.5 border-t border-slate-100 pt-3">
+        <section className="space-y-2.5 border-t border-slate-100 studio-ui-divider pt-3">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-slate-800">精选中文排印字体（8 套）</span>
-            <button
+            <span className="font-semibold text-slate-800 studio-ui-primary">精选中文排印字体（8 套）</span>
+            <button data-studio-control="true"
               type="button"
               onClick={loadFonts}
               disabled={loadingFonts}
-              className="inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-1 text-[10px] text-slate-500 studio-ui-muted hover:text-slate-900 studio-ui-hover-primary"
             >
               <RefreshCw size={10} className={loadingFonts ? 'animate-spin' : ''} /> 刷新本机字体
             </button>
@@ -392,7 +392,7 @@ export function StyleAndColorPane({
               const active = settings.fontFamily === item.id && !settings.customFontFamily;
               const hit = installedSet.size > 0 && installedSet.has(item.primaryFont.toLowerCase());
               return (
-                <button
+                <button data-studio-control="true"
                   key={item.id}
                   type="button"
                   onClick={() => {
@@ -405,8 +405,8 @@ export function StyleAndColorPane({
                   aria-pressed={active}
                   className={`rounded border p-2 text-left transition ${
                     active
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      ? 'border-slate-900 studio-ui-selected-border bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                      : 'border-slate-200 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1">
@@ -416,11 +416,11 @@ export function StyleAndColorPane({
                         className={`shrink-0 rounded px-1 py-0.5 text-[9px] ${
                           hit
                             ? active
-                              ? 'bg-emerald-500/30 text-emerald-200'
-                              : 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-emerald-500/30 studio-ui-success-surface text-emerald-200 studio-ui-success'
+                              : 'bg-emerald-50 studio-ui-success-surface text-emerald-700 studio-ui-success'
                             : active
-                              ? 'bg-slate-700 text-slate-300'
-                              : 'bg-slate-100 text-slate-400'
+                              ? 'bg-slate-700 studio-ui-raised text-slate-300 studio-ui-muted'
+                              : 'bg-slate-100 studio-ui-raised text-slate-400 studio-ui-muted'
                         }`}
                       >
                         {hit ? '已装' : '回退'}
@@ -429,7 +429,7 @@ export function StyleAndColorPane({
                   </div>
                   <div
                     className={`mt-1 truncate text-[12px] ${
-                      active ? 'text-white' : 'text-slate-900'
+                      active ? 'text-white studio-ui-on-fill' : 'text-slate-900 studio-ui-primary'
                     }`}
                     style={{ fontFamily: FONT_STACKS[item.id] }}
                   >
@@ -437,7 +437,7 @@ export function StyleAndColorPane({
                   </div>
                   <div
                     className={`mt-0.5 truncate text-[10px] ${
-                      active ? 'text-slate-300' : 'text-slate-400'
+                      active ? 'text-slate-300 studio-ui-on-fill-muted' : 'text-slate-400 studio-ui-muted'
                     }`}
                   >
                     {item.desc}
@@ -447,21 +447,21 @@ export function StyleAndColorPane({
             })}
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-slate-50/70 p-2.5 space-y-2">
+          <div className="rounded-md border border-slate-200 studio-ui-border bg-slate-50/70 studio-ui-raised p-2.5 space-y-2">
             <label className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-800">本机系统任意字体覆盖</span>
+                <span className="font-semibold text-slate-800 studio-ui-primary">本机系统任意字体覆盖</span>
                 {settings.customFontFamily && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-teal-700">
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-teal-700 studio-ui-selected-text">
                     <Check size={10} /> 已覆盖：{settings.customFontFamily}
                   </span>
                 )}
               </div>
-              <select
+              <select data-studio-control="true"
                 aria-label="本机任意字体覆盖"
                 value={settings.customFontFamily ?? ''}
                 onChange={(e) => patch('customFontFamily', e.target.value)}
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none"
+                className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-xs text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
               >
                 <option value="">默认（使用上方 8 套精选方案）</option>
                 <optgroup label="常用高质量中英文字体">
@@ -485,14 +485,14 @@ export function StyleAndColorPane({
                 )}
               </select>
             </label>
-            {fontSourceNote && <p className="text-[10px] text-slate-400">{fontSourceNote}</p>}
+            {fontSourceNote && <p className="text-[10px] text-slate-400 studio-ui-muted">{fontSourceNote}</p>}
           </div>
 
           {/* Fine Typography Controls */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
-              <span className="text-slate-600">标题字重</span>
-              <div className="inline-flex overflow-hidden rounded border border-slate-200 bg-slate-50 p-0.5">
+              <span className="text-slate-600 studio-ui-muted">标题字重</span>
+              <div className="inline-flex overflow-hidden rounded border border-slate-200 studio-ui-border bg-slate-50 studio-ui-raised p-0.5">
                 {(
                   [
                     ['normal', '常规'],
@@ -500,14 +500,14 @@ export function StyleAndColorPane({
                     ['bold', '加粗'],
                   ] as const
                 ).map(([w, label]) => (
-                  <button
+                  <button data-studio-control="true"
                     key={w}
                     type="button"
                     onClick={() => patch('headingWeight', w)}
                     className={`rounded px-2.5 py-0.5 text-[11px] font-medium transition ${
                       (settings.headingWeight ?? 'bold') === w
-                        ? 'bg-slate-900 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-slate-900 studio-ui-fill text-white studio-ui-on-fill'
+                        : 'text-slate-600 studio-ui-muted hover:text-slate-900 studio-ui-hover-primary'
                     }`}
                   >
                     {label}
@@ -517,8 +517,8 @@ export function StyleAndColorPane({
             </div>
 
             <label className="flex items-center justify-between gap-3">
-              <span className="text-slate-600">全局字距</span>
-              <input
+              <span className="text-slate-600 studio-ui-muted">全局字距</span>
+              <input data-studio-control="true"
                 type="range"
                 aria-label="全局字距"
                 min={-0.5}
@@ -526,19 +526,19 @@ export function StyleAndColorPane({
                 step={0.05}
                 value={settings.letterSpacing ?? 0}
                 onChange={(e) => patch('letterSpacing', Number(e.target.value))}
-                className="flex-1 accent-slate-900"
+                className="flex-1 accent-slate-900 studio-ui-accent"
               />
               <span className="w-12 text-right font-mono">
                 {(settings.letterSpacing ?? 0).toFixed(2)}px
               </span>
             </label>
 
-            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700">
-              <input
+            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700 studio-ui-primary">
+              <input data-studio-control="true"
                 type="checkbox"
                 checked={settings.tabularNums !== false}
                 onChange={(e) => patch('tabularNums', e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 studio-ui-border"
               />
               <span>数字与日期等宽对齐（tabular-nums）</span>
             </label>
@@ -546,141 +546,141 @@ export function StyleAndColorPane({
         </section>
 
         {/* Spacing & Typography Sliders */}
-        <section className="space-y-2.5 border-t border-slate-100 pt-3">
-          <div className="font-semibold text-slate-800">字号与间距精密微调</div>
+        <section className="space-y-2.5 border-t border-slate-100 studio-ui-divider pt-3">
+          <div className="font-semibold text-slate-800 studio-ui-primary">字号与间距精密微调</div>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">正文字号</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">正文字号</span>
+            <input data-studio-control="true"
               type="range"
               min={DENSITY_LIMITS.baseFontSize.min}
               max={DENSITY_LIMITS.baseFontSize.max}
               step={DENSITY_LIMITS.baseFontSize.step}
               value={settings.baseFontSize}
               onChange={(e) => patch('baseFontSize', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.baseFontSize}px</span>
           </label>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">行高倍率</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">行高倍率</span>
+            <input data-studio-control="true"
               type="range"
               min={DENSITY_LIMITS.lineHeight.min}
               max={DENSITY_LIMITS.lineHeight.max}
               step={DENSITY_LIMITS.lineHeight.step}
               value={settings.lineHeight}
               onChange={(e) => patch('lineHeight', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.lineHeight.toFixed(2)}</span>
           </label>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">模块间距</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">模块间距</span>
+            <input data-studio-control="true"
               type="range"
               min={DENSITY_LIMITS.sectionSpacing.min}
               max={DENSITY_LIMITS.sectionSpacing.max}
               step={DENSITY_LIMITS.sectionSpacing.step}
               value={settings.sectionSpacing}
               onChange={(e) => patch('sectionSpacing', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.sectionSpacing}px</span>
           </label>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">段落间距</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">段落间距</span>
+            <input data-studio-control="true"
               type="range"
               min={DENSITY_LIMITS.paragraphSpacing.min}
               max={DENSITY_LIMITS.paragraphSpacing.max}
               step={1}
               value={settings.paragraphSpacing}
               onChange={(e) => patch('paragraphSpacing', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.paragraphSpacing}px</span>
           </label>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">页面边距</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">页面边距</span>
+            <input data-studio-control="true"
               type="range"
               min={DENSITY_LIMITS.pagePadding.min}
               max={DENSITY_LIMITS.pagePadding.max}
               step={DENSITY_LIMITS.pagePadding.step}
               value={settings.pagePadding}
               onChange={(e) => patch('pagePadding', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.pagePadding}px</span>
           </label>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">标题字号</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">标题字号</span>
+            <input data-studio-control="true"
               type="range"
               min={14}
               max={26}
               step={1}
               value={settings.headerSize}
               onChange={(e) => patch('headerSize', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.headerSize}px</span>
           </label>
 
           <label className="flex items-center justify-between gap-3">
-            <span className="text-slate-600">副标题字号</span>
-            <input
+            <span className="text-slate-600 studio-ui-muted">副标题字号</span>
+            <input data-studio-control="true"
               type="range"
               min={12}
               max={22}
               step={1}
               value={settings.subheaderSize}
               onChange={(e) => patch('subheaderSize', Number(e.target.value))}
-              className="flex-1 accent-slate-900"
+              className="flex-1 accent-slate-900 studio-ui-accent"
             />
             <span className="w-10 text-right font-mono">{settings.subheaderSize}px</span>
           </label>
 
           <div className="flex flex-col gap-2 pt-1">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700">
-              <input
+            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700 studio-ui-primary">
+              <input data-studio-control="true"
                 type="checkbox"
                 checked={settings.useIconMode}
                 onChange={(e) => patch('useIconMode', e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 studio-ui-border"
               />
               <span>显示基础信息图标</span>
             </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700">
-              <input
+            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700 studio-ui-primary">
+              <input data-studio-control="true"
                 type="checkbox"
                 checked={settings.showPageGuide}
                 onChange={(e) => patch('showPageGuide', e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 studio-ui-border"
               />
               <span>显示 297mm 单页红线警戒标尺</span>
             </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700">
-              <input
+            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700 studio-ui-primary">
+              <input data-studio-control="true"
                 type="checkbox"
                 checked={settings.avoidItemSplit}
                 onChange={(e) => patch('avoidItemSplit', e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 studio-ui-border"
               />
               <span>防单条经历跨页劈断（推荐开启）</span>
             </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700">
-              <input
+            <label className="inline-flex cursor-pointer items-center gap-2 text-slate-700 studio-ui-primary">
+              <input data-studio-control="true"
                 type="checkbox"
                 checked={settings.autoCjkSpacing}
                 onChange={(e) => patch('autoCjkSpacing', e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 studio-ui-border"
               />
               <span>中英文与数字混排自动加空格（预览态无损生效）</span>
             </label>

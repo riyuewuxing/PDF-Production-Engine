@@ -182,17 +182,17 @@ export function ResumeEditorPane({
   const hasExperienceModule = orderedSections.some((s) => s.id === 'experience');
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5">
+    <div className="flex h-full flex-col bg-white studio-ui-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-200 studio-ui-border px-4 py-2.5">
         <div>
-          <div className="text-xs font-bold text-slate-900">内容编辑</div>
-          <div className="text-[11px] text-slate-500">拖动抓手排模块 · 点击右侧可跳转定位</div>
+          <div className="text-xs font-bold text-slate-900 studio-ui-primary">内容编辑</div>
+          <div className="text-[11px] text-slate-500 studio-ui-muted">拖动抓手排模块 · 点击右侧可跳转定位</div>
         </div>
-        <button
+        <button data-studio-control="true"
           type="button"
           onClick={() => emitDiscrete(applyCjkSpacingToDocument(document))}
           title="在中英文与数字间自动补充半角空格（跳过邮箱、URL、日期及不等式），支持 Ctrl+Z 撤销"
-          className="inline-flex shrink-0 items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-1 text-[11px] font-medium text-teal-800 hover:bg-teal-100"
+          className="inline-flex shrink-0 items-center gap-1 rounded border border-teal-200 studio-ui-selected-border bg-teal-50 studio-ui-selected px-2 py-1 text-[11px] font-medium text-teal-800 studio-ui-selected-text hover:bg-teal-100 studio-ui-selected-hover"
         >
           <Sparkles size={11} /> 一键中英排版
         </button>
@@ -200,9 +200,9 @@ export function ResumeEditorPane({
 
       <div className="flex-1 space-y-2.5 overflow-y-auto p-3.5">
         {!orderedSections.some(s => s.id === 'basic') && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-slate-700">
+          <div className="rounded-lg border border-amber-200 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface p-3 text-xs text-slate-700 studio-ui-primary">
             <p className="mb-2">导入文档未包含基本信息模块，原有字段仍保留。恢复后只显示已启用的字段。</p>
-            <button type="button" className="rounded border border-amber-300 bg-white px-2 py-1 font-medium hover:bg-amber-100"
+            <button data-studio-control="true" type="button" className="rounded border border-amber-300 studio-ui-warning-border bg-white studio-ui-surface px-2 py-1 font-medium hover:bg-amber-100 studio-ui-warning-hover"
               onClick={() => {
                 updateSections([{id:'basic',title:'基本信息',icon:'User',enabled:true,order:0,pageBreakBefore:false},
                   ...orderedSections.map((s,index)=>({...s,order:index+1}))]);
@@ -230,14 +230,14 @@ export function ResumeEditorPane({
               {...(!isBasic ? sectionDnd.getContainerProps(index) : {})}
               className={`rounded-lg border transition-all ${
                 isHighlighted
-                  ? 'border-amber-500 ring-2 ring-amber-400/50'
+                  ? 'border-amber-500 studio-ui-warning-border ring-2 ring-amber-400/50 studio-ui-warning-ring'
                   : isDragTarget
-                    ? 'border-t-2 border-t-sky-500 border-sky-400 bg-sky-50/40'
+                    ? 'border-t-2 border-t-sky-500 studio-ui-info-top-border border-sky-400 studio-ui-info-border bg-sky-50/40 studio-ui-info-surface'
                     : isDragging
-                      ? 'border-slate-300 bg-slate-100 opacity-60'
+                      ? 'border-slate-300 studio-ui-border bg-slate-100 studio-ui-raised opacity-60'
                       : section.enabled
-                        ? 'border-slate-200 bg-white'
-                        : 'border-slate-200/70 bg-slate-50/80'
+                        ? 'border-slate-200 studio-ui-border bg-white studio-ui-surface'
+                        : 'border-slate-200/70 studio-ui-border bg-slate-50/80 studio-ui-raised'
               }`}
             >
               <div className="relative flex items-center justify-between gap-1.5 px-2.5 py-2.5">
@@ -247,14 +247,14 @@ export function ResumeEditorPane({
                       {...sectionDnd.getHandleProps(index)}
                       title="按住拖动重排模块"
                       aria-label={`拖拽调整${section.title}顺序`}
-                      className="cursor-grab active:cursor-grabbing rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="cursor-grab active:cursor-grabbing rounded p-0.5 text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary"
                     >
                       <GripVertical size={14} />
                     </span>
                   )}
 
                   {!isBasic && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -264,15 +264,15 @@ export function ResumeEditorPane({
                       title="点击更换模块图标"
                       className={`shrink-0 rounded p-1 transition ${
                         isPickerOpen
-                          ? 'bg-teal-100 text-teal-800'
-                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                          ? 'bg-teal-100 studio-ui-selected text-teal-800 studio-ui-selected-text'
+                          : 'text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-900 studio-ui-hover-primary'
                       }`}
                     >
                       <LucideIconByName name={activeIconName} size={13} />
                     </button>
                   )}
 
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     onClick={() => toggleOpen(section.id)}
                     aria-expanded={isOpen}
@@ -280,12 +280,12 @@ export function ResumeEditorPane({
                     className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                   >
                     {isOpen ? (
-                      <ChevronDown size={15} className="shrink-0 text-slate-500" />
+                      <ChevronDown size={15} className="shrink-0 text-slate-500 studio-ui-muted" />
                     ) : (
-                      <ChevronRight size={15} className="shrink-0 text-slate-500" />
+                      <ChevronRight size={15} className="shrink-0 text-slate-500 studio-ui-muted" />
                     )}
                     {renamingId === section.id ? (
-                      <input
+                      <input data-studio-control="true"
                         type="text"
                         autoFocus
                         value={renameDraft}
@@ -296,12 +296,12 @@ export function ResumeEditorPane({
                           if (e.key === 'Enter') commitRename(section.id);
                           if (e.key === 'Escape') setRenamingId(null);
                         }}
-                        className="w-full rounded border border-slate-400 bg-white px-1.5 py-0.5 text-sm font-semibold text-slate-900 focus:outline-none"
+                        className="w-full rounded border border-slate-400 studio-ui-border bg-white studio-ui-surface px-1.5 py-0.5 text-sm font-semibold text-slate-900 studio-ui-primary focus:outline-none"
                       />
                     ) : (
                       <span
                         className={`truncate text-sm font-semibold ${
-                          section.enabled ? 'text-slate-900' : 'text-slate-400 line-through'
+                          section.enabled ? 'text-slate-900 studio-ui-primary' : 'text-slate-400 studio-ui-muted line-through'
                         }`}
                       >
                         {section.title}
@@ -311,17 +311,17 @@ export function ResumeEditorPane({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-0.5">
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     onClick={() => startRename(section)}
                     aria-label={`重命名${section.title}`}
                     title="重命名模块"
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary"
                   >
                     <Pencil size={13} />
                   </button>
                   {!isBasic && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() =>
                         updateSections(
@@ -340,15 +340,15 @@ export function ResumeEditorPane({
                       }
                       className={`rounded p-1 transition ${
                         section.pageBreakBefore
-                          ? 'bg-sky-100 text-sky-700'
-                          : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                          ? 'bg-sky-100 studio-ui-info-surface text-sky-700 studio-ui-info'
+                          : 'text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary'
                       }`}
                     >
                       <SeparatorHorizontal size={13} />
                     </button>
                   )}
                   {(!isBasic || !section.enabled) && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() =>
                         updateSections(
@@ -359,40 +359,40 @@ export function ResumeEditorPane({
                       }
                       aria-label={section.enabled ? `隐藏模块${section.title}` : `显示模块${section.title}`}
                       title={section.enabled ? '模块已启用' : '模块已隐藏'}
-                      className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                      className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover"
                     >
                       {section.enabled ? (
                         <Eye size={14} />
                       ) : (
-                        <EyeOff size={14} className="text-amber-600" />
+                        <EyeOff size={14} className="text-amber-600 studio-ui-warning" />
                       )}
                     </button>
                   )}
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     disabled={index === 0 || (index === 1 && orderedSections[0]?.id === 'basic')}
                     onClick={() => moveSection(index, -1)}
                     aria-label={`上移${section.title}`}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-25"
+                    className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary disabled:opacity-25"
                   >
                     <ArrowUp size={13} />
                   </button>
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     disabled={index === orderedSections.length - 1 || isBasic}
                     onClick={() => moveSection(index, 1)}
                     aria-label={`下移${section.title}`}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-25"
+                    className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary disabled:opacity-25"
                   >
                     <ArrowDown size={13} />
                   </button>
                   {!isBasic && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() => deleteSection(section.id)}
                       aria-label={`删除模块${section.title}`}
                       title="删除模块"
-                      className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -403,12 +403,12 @@ export function ResumeEditorPane({
                   <div
                     role="listbox"
                     aria-label={`${section.title}图标选择器`}
-                    className="absolute top-full left-8 z-30 mt-1 grid grid-cols-4 gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-xl"
+                    className="absolute top-full left-8 z-30 mt-1 grid grid-cols-4 gap-1 rounded-lg border border-slate-200 studio-ui-border bg-white studio-ui-surface p-2 shadow-xl"
                   >
                     {SECTION_ICON_OPTIONS.map((opt) => {
                       const selected = activeIconName === opt.name;
                       return (
-                        <button
+                        <button data-studio-control="true"
                           key={opt.name}
                           type="button"
                           title={opt.label}
@@ -423,8 +423,8 @@ export function ResumeEditorPane({
                           }}
                           className={`flex items-center justify-center rounded p-1.5 transition ${
                             selected
-                              ? 'bg-teal-600 text-white'
-                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                              ? 'bg-teal-600 studio-ui-fill text-white studio-ui-on-fill'
+                              : 'text-slate-600 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-900 studio-ui-hover-primary'
                           }`}
                         >
                           <LucideIconByName name={opt.name} size={14} />
@@ -436,7 +436,7 @@ export function ResumeEditorPane({
               </div>
 
               {isOpen && (
-                <div className="border-t border-slate-100 p-3">
+                <div className="border-t border-slate-100 studio-ui-divider p-3">
                   {isBasic ? (
                     <BasicInfoEditor
                       basic={document.basic}
@@ -457,14 +457,14 @@ export function ResumeEditorPane({
           );
         })}
 
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/70 p-3 space-y-2">
-          <div className="text-xs font-semibold text-slate-700">模块管理</div>
+        <div className="rounded-lg border border-dashed border-slate-300 studio-ui-border bg-slate-50/70 studio-ui-raised p-3 space-y-2">
+          <div className="text-xs font-semibold text-slate-700 studio-ui-primary">模块管理</div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <select
+            <select data-studio-control="true"
               aria-label="新模块图标"
               value={newSectionIcon}
               onChange={(e) => setNewSectionIcon(e.target.value)}
-              className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-slate-500 focus:outline-none"
+              className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-xs text-slate-700 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
             >
               {SECTION_ICON_OPTIONS.map((opt) => (
                 <option key={opt.name} value={opt.name}>
@@ -472,7 +472,7 @@ export function ResumeEditorPane({
                 </option>
               ))}
             </select>
-            <input
+            <input data-studio-control="true"
               type="text"
               value={newSectionTitle}
               onChange={(e) => setNewSectionTitle(e.target.value)}
@@ -480,21 +480,21 @@ export function ResumeEditorPane({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') addCustomSection();
               }}
-              className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-500 focus:outline-none"
+              className="min-w-0 flex-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2.5 py-1.5 text-xs text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
             />
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={addCustomSection}
-              className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+              className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 studio-ui-fill px-2.5 py-1.5 text-xs font-medium text-white studio-ui-on-fill hover:bg-slate-800 studio-ui-fill-hover"
             >
               <Plus size={13} /> 添加模块
             </button>
           </div>
           {!hasExperienceModule && (
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={addExperienceSection}
-              className="inline-flex w-full items-center justify-center gap-1 rounded border border-slate-200 bg-white py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+              className="inline-flex w-full items-center justify-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 text-xs font-medium text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
             >
               <Plus size={13} /> 启用标准“工作经历”模块
             </button>

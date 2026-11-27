@@ -200,7 +200,7 @@ export function CommandPaletteModal({
           id: 'studio-theme-' + id,
           category: '快捷操作',
           title: '工作台外观预览：' + STUDIO_THEMES[id].label,
-          subtitle: (activeStudioTheme === id ? '当前选择 · ' : '') + '仅顶栏和主导航，不改变简历',
+          subtitle: (activeStudioTheme === id ? '当前选择 · ' : '') + '顶栏、导航、编辑、样式与预览外框；不改变简历',
           keywords: 'studio theme appearance 工作台主题 外观 皮肤 ' + id,
           onSelect: () => onSelectStudioTheme(id),
         });

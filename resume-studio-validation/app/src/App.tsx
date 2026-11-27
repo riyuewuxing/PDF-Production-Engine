@@ -40,7 +40,9 @@ import { TEMPLATE_REGISTRY } from './templates/registry';
 import { StudioThemeProvider, useStudioTheme } from './studio-theme/StudioThemeProvider';
 import { StudioThemePicker } from './studio-theme/StudioThemePicker';
 import { chromeStyle } from './studio-theme/resolve';
+import { surfaceStyle } from './studio-theme/surfaces';
 import './studio-theme/styles/chrome.css';
+import './studio-theme/styles/surfaces.css';
 
 function buildDefaultGlobalSettings(doc: ResumeDocument): GlobalSettings {
   const meta = TEMPLATE_REGISTRY.find((t) => t.id === doc.templateId);
@@ -504,7 +506,10 @@ function StudioApp() {
           <TemplateGallery activeDocument={previewDoc ?? activeDoc} onSelectTemplate={handleSelectTemplate} />
         ) : (
           <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
-            <aside className="no-print h-full w-full shrink-0 border-r border-slate-200 bg-white lg:w-[430px]">
+            <aside data-studio-surface={activeTab === 'edit' || activeTab === 'style' ? 'panel' : undefined}
+              data-studio-theme={activeTab === 'edit' || activeTab === 'style' ? themeId : undefined}
+              style={activeTab === 'edit' || activeTab === 'style' ? surfaceStyle(themeId, 'panel') : undefined}
+              className="no-print h-full w-full shrink-0 border-r border-slate-200 bg-white lg:w-[430px]">
               {activeTab === 'edit' && (
                 <ResumeEditorPane
                   document={activeDoc}
@@ -585,6 +590,7 @@ function StudioApp() {
             </aside>
 
             <A4PreviewPane
+              studioThemeId={themeId}
               document={previewDoc ?? activeDoc}
               highlightedSectionId={focusSectionRequest?.id}
               onSelectSection={handlePreviewSelectSection}

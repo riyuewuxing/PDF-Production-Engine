@@ -146,41 +146,41 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
           <div key={field.id} className="flex items-center gap-2">
             <label
               htmlFor={`basic-field-${field.key}`}
-              className="w-16 shrink-0 text-xs font-medium text-slate-600"
+              className="w-16 shrink-0 text-xs font-medium text-slate-600 studio-ui-muted"
             >
               {field.label}
             </label>
-            <input
+            <input data-studio-control="true"
               id={`basic-field-${field.key}`}
               type="text"
               value={getCoreValue(field.key)}
               onChange={(e) => updateCoreValue(field.key, e.target.value)}
               placeholder={`输入${field.label}`}
-              className={`min-w-0 flex-1 rounded border border-slate-200 px-2.5 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none ${
-                field.visible ? 'bg-white' : 'bg-slate-50 text-slate-400'
+              className={`min-w-0 flex-1 rounded border border-slate-200 studio-ui-border px-2.5 py-1.5 text-sm text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none ${
+                field.visible ? 'bg-white studio-ui-surface' : 'bg-slate-50 studio-ui-raised text-slate-400 studio-ui-muted'
               }`}
             />
-            <button
+            <button data-studio-control="true"
               type="button"
               onClick={() => toggleFieldVisible(field.id)}
               aria-label={field.visible ? `隐藏${field.label}` : `显示${field.label}`}
               title={field.visible ? '当前显示' : '当前已隐藏'}
-              className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              className="rounded p-1.5 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-800 studio-ui-hover-primary"
             >
-              {field.visible ? <Eye size={15} /> : <EyeOff size={15} className="text-slate-400" />}
+              {field.visible ? <Eye size={15} /> : <EyeOff size={15} className="text-slate-400 studio-ui-muted" />}
             </button>
           </div>
         ))}
       </div>
 
       {/* Custom fields / tags */}
-      <div className="border-t border-slate-100 pt-3">
+      <div className="border-t border-slate-100 studio-ui-divider pt-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-700">自定义标签字段</span>
-          <button
+          <span className="text-xs font-semibold text-slate-700 studio-ui-primary">自定义标签字段</span>
+          <button data-studio-control="true"
             type="button"
             onClick={addCustomField}
-            className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border px-2 py-1 text-xs font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover"
           >
             <Plus size={12} /> 添加标签
           </button>
@@ -188,35 +188,35 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
         <div className="space-y-2">
           {basic.customFields.map((cf) => (
             <div key={cf.id} className="flex items-center gap-1.5">
-              <input
+              <input data-studio-control="true"
                 type="text"
                 aria-label="标签名"
                 value={cf.label}
                 onChange={(e) => updateCustomField(cf.id, { label: e.target.value })}
                 placeholder="标签"
-                className="w-20 shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-slate-500 focus:outline-none"
+                className="w-20 shrink-0 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-xs text-slate-800 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
               />
-              <input
+              <input data-studio-control="true"
                 type="text"
                 aria-label={`${cf.label || '自定义'}内容`}
                 value={cf.value}
                 onChange={(e) => updateCustomField(cf.id, { value: e.target.value })}
                 placeholder="值"
-                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:border-slate-500 focus:outline-none"
+                className="min-w-0 flex-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-xs text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
               />
-              <button
+              <button data-studio-control="true"
                 type="button"
                 onClick={() => updateCustomField(cf.id, { visible: !cf.visible })}
                 aria-label={cf.visible ? `隐藏${cf.label}` : `显示${cf.label}`}
-                className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover"
               >
-                {cf.visible ? <Eye size={14} /> : <EyeOff size={14} className="text-slate-400" />}
+                {cf.visible ? <Eye size={14} /> : <EyeOff size={14} className="text-slate-400 studio-ui-muted" />}
               </button>
-              <button
+              <button data-studio-control="true"
                 type="button"
                 onClick={() => removeCustomField(cf.id)}
                 aria-label={`删除${cf.label}`}
-                className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
               >
                 <Trash2 size={14} />
               </button>
@@ -226,10 +226,10 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
       </div>
 
       {/* Photo Upload & Config */}
-      <div className="border-t border-slate-100 pt-3">
+      <div className="border-t border-slate-100 studio-ui-divider pt-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-700">证件照设置</span>
-          <button
+          <span className="text-xs font-semibold text-slate-700 studio-ui-primary">证件照设置</span>
+          <button data-studio-control="true"
             type="button"
             onClick={() =>
               emitDiscrete({
@@ -237,7 +237,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                 photoConfig: { ...basic.photoConfig, visible: !basic.photoConfig.visible },
               })
             }
-            className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border px-2 py-1 text-xs text-slate-600 studio-ui-muted hover:bg-slate-50 studio-ui-hover"
           >
             {basic.photoConfig.visible ? <Eye size={12} /> : <EyeOff size={12} />}
             {basic.photoConfig.visible ? '显示头像' : '已隐藏头像'}
@@ -249,45 +249,45 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
             <img
               src={resolveAssetUrl(basic.photo)}
               alt="证件照预览"
-              className="h-20 w-16 shrink-0 rounded border border-slate-200 object-cover"
+              className="h-20 w-16 shrink-0 rounded border border-slate-200 studio-ui-border object-cover"
             />
           ) : (
-            <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded border border-dashed border-slate-300 bg-slate-50 text-[11px] text-slate-400">
+            <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded border border-dashed border-slate-300 studio-ui-border bg-slate-50 studio-ui-raised text-[11px] text-slate-400 studio-ui-muted">
               无头像
             </div>
           )}
 
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <input
+              <input data-studio-control="true"
                 ref={fileInputRef}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={handlePhotoFileChange}
                 className="hidden"
               />
-              <button
+              <button data-studio-control="true"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                className="inline-flex items-center gap-1.5 rounded bg-slate-900 studio-ui-fill px-2.5 py-1.5 text-xs font-medium text-white studio-ui-on-fill hover:bg-slate-800 studio-ui-fill-hover"
               >
                 <Upload size={12} />
                 {basic.photo ? '更换照片' : '上传并裁剪证件照'}
               </button>
               {basic.photo && (
-                <button
+                <button data-studio-control="true"
                   type="button"
                   onClick={() => setCropSrc(resolveAssetUrl(basic.photo))}
-                  className="inline-flex items-center gap-1 rounded border border-teal-300 bg-teal-50 px-2 py-1.5 text-xs font-medium text-teal-800 hover:bg-teal-100"
+                  className="inline-flex items-center gap-1 rounded border border-teal-300 studio-ui-selected-border bg-teal-50 studio-ui-selected px-2 py-1.5 text-xs font-medium text-teal-800 studio-ui-selected-text hover:bg-teal-100 studio-ui-selected-hover"
                 >
                   <Crop size={12} /> 裁剪/换底
                 </button>
               )}
               {basic.photo && (
-                <button
+                <button data-studio-control="true"
                   type="button"
                   onClick={() => emitDiscrete({ ...basic, photo: '' })}
-                  className="rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-600 hover:bg-red-50 hover:text-red-600"
+                  className="rounded border border-slate-200 studio-ui-border px-2 py-1.5 text-xs text-slate-600 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
                 >
                   清除
                 </button>
@@ -295,9 +295,9 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-xs">
-              <label className="flex flex-col gap-0.5 text-slate-500">
+              <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>宽 (px)</span>
-                <input
+                <input data-studio-control="true"
                   type="number"
                   min={50}
                   max={180}
@@ -311,12 +311,12 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                       },
                     })
                   }
-                  className="rounded border border-slate-200 px-1.5 py-1 text-slate-800"
+                  className="rounded border border-slate-200 studio-ui-border px-1.5 py-1 text-slate-800 studio-ui-primary"
                 />
               </label>
-              <label className="flex flex-col gap-0.5 text-slate-500">
+              <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>高 (px)</span>
-                <input
+                <input data-studio-control="true"
                   type="number"
                   min={50}
                   max={220}
@@ -330,12 +330,12 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                       },
                     })
                   }
-                  className="rounded border border-slate-200 px-1.5 py-1 text-slate-800"
+                  className="rounded border border-slate-200 studio-ui-border px-1.5 py-1 text-slate-800 studio-ui-primary"
                 />
               </label>
-              <label className="flex flex-col gap-0.5 text-slate-500">
+              <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>圆角</span>
-                <select
+                <select data-studio-control="true"
                   value={basic.photoConfig.borderRadius}
                   onChange={(e) =>
                     emitDiscrete({
@@ -346,7 +346,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                       },
                     })
                   }
-                  className="rounded border border-slate-200 bg-white px-1 py-1 text-slate-800"
+                  className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1 py-1 text-slate-800 studio-ui-primary"
                 >
                   <option value="none">直角</option>
                   <option value="sm">微圆</option>
@@ -356,9 +356,9 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               </label>
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-              <label className="flex flex-col gap-0.5 text-slate-500">
+              <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>相框样式</span>
-                <select
+                <select data-studio-control="true"
                   aria-label="头像相框样式"
                   value={basic.photoConfig.frameStyle ?? 'none'}
                   onChange={(e) =>
@@ -370,7 +370,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                       },
                     })
                   }
-                  className="rounded border border-slate-200 bg-white px-1.5 py-1 text-slate-800"
+                  className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1.5 py-1 text-slate-800 studio-ui-primary"
                 >
                   <option value="none">默认无框</option>
                   <option value="white-ring">白环投影</option>
@@ -378,9 +378,9 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                 </select>
               </label>
 
-              <label className="flex flex-col gap-0.5 text-slate-500">
+              <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>照片底衬色</span>
-                <select
+                <select data-studio-control="true"
                   aria-label="照片底衬色"
                   value={basic.photoConfig.bgBackdrop ?? ''}
                   onChange={(e) =>
@@ -392,7 +392,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                       },
                     })
                   }
-                  className="rounded border border-slate-200 bg-white px-1.5 py-1 text-slate-800"
+                  className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1.5 py-1 text-slate-800 studio-ui-primary"
                 >
                   <option value="">默认透明</option>
                   <option value="#2563eb">证件蓝</option>
@@ -402,7 +402,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                 </select>
               </label>
             </div>
-            {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+            {uploadError && <p className="text-xs text-red-600 studio-ui-error">{uploadError}</p>}
           </div>
         </div>
       </div>

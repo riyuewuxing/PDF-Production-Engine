@@ -12,6 +12,8 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { apiClient, isDesktopMode } from '../../lib/apiClient';
 import { DENSITY_LIMITS } from '../../lib/pageFit';
+import type { StudioThemeId } from '../../studio-theme/presets';
+import { resolvePreviewBacking, stageStyle, surfaceStyle, type PreviewBacking } from '../../studio-theme/surfaces';
 import type { GlobalSettings, ResumeDocument } from '../../schema/resumeSchema';
 import { getTemplateMetadata } from '../../templates/registry';
 import {
@@ -24,6 +26,7 @@ import {
 } from '../../templates/shared';
 
 interface A4PreviewPaneProps {
+  studioThemeId?: StudioThemeId;
   document: ResumeDocument;
   highlightedSectionId?: string | null;
   onSelectSection: (sectionId: string) => void;
@@ -39,6 +42,7 @@ interface A4PreviewPaneProps {
 }
 
 export function A4PreviewPane({
+  studioThemeId = 'classic',
   document,
   highlightedSectionId,
   onSelectSection,
@@ -60,7 +64,7 @@ export function A4PreviewPane({
   const [autoScale, setAutoScale] = useState(0.85);
   const [overflowPx, setOverflowPx] = useState(0);
   const [sheetHeightPx, setSheetHeightPx] = useState(1123);
-  const [canvasTheme, setCanvasTheme] = useState<'dark' | 'light'>('dark');
+  const [canvasTheme, setCanvasTheme] = useState<PreviewBacking>('follow');
   const [layoutView, setLayoutView] = useState<'scroll' | 'spread'>('scroll');
 
   useEffect(() => {
@@ -126,7 +130,9 @@ export function A4PreviewPane({
 
   const isSpread = layoutView === 'spread';
   const desktop = isDesktopMode();
-  const isDark = canvasTheme === 'dark';
+  const backing = resolvePreviewBacking(studioThemeId, canvasTheme);
+  const isDark = backing.scheme === 'dark';
+  const previewStyle = surfaceStyle(studioThemeId, 'preview');
 
   const patchSetting = <K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => {
     onUpdateSettings({ ...globalSettings, [key]: value });
@@ -134,22 +140,25 @@ export function A4PreviewPane({
 
   return (
     <section
+      data-studio-stage={studioThemeId !== 'classic' ? 'themed' : undefined}
+      data-studio-preview-backing={canvasTheme}
+      style={stageStyle(backing)}
       className={`print-workspace flex min-w-0 flex-1 flex-col transition-colors ${
         isDark ? 'bg-[#181d27]' : 'bg-slate-200/80'
       }`}
     >
       {/* Compact Canvas Micro-Toolbar */}
-      <div
+      <div data-studio-surface="preview" data-studio-theme={studioThemeId} style={previewStyle}
         className={`no-print flex flex-wrap items-center justify-between gap-2 border-b px-4 py-1.5 text-xs ${
           isDark
-            ? 'border-slate-800 bg-[#1e2533] text-slate-300'
-            : 'border-slate-200 bg-white text-slate-700'
+            ? 'border-slate-800 studio-ui-border bg-[#1e2533] text-slate-300 studio-ui-muted'
+            : 'border-slate-200 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary'
         }`}
       >
         <div className="flex flex-wrap items-center gap-3.5">
           <label className="flex items-center gap-1.5">
             <span className="opacity-70">字号</span>
-            <input
+            <input data-studio-control="true"
               type="range"
               aria-label="基础字号"
               min={DENSITY_LIMITS.baseFontSize.min}
@@ -157,14 +166,14 @@ export function A4PreviewPane({
               step={DENSITY_LIMITS.baseFontSize.step}
               value={globalSettings.baseFontSize}
               onChange={(e) => patchSetting('baseFontSize', Number(e.target.value))}
-              className="w-16 accent-teal-500"
+              className="w-16 accent-teal-500 studio-ui-accent"
             />
             <span className="w-8 font-mono text-[11px]">{globalSettings.baseFontSize}</span>
           </label>
 
           <label className="flex items-center gap-1.5">
             <span className="opacity-70">行高</span>
-            <input
+            <input data-studio-control="true"
               type="range"
               aria-label="行高"
               min={DENSITY_LIMITS.lineHeight.min}
@@ -172,14 +181,14 @@ export function A4PreviewPane({
               step={DENSITY_LIMITS.lineHeight.step}
               value={globalSettings.lineHeight}
               onChange={(e) => patchSetting('lineHeight', Number(e.target.value))}
-              className="w-16 accent-teal-500"
+              className="w-16 accent-teal-500 studio-ui-accent"
             />
             <span className="w-7 font-mono text-[11px]">{globalSettings.lineHeight.toFixed(2)}</span>
           </label>
 
           <label className="flex items-center gap-1.5">
             <span className="opacity-70">模块距</span>
-            <input
+            <input data-studio-control="true"
               type="range"
               aria-label="模块间距"
               min={DENSITY_LIMITS.sectionSpacing.min}
@@ -187,14 +196,14 @@ export function A4PreviewPane({
               step={DENSITY_LIMITS.sectionSpacing.step}
               value={globalSettings.sectionSpacing}
               onChange={(e) => patchSetting('sectionSpacing', Number(e.target.value))}
-              className="w-16 accent-teal-500"
+              className="w-16 accent-teal-500 studio-ui-accent"
             />
             <span className="w-6 font-mono text-[11px]">{globalSettings.sectionSpacing}</span>
           </label>
 
           <label className="flex items-center gap-1.5">
             <span className="opacity-70">页边距</span>
-            <input
+            <input data-studio-control="true"
               type="range"
               aria-label="页边距"
               min={DENSITY_LIMITS.pagePadding.min}
@@ -202,7 +211,7 @@ export function A4PreviewPane({
               step={DENSITY_LIMITS.pagePadding.step}
               value={globalSettings.pagePadding}
               onChange={(e) => patchSetting('pagePadding', Number(e.target.value))}
-              className="w-16 accent-teal-500"
+              className="w-16 accent-teal-500 studio-ui-accent"
             />
             <span className="w-6 font-mono text-[11px]">{globalSettings.pagePadding}</span>
           </label>
@@ -213,8 +222,8 @@ export function A4PreviewPane({
             aria-label="预估页数"
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
               estimatedPages > 2
-                ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/40'
-                : 'bg-slate-700/60 text-slate-200 ring-1 ring-slate-600'
+                ? 'bg-amber-500/20 studio-ui-warning-surface text-amber-300 studio-ui-warning ring-1 ring-amber-400/40 studio-ui-warning-ring'
+                : 'bg-slate-700/60 studio-ui-raised text-slate-200 studio-ui-primary ring-1 ring-slate-600 studio-ui-ring'
             }`}
           >
             共 {estimatedPages} 页
@@ -223,21 +232,21 @@ export function A4PreviewPane({
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
               isOverflow
-                ? 'bg-red-500/15 text-red-400 ring-1 ring-red-500/40'
-                : 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/40'
+                ? 'bg-red-500/15 studio-ui-error-surface text-red-400 studio-ui-error ring-1 ring-red-500/40 studio-ui-error-ring'
+                : 'bg-emerald-500/15 studio-ui-success-surface text-emerald-400 studio-ui-success ring-1 ring-emerald-500/40 studio-ui-success-ring'
             }`}
           >
             {isOverflow ? `超出单页 +${overflowPx}px` : `单页内 (余 ${Math.max(0, -overflowPx)}px)`}
           </span>
 
-          <select
+          <select data-studio-control="true"
             aria-label="画布缩放"
             value={zoomMode}
             onChange={(e) => setZoomMode(e.target.value as typeof zoomMode)}
             className={`rounded border px-2 py-0.5 text-[11px] ${
               isDark
-                ? 'border-slate-700 bg-slate-800 text-slate-200'
-                : 'border-slate-300 bg-white text-slate-800'
+                ? 'border-slate-700 studio-ui-border bg-slate-800 studio-ui-raised text-slate-200 studio-ui-primary'
+                : 'border-slate-300 studio-ui-border bg-white studio-ui-surface text-slate-800 studio-ui-primary'
             }`}
           >
             <option value="auto">适应窗口 ({Math.round(autoScale * 100)}%)</option>
@@ -246,57 +255,64 @@ export function A4PreviewPane({
             <option value="1">100%</option>
           </select>
 
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={() => setLayoutView((v) => (v === 'scroll' ? 'spread' : 'scroll'))}
             aria-label={isSpread ? '切回单列滚动' : '双页并排总览'}
             title={isSpread ? '切回单列滚动' : '双页并排总览'}
             className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] ${
               isSpread
-                ? 'border-teal-500 bg-teal-600/20 text-teal-300'
+                ? 'border-teal-500 studio-ui-selected-border bg-teal-600/20 studio-ui-selected text-teal-300 studio-ui-selected-text'
                 : isDark
-                  ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  ? 'border-slate-700 studio-ui-border bg-slate-800 studio-ui-raised text-slate-200 studio-ui-primary hover:bg-slate-700 studio-ui-hover'
+                  : 'border-slate-300 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover'
             }`}
           >
             {isSpread ? <ScrollText size={12} /> : <Columns2 size={12} />}
             {isSpread ? '单列滚动' : '双页总览'}
           </button>
 
-          <button
+          <button data-studio-control="true"
             type="button"
-            onClick={() => setCanvasTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            onClick={() => setCanvasTheme(isDark ? 'light' : 'dark')}
             aria-label={isDark ? '切换浅色画布' : '切换暗色画布'}
             title={isDark ? '切换浅色画布' : '切换暗色画布'}
             className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] ${
               isDark
-                ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                ? 'border-slate-700 studio-ui-border bg-slate-800 studio-ui-raised text-slate-200 studio-ui-primary hover:bg-slate-700 studio-ui-hover'
+                : 'border-slate-300 studio-ui-border bg-white studio-ui-surface text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover'
             }`}
           >
             {isDark ? <Sun size={12} /> : <Moon size={12} />}
             {isDark ? '浅色底' : '暗调底'}
           </button>
+          {canvasTheme !== 'follow' && (
+            <button data-studio-control="true" type="button" aria-label="画布底衬跟随工作台"
+              onClick={() => setCanvasTheme('follow')}
+              className="rounded border border-slate-300 studio-ui-border px-2 py-0.5 text-[11px] text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover">
+              跟随工作台
+            </button>
+          )}
         </div>
       </div>
 
       {/* Feedback & Redaction Banners */}
       {(isRedacted || fitFeedback || exportStatus) && (
-        <div className="no-print space-y-1 border-b border-slate-800/40 bg-[#181d27] px-4 py-2">
+        <div data-studio-surface="preview" data-studio-theme={studioThemeId} style={previewStyle} className="no-print space-y-1 border-b border-slate-800/40 studio-ui-border bg-[#181d27] px-4 py-2">
           {isRedacted && (
             <div
               role="status"
-              className="flex flex-wrap items-center justify-between gap-2 rounded border border-purple-400/50 bg-purple-600/20 px-3 py-1.5 text-xs text-purple-100"
+              className="flex flex-wrap items-center justify-between gap-2 rounded border border-purple-400/50 studio-ui-privacy-border bg-purple-600/20 studio-ui-privacy-surface px-3 py-1.5 text-xs text-purple-100 studio-ui-privacy"
             >
               <span className="inline-flex items-center gap-1.5 font-medium">
-                <ShieldAlert size={14} className="shrink-0 text-purple-300" />
+                <ShieldAlert size={14} className="shrink-0 text-purple-300 studio-ui-privacy" />
                 当前处于隐私脱敏预览与导出模式（已掩码姓名/手机/邮箱/敏感词并隐藏照片，不改动磁盘原档）
               </span>
               {onDisableRedaction && (
-                <button
+                <button data-studio-control="true"
                   type="button"
                   onClick={onDisableRedaction}
-                  className="rounded border border-purple-300/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-medium text-purple-100 hover:bg-purple-900"
+                  className="rounded border border-purple-300/40 studio-ui-privacy-border bg-purple-950/60 studio-ui-privacy-surface px-2 py-0.5 text-[11px] font-medium text-purple-100 studio-ui-privacy hover:bg-purple-900 studio-ui-privacy-hover"
                 >
                   退出脱敏模式
                 </button>
@@ -309,8 +325,8 @@ export function A4PreviewPane({
               role="status"
               className={`rounded px-3 py-1.5 text-xs ${
                 fitFeedback.type === 'ok'
-                  ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-200'
-                  : 'border border-amber-500/30 bg-amber-500/15 text-amber-200'
+                  ? 'border border-emerald-500/30 studio-ui-success-border bg-emerald-500/15 studio-ui-success-surface text-emerald-200 studio-ui-success'
+                  : 'border border-amber-500/30 studio-ui-warning-border bg-amber-500/15 studio-ui-warning-surface text-amber-200 studio-ui-warning'
               }`}
             >
               {fitFeedback.text}
@@ -322,40 +338,40 @@ export function A4PreviewPane({
               role="status"
               className={`flex flex-wrap items-center justify-between gap-2 rounded px-3 py-1.5 text-xs ${
                 exportStatus.type === 'ok'
-                  ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-200'
+                  ? 'border border-emerald-500/30 studio-ui-success-border bg-emerald-500/15 studio-ui-success-surface text-emerald-200 studio-ui-success'
                   : exportStatus.type==='warn'
-                    ? 'border border-amber-500/40 bg-amber-500/15 text-amber-200'
-                    : 'border border-red-500/40 bg-red-500/15 text-red-200'
+                    ? 'border border-amber-500/40 studio-ui-warning-border bg-amber-500/15 studio-ui-warning-surface text-amber-200 studio-ui-warning'
+                    : 'border border-red-500/40 studio-ui-error-border bg-red-500/15 studio-ui-error-surface text-red-200 studio-ui-error'
               }`}
             >
               <span className="inline-flex items-center gap-1.5 break-all">
-                {exportStatus.type === 'ok' && <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />}
+                {exportStatus.type === 'ok' && <CheckCircle2 size={14} className="shrink-0 text-emerald-400 studio-ui-success" />}
                 {exportStatus.text}
               </span>
               {exportStatus.type !== 'error' && (canLogApplication || (exportStatus.filePath && desktop)) && (
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                   {canLogApplication && onOpenQuickLog && (
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={onOpenQuickLog}
-                      className="inline-flex items-center gap-1 rounded border border-teal-300/60 bg-teal-600 px-2.5 py-0.5 font-semibold text-white hover:bg-teal-500"
+                      className="inline-flex items-center gap-1 rounded border border-teal-300/60 studio-ui-selected-border bg-teal-600 studio-ui-fill px-2.5 py-0.5 font-semibold text-white studio-ui-on-fill hover:bg-teal-500 studio-ui-fill-hover"
                     >
                       <BookmarkCheck size={12} /> 记入投递并锁定快照
                     </button>
                   )}
                   {exportStatus.filePath && desktop && (
                     <>
-                      <button
+                      <button data-studio-control="true"
                         type="button"
                         onClick={() => void apiClient.openFile(exportStatus.filePath!)}
-                        className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-950/60 px-2 py-0.5 font-medium text-emerald-200 hover:bg-emerald-900"
+                        className="inline-flex items-center gap-1 rounded border border-emerald-400/40 studio-ui-success-border bg-emerald-950/60 studio-ui-success-surface px-2 py-0.5 font-medium text-emerald-200 studio-ui-success hover:bg-emerald-900 studio-ui-success-hover"
                       >
                         <FileText size={12} /> 打开文件
                       </button>
-                      <button
+                      <button data-studio-control="true"
                         type="button"
                         onClick={() => void apiClient.showInFolder(exportStatus.filePath!)}
-                        className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-950/60 px-2 py-0.5 font-medium text-emerald-200 hover:bg-emerald-900"
+                        className="inline-flex items-center gap-1 rounded border border-emerald-400/40 studio-ui-success-border bg-emerald-950/60 studio-ui-success-surface px-2 py-0.5 font-medium text-emerald-200 studio-ui-success hover:bg-emerald-900 studio-ui-success-hover"
                       >
                         <FolderOpen size={12} /> 打开所在文件夹
                       </button>
@@ -375,7 +391,7 @@ export function A4PreviewPane({
             <div className="flex flex-wrap items-start justify-center gap-6">
               {/* Page 1 Frame */}
               <div className="flex flex-col items-center gap-1.5">
-                <span className="no-print text-[11px] font-medium text-slate-400">第 1 页</span>
+                <span data-studio-stage-label="true" className="no-print text-[11px] font-medium text-slate-400">第 1 页</span>
                 <div
                   className="overflow-hidden rounded-xs shadow-2xl ring-1 ring-black/25"
                   style={{
@@ -412,7 +428,7 @@ export function A4PreviewPane({
 
               {/* Page 2 Frame */}
               <div className="no-print flex flex-col items-center gap-1.5">
-                <span className="text-[11px] font-medium text-slate-400">
+                <span data-studio-stage-label="true" className="text-[11px] font-medium text-slate-400">
                   第 2 页
                   {isOverflow
                     ? '（自然续页）'
@@ -583,11 +599,11 @@ export function A4PreviewPane({
       </div>
 
       {/* Slim Bottom Status */}
-      <div
+      <div data-studio-surface="preview" data-studio-theme={studioThemeId} style={previewStyle}
         className={`no-print flex items-center justify-between border-t px-4 py-1 text-[11px] ${
           isDark
-            ? 'border-slate-800 bg-[#11161f] text-slate-400'
-            : 'border-slate-200 bg-white text-slate-500'
+            ? 'border-slate-800 studio-ui-border bg-[#11161f] text-slate-400 studio-ui-muted'
+            : 'border-slate-200 studio-ui-border bg-white studio-ui-surface text-slate-500 studio-ui-muted'
         }`}
       >
         <span>当前模板：{templateMeta.name}（A4 210mm × 297mm · 预估 {estimatedPages} 页）</span>
