@@ -370,29 +370,45 @@ async function listInstalledSystemFonts(): Promise<SystemFontResult> {
   return cachedSystemFonts;
 }
 
-// A managed portrait must be read and decoded before its receipt can be green.
+// A supported local or embedded portrait must decode before its receipt is green.
 // Freeze the bytes used for rendering; keep the original document for history.
 // The local Chromium decoder also supports WebP, unlike nativeImage on some
 // platforms. The script contains only a serialized data URL and fixed logic.
-async function prepareManagedExportPortrait(
+async function prepareExportPortrait(
   doc: ResumeDocument,
   ext: 'pdf' | 'png' | 'docx' | 'md' | 'html',
 ): Promise<{ document: ResumeDocument; warning?: string }> {
   const photo = doc.basic.photo.trim();
   if (ext === 'md' || !doc.basic.photoConfig.visible ||
-      !doc.menuSections.some(s => s.id === 'basic' && s.enabled) ||
-      !photo.startsWith('/api/assets/')) return { document: doc };
+      !doc.menuSections.some(s => s.id === 'basic' && s.enabled)) return { document: doc };
+  const managed = photo.startsWith('/api/assets/');
+  const inline = /^data:image\/(png|jpe?g|webp);base64,/i.exec(photo);
+  // Do not introduce a network fetch or change other legacy URL formats.
+  if (!managed && !inline) return { document: doc };
   const omit = (reason: string) => ({
     document: { ...doc, basic: { ...doc.basic, photo: '' } },
-    warning: '可见的本地头像资源' + reason + '，导出成品可能缺少照片。请检查成品、恢复头像或明确隐藏照片后再投递。',
+    warning: (managed ? '可见的本地头像资源' : '可见的内嵌头像') + reason + '，导出成品可能缺少照片。请检查成品、恢复头像或明确隐藏照片后再投递。',
   });
-  let asset: Awaited<ReturnType<LocalResumeStore['readAsset']>>;
-  try {
-    asset = await store.readAsset(decodeURIComponent(photo.slice('/api/assets/'.length)));
-  } catch {
-    return omit('无法读取');
+  let buffer: Buffer;
+  let mimeType: string;
+  if (managed) {
+    try {
+      const asset = await store.readAsset(decodeURIComponent(photo.slice('/api/assets/'.length)));
+      buffer = asset.buffer;
+      mimeType = asset.mimeType;
+    } catch {
+      return omit('无法读取');
+    }
+  } else if (inline) {
+    const payload = photo.slice(inline[0].length).replace(/\s/g, '');
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(payload) || payload.length % 4 === 1 ||
+        (payload.includes('=') && payload.length % 4 !== 0)) return omit('无法解码');
+    buffer = Buffer.from(payload, 'base64');
+    const format = inline[1].toLowerCase();
+    mimeType = 'image/' + (format === 'jpg' ? 'jpeg' : format);
+  } else {
+    return { document: doc };
   }
-  const { buffer, mimeType } = asset;
   if (!buffer.length || !['image/png', 'image/jpeg', 'image/webp'].includes(mimeType)) {
     return omit('无法解码');
   }
@@ -745,7 +761,7 @@ function registerIpcHandlers(): void {
       explicitPath = true;
     }
 
-    const prepared = await prepareManagedExportPortrait(targetDoc, spec.ext);
+    const prepared = await prepareExportPortrait(targetDoc, spec.ext);
     const contentWarning = prepared.warning;
     const content = await spec.produce(prepared.document);
     const writtenPath = explicitPath ? await writeFileSafely(targetPath, content) : await writeUniqueExportFile(targetPath, content);
