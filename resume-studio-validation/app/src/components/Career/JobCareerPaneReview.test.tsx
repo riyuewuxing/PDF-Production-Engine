@@ -2,7 +2,7 @@ import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/reac
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {JobCareerPane} from './JobCareerPane';
 import {comparisonFixture,changedComparisonFixture} from '../../lib/comparisonSyntheticFixture';
-import {JobApplicationSchema,type ApplicationsStoreData,type ApplicationSnapshotRecord} from '../../schema/applicationSchema';
+import {JobApplicationSchema,type ApplicationsStoreData,type ApplicationSnapshotRecord,type ApplicationPdfCheck} from '../../schema/applicationSchema';
 import type {ResumeSummary} from '../../schema/resumeSchema';
 import type {ResumeDesktopBridge} from '../../types/electron';
 type State={data:ApplicationsStoreData;ready:boolean;loading:boolean;saving:boolean;dirty:boolean;error:string|null;recoveryError:string|null};
@@ -15,7 +15,7 @@ vi.mock('./CareerAiPanel',()=>({CareerAiPanel:()=>null}));
 vi.mock('./InterviewPracticePane',()=>({InterviewPracticePane:()=>null}));
 const entry=JobApplicationSchema.parse({id:'application-39',company:'合成学校',role:'物理教师',resumeSlug:'origin',snapshotId:'app-archive-39',exportedFilePath:'C:/synthetic/old.pdf',atsScore:63});
 const manual=JobApplicationSchema.parse({id:'manual-39',company:'手工合成记录',role:'物理教师',resumeSlug:'current'});
-const read=vi.fn(),rawRead=vi.fn(),save=vi.fn(),clone=vi.fn(),openPath=vi.fn();
+const read=vi.fn(),rawRead=vi.fn(),save=vi.fn(),clone=vi.fn(),openPath=vi.fn(),checkPdf=vi.fn();
 const revision='a'.repeat(64);
 function sourceRecord():ApplicationSnapshotRecord{
  const doc=comparisonFixture();return {meta:{id:entry.snapshotId,applicationId:entry.id,resumeSlug:entry.resumeSlug,exportedFilePath:entry.exportedFilePath,atsScore:entry.atsScore,createdAt:'2026-01-01T00:00:00Z',title:doc.title,templateId:doc.templateId},document:doc};
@@ -32,7 +32,7 @@ beforeEach(()=>{
  session.state={data:{schemaVersion:1,revision,applications:[entry,manual],coverLetters:[],interviewAnswers:{}},ready:true,loading:false,saving:false,dirty:false,error:null,recoveryError:null};
  session.load.mockResolvedValue(undefined);session.flush.mockResolvedValue(undefined);
  read.mockResolvedValue(sourceRecord());clone.mockResolvedValue(undefined);
- window.resumeDesktop={isDesktop:true,applications:{getLinkedSnapshot:read,getSnapshot:rawRead},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
+ window.resumeDesktop={isDesktop:true,applications:{getLinkedSnapshot:read,getSnapshot:rawRead,checkPdf},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
  Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:vi.fn()});
 });
 afterEach(()=>{cleanup();delete window.resumeDesktop;Reflect.deleteProperty(HTMLElement.prototype,'scrollTo');vi.useRealTimers();});
@@ -95,5 +95,36 @@ describe('career permanent archive review and verified clone lifecycle',()=>{
   expect(screen.queryByRole('button',{name:'取消读取快照'})).toBeNull();
   expect(clone).toHaveBeenCalledWith(sourceRecord().document,'合成学校-物理教师-复盘版');
   await act(async()=>finish());await waitFor(()=>expect(cloneButton()).not.toBeDisabled());
+ });
+});
+
+describe('PDF receipt row lifecycle',()=>{
+ const receipt={sha256:'a'.repeat(64),documentSha256:'b'.repeat(64),sizeBytes:123,exportedAt:'2026-01-01T00:00:00Z'};
+ const at='2026-01-01T00:00:00Z';
+ const checkButton=()=>screen.getByRole('button',{name:'核验 PDF 合成学校'});
+ function seed(){session.state={...session.state,data:{...session.state.data,applications:[{...entry,pdfReceipt:receipt},manual]}};}
+ it('never auto-reads and invokes only the linked verification API, with explicit fresh open',async()=>{
+  seed();checkPdf.mockResolvedValueOnce({status:'verified',checkedAt:at}).mockResolvedValueOnce({status:'changed',checkedAt:at});
+  render(<JobCareerPane {...props()}/>);expect(checkPdf).not.toHaveBeenCalled();expect(screen.queryByRole('button',{name:'关联 PDF'})).toBeNull();
+  fireEvent.click(checkButton());await screen.findByText('记录路径字节一致');
+  expect(checkPdf).toHaveBeenCalledWith({applicationId:entry.id,snapshotId:entry.snapshotId,ledgerRevision:revision},'check');
+  fireEvent.click(screen.getByRole('button',{name:'核验并打开 PDF 合成学校'}));await screen.findByText('文件字节与封存凭证不一致，未打开');
+  expect(checkPdf).toHaveBeenLastCalledWith({applicationId:entry.id,snapshotId:entry.snapshotId,ledgerRevision:revision},'open');expect(openPath).not.toHaveBeenCalled();
+ });
+ it('displays a selected byte match without modifying the ledger',async()=>{
+  seed();checkPdf.mockResolvedValue({status:'verified',checkedAt:at});
+  render(<JobCareerPane {...props()}/>);fireEvent.click(screen.getByRole('button',{name:'选择 PDF 核验 合成学校'}));await screen.findByText('所选文件字节一致（未修改台账路径）');
+  expect(checkPdf).toHaveBeenCalledWith({applicationId:entry.id,snapshotId:entry.snapshotId,ledgerRevision:revision},'choose');expect(session.update).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled();
+ });
+ it('suppresses delayed results after redaction and return to the same context',async()=>{
+  seed();let finish!:(r:ApplicationPdfCheck)=>void;checkPdf.mockImplementationOnce(()=>new Promise(r=>{finish=r}));
+  const p=props(),v=render(<JobCareerPane {...p}/>);fireEvent.click(checkButton());
+  v.rerender(<JobCareerPane {...p} comparisonDisabled/>);expect(checkButton()).toBeDisabled();
+  v.rerender(<JobCareerPane {...p}/>);await act(async()=>finish({status:'verified',checkedAt:at}));
+  expect(screen.queryByText('记录路径字节一致')).toBeNull();
+ });
+ it('keeps legacy unknown and does not invent a browser file-check route',()=>{
+  render(<JobCareerPane {...props()}/>);expect(screen.getByText(/历史 PDF 路径 · 无字节凭证/)).toBeTruthy();expect(screen.queryByRole('button',{name:'核验 PDF 合成学校'})).toBeNull();
+  cleanup();seed();delete window.resumeDesktop;render(<JobCareerPane {...props()}/>);expect(screen.getByText('文件字节核验仅支持桌面工作台。')).toBeTruthy();expect(checkPdf).not.toHaveBeenCalled();
  });
 });
