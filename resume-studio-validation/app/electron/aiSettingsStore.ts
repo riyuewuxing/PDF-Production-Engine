@@ -116,10 +116,12 @@ export class AiSettingsStore{
       if(!sameBasis(basis,await this.inspectFile()))throw new Error('AI 配置文件已变化，请重新读取，原文件未覆盖。');
       const staged=await fs.lstat(temp);
       await fs.rename(temp,this.filePath);created=false;
-      const published=await this.inspectFile();
-      if(!published||published.dev!==staged.dev||published.ino!==staged.ino||published.size!==bytes.length||
-         await this.readBytes(published)!==bytes.toString('utf8'))throw new Error('AI 配置写入后未能确认，请重新读取核对。');
-      return published;
+      try{
+        const published=await this.inspectFile();
+        if(!published||published.dev!==staged.dev||published.ino!==staged.ino||published.size!==bytes.length||
+           await this.readBytes(published)!==bytes.toString('utf8'))throw Error('readback mismatch');
+        return published;
+      }catch{throw new Error('AI 配置已提交写入，但回读未确认；文件可能已更新，请重新读取核对。');}
     }finally{if(created)await fs.rm(temp,{force:true}).catch(()=>{});}
   }
   private async read():Promise<LoadedCatalog>{

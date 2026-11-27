@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -156,7 +156,7 @@ describe('T47 credential containment and cooperative cross-instance updates',()=
     await fs.writeFile(file,original);
     await expect(store.getPublicSettings()).rejects.toThrow();
     await expect(store.create(profile)).rejects.toThrow();
-    expect(await fs.readFile(file)).toEqual(original);
+    expect((await fs.readFile(file)).equals(original)).toBe(true);
   });
   it('allows exactly one same-revision writer across separate store instances',async()=>{
     const {store,file,codec}=await setup();
@@ -182,5 +182,29 @@ describe('T47 credential containment and cooperative cross-instance updates',()=
     expect(actual.profiles.find(x=>x.profileId===second.profileId)).toEqual(b);
     expect((await store.getRequestSettings(a.profileId,a.revision)).apiKey).toBe(dummy);
     expect((await store.getRequestSettings(b.profileId,b.revision)).apiKey).toBe('synthetic-second');
+  });
+});
+
+describe('T47 publication fault boundaries',()=>{
+  it('preserves credential bytes on a failed publication and can explicitly retry',async()=>{
+    const {store,file}=await setup(),saved=await store.save({...await store.getPublicSettings(),...profile,apiKey:dummy}),before=await fs.readFile(file);
+    const rename=fs.rename.bind(fs),fault=vi.spyOn(fs,'rename').mockImplementation(async(a,b)=>{if(String(b)===file)throw Object.assign(Error('synthetic ENOSPC'),{code:'ENOSPC'});return rename(a,b);});
+    try{await expect(store.save({...saved,model:'faulted'})).rejects.toThrow();expect((await fs.readFile(file)).equals(before)).toBe(true);}
+    finally{fault.mockRestore();}
+    const retried=await store.save({...saved,model:'retried'});
+    expect(await store.getPublicSettings()).toEqual(retried);
+    expect((await store.getRequestSettings()).apiKey).toBe(dummy);
+    expect((await fs.readdir(path.dirname(file))).sort()).toEqual(['config.json']);
+  });
+  it('does not claim the old catalog is unchanged after publication when readback fails',async()=>{
+    const {store,file}=await setup(),saved=await store.save({...await store.getPublicSettings(),...profile,apiKey:dummy});
+    const rename=fs.rename.bind(fs),lstat=fs.lstat.bind(fs);let published=false;
+    const renameSpy=vi.spyOn(fs,'rename').mockImplementation(async(a,b)=>{await rename(a,b);if(String(b)===file)published=true;});
+    const statSpy=vi.spyOn(fs,'lstat').mockImplementation(async(p,...args)=>{if(published&&String(p)===file)throw Error('synthetic readback failure');return lstat(p,...args as []);});
+    try{await expect(store.save({...saved,model:'published-but-unconfirmed'})).rejects.toThrow('文件可能已更新');}
+    finally{renameSpy.mockRestore();statSpy.mockRestore();}
+    expect((await store.getPublicSettings()).model).toBe('published-but-unconfirmed');
+    expect((await store.getRequestSettings()).apiKey).toBe(dummy);
+    await expect(store.save({...saved,model:'stale'})).rejects.toThrow('重新读取');
   });
 });

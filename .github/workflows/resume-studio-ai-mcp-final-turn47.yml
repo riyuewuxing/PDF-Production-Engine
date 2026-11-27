@@ -1,0 +1,246 @@
+name: Resume Studio T47 AI MCP and offline fixed-source audit
+on:
+  push:
+    branches: ['resume-studio/v6-ai-mcp-final-turn47']
+permissions:
+  contents: read
+jobs:
+  receipts:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Strict typecheck and build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Targeted receipt state matrix
+        timeout-minutes: 4
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-ai-receipts-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't47-evidence/receipts'
+          try {
+            & .\node_modules\.bin\electron.cmd .\validation-ai-receipts.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t47-final-receipts
+          path: t47-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  replay:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Strict typecheck and build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prior job evidence regression and recorded response replay
+        timeout-minutes: 5
+        run: |
+          pnpm exec esbuild validation-job-ai-adapters.ts --bundle --platform=node --format=cjs --outfile=validation-job-ai-adapters.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($mode in @('mock','replay')) {
+            $env:RESUME_STUDIO_JOB_AI_MODE = $mode
+            $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-job-ai-' + [guid]::NewGuid().ToString())
+            $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE "t47-evidence/job-ai-$mode"
+            try {
+              & .\node_modules\.bin\electron.cmd .\validation-job-ai.cjs
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            } finally {
+              Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t47-final-replay
+          path: t47-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  mcp:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Strict typecheck and build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec esbuild scripts/mcp-server.ts --bundle --platform=node --format=cjs --outfile=dist-electron/mcp-server.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real MCP process and transport
+        timeout-minutes: 4
+        run: |
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t47-mcp-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't47-evidence'
+          node validation-mcp-process.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node validation-mcp-transport.cjs candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t47-final-mcp-${{ matrix.os }}
+          path: t47-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  full:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Strict typecheck and build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full regression
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 't47-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          pnpm exec vitest run --reporter=json --outputFile="$out/vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t47-final-full
+          path: t47-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Strict typecheck and build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual OS credential, loopback HTTP, offline and restart
+        timeout-minutes: 5
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t47-native-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't47-evidence'
+          foreach ($phase in @('main','restart')) {
+            $env:T47_PHASE = $phase
+            & .\node_modules\.bin\electron.cmd .\validation-t47-native.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t47-final-native
+          path: t47-evidence/
+          if-no-files-found: error
+          retention-days: 3
