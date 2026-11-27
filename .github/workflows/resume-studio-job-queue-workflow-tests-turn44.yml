@@ -1,7 +1,7 @@
 name: Resume Studio Turn44 workflow task isolation tests and regression
 on:
   push:
-    branches: ['resume-studio/v6-job-queue-refresh-fix-turn44']
+    branches: ['resume-studio/v6-job-queue-refresh-regression-turn44']
 permissions:
   contents: read
 jobs:

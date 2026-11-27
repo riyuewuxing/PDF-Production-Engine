@@ -1,4 +1,7 @@
-import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {act,cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react';
+import {webcrypto,createHash} from 'node:crypto';
+import {prepareJobQueueTask} from '../../lib/jobQueueBinding';
+import {JobQueueTaskSchema,type ApplicationLogInput,type JobQueueOpen} from '../../schema/applicationSchema';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {JobCareerPane} from './JobCareerPane';
 import {comparisonFixture,changedComparisonFixture} from '../../lib/comparisonSyntheticFixture';
@@ -6,10 +9,10 @@ import {JobApplicationSchema,type ApplicationsStoreData,type ApplicationSnapshot
 import type {ResumeSummary} from '../../schema/resumeSchema';
 import type {ResumeDesktopBridge} from '../../types/electron';
 type State={data:ApplicationsStoreData;ready:boolean;loading:boolean;saving:boolean;dirty:boolean;error:string|null;recoveryError:string|null};
-const session=vi.hoisted(()=>({state:null as unknown as State,listeners:new Set<()=>void>(),load:vi.fn(),update:vi.fn(),flush:vi.fn()}));
+const session=vi.hoisted(()=>({state:null as unknown as State,listeners:new Set<()=>void>(),load:vi.fn(),update:vi.fn(),flush:vi.fn(),log:vi.fn()}));
 vi.mock('../../lib/careerLedgerSession',()=>({careerLedger:{
  getSnapshot:()=>session.state,subscribe:(listener:()=>void)=>{session.listeners.add(listener);return ()=>session.listeners.delete(listener);},
- load:session.load,update:session.update,flush:session.flush
+ load:session.load,update:session.update,flush:session.flush,log:session.log
 }}));
 vi.mock('./CareerAiPanel',()=>({CareerAiPanel:()=>null}));
 vi.mock('./InterviewPracticePane',()=>({InterviewPracticePane:()=>null}));
@@ -35,7 +38,7 @@ beforeEach(()=>{
  window.resumeDesktop={isDesktop:true,applications:{getLinkedSnapshot:read,getSnapshot:rawRead,checkPdf,exportPackage},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
  Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:vi.fn()});
 });
-afterEach(()=>{cleanup();delete window.resumeDesktop;Reflect.deleteProperty(HTMLElement.prototype,'scrollTo');vi.useRealTimers();});
+afterEach(()=>{cleanup();delete window.resumeDesktop;Reflect.deleteProperty(HTMLElement.prototype,'scrollTo');vi.useRealTimers();vi.unstubAllGlobals();});
 describe('career permanent archive review and verified clone lifecycle',()=>{
  it('offers review only on linked persisted records and starts no read before explicit request',async()=>{
   render(<JobCareerPane {...props()}/>);expect(reviewButton()).not.toBeDisabled();expect(screen.queryByRole('button',{name:'只读复盘 手工合成记录'})).toBeNull();
@@ -171,5 +174,50 @@ describe('scoped submission ZIP renderer lifecycle',()=>{
   act(()=>publish({dirty:false,saving:true}));expect(button()).toBeDisabled();cleanup();
   session.state={...session.state,saving:false};delete window.resumeDesktop!.applications.exportPackage;render(<JobCareerPane {...props()}/>);expect(button()).toBeDisabled();cleanup();
   delete window.resumeDesktop;render(<JobCareerPane {...props()}/>);expect(screen.queryByRole('button',{name:'制作投递包 合成学校'})).toBeNull();expect(exportPackage).not.toHaveBeenCalled();
+ });
+});
+
+describe('fixed queue archive refresh lifecycle',()=>{
+ it('retains the frozen modal and request ID across failed archive, loading and actual acknowledged refresh',async()=>{
+  vi.stubGlobal('crypto',webcrypto);
+  const p=props(),jd='必须具备教师资格。',now='2026-11-27T00:00:00Z';
+  const pending=await prepareJobQueueTask({id:crypto.randomUUID(),company:'合成队列单位',role:'物理教师',jdText:jd,slug:p.activeSlug,createdAt:now},p.activeDoc);
+  const task=JobQueueTaskSchema.parse({...pending,status:'prepared',execution:{attempts:1,attemptId:crypto.randomUUID(),updatedAt:now,deadlineAt:null,failure:null,result:{kind:'local-preflight-v1',jdSha256:createHash('sha256').update(jd).digest('hex'),documentSha256:pending.documentSha256,clauseCount:1}}});
+  session.state={...session.state,data:{...session.state.data,jobQueue:[task]}};
+  window.resumeDesktop!.applications.openPreparedJobQueue=vi.fn(async (input:JobQueueOpen)=>({task,document:p.activeDoc,ledgerRevision:input.ledgerRevision}));
+  const receipt={sha256:'d'.repeat(64),documentSha256:'e'.repeat(64),sizeBytes:123,exportedAt:now};
+  const token='synthetic-scoped-token';
+  window.resumeDesktop!.pdf={export:vi.fn(async()=>({canceled:false,filePath:'C:/synthetic/queue.pdf',pdfReceipt:receipt,pdfReceiptToken:token}))} as unknown as ResumeDesktopBridge['pdf'];
+  session.log.mockImplementationOnce(async()=>{publish({error:'合成归档故障'});throw Error('合成归档故障');});
+  session.log.mockImplementationOnce(async(input:ApplicationLogInput)=>{const saved={...input.entry,snapshotId:'app-'+input.entry.id,pdfReceipt:receipt};publish({error:null,data:{...session.state.data,applications:[saved,...session.state.data.applications],revision:'c'.repeat(64)}});return saved;});
+  render(<JobCareerPane {...p}/>);
+  fireEvent.click(screen.getByRole('button',{name:'岗位队列'}));
+  fireEvent.click(screen.getByRole('button',{name:'核对岗位流程 合成队列单位 物理教师'}));
+  fireEvent.click(await screen.findByRole('button',{name:'确认进入该岗位流程'}));
+  fireEvent.click(await screen.findByRole('button',{name:'岗位流程 PDF / 投递包'}));
+  fireEvent.click(await screen.findByRole('button',{name:'导出岗位原稿 PDF'}));
+  fireEvent.click(await screen.findByRole('button',{name:'核对并归档岗位 PDF'}));
+  const dlg=await screen.findByRole('dialog',{name:'记入投递并锁定永久快照'});
+  fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'}));
+  const refresh=await within(dlg).findByRole('button',{name:'刷新岗位归档台账'});
+  const first=session.log.mock.calls[0]![0] as ApplicationLogInput;
+  let release!:()=>void;
+  session.load.mockImplementationOnce(async()=>{publish({loading:true});await new Promise<void>(r=>{release=r});publish({loading:false,error:null,data:{...session.state.data,revision:'b'.repeat(64),jobQueue:[JSON.parse(JSON.stringify(task))]}});});
+  fireEvent.click(refresh);
+  expect(screen.getByRole('dialog',{name:'记入投递并锁定永久快照'})).toBe(dlg);
+  expect(within(dlg).getByRole('button',{name:'确认记入并锁定快照'})).toBeDisabled();
+  expect(within(dlg).getByRole('button',{name:'关闭记入投递弹窗'})).toBeDisabled();
+  fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'}));
+  expect(session.log).toHaveBeenCalledTimes(1);
+  await act(async()=>release());
+  await within(dlg).findByText(/已刷新磁盘台账/);
+  fireEvent.click(within(dlg).getByRole('button',{name:'确认记入并锁定快照'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'记入投递并锁定永久快照'})).toBeNull());
+  const second=session.log.mock.calls[1]![0] as ApplicationLogInput;
+  expect(second.entry.id).toBe(first.entry.id);expect(second.entry.queueTaskId).toBe(task.id);
+  expect(second.pdfReceiptToken).toBe(token);expect(second.document).toEqual(first.document);
+  expect(second.entry.status).toBe('wishlist');
+  expect(session.log).toHaveBeenCalledTimes(2);
+  expect(session.state.data.applications.filter(a=>a.queueTaskId===task.id)).toHaveLength(1);
  });
 });
