@@ -5,6 +5,7 @@ if(!root||!out||!path.basename(root).startsWith('synthetic-job-rewrite-'))throw 
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});
 app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
 const key='synthetic-job-rewrite-secret',baseUrl='http://127.0.0.1:43125/v1',model='synthetic-job-rewrite-model';
+const auditContrast=require('./validation-theme-t05-contrast.cjs');
 const report={runnerSha:process.env.GITHUB_SHA,checks:{},cases:[],calls:0,actualProviderCalls:0};
 const assert=(v,m)=>{if(!v)throw Error(m)},sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const write=()=>{const s=JSON.stringify(report,null,2);assert(!s.includes(key),'credential leaked');fs.writeFileSync(path.join(out,'job-rewrite.json'),s)};
@@ -100,7 +101,7 @@ async function run(){
       const images=await imageProof(portalSelector,'t05-'+id+'-portal-paper');
       assert(JSON.stringify(images.map(i=>i.sourceSha))===JSON.stringify(inline.map(i=>i.sourceSha)),'portal source differs from inline');
       if(id!=='classic'){const ref=report.themePortal.classic;assert(JSON.stringify(images)===JSON.stringify(ref.images),'portal source/geometry/pixels changed '+id);assert(JSON.stringify(inline)===JSON.stringify(ref.inline),'inline source/geometry changed '+id);}
-      report.themePortal[id]={portal,images,inline};
+      report.themePortal[id]={portal,images,inline,contrast:await auditContrast(win,portalSelector,id+'-portal')};
       await click('关闭全屏对照',portalSelector);await until('portal closed',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
       assert(await applyDisabled(),'closing portal enabled approval');await noWrite();
     }

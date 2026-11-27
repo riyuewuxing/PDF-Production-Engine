@@ -72,12 +72,22 @@
     & [data-studio-control]:focus-visible { outline: 2px solid var(--studio-focus); outline-offset: 2px; }
   }
 
+  /* These are business chrome and raster-image review surfaces, not a live A4.
+     Native scrollbar colors inherit within each explicit region; geometry is untouched.
+     The classic palette and OS forced-colors remain authoritative. */
+  :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+    scrollbar-color: var(--studio-border) var(--studio-surface);
+  }
+
   /* Only background is set on the stage. Do not set foreground, font,
      color-scheme, filter, opacity, transform, animation, zoom or layout here. */
   [data-studio-stage="themed"] { background-color: var(--studio-stage-background); }
   [data-studio-stage="themed"] [data-studio-stage-label="true"] { color: var(--studio-stage-label); }
 
   @media (forced-colors: active) {
+    :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+      scrollbar-color: auto;
+    }
     :is([data-studio-surface="panel"], [data-studio-surface="preview"], [data-studio-surface="gallery"]) [data-studio-control]:focus-visible {
       outline-color: Highlight;
     }
