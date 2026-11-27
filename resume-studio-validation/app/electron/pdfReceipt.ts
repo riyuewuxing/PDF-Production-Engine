@@ -17,7 +17,7 @@ const ordinary=(s:BigIntStats)=>s.isFile()&&!s.isSymbolicLink()&&s.nlink===1n;
 
 /** Bounded, local-only hash. Reject links, aliases, nonordinary files and
  * detectable races. A hash is a point-in-time observation, not a lease. */
-export async function readPdfFingerprint(file:string,signal?:AbortSignal):Promise<ReadResult>{
+export async function readPdfFingerprint(file:string,signal?:AbortSignal,allowReal?:(real:string)=>Promise<boolean>):Promise<ReadResult>{
   if(!safePdfPath(file))return {status:'unsafe'};
   let handle:Awaited<ReturnType<typeof fs.open>>|undefined;
   try{
@@ -26,7 +26,8 @@ export async function readPdfFingerprint(file:string,signal?:AbortSignal):Promis
     if(!ordinary(start))return {status:'unsafe'};
     if(start.size>BigInt(MAX_RECEIPT_PDF_BYTES))return {status:'unavailable'};
     const real=await fs.realpath(file);
-    if(!safePdfPath(real)||path.relative(file,real)!=='')return {status:'unsafe'};
+    const realParent=await fs.realpath(path.dirname(file));
+    if(!safePdfPath(real)||path.relative(path.join(realParent,path.basename(file)),real)!==''||(allowReal&&!await allowReal(real)))return {status:'unsafe'};
     handle=await fs.open(file,constants.O_RDONLY|(process.platform==='win32'?0:constants.O_NOFOLLOW));
     const opened=await handle.stat({bigint:true});
     if(!ordinary(opened)||!sameStat(start,opened))return {status:'unsafe'};
@@ -59,15 +60,26 @@ export function checkFingerprint(read:ReadResult,receipt:PdfArtifactReceipt):App
 export function canCheckRecordedPdf(file:string,exportsDir:string,authorized:ReadonlyMap<string,string>):boolean{
   return safePdfPath(file)&&(isPathInside(normalized(exportsDir),normalized(file))||authorized.has(normalized(file)));
 }
+/** Canonical directory aliases are allowed, but a redirected child cannot
+ * escape or change its relative location within the managed export root. */
+export async function canCheckRecordedRealPdf(file:string,real:string,exportsDir:string,authorized:ReadonlyMap<string,string>):Promise<boolean>{
+  if(!canCheckRecordedPdf(file,exportsDir,authorized)||!safePdfPath(real))return false;
+  if(authorized.has(normalized(file))&&path.relative(authorized.get(normalized(file))!,real)==='')return true;
+  if(!isPathInside(normalized(exportsDir),normalized(file)))return false;
+  const root=await fs.realpath(exportsDir).catch(()=>null);
+  if(!root)return false;
+  const expected=path.join(root,path.relative(normalized(exportsDir),normalized(file)));
+  return isPathInside(root,real)&&path.relative(expected,real)==='';
+}
 
 type BoundReceipt={filePath:string;slug:string;receipt:PdfArtifactReceipt;expires:number};
 export class PdfReceiptVault{
   private entries=new Map<string,BoundReceipt>();
   constructor(private now=()=>Date.now()){}
-  async issue(filePath:string,slug:string,document:unknown,bytes:Buffer,signal?:AbortSignal):Promise<{pdfReceipt:PdfArtifactReceipt;pdfReceiptToken:string}>{
+  async issue(filePath:string,slug:string,document:unknown,bytes:Buffer,signal?:AbortSignal,allowReal?:(real:string)=>Promise<boolean>):Promise<{pdfReceipt:PdfArtifactReceipt;pdfReceiptToken:string}>{
     if(!Buffer.isBuffer(bytes)||bytes.length>MAX_RECEIPT_PDF_BYTES||bytes.subarray(0,5).toString('ascii')!=='%PDF-'||!slug)throw Error('PDF 输出不支持建立字节凭证。');
     const pdfReceipt=PdfArtifactReceiptSchema.parse({sha256:createHash('sha256').update(bytes).digest('hex'),sizeBytes:bytes.length,documentSha256:documentSha256(document),exportedAt:new Date(this.now()).toISOString()});
-    if(checkFingerprint(await readPdfFingerprint(filePath,signal),pdfReceipt).status!=='verified')throw Error('PDF 文件已写出，但落盘字节未能确认与生成内容相同。');
+    if(checkFingerprint(await readPdfFingerprint(filePath,signal,allowReal),pdfReceipt).status!=='verified')throw Error('PDF 文件已写出，但落盘字节未能确认与生成内容相同。');
     const token=randomUUID(),now=this.now();
     for(const [id,value] of this.entries)if(value.expires<=now)this.entries.delete(id);
     while(this.entries.size>=128){const first=this.entries.keys().next().value;if(first===undefined)break;this.entries.delete(first);}

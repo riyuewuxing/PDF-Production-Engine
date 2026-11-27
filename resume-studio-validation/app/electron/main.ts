@@ -31,7 +31,7 @@ import type {
 } from '../src/types/electron';
 import { resolveAppPaths, resolveUniqueExportPath } from './paths';
 import { isLoopbackDevEntry, isPathInside, isSafeExportFileName, isTrustedRendererFrame, rendererEntryUrl } from './securityPolicy';
-import {PdfReceiptVault,readPdfFingerprint,checkFingerprint,canCheckRecordedPdf} from './pdfReceipt';
+import {PdfReceiptVault,readPdfFingerprint,checkFingerprint,canCheckRecordedPdf,canCheckRecordedRealPdf} from './pdfReceipt';
 
 const execFileAsync = promisify(execFile);
 
@@ -709,7 +709,7 @@ function registerIpcHandlers(): void {
     return boundedPdfCheck(async signal=>{
       const receipt=pdfReceipts.resolve(input.pdfReceiptToken,input.entry.exportedFilePath,input.entry.resumeSlug,input.document);
       requireRecordedPath(input.entry.exportedFilePath);
-      const result=checkFingerprint(await readPdfFingerprint(input.entry.exportedFilePath,signal),receipt);
+      const result=checkFingerprint(await readPdfFingerprint(input.entry.exportedFilePath,signal,real=>canCheckRecordedRealPdf(input.entry.exportedFilePath,real,exportsDir,authorizedOutputPaths)),receipt);
       if(result.status!=='verified')throw new Error('PDF 已变更、缺失或无法核验；未封存投递记录，请重新导出。');
       signal.throwIfAborted();
       return store.logApplication(input,receipt);
@@ -734,7 +734,7 @@ function registerIpcHandlers(): void {
       file=result.filePaths[0]!;
     }else if(!canCheckRecordedPdf(file,exportsDir,authorizedOutputPaths))return {status:'unavailable',checkedAt:new Date().toISOString()};
     return boundedPdfCheck(async signal=>{
-      const read=await readPdfFingerprint(file,signal);
+      const read=await readPdfFingerprint(file,signal,action==='choose'?undefined:real=>canCheckRecordedRealPdf(file,real,exportsDir,authorizedOutputPaths));
       const result=checkFingerprint(read,receipt);
       signal.throwIfAborted();
       // Recheck the persisted association before reporting or opening.
@@ -850,7 +850,7 @@ function registerIpcHandlers(): void {
     let receiptWarning=outputWarning;
     if(spec.ext==='pdf'&&options.skipSave!==true&&options.slug&&!snapshotWarning&&!contentWarning&&!receiptWarning){
       try{
-        receiptResult=await boundedPdfCheck(signal=>pdfReceipts.issue(writtenPath,options.slug!,targetDoc,Buffer.isBuffer(content)?content:Buffer.from(content),signal));
+        receiptResult=await boundedPdfCheck(signal=>pdfReceipts.issue(writtenPath,options.slug!,targetDoc,Buffer.isBuffer(content)?content:Buffer.from(content),signal,real=>canCheckRecordedRealPdf(writtenPath,real,exportsDir,authorizedOutputPaths)));
       }catch{receiptWarning='PDF 文件已写出，但无法确认字节凭证；请重新导出后再封存投递。';}
     }
     return {

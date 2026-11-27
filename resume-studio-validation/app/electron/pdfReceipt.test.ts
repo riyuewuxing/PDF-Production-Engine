@@ -4,7 +4,7 @@ import {promises as fs} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
-import {PdfReceiptVault,readPdfFingerprint,checkFingerprint,documentSha256,canCheckRecordedPdf,MAX_RECEIPT_PDF_BYTES} from './pdfReceipt';
+import {PdfReceiptVault,readPdfFingerprint,checkFingerprint,documentSha256,canCheckRecordedPdf,canCheckRecordedRealPdf,MAX_RECEIPT_PDF_BYTES} from './pdfReceipt';
 import {LocalResumeStore} from '../src/server/localFsApi';
 import {JobApplicationSchema} from '../src/schema/applicationSchema';
 import {comparisonFixture} from '../src/lib/comparisonSyntheticFixture';
@@ -56,6 +56,18 @@ describe('actual PDF byte fingerprint and export receipt',()=>{
   expect(canCheckRecordedPdf(outside,dir,new Map())).toBe(false);
   expect(canCheckRecordedPdf(outside,dir,new Map([[outside,outside]]))).toBe(true);
   expect(canCheckRecordedPdf('outside.pdf',dir,new Map())).toBe(false);
+ });
+ it('allows a canonical directory alias but rejects a redirected managed child before hashing',async()=>{
+  const {root,dir,file,issued}=await fixture(),alias=path.join(root,'managed-alias'),external=path.join(root,'external'),child=path.join(dir,'redirected');
+  await fs.mkdir(external);await fs.writeFile(path.join(external,'resume.pdf'),bytes);
+  await fs.symlink(dir,alias,process.platform==='win32'?'junction':'dir');
+  await fs.symlink(external,child,process.platform==='win32'?'junction':'dir');
+  try{
+   const aliasFile=path.join(alias,'resume.pdf'),bad=path.join(child,'resume.pdf');
+   expect(checkFingerprint(await readPdfFingerprint(aliasFile,undefined,real=>canCheckRecordedRealPdf(aliasFile,real,alias,new Map())),issued.pdfReceipt).status).toBe('verified');
+   expect((await readPdfFingerprint(bad,undefined,real=>canCheckRecordedRealPdf(bad,real,dir,new Map()))).status).toBe('unsafe');
+   expect((await readPdfFingerprint(file,undefined,async()=>false)).status).toBe('unsafe');
+  }finally{await fs.unlink(alias).catch(()=>fs.rmdir(alias));await fs.unlink(child).catch(()=>fs.rmdir(child));}
  });
  it('respects an already-aborted read',async()=>{
   const {file}=await fixture();const ctl=new AbortController();ctl.abort();expect((await readPdfFingerprint(file,ctl.signal)).status).toBe('unavailable');

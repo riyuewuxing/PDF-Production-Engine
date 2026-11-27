@@ -47,7 +47,7 @@ async function run(){
  await rowClick('核验 PDF 合成凭证学校');await until('verified status',()=>has('记录路径字节一致'));await capture('03-verified-record');unchanged();checks.verifiedAndLegacyUnknown=true;
  fs.writeFileSync(first,changed);
  await rowClick('核验 PDF 合成凭证学校');await until('changed status',()=>has('文件字节与封存凭证不一致'));await capture('04-changed-record');unchanged();checks.sameLengthChangeDetected=true;
- const open=shell.openPath;let opens=0;shell.openPath=async file=>{opens++;assert(file===first,'wrong shell path');return ''};
+ const open=shell.openPath;let opens=0;shell.openPath=async file=>{opens++;assert(path.relative(fs.realpathSync(first),file)==='','wrong shell path');return ''};
  await rowClick('核验并打开 PDF 合成凭证学校');await until('changed open refused',()=>has('文件字节与封存凭证不一致'));await sleep(300);assert(opens===0,'changed PDF opened');
  checks.changedOpenRefused=true;
  fs.rmSync(first);await rowClick('核验 PDF 合成凭证学校');await until('missing status',()=>has('记录文件缺失'));await capture('05-missing-record');unchanged();checks.missingDetected=true;
