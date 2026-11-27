@@ -60,7 +60,15 @@ async function run(){
  await click('求职面试');await rowClick('核验 PDF 打包凭证学校');await until('verified',()=>has('记录路径字节一致'));await capture('02-packaged-verified');report.checks.verifiedBeforeRestart=true;
  unchanged();stop();await sleep(400);await connect(exe);await click('求职面试');await rowClick('核验 PDF 打包凭证学校');await until('verified after restart',()=>has('记录路径字节一致'));await capture('03-packaged-verified-restart');report.checks.verifiedAfterRestart=true;unchanged();
  // Exercise actual OS-owned dialogs from the packaged executable, not a mocked IPC.
- const nativeClick=(title,button,id='')=>execFileSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve('validation-native-dialog.ps1'),'-OwnerPid',String(child.pid),'-Title',title,'-Button',button,'-ButtonId',id||'none'],{encoding:'utf8',timeout:24000,windowsHide:true});
+ const nativeClick=(title,button,id='')=>{
+  const enc=s=>Buffer.from(s,'utf8').toString('base64');
+  try{
+   const log=execFileSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve('validation-native-dialog.ps1'),'-OwnerPid',String(child.pid),'-Title64',enc(title),'-Button64',enc(button),'-ButtonId',id||'none'],{encoding:'utf8',timeout:27000,windowsHide:true});
+   fs.appendFileSync(path.join(out,'native-dialog.log'),log);
+  }catch(e){
+   fs.appendFileSync(path.join(out,'native-dialog.log'),String(e.stdout||'')+'\n'+String(e.stderr||'')+'\n');throw e;
+  }
+ };
  const zipBefore=fs.readdirSync(exports).filter(n=>n.endsWith('.zip'));
  await rowClick('制作投递包 打包凭证学校');
  nativeClick('选择投递包内容','仅封存简历');
@@ -80,4 +88,4 @@ async function run(){
  await click('隐私脱敏');await until('redaction',()=>js(q(row('核验 PDF 打包凭证学校'))+'?.disabled===true'));report.checks.redactionGate=true;assert(await js(q(row('制作投递包 打包凭证学校'))+'?.disabled===true'),'package privacy gate');report.checks.packageRedactionGate=true;
  report.checks.originalArchiveAndLedgerUnchanged=true;write();
 }
-run().then(()=>{clearTimeout(watchdog);cleanup();process.exit(0)}).catch(e=>{clearTimeout(watchdog);report.error=String(e?.message||'package fixture error').slice(0,500);write();cleanup();process.exit(1)});
+run().then(()=>{clearTimeout(watchdog);cleanup();process.exit(0)}).catch(async e=>{clearTimeout(watchdog);report.error=String(e?.message||'package fixture error').slice(0,1200);try{const shot=await cdp('Page.captureScreenshot',{format:'png'});if(shot.data)fs.writeFileSync(path.join(out,'failure-renderer.png'),Buffer.from(shot.data,'base64'));}catch{}write();cleanup();process.exit(1)});
