@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs';
+import { promises as fs, type Stats } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
@@ -38,6 +38,7 @@ const SAFE_ASSET_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}\.(png|jpe?g|webp)$/i
 const SAFE_SNAPSHOT_ID_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/;
 export const MAX_SNAPSHOTS_PER_RESUME = 15;
 const MAX_JSON_BYTES = 5 * 1024 * 1024;
+export const MAX_JOB_QUEUE_DOCUMENT_BYTES=16*1024*1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export class LocalFsApiError extends Error {
@@ -1068,15 +1069,44 @@ export class LocalResumeStore {
   }
 
   /** Used only by registration and trusted local executor. No renderer-provided path or result. */
-  private async readBoundJobQueueDocument(task:JobQueueTask):Promise<ResumeDocument>{
+  private async readBoundJobQueueDocument(task:JobQueueTask,signal?:AbortSignal):Promise<ResumeDocument>{
     try{
+      signal?.throwIfAborted();
       const {filePath}=this.resolveResumePath(task.slug);
       await checkWorkspaceFile(this.dataDir,filePath);
       if(!(await fs.readdir(path.dirname(filePath),{withFileTypes:true})).some(e=>e.name===path.basename(filePath)&&e.isFile()))throw Error('source missing or aliased');
-      const doc=await this.getResume(task.slug);
+      const initial=await fs.lstat(filePath);
+      const limit=()=>new LocalFsApiError(413,'JOB_QUEUE_SOURCE_LIMIT','岗位队列绑定简历超过16 MiB本地读取上限；未登记或执行，请先另存精简版本。');
+      if(initial.size>MAX_JOB_QUEUE_DOCUMENT_BYTES)throw limit();
+      const same=(a:Stats,b:Stats)=>a.isFile()&&b.isFile()&&a.nlink===1&&b.nlink===1&&a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
+      const handle=await fs.open(filePath,'r');
+      let bytes:Buffer;
+      try{
+        const opened=await handle.stat();
+        if(opened.size>MAX_JOB_QUEUE_DOCUMENT_BYTES)throw limit();
+        if(!same(initial,opened))throw Error('source changed before read');
+        bytes=Buffer.alloc(opened.size);
+        let offset=0;
+        while(offset<bytes.length){
+          signal?.throwIfAborted();
+          const {bytesRead}=await handle.read(bytes,offset,Math.min(65536,bytes.length-offset),offset);
+          if(bytesRead<=0)throw Error('short source read');
+          offset+=bytesRead;
+        }
+        signal?.throwIfAborted();
+        const after=await handle.stat(),linked=await fs.lstat(filePath);
+        if(!same(opened,after)||!same(opened,linked))throw Error('source changed during read');
+      }finally{await handle.close();}
+      await checkWorkspaceFile(this.dataDir,filePath);
+      if(!same(initial,await fs.lstat(filePath)))throw Error('source changed after read');
+      signal?.throwIfAborted();
+      const doc=ResumeDocumentSchema.parse(JSON.parse(bytes.toString('utf8')));
       if(!jobQueueBindingMatches(task,doc,createHash('sha256').update(jobQueueDocumentText(doc)).digest('hex')))throw Error('binding changed');
+      signal?.throwIfAborted();
       return doc;
-    }catch{
+    }catch(err){
+      if(signal?.aborted)throw signal.reason;
+      if(err instanceof LocalFsApiError&&err.code==='JOB_QUEUE_SOURCE_LIMIT')throw err;
       throw new LocalFsApiError(409,'JOB_QUEUE_STALE','岗位任务绑定的磁盘简历已变化、缺失或无法核验；未登记任务或执行。');
     }
   }
@@ -1100,6 +1130,7 @@ export class LocalResumeStore {
         if(task.status==='running')return {store:current}; // idempotent; never dispatch a second attempt
         if(action==='start'?task.status!=='pending':task.status!=='paused'&&task.status!=='failed')throw stateError();
         if(rows.some(t=>t.status==='running'))throw new LocalFsApiError(409,'JOB_QUEUE_BUSY','同一工作区仅允许一项任务运行。');
+        if(old?.failure==='invalid-source')throw new LocalFsApiError(422,'JOB_QUEUE_JD_INVALID','原文没有可核对条款或超过80条；请分批登记新任务，不自动截断或重试。');
         if((old?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS)throw new LocalFsApiError(409,'JOB_QUEUE_ATTEMPT_LIMIT','任务尝试次数已达上限，不自动重试。');
         await this.readBoundJobQueueDocument(task);
         const startedAt=Date.now();
@@ -1127,10 +1158,11 @@ export class LocalResumeStore {
    * no eligibility judgment, evidence review, AI, or external effect. */
   async prepareJobQueueAttempt(task:JobQueueTask,signal:AbortSignal):Promise<JobQueueResult>{
     signal.throwIfAborted();
-    await this.readBoundJobQueueDocument(task);
+    await this.readBoundJobQueueDocument(task,signal);
     signal.throwIfAborted();
-    const clauses=splitJobRequirements(task.jdText);
-    if(!clauses.length)throw Error('no local clauses');
+    let clauses:ReturnType<typeof splitJobRequirements>;
+    try{clauses=splitJobRequirements(task.jdText);if(!clauses.length)throw Error('no clauses');}
+    catch{throw new LocalFsApiError(422,'JOB_QUEUE_JD_INVALID','原文没有可核对条款或超过80条；请分批登记新任务。');}
     return JobQueueResultSchema.parse({kind:'local-preflight-v1',jdSha256:createHash('sha256').update(task.jdText).digest('hex'),documentSha256:task.documentSha256,clauseCount:clauses.length});
   }
 
@@ -1150,7 +1182,7 @@ export class LocalResumeStore {
           const r=JobQueueResultSchema.parse(outcome.result);
           if(r.documentSha256!==task.documentSha256||r.jdSha256!==createHash('sha256').update(task.jdText).digest('hex')||r.clauseCount!==splitJobRequirements(task.jdText).length)throw Error('result mismatch');
           result=r;
-        }catch(err){failure=err instanceof LocalFsApiError&&err.code==='JOB_QUEUE_STALE'?'source-changed':'local-error';}
+        }catch(err){failure=err instanceof LocalFsApiError&&['JOB_QUEUE_STALE','JOB_QUEUE_SOURCE_LIMIT'].includes(err.code)?'source-changed':'local-error';}
         if(expired())failure='timeout';
       }
       const next=JobQueueTaskSchema.parse({...task,status:failure?'failed':'prepared',execution:{...old,updatedAt:new Date().toISOString(),deadlineAt:null,failure,result:failure?null:result}});

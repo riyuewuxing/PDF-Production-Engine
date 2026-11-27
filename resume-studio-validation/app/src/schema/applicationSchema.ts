@@ -121,7 +121,7 @@ export const JOB_QUEUE_RUN_MS=30000;
 export const MAX_JOB_QUEUE_ATTEMPTS=5;
 export const JOB_QUEUE_STATES=['pending','running','paused','canceled','failed','prepared'] as const;
 const canonicalUuid=z.string().uuid().refine(s=>s===s.toLowerCase(),'任务标识必须规范');
-export const JobQueueFailureSchema=z.enum(['local-error','source-changed','timeout','interrupted']);
+export const JobQueueFailureSchema=z.enum(['local-error','source-changed','invalid-source','timeout','interrupted']);
 export type JobQueueFailure=z.infer<typeof JobQueueFailureSchema>;
 export const JobQueueResultSchema=z.object({
   kind:z.literal('local-preflight-v1'),

@@ -17,7 +17,7 @@ function assertQueue(tasks:JobQueueTask[]){
 }
 
 const stateLabels:Record<JobQueueTask['status'],string>={pending:'待处理',running:'准备尝试未结算',paused:'已暂停',canceled:'已取消',failed:'准备失败',prepared:'本地准备完成'};
-const failureLabels={ 'local-error':'本地解析或写入前核验失败','source-changed':'绑定简历发生变化','timeout':'执行超时','interrupted':'中断后已显式恢复为失败' };
+const failureLabels={ 'local-error':'本地解析或写入前核验失败','source-changed':'绑定简历发生变化或超出读取上限','invalid-source':'岗位原文无可核对条款或超过80条，请分批登记新任务。','timeout':'执行超时','interrupted':'中断后已显式恢复为失败' };
 /** The renderer requests explicit commands only; no worker or AI request here. */
 export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;activeDoc:ResumeDocument;redacted:boolean}){
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
@@ -195,7 +195,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
           </div>}
           {supportsExecution&&<div className="flex flex-wrap gap-2">
             {task.status==='pending'&&<button type="button" aria-label={'开始岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning} onClick={()=>void execute(task,'start')}>开始本地准备</button>}
-            {(task.status==='paused'||task.status==='failed')&&<button type="button" aria-label={'重试岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning||(task.execution?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS} onClick={()=>void execute(task,'retry')}>{task.status==='paused'?'继续准备（新尝试）':'重试准备'}</button>}
+            {(task.status==='paused'||task.status==='failed')&&<button type="button" aria-label={'重试岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning||task.execution?.failure==='invalid-source'||(task.execution?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS} onClick={()=>void execute(task,'retry')}>{task.status==='paused'?'继续准备（新尝试）':'重试准备'}</button>}
             {task.status==='running'&&<><button type="button" aria-label={'暂停岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void execute(task,'pause')}>暂停</button>
               <button type="button" aria-label={'恢复中断岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||!task.execution?.deadlineAt||clock<Date.parse(task.execution.deadlineAt)} onClick={()=>void execute(task,'recover')}>恢复中断为失败</button></>}
             {task.status!=='canceled'&&task.status!=='prepared'&&<button type="button" aria-label={'取消岗位 '+task.company+' '+task.role} className={button+' text-red-700'} disabled={locked||!!candidate} onClick={()=>void execute(task,'cancel')}>取消任务（保留记录）</button>}

@@ -4,7 +4,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {LocalResumeStore} from './localFsApi';
+import {LocalResumeStore,MAX_JOB_QUEUE_DOCUMENT_BYTES} from './localFsApi';
 import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
 import {JobQueueExecutor} from './jobQueueExecutor';
 import {JobQueueSchema,JobQueueTaskSchema,JOB_QUEUE_RUN_MS,MAX_JOB_QUEUE_ATTEMPTS,type JobQueueCommand,type JobQueueTask,type JobQueueResult} from '../schema/applicationSchema';
@@ -193,6 +193,33 @@ describe('queue storage failure and workspace isolation',()=>{
     expect(row(recovered.store,f.y.id).status).toBe('failed');expect(row(recovered.store,f.x.id)).toEqual(row(done,f.x.id));expect(worker).not.toHaveBeenCalled();
     expect(await readBytes(f.store)).toEqual(source);expect(row(await f.store.getApplications(),f.y.id).status).toBe('running');
   },20000);
+});
+describe('bounded preparation input',()=>{
+  it('rejects a too-large source before parsing or writing the running state; registration remains intact',async()=>{
+    const f=await fixture(),file=f.store.resolveResumePath(f.x.slug).filePath,before=await readBytes(f.store);
+    await fs.truncate(file,MAX_JOB_QUEUE_DOCUMENT_BYTES+1);
+    await expect(f.store.commandJobQueue(command(f.x,f.ledger.revision!,'start'))).rejects.toMatchObject({code:'JOB_QUEUE_SOURCE_LIMIT'});
+    expect(await readBytes(f.store)).toEqual(before);expect((await fs.stat(file)).size).toBe(MAX_JOB_QUEUE_DOCUMENT_BYTES+1);
+    await fs.writeFile(file,f.original[0]!);
+    const started=await f.store.commandJobQueue(command(f.x,f.ledger.revision!,'start'));
+    const controller=new AbortController();controller.abort();
+    await expect(f.store.prepareJobQueueAttempt(started.started!,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+    const p=await f.store.prepareJobQueueAttempt(started.started!,signal());
+    await fs.truncate(file,MAX_JOB_QUEUE_DOCUMENT_BYTES+1);
+    const failed=await f.store.finishJobQueueAttempt(f.x.id,started.started!.execution!.attemptId!,{result:p});
+    expect(row(failed,f.x.id)).toMatchObject({status:'failed',execution:{failure:'source-changed',result:null}});
+    expect(row(failed,f.y.id)).toEqual(f.y);
+  });
+  it('reports deterministic invalid JD without truncation or wasted retries, leaving the next task untouched',async()=>{
+    const f=await fixture(),bad=await f.make(f.a,'demo-a','合成过长条款',Array.from({length:81},(_,i)=>'条款'+i+'。').join(''));
+    const saved=await f.store.saveApplications({...f.ledger,jobQueue:[f.x,f.y,bad]},f.ledger.revision);
+    const executor=new JobQueueExecutor(f.store);await executor.command(command(bad,saved.revision!,'start'));
+    await until(async()=>row(await f.store.getApplications(),bad.id).status==='failed');
+    const failed=await f.store.getApplications(),before=await readBytes(f.store);
+    expect(row(failed,bad.id)).toMatchObject({status:'failed',execution:{failure:'invalid-source',attempts:1,result:null}});
+    await expect(f.store.commandJobQueue(command(bad,failed.revision!,'retry'))).rejects.toMatchObject({code:'JOB_QUEUE_JD_INVALID'});
+    expect(await readBytes(f.store)).toEqual(before);expect(row(failed,f.x.id)).toEqual(f.x);expect(row(failed,f.y.id)).toEqual(f.y);
+  });
 });
 describe('local worker cancellation and watchdog',()=>{
   it('explicitly starts a single worker, refuses overlapping work, and ignores a delayed canceled result',async()=>{

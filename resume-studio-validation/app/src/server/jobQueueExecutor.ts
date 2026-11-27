@@ -44,7 +44,7 @@ export class JobQueueExecutor{
         try{outcome={result:await Promise.race([run,timeout,canceled])};}
         catch(err){
           const code=(err as {code?:string})?.code;
-          outcome={failure:timedOut?'timeout':code==='JOB_QUEUE_STALE'?'source-changed':'local-error'};
+          outcome={failure:timedOut?'timeout':code==='JOB_QUEUE_JD_INVALID'?'invalid-source':code==='JOB_QUEUE_STALE'||code==='JOB_QUEUE_SOURCE_LIMIT'?'source-changed':'local-error'};
         }
         // Pause/cancel is committed first, then signals the worker. Its late
         // completion is harmless; timeout still records a failure if possible.
