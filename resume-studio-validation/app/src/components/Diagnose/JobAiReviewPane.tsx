@@ -26,6 +26,8 @@ export function JobAiReviewPane(props:Props){
   const [pending,setPending]=useState<Pending|null>(null);
   const [result,setResult]=useState<Result|null>(null);
   const [rewrite,setRewrite]=useState<{draft:JobRewriteDraft;request:Pending}|null>(null);
+  const rewriteElement=useRef<HTMLElement|null>(null);
+  useEffect(()=>{if(rewrite)rewriteElement.current?.scrollIntoView({block:'start'});},[rewrite]);
   const [attempt,setAttempt]=useState<{basis:Basis;value:AiTaskReceipt}|null>(null);
   const [busy,setBusy]=useState<'load'|'send'|null>(null);
   const [error,setError]=useState('');
@@ -126,8 +128,8 @@ export function JobAiReviewPane(props:Props){
         {jobRewriteTargets(document,r).map(t=><button type="button" key={t.blockKey} disabled={locked} onClick={()=>openRewrite(r,t.blockKey)} className="block rounded border border-teal-300 px-2 py-1 text-teal-800">准备本段定向改写 · {t.label}</button>)}
       </article>)}
     </section>}
-    {rewrite&&current(rewrite.request.basis)&&<section aria-label="岗位定向改写工作区" className="space-y-2 rounded border-2 border-teal-300 bg-teal-50 p-2">
-      <div className="flex items-start justify-between gap-2"><strong>岗位定向改写（尚未发送）</strong><button type="button" onClick={()=>setRewrite(null)} className="shrink-0 rounded border px-2 py-1">关闭定向改写</button></div>
+    {rewrite&&current(rewrite.request.basis)&&<section ref={rewriteElement} aria-label="岗位定向改写工作区" className="space-y-2 rounded border-2 border-teal-300 bg-teal-50 p-2">
+      <div className="flex items-start justify-between gap-2"><strong>岗位定向改写 · 独立任务</strong><button type="button" onClick={()=>setRewrite(null)} className="shrink-0 rounded border px-2 py-1">关闭定向改写</button></div>
       <p>仅准备本条公告与本段正文。原模型理由、缺口与核对审批不继承；不新增事实、资质或经历。采纳后简历变化，当前岗位核对会话将失效，请先归档需要保留的人工核对。</p>
       <ResumeAiAssistantPane {...props.rewriteActions} document={document} slug={slug} settings={rewrite.request.settings} jdText={rewrite.draft.clause.quote} jobScope={rewrite.draft} assertSettings={assertAiPreviewSettings}/>
     </section>}

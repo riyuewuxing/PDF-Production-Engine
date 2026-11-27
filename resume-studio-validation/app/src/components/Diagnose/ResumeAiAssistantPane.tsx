@@ -184,7 +184,7 @@ export function ResumeAiAssistantPane(props:Props){
       const next=await previewTextPatch({document:props.document,slug:props.slug,revision,envelope});
       if(JSON.stringify(next)!==JSON.stringify(review.next))throw new Error('候选已变化，请重新试渲染。');
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
-      await apiClient.createSnapshot(props.slug,'AI 协作任务前快照',revision);
+      await apiClient.createSnapshot(props.slug,request.basis.jobScope?'岗位定向改写前快照':'AI 协作任务前快照',revision);
       await assertFactsFresh(request.basis).catch(err=>{setReview(null);setPdfConfirmed(false);throw err;});
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
       props.onImmediateChange(next);setResult(null);setAttempt(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setFactIds([]);
