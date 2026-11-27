@@ -10,6 +10,12 @@ type Basis=Pick<Props,'document'|'slug'|'source'|'clauses'>;
 type Pending={basis:Basis;settings:ByokAiSettings;prepared:PreparedJobAiReview};
 type Result={request:Pending;rows:JobAiRow[];receipt:AiCompletionReceipt|null};
 const sameSettings=(a:ByokAiSettings,b:ByokAiSettings)=>JSON.stringify(a)===JSON.stringify(b);
+const shortAssessment={supported:'支持线索',partial:'部分线索',gap:'未见依据',uncertain:'待核实','not-requirement':'非条件线索'} as const;
+const priorityHints={mandatory:'硬条件线索',preferred:'优先条件线索',unknown:'条件类型待判定','not-requirement':'非条件线索'} as const;
+const priorityOrder={mandatory:0,unknown:1,preferred:2,'not-requirement':3} as const;
+function actionRows(rows:readonly JobAiRow[]){
+  return rows.filter(r=>['gap','partial','uncertain'].includes(r.reviewAssessment)).sort((a,b)=>priorityOrder[a.clause.priorityHint]-priorityOrder[b.clause.priorityHint]);
+}
 export function JobAiReviewPane(props:Props){
   const {document,slug,source,clauses}=props;
   const evidence=useMemo(()=>collectJobAiEvidence(document),[document]);
@@ -86,14 +92,25 @@ export function JobAiReviewPane(props:Props){
       <div className="flex gap-2"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送岗位 AI 分析</button><button type="button" onClick={()=>setPending(null)} className="rounded border px-2 py-1">取消岗位发送</button></div>
     </section>}
     {result&&current(result.request.basis)&&<section aria-label="岗位 AI 分析结果" className="space-y-2 rounded border border-teal-200 bg-teal-50/50 p-2">
-      <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong><div className="flex flex-wrap gap-1">{Object.entries(JOB_AI_ASSESSMENTS).map(([key,label])=><span key={key} className="rounded border bg-white px-1.5 py-1">{label} {result.rows.filter(r=>r.reviewAssessment===key).length}</span>)}</div>
+      <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong><div className="flex flex-wrap gap-1">{Object.entries(shortAssessment).map(([key,label])=><span key={key} className="rounded border bg-white px-1.5 py-1">{label} {result.rows.filter(r=>r.reviewAssessment===key).length}</span>)}</div>
       <p aria-label="岗位 AI 调用回执" className="break-all text-slate-600">{formatAiCompletionReceipt(result.receipt)}</p>
       <p>逐字引用仅证明文字存在，不证明事实真实或满足招聘条件。未选中的自述、事实库和完整公告可能改变判断。请回到下方人工核对逐项确认。</p>
+      <section aria-label="岗位待补材料清单" className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2">
+        <strong>待补材料与待核实项 · {actionRows(result.rows).length} 条</strong>
+        <p className="text-slate-600">按本地条件类型线索排列，仅供安排核对顺序；不是资格结论。</p>
+        {actionRows(result.rows).length===0&&<p>本批没有模型标记的待补项；不代表招聘条件已满足。</p>}
+        {actionRows(result.rows).map(r=><div key={r.clause.id} className="rounded border bg-white p-1.5" data-clause-id={r.clause.id}>
+          <p className="font-semibold">{priorityHints[r.clause.priorityHint]} · {r.clause.quote}</p>
+          {r.reviewAssessment!==r.assessment&&<p>· 核对引文的完整否定、角色及范围限定。</p>}
+          {r.missing.map((m,j)=><p key={j} className="break-words">· {m}</p>)}
+          <button type="button" disabled={locked} onClick={()=>props.onReview(r.clause.id)} className="rounded border px-2 py-1">核对此项原文</button>
+        </div>)}
+      </section>
       {result.rows.map((r,i)=><article key={r.clause.id} aria-label={'岗位 AI 建议 '+(i+1)} data-model-assessment={r.assessment} data-review-assessment={r.reviewAssessment} className="space-y-1 rounded border bg-white p-2">
-        <p className="font-semibold">第 {r.clause.line} 行 · {r.clause.quote}</p>
+        <p className="font-semibold">第 {r.clause.line} 行 · {r.clause.quote}</p><p className="text-slate-600">本地提示：{priorityHints[r.clause.priorityHint]}（未经人工判定）</p>
         <p className="font-semibold text-teal-900">模型建议：{JOB_AI_ASSESSMENTS[r.assessment]}</p>{r.reviewAssessment!==r.assessment&&<p className="rounded bg-amber-100 p-1 font-semibold text-amber-900">本地提醒：引文可能截掉否定或角色限定，本条只计入待核实，不计入支持线索。请核对完整原文。</p>}
         <p className="whitespace-pre-wrap break-words">模型理由（未验证）：{r.reason}</p>
-        {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote><details className="rounded border p-1"><summary className="cursor-pointer">引文上下文（发送版本，节选；出现 {c.occurrences} 次）</summary><p className="whitespace-pre-wrap break-words">{c.context}</p></details>{c.caution&&<p className="text-amber-800">该来源含可能的否定、角色或范围限定，即使逐字引用也须特别核对。<span className="block whitespace-pre-wrap">{c.context}</span></p>}</div>)}
+        {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote><details className="rounded border p-1"><summary className="cursor-pointer">引文上下文（发送版本，节选；出现 {c.occurrences} 次）</summary><p className="whitespace-pre-wrap break-words">{c.context}</p></details>{c.caution&&<p className="text-amber-800">来源含可能的否定、角色或范围限定，请核对上下文。{c.qualifierClipped&&<span className="block whitespace-pre-wrap">{c.context}</span>}</p>}</div>)}
         {!!r.missing.length&&<div><p className="font-semibold">待补／待核实</p>{r.missing.map((m,j)=><p key={j}>· {m}</p>)}</div>}
         <button type="button" disabled={locked} onClick={()=>props.onReview(r.clause.id)} className="rounded border px-2 py-1">定位到人工核对</button>
       </article>)}

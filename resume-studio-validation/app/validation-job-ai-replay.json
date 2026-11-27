@@ -1,0 +1,38 @@
+{
+  "sourceRun": 45944201455,
+  "sourceCommit": "4c75d4524e886f67cc1b08bbd7f64e4c5fd5ce52",
+  "sourceArtifactSha256": "1a386974660005b42495af5bfa9cd066c76a648c9d544d296819b5b451ca3958",
+  "model": "deepseek-flash",
+  "cases": {
+    "teacher": {
+      "sha256": "89ef1c63ca0aca4d6738437800f27f4b5b8286b94a0e0d555c4820a10f5b7f95",
+      "usage": {
+        "input": 680,
+        "output": 362,
+        "total": 1042,
+        "cached": 0
+      },
+      "content": "[\n  {\n    \"requirementId\": \"R1\",\n    \"assessment\": \"supported\",\n    \"citations\": [\n      {\n        \"evidenceId\": \"E1\",\n        \"quote\": \"物理学\\n硕士\\n2022.09\\n2025.06\"\n      }\n    ],\n    \"reason\": \"教育经历自述显示物理学硕士，起止时间为2022.09至2025.06，有支持线索；但自述不是独立证明，且未提供学位证书，不能据此认定资格通过。\",\n    \"missing\": []\n  },\n  {\n    \"requirementId\": \"R2\",\n    \"assessment\": \"gap\",\n    \"citations\": [],\n    \"reason\": \"所选两条自述均未提及教师资格证，也未出现高中物理教师资格相关表述，未见所需依据；这不等于本人没有证书。\",\n    \"missing\": [\n      \"需核对高中物理教师资格证及证书编号、学段学科等证书信息\"\n    ]\n  },\n  {\n    \"requirementId\": \"R3\",\n    \"assessment\": \"gap\",\n    \"citations\": [\n      {\n        \"evidenceId\": \"E2\",\n        \"quote\": \"协助组织30课时教学活动，未独立主讲。\"\n      },\n      {\n        \"evidenceId\": \"E1\",\n        \"quote\": \"参与整理12份实验记录；未独立主持课题。\"\n      }\n    ],\n    \"reason\": \"工作经历明确为教学助理并自述未独立主讲，教育经历亦为参与整理、未独立主持课题；均为协助角色，未见独立主讲经验依据。\",\n    \"missing\": [\n      \"需核对本人独立主讲课程的证明材料，如课程安排、授课记录或单位证明\"\n    ]\n  }\n]"
+    },
+    "research": {
+      "sha256": "9cb9fcf5eaa6faf715253e85db2f06e34fabf1f10c19bb540c00becdcfe84552",
+      "usage": {
+        "input": 671,
+        "output": 303,
+        "total": 974,
+        "cached": 256
+      },
+      "content": "[\n  {\n    \"requirementId\": \"R1\",\n    \"assessment\": \"supported\",\n    \"citations\": [\n      {\n        \"evidenceId\": \"E1\",\n        \"quote\": \"参与整理12份实验记录\"\n      }\n    ],\n    \"reason\": \"自述明确提到参与整理12份实验记录，与整理实验记录的经历有直接支持线索；但仅为自述，且为“参与”角色，不构成资格通过。\",\n    \"missing\": []\n  },\n  {\n    \"requirementId\": \"R2\",\n    \"assessment\": \"gap\",\n    \"citations\": [\n      {\n        \"evidenceId\": \"E1\",\n        \"quote\": \"未独立主持课题\"\n      }\n    ],\n    \"reason\": \"自述明确写明未独立主持课题，与“必须独立主持课题”的正面要求相反，所选文字未见独立主持课题的依据。\",\n    \"missing\": [\n      \"需核实是否存在其他独立主持课题的材料（如立项书、任务分工证明）\"\n    ]\n  },\n  {\n    \"requirementId\": \"R3\",\n    \"assessment\": \"gap\",\n    \"citations\": [],\n    \"reason\": \"所选自述未提及任何SCI论文或发表情况，无法判断是否满足优先条件；未见依据不等于本人没有。\",\n    \"missing\": [\n      \"需核对是否有SCI论文发表记录及作者角色、期刊、时间等证明材料\"\n    ]\n  }\n]"
+    },
+    "general": {
+      "sha256": "9e4dabb0f137f90c2361b1d52e088bee82a58d3ebe8155fe04448780eb6df938",
+      "usage": {
+        "input": 671,
+        "output": 327,
+        "total": 998,
+        "cached": 256
+      },
+      "content": "[\n  {\n    \"requirementId\": \"R1\",\n    \"assessment\": \"supported\",\n    \"citations\": [\n      {\n        \"evidenceId\": \"E2\",\n        \"quote\": \"使用 Python 清洗数据；参与小组开发。\"\n      }\n    ],\n    \"reason\": \"项目经历自述明确写明使用 Python 清洗数据，属于所选文字中的支持线索；但仅为自述，不构成资格通过。\",\n    \"missing\": []\n  },\n  {\n    \"requirementId\": \"R2\",\n    \"assessment\": \"gap\",\n    \"citations\": [\n      {\n        \"evidenceId\": \"E2\",\n        \"quote\": \"参与小组开发。\"\n      },\n      {\n        \"evidenceId\": \"E1\",\n        \"quote\": \"协助组织30课时教学活动，未独立主讲。\"\n      }\n    ],\n    \"reason\": \"自述仅显示参与小组开发，未体现独立负责开发团队；工作经历为教学助理且明确未独立主讲，与独立负责角色不符。\",\n    \"missing\": [\n      \"需核对是否有独立负责开发团队的经历及具体职责范围\",\n      \"需核对团队规模、汇报关系与任职时间等可验证材料\"\n    ]\n  },\n  {\n    \"requirementId\": \"R3\",\n    \"assessment\": \"not-requirement\",\n    \"citations\": [],\n    \"reason\": \"该条为否定性说明，表示不要求销售经验，并非候选人需满足的条件；所选自述中也未涉及销售经验。\",\n    \"missing\": []\n  }\n]"
+    }
+  }
+}

@@ -2,10 +2,11 @@ const {app,safeStorage}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
 const mode=process.env.RESUME_STUDIO_JOB_AI_MODE;
-const real=mode==='live';
+const real=mode==='live',replay=mode==='replay';
+const recorded=replay?require('./validation-job-ai-replay.json'):null;
 const key=real?(process.env.RESUME_STUDIO_LIVE_KEY||''):'synthetic-job-evidence-key';
 delete process.env.RESUME_STUDIO_LIVE_KEY;
-if(!['mock','live'].includes(mode)||!root||!out||!path.basename(root).startsWith('synthetic-job-ai-'))throw Error('isolated synthetic fixture required');
+if(!['mock','live','replay'].includes(mode)||!root||!out||!path.basename(root).startsWith('synthetic-job-ai-'))throw Error('isolated synthetic fixture required');
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});
 const report={runnerSha:process.env.GITHUB_SHA,mode,credentialAvailable:!!key,observations:[],checks:{}};
 const assert=(v,m)=>{if(!v)throw Error(m)},sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -20,11 +21,15 @@ const safeNumber=v=>Number.isSafeInteger(v)&&v>=0?v:null;
 const mockRow=(requirementId,assessment,citations,missing=[])=>({requirementId,assessment,citations,reason:'合成核对建议',missing});
 global.fetch=async(url,init)=>{
   const body=JSON.parse(String(init?.body||'{}')),payload=JSON.stringify(body.messages);
-  assert(active&&String(url)===endpoint&&init.method==='POST'&&init.redirect==='error'&&new Headers(init.headers).get('authorization')==='Bearer '+key&&body.model===model&&(!real||body.thinking?.type==='disabled')&&Number.isInteger(body.max_tokens)&&body.max_tokens>0&&body.max_tokens<=1200&&calls<(real?3:2)&&tokenBudget+body.max_tokens<=(real?3600:2400)&&payload===JSON.stringify(active.expected)&&!payload.includes(key)&&!privateMarkers.some(m=>payload.includes(m)),'fixture outbound policy rejected');
+  assert(active&&String(url)===endpoint&&init.method==='POST'&&init.redirect==='error'&&new Headers(init.headers).get('authorization')==='Bearer '+key&&body.model===model&&(!real||body.thinking?.type==='disabled')&&Number.isInteger(body.max_tokens)&&body.max_tokens>0&&body.max_tokens<=1200&&calls<(real||replay?3:2)&&tokenBudget+body.max_tokens<=(real||replay?3600:2400)&&payload===JSON.stringify(active.expected)&&!payload.includes(key)&&!privateMarkers.some(m=>payload.includes(m)),'fixture outbound policy rejected');
   calls++;tokenBudget+=body.max_tokens;active.sent=true;active.requestedTokens=body.max_tokens;
   const started=Date.now();let response;
   if(real)response=await fetchActual(url,init);
-  else{
+  else if(replay){
+    const record=recorded.cases[active.id];
+    assert(record&&crypto.createHash('sha256').update(record.content).digest('hex')===record.sha256,'recorded live response hash differs');
+    response=new Response(JSON.stringify({model:recorded.model,usage:{prompt_tokens:record.usage.input,completion_tokens:record.usage.output,total_tokens:record.usage.total,prompt_tokens_details:{cached_tokens:record.usage.cached}},choices:[{finish_reason:'stop',message:{content:record.content}}]}),{status:200});
+  }else{
     const u=JSON.parse(body.messages[1].content);
     assert(u.task==='job-evidence-v1'&&u.requirements.length===3&&u.sources.length===2,'unexpected mock task scope');
     const rows=[
@@ -135,8 +140,13 @@ async function run(){
       const receipt=await js(q('[aria-label="岗位 AI 调用回执"]')+'?.innerText||""');
       if(obs.usage?.total!==null)assert(receipt.includes('合计 '+obs.usage.total+' tokens'),'receipt usage mismatch');
       report.checks.receiptAndRowsMatch=true;
+      const pendingList=await js(q('[aria-label="岗位待补材料清单"]')+'?.innerText||""');
+      const gapRows=rows.filter(r=>['gap','partial','uncertain'].includes(r.reviewAssessment));
+      assert(pendingList.includes('待补材料与待核实项 · '+gapRows.length+' 条')&&gapRows.every(r=>pendingList.includes(r.clause.quote)&&r.missing.every(m=>pendingList.includes(m))),'action list differs from grounded rows');
+      report.checks.actionListMatches=true;
       await capture(id+'-result',result);
-      if(!real){
+      await capture(id+'-action-list','[aria-label="岗位待补材料清单"]');
+      if(mode==='mock'){
         assert(rows[2].assessment==='supported'&&rows[2].reviewAssessment==='uncertain'&&rows[2].citations[0].qualifierClipped&&dom[2].text.includes('未独立主讲'),'clipped qualifier not isolated');
         report.checks.clippedQualifierDemoted=true;
         await capture(id+'-clipped','article[aria-label="岗位 AI 建议 3"]');
@@ -153,9 +163,10 @@ async function run(){
     }
     await verifyReadOnly();endCase();
   };
-  if(real){
+  if(real||replay){
     for(const s of scenarios){await begin(s);await evaluate(s,s.id);if(report.observations.at(-1)?.status===401||report.observations.at(-1)?.status===403||report.observations.at(-1)?.status===429)break;}
     report.checks.threeBoundedRequests=calls===3;
+    if(replay){assert(calls===3&&report.observations.every(o=>o.qualityMatched===3),'recorded role replay did not match all nine expected outcomes');report.checks.recordedResponsesReplayed=true;report.recordedSourceRun=recorded.sourceRun;}
   }else{
     const s=scenarios[0];
     await begin(s);
