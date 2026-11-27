@@ -1,0 +1,73 @@
+name: Resume Studio T45 final long-contact boundary audit
+on:
+  push:
+    branches: ['resume-studio/v6-template-contact-boundary-turn45']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-v6-template-contact-boundary-turn45
+  cancel-in-progress: true
+jobs:
+  pagination-matrix:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - locale: zh-CN
+            modes: contacts
+            suite: contacts
+          - locale: en-US
+            modes: contacts
+            suite: contacts
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        run: pnpm desktop:build
+      - name: Render actual template matrix
+        env:
+          RESUME_MATRIX_LOCALE: ${{ matrix.locale }}
+          RESUME_MATRIX_MODES: ${{ matrix.modes }}
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_MATRIX_SOURCE_SHA = '6151828896b0945d17e464bf96080f2c230b5df7'
+          $env:RESUME_MATRIX_OUT = Join-Path $env:GITHUB_WORKSPACE 'natural-matrix'
+          & .\node_modules\.bin\electron.cmd .\scripts\qa-template-matrix.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: |
+          python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit actual PDF output
+        timeout-minutes: 2
+        run: |
+          $source = '6151828896b0945d17e464bf96080f2c230b5df7'
+          python scripts/qa-audit-template-matrix.py --root (Join-Path $env:GITHUB_WORKSPACE 'natural-matrix') --locale '${{ matrix.locale }}' --modes '${{ matrix.modes }}' --source-sha $source --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload PDF matrix and audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pagination-${{ matrix.suite }}-${{ matrix.locale }}
+          path: natural-matrix/
+          if-no-files-found: error
+          retention-days: 3
+
+
