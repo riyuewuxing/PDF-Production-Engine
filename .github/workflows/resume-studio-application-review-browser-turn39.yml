@@ -1,0 +1,43 @@
+name: Resume Studio Turn39 browser permanent snapshot review
+on:
+  push:
+    branches: ['resume-studio/v6-application-snapshot-browser-turn39']
+permissions:
+  contents: read
+jobs:
+  browser-local:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual browser without preload and local historical endpoint
+        timeout-minutes: 4
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_BROWSER_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'application-review-browser-evidence'
+          pnpm exec tsx validation-browser-application-review-server.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: application-review-browser-evidence
+          path: application-review-browser-evidence/
+          if-no-files-found: warn
+          retention-days: 3
