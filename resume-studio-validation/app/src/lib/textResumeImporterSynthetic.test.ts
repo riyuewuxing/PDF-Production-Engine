@@ -42,10 +42,15 @@ describe('synthetic local text import',()=>{
   it('does not infer self-evaluation or header contacts from unclassified body',()=>{
     const unstructured=parseResumeTextFile(encode('Unclassified note\nSecond line'),'note.txt');
     expect(unstructured.selfEvaluationText).toBe('');
+    expect(unstructured.name).toBe('');
     expect(unstructured.unclassifiedText).toContain('Second line');
     const md=parseResumeTextFile(encode('# Demo Candidate\n## Publications\ncontact: other@example.invalid'),'note.md');
     expect(md.email).toBe('');
     expect(md.unclassifiedText).toContain('other@example.invalid');
+  });
+  it('does not infer PDF availability from a project body',()=>{
+    const d=parseExtractedResumeText('测试甲\n项目经历\nStatus: Complete');
+    expect(buildResumeDocumentFromPdfDraft(d).basic.employmentStatus).toBe('');
   });
   it('preserves explicit availability only when provided',()=>{
     const d=parseResumeTextFile(encode('# Demo Candidate\n> Status: Contract ends in May | Email: demo@example.invalid\n## Education\n### Alpha School'),'note.md');

@@ -94,7 +94,8 @@ export function VersionAndMasterPane({
   const textInputRef = useRef<HTMLInputElement>(null);
   const parsingImport = useRef<AbortController|null>(null);
   const [parsingTextualImport, setParsingTextualImport] = useState(false);
-  useEffect(()=>()=>{ parsingImport.current?.abort(); },[]);
+  const importMounted=useRef(false);
+  useEffect(()=>{importMounted.current=true;return()=>{importMounted.current=false;parsingImport.current?.abort();};},[]);
   const [newTitleDraft, setNewTitleDraft] = useState('');
   const [cloneSource, setCloneSource] = useState<'current' | 'master'>('current');
   const [isRenaming, setIsRenaming] = useState(false);
@@ -230,13 +231,12 @@ export function VersionAndMasterPane({
       const buffer = await readImportFile(file,controller.signal);
       if(controller.signal.aborted)throw new Error('本地导入解析已取消。');
       const draft = kind === 'pdf' ? await extractAndParsePdfResume(buffer, file.name,controller.signal) : parseResumeTextFile(buffer, file.name);
-      if(!controller.signal.aborted)setPdfDraft(draft);
+      if(importMounted.current&&!controller.signal.aborted)setPdfDraft(draft);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '本地导入解析失败。');
+      if(importMounted.current)setError(err instanceof Error ? err.message : '本地导入解析失败。');
     } finally {
       if(parsingImport.current===controller)parsingImport.current=null;
-      setParsingTextualImport(false);
-      setBusy(false);
+      if(importMounted.current){setParsingTextualImport(false);setBusy(false);}
     }
   };
 

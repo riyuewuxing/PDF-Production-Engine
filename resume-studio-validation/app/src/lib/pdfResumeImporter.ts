@@ -74,6 +74,11 @@ const NON_NAME_TERMS = new Set([
   '获奖情况',
   '个人评价',
   '个人总结',
+  '未命名简历',
+  'Untitled Resume',
+  'Curriculum Vitae',
+  'Resume',
+  'CV',
 ]);
 
 /** 机构/单位结尾词：命中则降权，避免把学校名当姓名 */
@@ -233,19 +238,20 @@ export function parseExtractedResumeText(
     .map((l) => l.trim())
     .filter(Boolean);
   // For text imports, contact candidates come from the header only, not from references or body entries.
-  const headerEnd = textOptions ? lines.findIndex(line=>textOptions.markdown ? /^#{2,6}\s/.test(line) : Boolean(matchHeadingLine(line) && matchHeadingLine(line)!=='ignore')) : -1;
-  const header = textOptions ? lines.slice(0,headerEnd===-1?Math.min(lines.length,12):headerEnd) : lines;
+  const headerEnd = lines.findIndex(line=>textOptions?.markdown ? /^#{2,6}\s/.test(line) : Boolean(matchHeadingLine(line) && matchHeadingLine(line)!=='ignore'));
+  const header = lines.slice(0,headerEnd===-1?Math.min(lines.length,12):headerEnd);
   const metadataText = textOptions ? header.map(line=>line.replace(/^#\s+|^>\s*/, '')).join('\n') : rawText;
   const emailMatch = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.exec(metadataText);
   const textWithoutEmails = metadataText.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, ' ');
   const phoneMatch = /(?:(?:\+?86[-\s]?)?1[3-9]\d{9}|1[3-9]\d[-\s]\d{4}[-\s]\d{4})/.exec(textWithoutEmails);
-  const roleMatch = /(?:求职意向|意向岗位|应聘岗位|求职岗位|Target Role)[:：]?[^\S\n]*([^\n|｜/]{2,80})/i.exec(metadataText);
+  const roleMatch = textOptions ? /(?:求职意向|意向岗位|应聘岗位|求职岗位|Target Role)[:：]?[^\S\n]*([^\n|｜/]{2,80})/i.exec(metadataText) : /(?:求职意向|意向岗位|应聘岗位|求职岗位)[:：]?\s*([^\n|｜/]{2,26})/.exec(rawText);
   const birthMatch = /(?:生日|出生年月|出生日期|Birth)[:：]?[^\S\n]*((?:19|20)\d{2}[.\-/年]\d{1,2}(?:[.\-/月]\d{1,2}日?)?月?)/i.exec(metadataText);
-  const locMatch = /(?:所在地|现居|城市|籍贯|Location)[:：][^\S\n]*([^\n|｜]{2,80})/i.exec(metadataText);
-  const statusMatch = /(?:^|[|｜])[^\S\n]*(?:求职状态|状态|Status)[:：][^\S\n]*([^\n|｜]{1,80})/im.exec(metadataText);
+  const locMatch = textOptions ? /(?:所在地|现居|城市|籍贯|Location)[:：][^\S\n]*([^\n|｜]{2,80})/i.exec(metadataText) : /(?:所在地|现居|城市|籍贯)[:：]\s*([\u4e00-\u9fffA-Za-z]{2,12})/.exec(rawText);
+  const statusMatch = /(?:^|[|｜])[^\S\n]*(?:求职状态|状态|Status)[:：][^\S\n]*([^\n|｜]{1,80})/im.exec(header.map(line=>line.replace(/^>\s*/, '')).join('\n'));
 
   const nameLines = textOptions ? header.map(line=>line.replace(/^#\s+|^>\s*/, '')) : lines;
-  const guessedName = guessResumeName(nameLines, nameOptions);
+  const hasTextNameCue = headerEnd>=0 || header.some(line=>/^(?:#\s+|姓\s*名[:：]|Name\s*[:：])/i.test(line));
+  const guessedName = textOptions && !hasTextNameCue ? '' : guessResumeName(nameLines, nameOptions);
 
   const buckets: Record<
     'education' | 'experience' | 'projects' | 'skills' | 'selfEvaluation' | 'honors',

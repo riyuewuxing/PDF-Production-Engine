@@ -31,8 +31,9 @@ export function PdfImportModal({
     setForm((prev) => (prev ? { ...prev, [key]: val } : prev));
   };
 
+  const needsUnclassifiedDecision = Boolean(form.unclassifiedText?.trim()) && form.keepUnclassified===undefined;
   const handleConfirm = async () => {
-    if (confirming.current) return;
+    if (confirming.current || needsUnclassifiedDecision) return;
     confirming.current = true;
     setBusy(true);
     setError(null);
@@ -53,7 +54,7 @@ export function PdfImportModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${sourceLabel} 简历解析导入确认`}
+      aria-label={form.sourceKind === 'text' ? 'TXT / Markdown 简历解析导入确认' : '旧版 PDF 简历解析导入确认'}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
       onClick={cancel}
     >
@@ -201,22 +202,25 @@ export function PdfImportModal({
               <textarea rows={3} data-native-undo="true" value={form.honorsText} onChange={e=>updateField('honorsText',e.target.value)} className="rounded border border-slate-200 p-2 text-slate-900" />
             </label>
             {Boolean(form.unclassifiedText?.trim()) && <div className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2">
-              <label className="flex items-start gap-2"><input type="checkbox" checked={form.keepUnclassified===true} onChange={e=>updateField('keepUnclassified',e.target.checked)} />保留未分类原文为禁用栏目（可能含个人信息或重复字段）</label>
+              <p className="font-semibold text-amber-900">未分类或重复原文（必须明确选择处理方式）</p>
+              <label className="flex items-start gap-2"><input type="radio" name="import-unclassified" checked={form.keepUnclassified===true} onChange={()=>updateField('keepUnclassified',true)} />保留为禁用栏目（可能含个人信息或重复字段；原生备份包含该栏目）</label>
+              <label className="flex items-start gap-2"><input type="radio" name="import-unclassified" checked={form.keepUnclassified===false} onChange={()=>updateField('keepUnclassified',false)} />不保留未分类原文</label>
               <textarea aria-label="未分类原文" rows={3} data-native-undo="true" value={form.unclassifiedText ?? ''} onChange={e=>updateField('unclassifiedText',e.target.value)} className="w-full rounded border border-slate-200 p-2" />
-              <p>未勾选时，此栏不会写入新版本。可将需要的内容手动放到上方栏目。</p>
+              <p>选择不保留时，此栏不会写入新版本，原文件不变。可将需要的内容手动放到上方栏目。</p>
             </div>}
           </fieldset>
 
           {/* Right: Raw extracted lines for verification */}
           <div className="flex flex-col gap-1.5">
             <span className="font-semibold text-slate-700">{sourceLabel} 原文提取对照</span>
-            <pre className="flex-1 overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700">
+            <pre className="max-h-[60vh] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700">
               {form.rawText || '（未检测到可提取的文本）'}
             </pre>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs">
+          {needsUnclassifiedDecision && <p role="status" className="mr-auto text-amber-800">请先选择未分类原文的处理方式。</p>}
           <button
             type="button"
             onClick={cancel}
@@ -227,7 +231,7 @@ export function PdfImportModal({
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || needsUnclassifiedDecision}
             onClick={() => void handleConfirm()}
             className="inline-flex items-center gap-1.5 rounded bg-teal-600 px-3.5 py-1.5 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
           >
