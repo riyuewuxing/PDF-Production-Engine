@@ -148,7 +148,7 @@ async function run(){
    await switchTo(slugA);await queue();await until('prepared rows',()=>enabled('核对岗位流程 '+companies[0]+' '+role));assert(!await has('固定岗位材料流程')&&sha(ledgerBytes())===initialHash,'cold restart entered workflow or wrote');
    await openTask(0);assert(await has('甲校独立核对备注')||await has('本地核对档案'), 'review archives absent');
    await selectTab('自荐信 / 话术','[aria-label="岗位自荐信正文"]');await until('saved A letter',()=>has('甲校独立信'));await click('载入此岗位历史自荐信');
-   assert(await js(()=>document.querySelector('[aria-label="岗位自荐信正文"]').value.includes('甲校独立自荐信正文')),'cold restart letter missing');
+   await until('cold restart letter readback',()=>js(()=>document.querySelector('[aria-label="岗位自荐信正文"]').value.includes('甲校独立自荐信正文')));
    await selectTab('岗位面试','[aria-label="面试练习目标岗位"]');await until('saved A answer',()=>js(()=>document.querySelector('[aria-label="面试答案 1"]')?.value==='甲校独立面试回答'));
    checks.coldRestartScopedHistory=true;await capture('11-reopened-practice','[aria-label="面试答案 1"]');
    await click('返回岗位队列');await until('queue restored',()=>has('本地岗位任务队列'));

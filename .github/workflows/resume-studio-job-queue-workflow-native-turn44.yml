@@ -1,7 +1,7 @@
 name: Resume Studio Turn44 actual scoped workflow and cold restart
 on:
   push:
-    branches: ['resume-studio/v6-job-queue-refresh-fix-turn44']
+    branches: ['resume-studio/v6-job-queue-final-recheck-turn44']
 permissions:
   contents: read
 jobs:
