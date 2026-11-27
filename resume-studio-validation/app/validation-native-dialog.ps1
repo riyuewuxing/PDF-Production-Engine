@@ -1,8 +1,9 @@
-param([Parameter(Mandatory=$true)][int]$OwnerPid,[Parameter(Mandatory=$true)][string]$Title64,[Parameter(Mandatory=$true)][string]$Button64,[string]$ButtonId='none')
+param([Parameter(Mandatory=$true)][int]$OwnerPid,[Parameter(Mandatory=$true)][string]$Title64,[Parameter(Mandatory=$true)][string]$Button64,[string]$ButtonId='none',[string]$File64='none')
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)
 $Title=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Title64))
 $Button=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Button64))
+$File=if($File64 -eq 'none'){''}else{[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($File64))}
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -TypeDefinition @'
@@ -41,6 +42,21 @@ do {
   if($target.Count -eq 1){
     $window=$target[0]
     $children=[NativeDialog]::Children($window.Handle)
+    if($File -ne ''){
+      # Exact native dialog + standard filename edit, no clipboard or arbitrary keypress.
+      $element=$AE::FromHandle($window.Handle)
+      $editCondition=[System.Windows.Automation.PropertyCondition]::new($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::Edit)
+      $edits=@($element.FindAll($scope,$editCondition)|Where-Object {$_.Current.IsEnabled -and ($_.Current.AutomationId -eq '1001' -or $_.Current.AutomationId -eq '1148' -or $_.Current.Name -match '^File name:?' -or $_.Current.Name -match '^文件名')})
+      if($edits.Count -eq 1){
+        $val=$null
+        if($edits[0].TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$val) -and -not $val.Current.IsReadOnly){
+          $val.SetValue($File)
+          if($val.Current.Value -ne $File){throw 'Filename value did not read back exactly'}
+          Write-Output ('Filename field verified in '+$Title)
+        }else{throw 'Native filename field has no writable ValuePattern'}
+      }else{throw ('Native filename field missing or ambiguous; count='+$edits.Count+'; edits='+(@($element.FindAll($scope,$editCondition)|ForEach-Object {$_.Current.Name+' / '+$_.Current.AutomationId}) -join ' | '))}
+    }
+
     $buttons=@($children|Where-Object {$_.Visible -and $_.Enabled -and $_.Class -eq 'Button' -and ($_.Name.Replace('&','') -eq $Button -or ($ButtonId -ne 'none' -and $_.Id.ToString() -eq $ButtonId))})
     if($buttons.Count -eq 1){
       if(-not [NativeDialog]::Click($buttons[0].Handle)){throw 'Win32 button dispatch failed'}

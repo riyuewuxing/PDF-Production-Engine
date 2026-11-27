@@ -1,11 +1,11 @@
 name: Resume Studio Turn41 packaged receipt restart validation (canonical paths)
 on:
   push:
-    branches: ['resume-studio/v6-submission-package-final-turn41']
+    branches: ['resume-studio/v6-submission-package-native-attachments-turn41']
 permissions:
   contents: read
 concurrency:
-  group: resume-studio-v6-submission-package-final-turn41
+  group: resume-studio-v6-submission-package-native-attachments-turn41
   cancel-in-progress: true
 jobs:
   windows-portable-launch:
@@ -73,6 +73,8 @@ jobs:
         timeout-minutes: 1
         run: |
           python -c "import os,zipfile,pathlib,hashlib,json; p=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'resume-studio-portable-evidence'; f=p/'actual-package.zip'; z=zipfile.ZipFile(f); assert z.namelist()==['resume.pdf']; assert z.testzip() is None; assert z.read('resume.pdf')==(p/'expected-resume.pdf').read_bytes(); (p/'zip-verification.json').write_text(json.dumps({'entries':z.namelist(),'crcPassed':True,'byteEquality':True,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()}))"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "import os,zipfile,pathlib,hashlib,json; p=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'resume-studio-portable-evidence'; f=p/'actual-package-with-attachment.zip'; z=zipfile.ZipFile(f); assert z.namelist()==['resume.pdf','attachment-01.pdf']; assert z.testzip() is None; assert z.read('resume.pdf')==(p/'expected-resume.pdf').read_bytes(); assert z.read('attachment-01.pdf')==(p/'expected-attachment.pdf').read_bytes(); (p/'zip-with-attachment-verification.json').write_text(json.dumps({'entries':z.namelist(),'crcPassed':True,'byteEquality':True,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()}))"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload portable launch evidence
         if: always()

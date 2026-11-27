@@ -60,10 +60,10 @@ async function run(){
  await click('求职面试');await rowClick('核验 PDF 打包凭证学校');await until('verified',()=>has('记录路径字节一致'));await capture('02-packaged-verified');report.checks.verifiedBeforeRestart=true;
  unchanged();stop();await sleep(400);await connect(exe);await click('求职面试');await rowClick('核验 PDF 打包凭证学校');await until('verified after restart',()=>has('记录路径字节一致'));await capture('03-packaged-verified-restart');report.checks.verifiedAfterRestart=true;unchanged();
  // Exercise actual OS-owned dialogs from the packaged executable, not a mocked IPC.
- const nativeClick=(title,button,id='')=>{
+ const nativeClick=(title,button,id='',file='')=>{
   const enc=s=>Buffer.from(s,'utf8').toString('base64');
   try{
-   const log=execFileSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve('validation-native-dialog.ps1'),'-OwnerPid',String(child.pid),'-Title64',enc(title),'-Button64',enc(button),'-ButtonId',id||'none'],{encoding:'utf8',timeout:27000,windowsHide:true});
+   const log=execFileSync('pwsh',['-NoProfile','-NonInteractive','-File',path.resolve('validation-native-dialog.ps1'),'-OwnerPid',String(child.pid),'-Title64',enc(title),'-Button64',enc(button),'-ButtonId',id||'none','-File64',enc(file)||'none'],{encoding:'utf8',timeout:27000,windowsHide:true});
    fs.appendFileSync(path.join(out,'native-dialog.log'),log);
   }catch(e){
    fs.appendFileSync(path.join(out,'native-dialog.log'),String(e.stdout||'')+'\n'+String(e.stderr||'')+'\n');throw e;
@@ -82,6 +82,33 @@ async function run(){
  fs.writeFileSync(path.join(out,'actual-package.zip'),zip);fs.writeFileSync(path.join(out,'expected-resume.pdf'),bytes);
  report.packageSha256=hash(zip);report.checks.realNativeDialogPackageAfterRestart=true;
  await capture('06-packaged-submission-package');unchanged();
+ // Real supplementary PDF selection using the native file dialog, not a test double.
+ // Produce a distinct valid minimal PDF with correct xref offsets.
+ function makeAttachment(){
+  const header=Buffer.from('%PDF-1.4\n'),parts=[header],offsets=[0];let pos=header.length;
+  const content='BT /F1 12 Tf 72 720 Td (Synthetic attachment) Tj ET\n';
+  const objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Length '+Buffer.byteLength(content)+' >>\nstream\n'+content+'endstream'];
+  for(let i=0;i<objects.length;i++){offsets.push(pos);const b=Buffer.from((i+1)+' 0 obj\n'+objects[i]+'\nendobj\n');parts.push(b);pos+=b.length;}
+  parts.push(Buffer.from('xref\n0 6\n0000000000 65535 f \n'+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+pos+'\n%%EOF\n'));
+  return Buffer.concat(parts);
+ }
+ const attach=makeAttachment(),attachPath=path.join(root,'synthetic-attachment.pdf');fs.writeFileSync(attachPath,attach);
+ const firstFiles=fs.readdirSync(exports).filter(n=>n.endsWith('.zip'));
+ await rowClick('制作投递包 打包凭证学校');
+ nativeClick('选择投递包内容','另选附加 PDF');
+ nativeClick('明确选择附加 PDF（自荐信、证书等）','Open','1',attachPath);
+ nativeClick('确认投递包文件清单','确认清单并另存');
+ nativeClick('另存投递包 ZIP（不覆盖现有文件）','Save','1');
+ await until('actual attachment package written',()=>has('attachment-01.pdf'));
+ const newFiles=fs.readdirSync(exports).filter(n=>n.endsWith('.zip')&&!firstFiles.includes(n));
+ assert(newFiles.length===1,'expected one new attachment ZIP');
+ const zipWithAttachment=fs.readFileSync(path.join(exports,newFiles[0]));
+ assert(await has(hash(zipWithAttachment)),'attachment package receipt not visible');
+ fs.writeFileSync(path.join(out,'actual-package-with-attachment.zip'),zipWithAttachment);
+ fs.writeFileSync(path.join(out,'expected-attachment.pdf'),attach);
+ report.attachmentPackageSha256=hash(zipWithAttachment);report.checks.realNativeSupplementaryPicker=true;
+ await capture('07-packaged-attachment-package');unchanged();
+
  const altered=Buffer.from(bytes);altered[altered.length-10]^=1;fs.writeFileSync(file,altered);
  await rowClick('核验 PDF 打包凭证学校');await until('changed',()=>has('文件字节与封存凭证不一致'));await capture('04-packaged-changed');report.checks.detectsSameSizeReplacement=true;unchanged();
  fs.rmSync(file);await rowClick('核验 PDF 打包凭证学校');await until('missing',()=>has('记录文件缺失'));await capture('05-packaged-missing');report.checks.detectsMissing=true;unchanged();
