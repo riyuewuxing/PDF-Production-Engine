@@ -195,6 +195,7 @@ function LiveThumbnailCard({
       {/* Full-bleed adaptive A4 Thumbnail Surface */}
       <div
         ref={hostRef}
+        data-studio-thumbnail-host="true"
         className="relative aspect-[210/297] w-full overflow-hidden bg-white shadow-inner"
       >
         {mounted ? (

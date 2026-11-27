@@ -223,40 +223,16 @@ async function run() {
       const y=Math.max(Math.ceil(b.top)+38,Math.ceil(host.top)+38,Math.ceil(clip.top)+1,0);
       const right=Math.min(Math.floor(b.right)-3,Math.floor(host.right)-3,Math.floor(clip.right)-1,innerWidth-2);
       const bottom=Math.min(Math.floor(b.bottom)-3,Math.floor(host.bottom)-3,Math.floor(clip.bottom)-1,innerHeight-2);
-      const ancestors=[];
-      for(let el=root;el&&ancestors.length<9;el=el.parentElement){const r=el.getBoundingClientRect(),c=getComputedStyle(el);ancestors.push({tag:el.tagName,cls:el.getAttribute('class'),rect:[n(r.x),n(r.y),n(r.width),n(r.height)],background:c.backgroundColor,border:c.borderColor,shadow:c.boxShadow,isolation:c.isolation,contain:c.contain,transform:c.transform,filter:c.filter,backdrop:c.backdropFilter,opacity:c.opacity,willChange:c.willChange,scheme:c.colorScheme,transition:c.transitionProperty,overflow:c.overflow});}
-      return {paper:{text:root.innerText,children,rect:[n(b.width),n(b.height)]},crop:{x,y,width:right-x,height:bottom-y},ancestors,markers:root.querySelectorAll('[data-studio-control],[class*="studio-ui-"],[data-studio-surface]').length,cardName:card.querySelector('h3').innerText.trim(),scroll:card.closest('.overflow-y-auto').scrollTop};
+      return {paper:{text:root.innerText,children,rect:[n(b.width),n(b.height)]},crop:{x,y,width:right-x,height:bottom-y},markers:root.querySelectorAll('[data-studio-control],[class*="studio-ui-"],[data-studio-surface]').length,cardName:card.querySelector('h3').innerText.trim(),scroll:card.closest('.overflow-y-auto').scrollTop};
     }.toString()+')('+index+')');
     assert.equal(state.markers,0,'document contains studio markers');
     assert.equal(state.cardName,cards[index].name);
     assert.ok(state.crop.width>150&&state.crop.height>200,'insufficient visible paper '+index+':'+JSON.stringify(state.crop));
     const img=await win.webContents.capturePage(state.crop);assert.ok(!img.isEmpty());
     fs.writeFileSync(path.join(out,name+'.png'),img.toPNG());
-    return {styleHash:sha(JSON.stringify(state.paper)),cropHash:sha(img.toBitmap()),size:img.getSize(),scroll:state.scroll,markers:state.markers,crop:state.crop,ancestors:state.ancestors};
+    return {styleHash:sha(JSON.stringify(state.paper)),cropHash:sha(img.toBitmap()),size:img.getSize(),scroll:state.scroll,markers:state.markers};
   }
   results.pixelMismatches=[];
-  results.isolation=[];
-  // Diagnostics operate on the gallery chrome only and restore all changes in finally.
-  // They do not change production code or substitute for the exact full-matrix gate.
-  async function isolate(index,kind,ref){
-    const apply=await js('('+function(index,kind,reference){
-      const card=[...document.querySelectorAll('.group h3')][index].closest('.group');
-      const root=card.querySelector('.pointer-events-none.origin-top-left.select-none');
-      const host=root.parentElement,gallery=card.closest('[data-studio-surface="gallery"]');
-      const restore=[];
-      const set=(el,key,value)=>{const old=el.style.getPropertyValue(key),priority=el.style.getPropertyPriority(key);restore.push(()=>old?el.style.setProperty(key,old,priority):el.style.removeProperty(key));el.style.setProperty(key,value,'important');};
-      if(kind==='gallery-classic'){const old=gallery.dataset.studioTheme;restore.push(()=>gallery.dataset.studioTheme=old);gallery.dataset.studioTheme='classic';}
-      if(kind==='card-classic-paint'){set(card,'background-color',reference[2].background);set(card,'border-color',reference[2].border);set(card,'box-shadow',reference[2].shadow);}
-      if(kind==='host-isolation'){set(host,'isolation','isolate');}
-      if(kind==='host-contain-paint'){set(host,'contain','paint');}
-      if(kind==='card-no-transition'){set(card,'transition','none');}
-      if(kind==='overlay-no-backdrop'){const overlay=host.querySelector('.backdrop-blur-\\[1\\.5px\\]');if(!overlay)return {ok:false};set(overlay,'backdrop-filter','none');}
-      window.__restoreT04=()=>{for(const undo of restore.reverse())undo();delete window.__restoreT04;};return {ok:true};
-    }.toString()+')('+index+','+JSON.stringify(kind)+','+JSON.stringify(ref.ancestors)+')');
-    if(!apply.ok)return {kind,skipped:true};
-    try{const proof=await cardProof(index,'isolate-'+String(index).padStart(2,'0')+'-'+kind);return {kind,exact:proof.cropHash===ref.cropHash,styleExact:proof.styleHash===ref.styleHash,proof};}
-    finally{await js('(()=>{window.__restoreT04?.();return true})()');}
-  }
   for(const id of themes){
     await selectTheme(id);
     await js('(()=>{const e=document.querySelector('+JSON.stringify(rootSelector)+');e.focus();return true})()');
@@ -279,13 +255,6 @@ async function run() {
           const r2=await cardProof(i,id+'-'+String(i).padStart(2,'0')+'-retry2');
           assert.equal(r1.styleHash,ref.styleHash);assert.equal(r2.styleHash,ref.styleHash);
           results.pixelMismatches.push({id,index:i,name:cards[i].name,reference:ref.cropHash,first:proof.cropHash,retry1:r1.cropHash,retry2:r2.cropHash,matchedAfterSettling:r1.cropHash===ref.cropHash&&r2.cropHash===ref.cropHash});
-          if(id==='dark'){
-            const variants=[];
-            for(const kind of ['gallery-classic','card-classic-paint','host-isolation','host-contain-paint','card-no-transition','overlay-no-backdrop'])variants.push(await isolate(i,kind,ref));
-            const restored=await cardProof(i,'isolate-'+String(i).padStart(2,'0')+'-restored');
-            results.isolation.push({id,index:i,name:cards[i].name,baseline:ref,original:proof,variants,restored,restoredOriginal:restored.cropHash===proof.cropHash});
-            fs.writeFileSync(path.join(out,'isolation-progress.json'),JSON.stringify(results.isolation,null,2));
-          }
         }
         assert.deepEqual(proof.size,ref.size);
       }
