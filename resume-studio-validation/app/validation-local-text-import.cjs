@@ -16,6 +16,7 @@ async function makePdf(target,html){
   finally{if(!w.isDestroyed())w.destroy();}
 }
 async function run(){
+  const relative=path.relative(path.resolve(root),path.resolve(main.store.resumesDir));if(relative.startsWith('..')||path.isAbsolute(relative))throw Error('store escaped isolated root');
   await main.store.saveResume('master',{...fixture,id:'synthetic-import-master',title:'合成母库'});
   await main.store.saveResume('runner-fixture',fixture);
   await main.registerAssetProtocol();main.registerIpcHandlers();
@@ -28,8 +29,8 @@ async function run(){
   const getField=label=>js(label=>{const l=[...document.querySelectorAll('[role="dialog"] label')].find(e=>e.querySelector('span')?.textContent.trim()===label);return l?.querySelector('input,textarea')?.value??null;},label);
   const choose=async keep=>{if(!await js(keep=>{const r=[...document.querySelectorAll('[role="dialog"] input[name="import-unclassified"]')][keep?0:1];if(!r)return false;r.click();return true;},keep))throw Error('unclassified choice missing');};
   const capture=async name=>{await js(()=>document.fonts.ready.then(()=>true));await sleep(300);const shot=await win.webContents.capturePage();if(shot.isEmpty())throw Error('empty capture');fs.writeFileSync(path.join(out,name+'.png'),shot.toPNG());};
-  const count=()=>fs.readdirSync(path.join(root,'resumes')).filter(n=>n.endsWith('.json')).length;
-  const original=fs.readFileSync(path.join(root,'resumes','runner-fixture.json'));
+  const count=()=>fs.readdirSync(main.store.resumesDir).filter(n=>n.endsWith('.json')).length;
+  const original=fs.readFileSync(path.join(main.store.resumesDir,'runner-fixture.json'));
   const initial=count();
   const selectFile=async(label,inputPath)=>{
     const picker=win.webContents.debugger;let listener,timer;
@@ -65,7 +66,7 @@ async function run(){
   const slug=await active(),doc=await main.store.getResume(slug);
   if(count()!==initial+1||doc.basic.email!=='corrected@example.invalid'||doc.basic.location!=='Synthetic City'||doc.basic.birthDate!=='2000-01'||doc.basic.employmentStatus!==''||doc.education.map(e=>e.school).join('|')!=='Alpha Academy|Beta Academy'||doc.customData['custom-honors']?.[0]?.title!=='Corrected Honor')throw Error('created resume not equal reviewed fields');
   if(doc.menuSections.find(s=>s.id==='custom-import-unclassified')?.enabled!==false||!doc.customData['custom-import-unclassified']?.[0]?.description.includes('UNCLASSIFIED_PUBLICATION_36')||doc.education.some(e=>e.description.includes('UNCLASSIFIED_PUBLICATION_36')))throw Error('unclassified source leaked or missing');
-  if(fs.readFileSync(md,'utf8')!==mdText||!fs.readFileSync(path.join(root,'resumes','runner-fixture.json')).equals(original))throw Error('source bytes changed');
+  if(fs.readFileSync(md,'utf8')!==mdText||!fs.readFileSync(path.join(main.store.resumesDir,'runner-fixture.json')).equals(original))throw Error('source bytes changed');
   checks.reviewedFieldsDisk=true;checks.groupingAndUnclassifiedDisk=true;checks.doubleConfirmOneVersion=true;checks.originalBytesUnchanged=true;
   await click('内容编辑');
   await until('rendered imported version',()=>js(()=>{const t=[...document.querySelectorAll('.a4-sheet')].map(e=>e.innerText).join('\n');return t.includes('Alpha Academy')&&t.includes('Beta Academy')&&!t.includes('UNCLASSIFIED_PUBLICATION_36');}));
