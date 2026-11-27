@@ -1,0 +1,61 @@
+name: Resume Studio Turn42 actual packaged cross-version queue
+on:
+  push:
+    branches: ['resume-studio/v6-job-queue-packaged-turn42']
+permissions:
+  contents: read
+jobs:
+  windows-packaged-queue:
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Pack actual Windows application (synthetic icon)
+        timeout-minutes: 5
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $bitmap = [System.Drawing.Bitmap]::new(256, 256)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.Clear([System.Drawing.Color]::Teal)
+          $graphics.FillRectangle([System.Drawing.Brushes]::White,64,48,128,160)
+          $icon = [System.Drawing.Icon]::FromHandle($bitmap.GetHicon())
+          $stream = [System.IO.File]::Create((Join-Path (Get-Location) 'build\icon.ico'))
+          try { $icon.Save($stream) } finally { $stream.Dispose(); $icon.Dispose(); $graphics.Dispose(); $bitmap.Dispose() }
+          pnpm exec electron-builder --win --dir --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Inspect ASAR and run actual packaged queue across versions and restart
+        timeout-minutes: 5
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'job-queue-packaged-evidence'
+          node validation-asar.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node validation-packaged-job-queue.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload packaged evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: job-queue-packaged-evidence
+          path: job-queue-packaged-evidence/
+          if-no-files-found: warn
+          retention-days: 3
