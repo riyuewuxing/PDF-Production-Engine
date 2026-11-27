@@ -47,6 +47,8 @@ export interface PdfImportDraft {
   honorsText: string;
   rawText: string;
   sourceKind?: 'pdf' | 'text';
+  markdownHeadings?: boolean;
+  employmentStatus?: string;
   unclassifiedText?: string;
   keepUnclassified?: boolean;
 }
@@ -183,7 +185,7 @@ const SECTION_HEADER_RULES: Array<{
   key: 'education' | 'experience' | 'projects' | 'skills' | 'selfEvaluation' | 'honors' | 'ignore';
   pattern: RegExp;
 }> = [
-    { key: 'ignore', pattern: /^(个人简历|基本信息|个人信息|联系方式|求职意向)$/ },
+    { key: 'ignore', pattern: /^(个人简历|基本信息|个人信息|联系方式|求职意向|Basic Info|Contact|Profile)$/i },
     { key: 'education', pattern: /^(教育经历|教育背景|学历背景|学习经历|Education)$/i },
     {
       key: 'experience',
@@ -199,7 +201,7 @@ const SECTION_HEADER_RULES: Array<{
     },
     {
       key: 'honors',
-      pattern: /^(荣誉奖项|获奖情况|奖项荣誉|荣誉奖励|Honors|Awards)$/i,
+      pattern: /^(荣誉奖项|获奖情况|奖项荣誉|荣誉奖励|Honors|Awards|Honors & Awards)$/i,
     },
     {
       key: 'selfEvaluation',
@@ -224,20 +226,26 @@ export function parseExtractedResumeText(
   rawText: string,
   fileTitle = 'PDF 导入简历',
   nameOptions?: NameScoringOptions,
+  textOptions?: { markdown: boolean },
 ): PdfImportDraft {
   const lines = rawText
-    .split(/\r?\n/)
+    .split(/\r\n|\n|\r/)
     .map((l) => l.trim())
     .filter(Boolean);
-
-  const emailMatch = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.exec(rawText);
-  const textWithoutEmails = rawText.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, ' ');
+  // For text imports, contact candidates come from the header only, not from references or body entries.
+  const headerEnd = textOptions ? lines.findIndex(line=>textOptions.markdown ? /^#{2,6}\s/.test(line) : Boolean(matchHeadingLine(line) && matchHeadingLine(line)!=='ignore')) : -1;
+  const header = textOptions ? lines.slice(0,headerEnd===-1?Math.min(lines.length,12):headerEnd) : lines;
+  const metadataText = textOptions ? header.map(line=>line.replace(/^#\s+|^>\s*/, '')).join('\n') : rawText;
+  const emailMatch = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.exec(metadataText);
+  const textWithoutEmails = metadataText.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, ' ');
   const phoneMatch = /(?:(?:\+?86[-\s]?)?1[3-9]\d{9}|1[3-9]\d[-\s]\d{4}[-\s]\d{4})/.exec(textWithoutEmails);
-  const roleMatch = /(?:求职意向|意向岗位|应聘岗位|求职岗位)[:：]?\s*([^\n|｜/]{2,26})/.exec(rawText);
-  const birthMatch = /(?:生日|出生年月|出生日期)[:：]?\s*((?:19|20)\d{2}[.\-/年]\d{1,2}月?)/.exec(rawText);
-  const locMatch = /(?:所在地|现居|城市|籍贯)[:：]\s*([\u4e00-\u9fffA-Za-z]{2,12})/.exec(rawText);
+  const roleMatch = /(?:求职意向|意向岗位|应聘岗位|求职岗位|Target Role)[:：]?[^\S\n]*([^\n|｜/]{2,80})/i.exec(metadataText);
+  const birthMatch = /(?:生日|出生年月|出生日期|Birth)[:：]?[^\S\n]*((?:19|20)\d{2}[.\-/年]\d{1,2}(?:[.\-/月]\d{1,2}日?)?月?)/i.exec(metadataText);
+  const locMatch = /(?:所在地|现居|城市|籍贯|Location)[:：][^\S\n]*([^\n|｜]{2,80})/i.exec(metadataText);
+  const statusMatch = /(?:^|[|｜])[^\S\n]*(?:求职状态|状态|Status)[:：][^\S\n]*([^\n|｜]{1,80})/im.exec(metadataText);
 
-  const guessedName = guessResumeName(lines, nameOptions);
+  const nameLines = textOptions ? header.map(line=>line.replace(/^#\s+|^>\s*/, '')) : lines;
+  const guessedName = guessResumeName(nameLines, nameOptions);
 
   const buckets: Record<
     'education' | 'experience' | 'projects' | 'skills' | 'selfEvaluation' | 'honors',
@@ -253,8 +261,20 @@ export function parseExtractedResumeText(
 
   const unclassified: string[] = [];
   let activeBucket: keyof typeof buckets | null = null;
+  let fence: string | null = null;
   for (const line of lines) {
-    const heading = matchHeadingLine(line);
+    if (textOptions?.markdown) {
+      const fenceMark = /^(`{3,}|~{3,})/.exec(line)?.[1];
+      if (fenceMark && (!fence || (fenceMark[0]===fence[0] && fenceMark.length>=fence.length))) {
+        fence = fence ? null : fenceMark;
+        (activeBucket ? buckets[activeBucket] : unclassified).push(line);
+        continue;
+      }
+      if (fence) { (activeBucket ? buckets[activeBucket] : unclassified).push(line); continue; }
+      if (/^#\s/.test(line)) { activeBucket=null; unclassified.push(line); continue; }
+      if (/^##\s/.test(line) && !matchHeadingLine(line)) { activeBucket=null; unclassified.push(line); continue; }
+    }
+    const heading = textOptions?.markdown && !/^##\s/.test(line) ? null : matchHeadingLine(line);
     if (heading === 'ignore') {
       activeBucket = null;
       continue;
@@ -270,11 +290,7 @@ export function parseExtractedResumeText(
     }
   }
 
-  // Fallback: if no standard heading matched at all, place body into selfEvaluation/notes so nothing is lost
-  const allBucketCount = Object.values(buckets).reduce((s, arr) => s + arr.length, 0);
-  if (allBucketCount === 0 && lines.length > 0) {
-    buckets.selfEvaluation.push(...lines);
-  }
+  // No recognized section is not evidence of a self-evaluation. Keep unmatched lines in review only.
 
   return {
     title: fileTitle.replace(/\.pdf$/i, '').trim() || 'PDF 导入简历',
@@ -284,6 +300,8 @@ export function parseExtractedResumeText(
     phone: phoneMatch?.[0] ?? '',
     location: locMatch?.[1]?.trim() ?? '',
     birthDate: birthMatch?.[1]?.trim() ?? '',
+    employmentStatus: statusMatch?.[1]?.trim() ?? '',
+    markdownHeadings: textOptions?.markdown ?? false,
     educationText: buckets.education.join('\n'),
     experienceText: buckets.experience.join('\n'),
     projectsText: buckets.projects.join('\n'),
@@ -304,15 +322,30 @@ function splitParagraphBlocks(raw: string): string[] {
 
 export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDocument {
   const nowIso = new Date().toISOString();
-  const eduLines = splitParagraphBlocks(draft.educationText);
-  const expLines = splitParagraphBlocks(draft.experienceText);
-  const projLines = splitParagraphBlocks(draft.projectsText);
+  const splitEntries = (raw: string): string[][] => {
+    const lines = splitParagraphBlocks(raw);
+    if (!draft.markdownHeadings) return lines.length ? [lines] : [];
+    const entries: string[][] = [];
+    let active: string[] = [];
+    let fence: string | null = null;
+    for (const line of lines) {
+      const mark=/^(`{3,}|~{3,})/.exec(line)?.[1];
+      if (mark && (!fence || (mark[0]===fence[0] && mark.length>=fence.length))) {
+        fence=fence?null:mark;active.push(line);continue;
+      }
+      const heading = !fence ? /^###\s+(.+)$/.exec(line) : null;
+      if (heading) { if (active.length) entries.push(active); active=[heading[1]!.trim()]; }
+      else active.push(line);
+    }
+    if (active.length) entries.push(active);
+    return entries;
+  };
+  const eduEntries = splitEntries(draft.educationText);
+  const expEntries = splitEntries(draft.experienceText);
+  const projEntries = splitEntries(draft.projectsText);
   const honorsLines = splitParagraphBlocks(draft.honorsText);
 
-  const education: EducationItem[] =
-    eduLines.length > 0
-      ? [
-        {
+  const education: EducationItem[] = eduEntries.map(eduLines => ({
           id: crypto.randomUUID(),
           school: eduLines[0] ?? '',
           major: '',
@@ -323,14 +356,9 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
           description: eduLines.slice(1).map((l) => (l.startsWith('-') ? l : `- ${l}`)).join('\n'),
           visible: true,
           logo: '',
-        },
-      ]
-      : [];
+        }));
 
-  const experience: ExperienceItem[] =
-    expLines.length > 0
-      ? [
-        {
+  const experience: ExperienceItem[] = expEntries.map(expLines => ({
           id: crypto.randomUUID(),
           company: expLines[0] ?? '',
           position: '',
@@ -340,14 +368,9 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
           description: expLines.slice(1).map((l) => (l.startsWith('-') ? l : `- ${l}`)).join('\n'),
           visible: true,
           logo: '',
-        },
-      ]
-      : [];
+        }));
 
-  const projects: ProjectItem[] =
-    projLines.length > 0
-      ? [
-        {
+  const projects: ProjectItem[] = projEntries.map(projLines => ({
           id: crypto.randomUUID(),
           name: projLines[0] ?? '',
           role: '',
@@ -356,15 +379,13 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
           link: '',
           linkLabel: '',
           visible: true,
-        },
-      ]
-      : [];
+        }));
 
   const menuSections: MenuSection[] = [
     { id: 'basic', title: '基本信息', icon: 'User', enabled: true, order: 0, pageBreakBefore: false },
     { id: 'education', title: '教育经历', icon: 'GraduationCap', enabled: true, order: 1, pageBreakBefore: false },
-    { id: 'experience', title: '工作经历', icon: 'Briefcase', enabled: expLines.length > 0, order: 2, pageBreakBefore: false },
-    { id: 'projects', title: '项目经历', icon: 'Rocket', enabled: projLines.length > 0, order: 3, pageBreakBefore: false },
+    { id: 'experience', title: '工作经历', icon: 'Briefcase', enabled: expEntries.length > 0, order: 2, pageBreakBefore: false },
+    { id: 'projects', title: '项目经历', icon: 'Rocket', enabled: projEntries.length > 0, order: 3, pageBreakBefore: false },
     { id: 'skills', title: '专业技能', icon: 'Award', enabled: Boolean(draft.skillsText.trim()), order: 4, pageBreakBefore: false },
     { id: 'selfEvaluation', title: '自我评价', icon: 'User', enabled: Boolean(draft.selfEvaluationText.trim()), order: 5, pageBreakBefore: false },
   ];
@@ -405,7 +426,7 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
     basic: {
       name: draft.name.trim(),
       title: draft.jobTitle.trim(),
-      employmentStatus: '',
+      employmentStatus: draft.employmentStatus?.trim() ?? '',
       email: draft.email.trim(),
       phone: draft.phone.trim(),
       location: draft.location.trim(),
@@ -508,27 +529,32 @@ export function parseResumeTextFile(bytes: ArrayBuffer | Uint8Array, fileName: s
   if (!raw.trim()) throw new Error('文本文件为空。');
   if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(raw)) throw new Error('文本包含不支持的控制字符。');
   if (raw.length > RESUME_IMPORT_TEXT_MAX_CHARS) throw new Error('文本超过 120000 字符上限，没有截断。');
-  return { ...parseExtractedResumeText(raw, fileName.replace(/\.(txt|md|markdown)$/i, '') || '文本导入简历'), sourceKind: 'text' };
+  return { ...parseExtractedResumeText(raw, fileName.replace(/\.(txt|md|markdown)$/i, '') || '文本导入简历', undefined, { markdown: /\.(md|markdown)$/i.test(fileName) }), sourceKind: 'text' };
 }
 
 export async function extractAndParsePdfResume(
   buffer: ArrayBuffer | Uint8Array,
   fileName: string,
+  signal?: AbortSignal,
 ): Promise<PdfImportDraft> {
   if (buffer.byteLength > RESUME_IMPORT_PDF_MAX_BYTES) throw new Error('PDF 文件超过 20 MiB 上限，没有截断。');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let rejectCancel: ((reason:Error)=>void) | undefined;
+  const cancel = () => { controller.abort(); rejectCancel?.(new Error('本地导入解析已取消。')); };
+  if (signal?.aborted) throw new Error('本地导入解析已取消。');
+  signal?.addEventListener('abort',cancel,{once:true});
   try {
     const pages = await Promise.race([
       extractTokensFromPdfArrayBuffer(buffer, 30, controller.signal, { maxPageTokens: 10_000, maxTotalTokens: 30_000, maxTotalChars: RESUME_IMPORT_TEXT_MAX_CHARS }),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('PDF 本地解析超过 30 秒，已请求停止。')); }, 30_000); }),
+      new Promise<never>((_, reject) => { rejectCancel=reject; timer = setTimeout(() => { controller.abort(); reject(new Error('PDF 本地解析超过 30 秒，已请求停止。')); }, 30_000); }),
     ]);
     const { lines, lineHeights } = reconstructLinesWithHeights(pages);
     const text = lines.join('\n');
     if (!text.trim()) throw new Error('PDF 无可提取文本；扫描件需要先在本地 OCR，不会创建空白简历。');
     if (text.length > RESUME_IMPORT_TEXT_MAX_CHARS) throw new Error('PDF 重建文本超出字符上限，没有截断。');
     return { ...parseExtractedResumeText(text, fileName, { lineHeights }), sourceKind: 'pdf' };
-  } finally { if (timer !== undefined) clearTimeout(timer); }
+  } finally { if (timer !== undefined) clearTimeout(timer); signal?.removeEventListener('abort',cancel); }
 }
 
 /** Rasterize the actual native PDF locally, not a second approximation of the HTML canvas. */

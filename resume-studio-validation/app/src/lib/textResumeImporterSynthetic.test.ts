@@ -28,6 +28,40 @@ describe('synthetic local text import',()=>{
   it.each([[new Uint8Array([0xff]),'UTF-8'],[encode('   '),'为空'],[encode('a\u0000b'),'控制字符'],[new Uint8Array(RESUME_IMPORT_TEXT_MAX_BYTES+1),'1 MiB'],[encode('a'.repeat(120001)),'120000']])('rejects invalid or oversized text without truncation', (bytes,reason)=>{
     expect(()=>parseResumeTextFile(bytes as Uint8Array,'synthetic.txt')).toThrow(String(reason));
   });
+  it('keeps separate Markdown entries and unknown headings out of preceding sections',()=>{
+    const d=parseResumeTextFile(encode('# Demo Candidate\n> Target Role: Teacher | Email: demo@example.invalid\n## Education\n### Alpha School\nCourse A\n### Beta School\nCourse B\n## Publications\nUNCLASSIFIED_PUBLICATION\n## Honors & Awards\nHonor A'), 'synthetic.md');
+    expect(d.name).toBe('Demo Candidate');
+    expect(d.jobTitle).toBe('Teacher');
+    expect(d.educationText).not.toContain('UNCLASSIFIED_PUBLICATION');
+    expect(d.unclassifiedText).toContain('UNCLASSIFIED_PUBLICATION');
+    expect(d.honorsText).toBe('Honor A');
+    const doc=buildResumeDocumentFromPdfDraft(d);
+    expect(doc.education.map(x=>x.school)).toEqual(['Alpha School','Beta School']);
+    expect(doc.education[1]?.description).toContain('Course B');
+  });
+  it('does not infer self-evaluation or header contacts from unclassified body',()=>{
+    const unstructured=parseResumeTextFile(encode('Unclassified note\nSecond line'),'note.txt');
+    expect(unstructured.selfEvaluationText).toBe('');
+    expect(unstructured.unclassifiedText).toContain('Second line');
+    const md=parseResumeTextFile(encode('# Demo Candidate\n## Publications\ncontact: other@example.invalid'),'note.md');
+    expect(md.email).toBe('');
+    expect(md.unclassifiedText).toContain('other@example.invalid');
+  });
+  it('preserves explicit availability only when provided',()=>{
+    const d=parseResumeTextFile(encode('# Demo Candidate\n> Status: Contract ends in May | Email: demo@example.invalid\n## Education\n### Alpha School'),'note.md');
+    expect(buildResumeDocumentFromPdfDraft(d).basic.employmentStatus).toBe('Contract ends in May');
+  });
+  it('does not treat fenced heading text as a section or another entry',()=>{
+    const d=parseResumeTextFile(encode('# Demo Candidate\n## Projects\n### Alpha\n```\n## Education\n### Not an entry\n```\n### Beta\nBody'),'note.md');
+    const doc=buildResumeDocumentFromPdfDraft(d);
+    expect(doc.education).toEqual([]);
+    expect(doc.projects.map(x=>x.name)).toEqual(['Alpha','Beta']);
+    expect(doc.projects[0]?.description).toContain('Not an entry');
+  });
+  it('rejects already-cancelled PDF imports before parsing',async()=>{
+    const c=new AbortController();c.abort();
+    await expect(extractAndParsePdfResume(new Uint8Array([1]),'cancel.pdf',c.signal)).rejects.toThrow('取消');
+  });
   it('does not accept other file formats as text',()=>{expect(()=>parseResumeTextFile(encode('test'),'synthetic.docx')).toThrow('TXT');});
   it('rejects oversized PDF before invoking the parser',async()=>{await expect(extractAndParsePdfResume(new Uint8Array(RESUME_IMPORT_PDF_MAX_BYTES+1),'large.pdf')).rejects.toThrow('20 MiB');});
 });

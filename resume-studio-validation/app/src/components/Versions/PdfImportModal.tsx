@@ -67,7 +67,7 @@ export function PdfImportModal({
               <FileText size={15} className="text-teal-600" /> 本地离线 {sourceLabel} 解析导入确认
             </h2>
             <p className="text-[11px] text-slate-500">
-              本地启发式提取，所有字段均为待核对候选。确认原文、归类、联系方式后再新建独立版本；不会覆盖现有简历。
+              本地启发式提取，所有字段均为待核对候选，并非事实验证。Markdown 仅识别常见二级章节、三级经历标题；原文件不变。确认后另建独立版本。
             </p>
           </div>
           <button
@@ -132,17 +132,17 @@ export function PdfImportModal({
                 />
               </label>
               {([
-                ['email','邮箱'], ['location','所在地'], ['birthDate','出生日期']
+                ['email','邮箱'], ['location','所在地'], ['birthDate','出生日期'], ['employmentStatus','状态（可留空）']
               ] as const).map(([key,label]) => (
                 <label key={key} className="flex flex-col gap-1">
                   <span className="font-semibold text-slate-700">{label}</span>
-                  <input type="text" data-native-undo="true" value={form[key]} onChange={e=>updateField(key,e.target.value)} className="rounded border border-slate-200 px-2 py-1.5 text-slate-900" />
+                  <input type="text" data-native-undo="true" value={form[key] ?? ''} onChange={e=>updateField(key,e.target.value)} className="rounded border border-slate-200 px-2 py-1.5 text-slate-900" />
                 </label>
               ))}
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className="font-semibold text-slate-700">教育经历（首行作学校抬头，其余作列表）</span>
+              <span className="font-semibold text-slate-700">教育经历（{form.markdownHeadings ? '### 标题分条，其余作正文' : '首行作学校抬头，其余作列表'}）</span>
               <textarea
                 rows={3}
                 data-native-undo="true"

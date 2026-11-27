@@ -48,6 +48,24 @@ interface VersionAndMasterPaneProps {
   getCurrentRevision: () => string;
 }
 
+/** Bound browser/Chromium file reads, including slow removable or network-backed paths. */
+function readImportFile(file:File,signal:AbortSignal):Promise<ArrayBuffer> {
+  return new Promise((resolve,reject)=>{
+    if(signal.aborted){reject(new Error('本地导入解析已取消。'));return;}
+    const reader=new FileReader();
+    let timer:ReturnType<typeof setTimeout>;
+    const cleanup=()=>{clearTimeout(timer);signal.removeEventListener('abort',cancel);reader.onload=null;reader.onerror=null;reader.onabort=null;};
+    const fail=(message:string)=>{cleanup();try{if(reader.readyState===FileReader.LOADING)reader.abort();}catch{/* already stopped */}reject(new Error(message));};
+    const cancel=()=>fail('本地导入解析已取消。');
+    timer=setTimeout(()=>fail('读取本地文件超过 10 秒，已请求停止。'),10_000);
+    signal.addEventListener('abort',cancel,{once:true});
+    reader.onload=()=>{const result=reader.result;cleanup();if(result instanceof ArrayBuffer)resolve(result);else reject(new Error('无法读取本地文件。'));};
+    reader.onerror=()=>fail('无法读取本地文件。');
+    reader.onabort=()=>fail('本地导入解析已取消。');
+    try{reader.readAsArrayBuffer(file);}catch{fail('无法读取本地文件。');}
+  });
+}
+
 function formatSnapshotTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
@@ -74,7 +92,9 @@ export function VersionAndMasterPane({
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
-  const parsingImport = useRef(false);
+  const parsingImport = useRef<AbortController|null>(null);
+  const [parsingTextualImport, setParsingTextualImport] = useState(false);
+  useEffect(()=>()=>{ parsingImport.current?.abort(); },[]);
   const [newTitleDraft, setNewTitleDraft] = useState('');
   const [cloneSource, setCloneSource] = useState<'current' | 'master'>('current');
   const [isRenaming, setIsRenaming] = useState(false);
@@ -199,19 +219,23 @@ export function VersionAndMasterPane({
     const file = input.files?.[0];
     input.value = '';
     if (!file || parsingImport.current || busy || pdfDraft) return;
-    parsingImport.current = true;
+    const controller = new AbortController();
+    parsingImport.current = controller;
+    setParsingTextualImport(true);
     setError(null);
     setBusy(true);
     try {
       const limit = kind === 'pdf' ? RESUME_IMPORT_PDF_MAX_BYTES : RESUME_IMPORT_TEXT_MAX_BYTES;
       if (file.size > limit) throw new Error(kind === 'pdf' ? 'PDF 文件超过 20 MiB 上限。' : '文本文件超过 1 MiB 上限。');
-      const buffer = await file.arrayBuffer();
-      const draft = kind === 'pdf' ? await extractAndParsePdfResume(buffer, file.name) : parseResumeTextFile(buffer, file.name);
-      setPdfDraft(draft);
+      const buffer = await readImportFile(file,controller.signal);
+      if(controller.signal.aborted)throw new Error('本地导入解析已取消。');
+      const draft = kind === 'pdf' ? await extractAndParsePdfResume(buffer, file.name,controller.signal) : parseResumeTextFile(buffer, file.name);
+      if(!controller.signal.aborted)setPdfDraft(draft);
     } catch (err) {
       setError(err instanceof Error ? err.message : '本地导入解析失败。');
     } finally {
-      parsingImport.current = false;
+      if(parsingImport.current===controller)parsingImport.current=null;
+      setParsingTextualImport(false);
       setBusy(false);
     }
   };
@@ -542,6 +566,7 @@ export function VersionAndMasterPane({
             </button>
             <button type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">从 TXT / Markdown 导入</button>
           </div>
+          {parsingTextualImport && <button type="button" onClick={()=>parsingImport.current?.abort()} className="w-full rounded border border-amber-300 bg-amber-50 py-1.5 text-amber-900">取消本地解析</button>}
           <button
             type="button"
             onClick={handleExportJson}
