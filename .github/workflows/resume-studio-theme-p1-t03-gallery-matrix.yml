@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [candidate]
+        phase: [baseline]
     runs-on: windows-latest
     timeout-minutes: 15
     defaults:
@@ -26,6 +26,8 @@ jobs:
         working-directory: .
         timeout-minutes: 1
         run: |
+          git fetch --no-tags --depth=1 origin 7d66321ddbf1cbcf3d37a3f202d4ee095ba33453
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git restore --source=7d66321ddbf1cbcf3d37a3f202d4ee095ba33453 --worktree --staged -- resume-studio-validation/app/src
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
