@@ -62,6 +62,7 @@ async function run() {
     return js(`(()=>{
       const sheet=document.querySelector('.a4-sheet');if(!sheet)throw Error('missing A4');
       const base=sheet.getBoundingClientRect();
+      const clipEl=sheet.closest('.print-workspace.overflow-auto');if(!clipEl)throw Error('missing scroll viewport');const cr=clipEl.getBoundingClientRect();
       const num=v=>Math.round(v*1000)/1000;
       const children=[sheet,...sheet.querySelectorAll('*')].map(el=>{
         const r=el.getBoundingClientRect(),s=getComputedStyle(el);
@@ -71,20 +72,20 @@ async function run() {
           line:s.lineHeight,spacing:s.letterSpacing,border:s.border,transform:s.transform,scheme:s.colorScheme};
       });
       return {text:sheet.innerText,children,width:num(base.width),height:num(base.height),
-        x:base.x,y:base.y,viewport:[innerWidth,innerHeight]};
+        x:base.x,y:base.y,viewport:[innerWidth,innerHeight],clip:{left:cr.left,top:cr.top,right:cr.right,bottom:cr.bottom}};
     })()`);
   }
   const compareSheet = state => sha(JSON.stringify({text:state.text,children:state.children,width:state.width,height:state.height}));
   async function captureSheet(name) {
     const s=await sheetState();
-    const x=Math.ceil(s.x)+2,y=Math.ceil(s.y)+2;
-    const right=Math.min(Math.floor(s.x+s.width)-2,s.viewport[0]-2);
-    const bottom=Math.min(Math.floor(s.y+s.height)-2,s.viewport[1]-2);
+    const x=Math.max(Math.ceil(s.x)+2,Math.ceil(s.clip.left)+1,0),y=Math.max(Math.ceil(s.y)+2,Math.ceil(s.clip.top)+1,0);
+    const right=Math.min(Math.floor(s.x+s.width)-2,Math.floor(s.clip.right)-1,s.viewport[0]-2);
+    const bottom=Math.min(Math.floor(s.y+s.height)-2,Math.floor(s.clip.bottom)-1,s.viewport[1]-2);
     assert.ok(right-x>100&&bottom-y>100,'visible A4 too small');
     const image=await win.webContents.capturePage({x,y,width:right-x,height:bottom-y});
     assert.ok(!image.isEmpty(),'empty A4 crop');
     fs.writeFileSync(path.join(out,name+'-a4.png'),image.toPNG());
-    return {styleHash:compareSheet(s),cropHash:sha(image.toBitmap()),cropSize:image.getSize(),sheet:[s.width,s.height],viewport:s.viewport};
+    return {styleHash:compareSheet(s),cropHash:sha(image.toBitmap()),cropSize:image.getSize(),sheet:[s.width,s.height],viewport:s.viewport,clip:s.clip,cropRect:{x,y,right,bottom}};
   }
   async function exportNative(label) {
     const pdf=await js('window.resumeDesktop.pdf.export('+JSON.stringify({slug:'',document:doc})+')');
@@ -191,6 +192,7 @@ async function run() {
       results[id]={chrome:c,sheet,export:exp,surfaces:await inspectSurfaces(id)};
       if(id!=='classic'){
         assert.equal(sheet.styleHash,results.classic.sheet.styleHash,'A4 computed layout/style changed for '+id);
+        assert.equal(sheet.cropHash,results.classic.sheet.cropHash,'visible A4 pixels changed for '+id);
         assert.equal(exp.pngPixels,results.classic.export.pngPixels,'actual exported PNG changed for '+id);
         assert.deepEqual(exp.pngSize,results.classic.export.pngSize);
       }
@@ -217,6 +219,7 @@ async function run() {
       assert.ok(surface.swatches.length>=10,'actual swatch controls missing');
       const sheet=await captureSheet('style-'+id);
       assert.equal(sheet.styleHash,results.classic.sheet.styleHash,'style tab changed paper layout');
+      assert.equal(sheet.cropHash,results.classic.sheet.cropHash,'style tab changed visible paper pixels');
       results.style[id]={surface,sheet};
       if(id!=='classic') assert.deepEqual(surface.swatches,results.style.classic.surface.swatches,'actual swatch colors changed');
       await capture('style-'+id);
@@ -241,6 +244,7 @@ async function run() {
     const follow=await inspectSurfaces('light');assert.equal(follow.stage,'rgb(226, 232, 240)');
     const afterBacking=await captureSheet('backing-after');
     assert.equal(afterBacking.styleHash,beforeBacking.styleHash,'backing override changed paper');
+    assert.equal(afterBacking.cropHash,beforeBacking.cropHash,'backing override changed paper pixels');
     assert.equal(sha(fs.readFileSync(disk)),originalDisk,'backing override changed document');
     results.backing={override,retained,follow,before:beforeBacking,after:afterBacking};
     checks.backingOverride=true;

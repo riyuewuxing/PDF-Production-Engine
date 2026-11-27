@@ -107,7 +107,8 @@ export function A4PreviewPane({
     ro.observe(contentEl);
     ro.observe(rulerEl);
     return () => ro.disconnect();
-  }, [document, onOverflowChange]);
+  // Scroll/spread replaces the measured DOM nodes; rebind the observer to the new refs.
+  }, [document, onOverflowChange, layoutView]);
 
   const scale = zoomMode === 'auto' ? autoScale : Number(zoomMode);
   const spreadScale = Math.max(0.36, Math.min(0.65, Math.round(scale * 0.62 * 100) / 100));
