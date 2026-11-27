@@ -62,7 +62,7 @@ async function run(){
    await click('取消进入流程');assert(!await has('固定岗位材料流程')&&sha(ledgerBytes())===before,'cancel opened/wrote');
    await click('核对岗位流程 '+companies[0]+' '+role);await until('workflow confirmation again',()=>has('确认进入：'+companies[0]));
    await click('隐私脱敏');await until('redaction',()=>has('脱敏预览开启时隐藏岗位队列'));assert(!await has(companies[0]),'redaction exposed pending scope');
-   await click('隐私脱敏');await until('queue after redaction',()=>has('本地岗位任务队列'));assert(!await has('确认进入：'+companies[0]),'old confirmation survived privacy toggle');
+   await click('脱敏模式中');await until('queue after redaction',()=>has('本地岗位任务队列'));assert(!await has('确认进入：'+companies[0]),'old confirmation survived privacy toggle');
    await openTask(0);assert(sha(ledgerBytes())===before,'enter workflow wrote formal data');checks.confirmCancelAndOtherVersionGate=true;
    await click('分析岗位原文');await until('clause visible',()=>has('必须具备教师资格。'));
    await fill('岗位条件类型','mandatory');await fill('岗位核对结果','gap');await fill('岗位核对说明','甲校独立核对备注');await click('记录本条人工核对');await until('manual review',()=>has('已记录 1 条'));
@@ -133,7 +133,7 @@ async function run(){
    await click('隐私脱敏');await until('workflow redacted',()=>has('脱敏预览开启时隐藏岗位队列'));assert(!await has(companies[1]),'workflow raw data leaked');
    await click(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim()));
    assert(!await has(companies[0]),'redacted tracker exposed scoped record');await capture('09-redacted-tracker');checks.redactionTrackerAndWorkflow=true;
-   await click('隐私脱敏');await until('tracker restored',()=>has(companies[0]));
+   await click('脱敏模式中');await until('tracker restored',()=>has(companies[0]));
    await click('只读复盘 '+companies[0]);await until('permanent snapshot review',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label="永久投递快照只读复盘"]')));await capture('10-permanent-review');
    assert(sha(fs.readFileSync(snapshotFile))===snapHash,'review mutated snapshot');
    assert(sourceHash(slugA)===originalHashes[0]&&sourceHash(slugC)===originalHashes[1],'source documents mutated');
