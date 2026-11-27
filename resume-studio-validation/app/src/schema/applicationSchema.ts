@@ -116,12 +116,45 @@ export type JobReviewArchive = z.infer<typeof JobReviewArchiveSchema>;
 export const MAX_JOB_REVIEW_ARCHIVES=40;
 export const MAX_JOB_REVIEW_ARCHIVE_CHARS=2000000;
 
+/** Local registration only. Execution states and transitions are a separate gate. */
+export const MAX_JOB_QUEUE_TASKS=30;
+export const MAX_JOB_QUEUE_BYTES=600000;
+export const MAX_JOB_QUEUE_JD_CHARS=20000;
+const queueLabel=z.string().min(1).max(200).refine(s=>s===s.trim(),'名称必须为非空且首尾无空格');
+export const JobQueueTaskSchema=z.object({
+  taskVersion:z.literal(1),
+  id:z.string().uuid().refine(s=>s===s.toLowerCase(),'任务标识必须规范'),
+  company:queueLabel,
+  role:queueLabel,
+  jdText:z.string().min(1).max(MAX_JOB_QUEUE_JD_CHARS).refine(s=>!!s.trim(),'岗位原文不能为空'),
+  slug:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/),
+  docId:z.string().min(1).max(500),
+  documentRevision:z.string().min(1).max(1000),
+  documentSha256:z.string().regex(/^[a-f0-9]{64}$/),
+  createdAt:z.string().datetime(),
+  status:z.literal('pending'),
+}).strict().superRefine((task,ctx)=>{
+  try{
+    const revision:unknown=JSON.parse(task.documentRevision);
+    if(!Array.isArray(revision)||revision.length!==2||revision[0]!==task.docId||typeof revision[1]!=='string'||!revision[1]||JSON.stringify(revision)!==task.documentRevision)throw Error('invalid');
+  }catch{ctx.addIssue({code:'custom',path:['documentRevision'],message:'任务文档身份与版本不一致'});}
+});
+export type JobQueueTask=z.infer<typeof JobQueueTaskSchema>;
+export function jobQueueBasisKey(task:JobQueueTask):string{
+  return JSON.stringify([task.company,task.role,task.jdText,task.slug,task.docId,task.documentRevision,task.documentSha256]);
+}
+export const JobQueueSchema=z.array(JobQueueTaskSchema).max(MAX_JOB_QUEUE_TASKS)
+  .refine(tasks=>new Set(tasks.map(t=>t.id)).size===tasks.length,'岗位任务标识重复')
+  .refine(tasks=>new Set(tasks.map(jobQueueBasisKey)).size===tasks.length,'同一岗位及绑定版本已登记')
+  .refine(tasks=>new TextEncoder().encode(JSON.stringify(tasks)).byteLength<=MAX_JOB_QUEUE_BYTES,'岗位队列容量已达上限');
+
 export const ApplicationsStoreSchema = z.object({
   schemaVersion: z.literal(1).default(1),
   revision: z.string().optional(),
   applications: z.array(JobApplicationSchema).default([]),
   coverLetters: z.array(SavedCoverLetterSchema).default([]),
   interviewAnswers: z.record(z.string(), z.string()).default({}),
+  jobQueue:JobQueueSchema.optional(),
   jobReviews: z.array(JobReviewArchiveSchema).max(MAX_JOB_REVIEW_ARCHIVES).refine(rows=>new Set(rows.map(r=>r.id)).size===rows.length,'岗位核对档案标识重复').refine(rows=>JSON.stringify(rows).length<=MAX_JOB_REVIEW_ARCHIVE_CHARS,'岗位核对档案总容量已达上限').optional(),
 });
 

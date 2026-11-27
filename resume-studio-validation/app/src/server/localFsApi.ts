@@ -6,6 +6,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 import { ZodError } from 'zod';
 import {restoreArchivedJobReview,sameJobReviewDocument} from '../lib/jobRequirements';
+import {jobQueueDocumentText,jobQueueBindingMatches} from '../lib/jobQueueBinding';
 import { adaptResumeOrLegacy } from '../schema/legacyAdapter';
 import {
   type ApplicationSnapshotMeta,
@@ -866,7 +867,7 @@ export class LocalResumeStore {
   }
 
   private applicationRevision(data:ApplicationsStoreData):string {
-    const content={schemaVersion:data.schemaVersion,applications:data.applications,coverLetters:data.coverLetters,interviewAnswers:Object.fromEntries(Object.entries(data.interviewAnswers).sort(([a],[b])=>a.localeCompare(b))),jobReviews:data.jobReviews};
+    const content={schemaVersion:data.schemaVersion,applications:data.applications,coverLetters:data.coverLetters,interviewAnswers:Object.fromEntries(Object.entries(data.interviewAnswers).sort(([a],[b])=>a.localeCompare(b))),jobReviews:data.jobReviews,jobQueue:data.jobQueue};
     return createHash('sha256').update(JSON.stringify(content)).digest('hex');
   }
   private async writeApplications(data:ApplicationsStoreData):Promise<ApplicationsStoreData>{
@@ -1085,6 +1086,30 @@ export class LocalResumeStore {
         if(old&&(!samePdfReceipt(a.pdfReceipt,old.pdfReceipt)||a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore||a.jdText!==old.jdText))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联、原岗位原文及导出信息不能通过整表保存修改。');
         if(!old&&a.pdfReceipt&&!a.snapshotId)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','PDF 凭证不能添加到无永久快照的记录。');
         if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug||!samePdfReceipt(snap.meta.pdfReceipt,a.pdfReceipt)||(a.pdfReceipt&&(snap.meta.exportedFilePath!==a.exportedFilePath||a.pdfReceipt.documentSha256!==createHash('sha256').update(JSON.stringify(snap.document)).digest('hex'))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
+      }
+      // Preserve registrations from older clients and all ordinary ledger writes.
+      // Until the execution state machine is introduced, registrations are immutable,
+      // including their presence: absence cannot silently cancel or remove a task.
+      if(validated.jobQueue===undefined&&current.jobQueue!==undefined)validated={...validated,jobQueue:current.jobQueue};
+      const queue=validated.jobQueue??[];
+      for(const old of current.jobQueue??[]){
+        const next=queue.find(t=>t.id===old.id);
+        if(!next||JSON.stringify(next)!==JSON.stringify(old))throw new LocalFsApiError(409,'JOB_QUEUE_IMMUTABLE','已登记岗位任务不可覆盖或移除；保留原任务及版本绑定。');
+      }
+      for(const task of queue){
+        if(current.jobQueue?.some(t=>t.id===task.id))continue;
+        // Verify the exact persisted source under the existing workspace write lock.
+        // A stale historical registration remains readable and does not block unrelated edits.
+        try{
+          const {filePath}=this.resolveResumePath(task.slug);
+          await checkWorkspaceDirectory(this.dataDir,path.dirname(filePath));
+          if(!(await fs.readdir(path.dirname(filePath),{withFileTypes:true})).some(e=>e.name===path.basename(filePath)&&e.isFile()))throw Error('source missing or aliased');
+          const doc=await this.getResume(task.slug);
+          const digest=createHash('sha256').update(jobQueueDocumentText(doc)).digest('hex');
+          if(!jobQueueBindingMatches(task,doc,digest))throw Error('binding changed');
+        }catch{
+          throw new LocalFsApiError(409,'JOB_QUEUE_STALE','岗位任务绑定的磁盘简历已变化、缺失或无法核验；未登记任务。');
+        }
       }
       // Older clients omitting the optional field cannot silently erase local review archives.
       if(validated.jobReviews===undefined&&current.jobReviews!==undefined)validated={...validated,jobReviews:current.jobReviews};

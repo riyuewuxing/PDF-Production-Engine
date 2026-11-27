@@ -1,0 +1,117 @@
+// @vitest-environment node
+import {promises as fs} from 'node:fs';
+import {createHash,randomUUID} from 'node:crypto';
+import path from 'node:path';
+import os from 'node:os';
+import {afterEach,describe,expect,it} from 'vitest';
+import {LocalResumeStore} from './localFsApi';
+import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup} from './workspaceBackup';
+import {JobQueueSchema,JobQueueTaskSchema,JobApplicationSchema,type JobQueueTask} from '../schema/applicationSchema';
+import {ResumeDocumentSchema,resumeRevision,type ResumeDocument} from '../schema/resumeSchema';
+import {jobQueueDocumentText,jobQueueDocumentHash,jobQueueBindingMatches,prepareJobQueueTask} from '../lib/jobQueueBinding';
+const dirs:string[]=[];
+afterEach(async()=>{await Promise.all(dirs.splice(0).map(dir=>fs.rm(dir,{recursive:true,force:true})));});
+const document=(id:string)=>ResumeDocumentSchema.parse({id,title:'合成简历 '+id,createdAt:'2026-01-01',updatedAt:'2026-01-01',basic:{name:'合成候选人'},menuSections:[{id:'basic',title:'Basic',order:0}],globalSettings:{}});
+async function fixture(){
+  const parent=await fs.mkdtemp(path.join(os.tmpdir(),'resume-job-queue-'));dirs.push(parent);
+  const root=path.join(parent,'live'),data=path.join(root,'data'),dest=path.join(parent,'copies');
+  await fs.mkdir(dest,{recursive:true});
+  const store=new LocalResumeStore(data);
+  const a=await store.saveResume('demo-a',document('synthetic-a'));
+  const b=await store.saveResume('demo-b',document('synthetic-b'));
+  return {store,root,data,dest,a,b};
+}
+const task=(doc:ResumeDocument,slug='demo-a',overrides:Partial<{id:string;company:string;role:string;jdText:string;createdAt:string}>={})=>prepareJobQueueTask({id:randomUUID(),company:'合成学校',role:'物理教师',jdText:'  合成岗位原文\n必须具备合成能力。  ',slug,createdAt:'2026-11-27T00:00:00Z',...overrides},doc);
+const bytes=(file:string)=>fs.readFile(file);
+describe('local job queue registrations',()=>{
+  it('keeps legacy bytes and revision unchanged on read; persists two exact isolated bindings and protects unrelated source bytes',async()=>{
+    const {store,data,a,b}=await fixture();
+    const legacy={schemaVersion:1,applications:[JobApplicationSchema.parse({id:'legacy',company:'合成历史记录'})],coverLetters:[],interviewAnswers:{}};
+    await fs.writeFile(store.applicationsPath,JSON.stringify(legacy));
+    const oldBytes=await bytes(store.applicationsPath),base=await store.getApplications();
+    expect(base.jobQueue).toBeUndefined();expect(await bytes(store.applicationsPath)).toEqual(oldBytes);
+    const legacyHash=createHash('sha256').update(JSON.stringify({...legacy,jobReviews:undefined})).digest('hex');expect(base.revision).toBe(legacyHash);
+    const aPath=store.resolveResumePath('demo-a').filePath,bPath=store.resolveResumePath('demo-b').filePath;
+    const originalA=await bytes(aPath),originalB=await bytes(bPath);
+    const x=await task(a),y=await task(b,'demo-b',{company:'合成研究单位',role:'研究员',jdText:'岗位乙'});
+    const saved=await store.saveApplications({...base,jobQueue:[x,y]},base.revision);
+    expect(saved.revision).not.toBe(base.revision);
+    const reopened=await new LocalResumeStore(data).getApplications();
+    expect(reopened).toEqual(saved);expect(reopened.jobQueue).toEqual([x,y]);expect(reopened.applications).toEqual(legacy.applications);
+    expect(JSON.parse((await bytes(store.applicationsPath)).toString()).jobQueue).toEqual([x,y]);
+    expect(await bytes(aPath)).toEqual(originalA);expect(await bytes(bPath)).toEqual(originalB);
+    expect(x.jdText).toBe('  合成岗位原文\n必须具备合成能力。  ');
+    expect(x.documentSha256).toBe(createHash('sha256').update(jobQueueDocumentText(a)).digest('hex'));
+    expect(jobQueueBindingMatches(x,b,await jobQueueDocumentHash(b))).toBe(false);
+  });
+  it('rejects duplicate identity, duplicate binding, malformed revision/status, excess and aggregate capacity',async()=>{
+    const {a}=await fixture();const x=await task(a);
+    expect(JobQueueSchema.safeParse([x,{...x,company:'另一单位'}]).success).toBe(false);
+    expect(JobQueueSchema.safeParse([x,{...x,id:randomUUID()}]).success).toBe(false);
+    expect(JobQueueTaskSchema.safeParse({...x,documentRevision:JSON.stringify(['other',a.updatedAt])}).success).toBe(false);
+    expect(JobQueueTaskSchema.safeParse({...x,status:'running'}).success).toBe(false);
+    expect(JobQueueTaskSchema.safeParse({...x,jdText:'   '}).success).toBe(false);
+    expect(JobQueueTaskSchema.safeParse({...x,jdText:'x'.repeat(20001)}).success).toBe(false);
+    expect(JobQueueTaskSchema.safeParse({...x,slug:'../demo-a'}).success).toBe(false);
+    expect(JobQueueSchema.safeParse(Array.from({length:31},(_,i)=>({...x,id:randomUUID(),company:'单位 '+i}))).success).toBe(false);
+    expect(JobQueueSchema.safeParse(Array.from({length:11},(_,i)=>({...x,id:randomUUID(),company:'单位 '+i,jdText:'测'.repeat(20000)}))).success).toBe(false);
+  });
+  it('rejects stale revision, same-revision content tampering, different document and case alias without writing',async()=>{
+    const {store,a,b}=await fixture();const base=await store.getApplications(),x=await task(a);
+    const file=store.resolveResumePath('demo-a').filePath,original=await bytes(file);
+    await expect(store.saveApplications({...base,jobQueue:[await task(b,'demo-a')]},base.revision)).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    await expect(store.saveApplications({...base,jobQueue:[await task(a,'DEMO-A')]},base.revision)).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    await fs.writeFile(file,JSON.stringify({...a,title:'同修订号外部篡改'}));
+    expect(resumeRevision(await store.getResume('demo-a'))).toBe(x.documentRevision);
+    await expect(store.saveApplications({...base,jobQueue:[x]},base.revision)).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    await fs.writeFile(file,original);
+    await store.saveResume('demo-a',{...a,title:'新版本'});
+    await expect(store.saveApplications({...base,jobQueue:[x]},base.revision)).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    expect(await store.getApplications()).toEqual(base);await expect(fs.access(store.applicationsPath)).rejects.toMatchObject({code:'ENOENT'});
+  });
+  it('retains registrations on old-client writes and application logging; blocks rebind/removal and stale CAS while allowing unrelated edits',async()=>{
+    const {store,a}=await fixture();const base=await store.getApplications(),x=await task(a);
+    const saved=await store.saveApplications({...base,jobQueue:[x]},base.revision);
+    const raw=await bytes(store.applicationsPath);
+    await expect(store.saveApplications({...saved,jobQueue:[{...x,jdText:'替换原文'}]},saved.revision)).rejects.toMatchObject({code:'JOB_QUEUE_IMMUTABLE'});
+    await expect(store.saveApplications({...saved,jobQueue:[]},saved.revision)).rejects.toMatchObject({code:'JOB_QUEUE_IMMUTABLE'});
+    await expect(store.saveApplications({...base,jobQueue:[x]},base.revision)).rejects.toMatchObject({code:'APPLICATION_CONFLICT'});
+    expect(await bytes(store.applicationsPath)).toEqual(raw);
+    await store.saveResume('demo-a',{...a,title:'后来编辑'});
+    const {jobQueue:_omitted,...oldClient}=saved;
+    const next=await store.saveApplications({...oldClient,interviewAnswers:{synthetic:'answer'}},saved.revision);
+    expect(next.jobQueue).toEqual([x]);
+    const logged=await store.logApplication({entry:JobApplicationSchema.parse({id:randomUUID(),company:'合成投递',resumeSlug:'demo-a'}),document:await store.getResume('demo-a')});
+    expect(logged.store.jobQueue).toEqual([x]);expect(logged.store.interviewAnswers.synthetic).toBe('answer');
+    expect(jobQueueBindingMatches(x,await store.getResume('demo-a'),await jobQueueDocumentHash(await store.getResume('demo-a')))).toBe(false);
+  });
+  it('rejects competing writers, and a missing or corrupt binding; malformed queue is not silently reset',async()=>{
+    const {store,data,a,b}=await fixture();const base=await store.getApplications(),x=await task(a),y=await task(b,'demo-b');
+    const results=await Promise.allSettled([store.saveApplications({...base,jobQueue:[x]},base.revision),new LocalResumeStore(data).saveApplications({...base,jobQueue:[y]},base.revision)]);
+    expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+    expect(results.find(r=>r.status==='rejected')).toMatchObject({reason:{code:'APPLICATION_CONFLICT'}});
+    const saved=await store.getApplications();const z=await task(b,'demo-b',{company:'新岗位'});
+    await fs.writeFile(store.resolveResumePath('demo-b').filePath,'corrupt');
+    await expect(store.saveApplications({...saved,jobQueue:[...(saved.jobQueue??[]),z]},saved.revision)).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    await fs.rm(store.resolveResumePath('demo-b').filePath);
+    await expect(store.saveApplications({...saved,jobQueue:[...(saved.jobQueue??[]),z]},saved.revision)).rejects.toMatchObject({code:'JOB_QUEUE_STALE'});
+    const corrupt=JSON.stringify({...saved,jobQueue:[{...x,status:'running'}]});
+    await fs.writeFile(store.applicationsPath,corrupt);
+    await expect(store.getApplications()).rejects.toMatchObject({code:'VALIDATION_ERROR'});
+    await expect(store.saveApplications(saved,saved.revision)).rejects.toMatchObject({code:'VALIDATION_ERROR'});
+    expect((await bytes(store.applicationsPath)).toString()).toBe(corrupt);
+  });
+  it('preserves exact queue bytes in an independent workspace backup and restores without execution',async()=>{
+    const f=await fixture(),base=await f.store.getApplications(),x=await task(f.a);
+    const saved=await f.store.saveApplications({...base,jobQueue:[x]},base.revision),source=await bytes(f.store.applicationsPath);
+    const signal=new AbortController().signal;
+    const backup=await createWorkspaceBackup(f.root,f.dest,signal);
+    const inspection=await inspectWorkspaceBackup(backup.folder,signal);
+    const restored=await restoreWorkspaceBackup(f.root,backup.folder,inspection.manifestHash,f.dest,signal);
+    const newStore=new LocalResumeStore(path.join(restored.folder,'data'));
+    expect(restored.folder).not.toBe(f.root);expect(await newStore.getApplications()).toEqual(saved);
+    expect(await bytes(newStore.applicationsPath)).toEqual(source);expect(await bytes(f.store.applicationsPath)).toEqual(source);
+    expect((await newStore.getApplications()).jobQueue?.[0]?.status).toBe('pending');
+    expect(await newStore.getResume('demo-a')).toEqual(f.a);
+  },20000);
+});

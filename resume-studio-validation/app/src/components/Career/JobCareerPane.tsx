@@ -23,6 +23,7 @@ import { apiClient, isDesktopMode, localErrorMessage } from '../../lib/apiClient
 import { careerLedger } from '../../lib/careerLedgerSession';
 import { CareerAiPanel } from './CareerAiPanel';
 import { InterviewPracticePane } from './InterviewPracticePane';
+import { JobQueuePane } from './JobQueuePane';
 import {VersionCompareModal,type ApplicationReviewSource} from '../Versions/VersionCompareModal';
 import {visibleBasicValue} from '../../lib/aiContext';
 import {
@@ -49,7 +50,7 @@ import {
 } from '../../schema/applicationSchema';
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 
-type CareerSubTab = 'tracker' | 'letters' | 'interview';
+type CareerSubTab = 'tracker' | 'letters' | 'interview' | 'queue';
 
 interface JobCareerPaneProps {
   activeSlug: string;
@@ -409,7 +410,7 @@ export function JobCareerPane({
           </div>
           {saveTip && <span className={'text-[10px] '+(ledger.dirty?'text-amber-700':'text-emerald-600')}>{saveTip}</span>}
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium">
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium sm:grid-cols-4">
           <button
             type="button"
             onClick={() => setSubTab('tracker')}
@@ -436,6 +437,9 @@ export function JobCareerPane({
             }`}
           >
             面试追问
+          </button>
+          <button type="button" aria-label="岗位队列" onClick={()=>setSubTab('queue')} className={`rounded py-1 transition ${subTab==='queue'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:text-slate-900'}`}>
+            岗位队列 ({storeData.jobQueue?.length??0})
           </button>
         </div>
       </div>
@@ -1019,6 +1023,7 @@ export function JobCareerPane({
               </div>
             )}
 
+            {subTab==='queue'&&<JobQueuePane key={JSON.stringify([activeSlug,activeDoc.id])} activeSlug={activeSlug} activeDoc={activeDoc} redacted={comparisonDisabled}/>}
             {subTab === 'interview' && (
               <InterviewPracticePane key={JSON.stringify([activeSlug,activeDoc.id])} document={activeDoc} slug={activeSlug}/>
             )}
