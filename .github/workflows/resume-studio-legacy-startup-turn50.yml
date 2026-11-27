@@ -1,0 +1,42 @@
+name: Resume Studio T50 legacy startup regression
+on:
+  push:
+    branches: ['resume-studio/v6-bootstrap-repro-turn50']
+permissions:
+  contents: read
+jobs:
+  startup:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          pnpm install --frozen-lockfile
+      - name: Strict typecheck
+        timeout-minutes: 2
+        run: pnpm typecheck
+      - name: Actual temporary-disk startup tests
+        timeout-minutes: 2
+        run: pnpm test src/server/resumeListRecovery.test.ts --reporter=default --reporter=json --outputFile=t50-startup.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: t50-startup-${{ matrix.os }}
+          path: resume-studio-validation/app/t50-startup.json
+          if-no-files-found: warn
+          retention-days: 3
