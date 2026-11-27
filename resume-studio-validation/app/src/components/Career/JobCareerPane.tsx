@@ -94,9 +94,9 @@ export function JobCareerPane({
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;cloneRead.current?.cancel();};},[]);
   const ledgerReviewReady=ledger.ready&&!ledger.loading&&!ledger.saving&&!ledger.dirty&&!ledger.error&&typeof storeData.revision==='string'&&/^[a-f0-9]{64}$/.test(storeData.revision);
   const canReview=ledgerReviewReady&&!comparisonDisabled;
-  const reviewValid=Boolean(review&&canReview&&review.activeSlug===activeSlug&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
+  const reviewValid=Boolean(review&&canReview&&subTab==='tracker'&&review.activeSlug===activeSlug&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
   useEffect(()=>{if(!reviewValid)setReview(null);},[reviewValid]);
-  useEffect(()=>{if(comparisonDisabled)cloneRead.current?.cancel();},[comparisonDisabled]);
+  useEffect(()=>{cloneRead.current?.cancel();},[activeSlug,comparisonDisabled]);
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');

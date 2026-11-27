@@ -1250,6 +1250,7 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
       if (pathname.startsWith('/api/application-snapshots/')) {
         const snapId = pathname.slice('/api/application-snapshots/'.length);
         if (method === 'GET') {
+          assertLocalSnapshotRead(req,res,method);
           const rec = await store.getApplicationSnapshot(snapId);
           sendJson(res, 200, rec);
           return;

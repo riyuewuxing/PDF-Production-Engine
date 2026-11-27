@@ -43,7 +43,7 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
     if(seen.has(item.slug))continue;seen.add(item.slug);
     targets.push({key:'disk:'+item.slug,label:(item.slug==='master'?'母库：':'磁盘版本：')+item.title+(item.slug===activeSlug?'（当前版本的磁盘副本）':'')+(applicationReview?.resumeSlug===item.slug?'（原关联标识）':''),slug:item.slug,docId:item.id,kind:'disk'});
   }
-  if(!seen.has(activeSlug))targets.push({key:'disk:'+activeSlug,label:'当前版本的磁盘副本',slug:activeSlug,docId:activeDoc.id,kind:'disk'});
+  if(!seen.has(activeSlug)){const fallback:Target={key:'disk:'+activeSlug,label:'当前版本的磁盘副本',slug:activeSlug,docId:activeDoc.id,kind:'disk'};if(applicationReview)targets.push(fallback);else targets.unshift(fallback);}
   for(const snap of applicationReview?[]:snapshots)if(snap.slug===activeSlug)targets.push({key:'snapshot:'+snap.id,label:'历史快照：'+showTime(snap.createdAt)+' · '+snap.reason,slug:activeSlug,docId:activeDoc.id,kind:'snapshot',snapshot:snap});
   const target=targets.find(x=>x.key===targetKey);
   const cancelRead=()=>{const old=request.current;request.current=null;old?.cancel();setBusy(false);};
