@@ -32,7 +32,7 @@ beforeEach(()=>{
  session.state={data:{schemaVersion:1,revision,applications:[entry,manual],coverLetters:[],interviewAnswers:{}},ready:true,loading:false,saving:false,dirty:false,error:null,recoveryError:null};
  session.load.mockResolvedValue(undefined);session.flush.mockResolvedValue(undefined);
  read.mockResolvedValue(sourceRecord());clone.mockResolvedValue(undefined);
- window.resumeDesktop={applications:{getLinkedSnapshot:read,getSnapshot:rawRead},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
+ window.resumeDesktop={isDesktop:true,applications:{getLinkedSnapshot:read,getSnapshot:rawRead},resumes:{save},shell:{openPath}} as unknown as ResumeDesktopBridge;
  Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:vi.fn()});
 });
 afterEach(()=>{cleanup();delete window.resumeDesktop;Reflect.deleteProperty(HTMLElement.prototype,'scrollTo');vi.useRealTimers();});
