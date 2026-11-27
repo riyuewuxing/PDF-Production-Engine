@@ -65,8 +65,8 @@ export function JobAiReviewPane(props:Props){
     setter(old=>checked?[...old,id]:old.filter(x=>x!==id));
   };
   if(!window.resumeDesktop?.ai)return null;
-  return <section aria-label="岗位 AI 证据分析" className="space-y-2 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800">
-    <div className="font-bold text-teal-900">AI 岗位证据分析 · 只读建议</div>
+  return <details aria-label="岗位 AI 证据分析" className="space-y-2 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800">
+    <summary className="cursor-pointer font-bold text-teal-900">AI 岗位证据分析 · 只读建议（展开）</summary>
     <p>逐条对比公告条件和你明确选择的可见简历自述，给出逐字引用、缺口和待补材料。不作资格判定，不自动保存人工核对、不修改简历。本批不发送基本信息、独立事实库、附件或母库。</p>
     <div className="flex flex-wrap items-center gap-2"><button type="button" disabled={locked} onClick={()=>void load()} className="rounded border px-2 py-1">读取已保存岗位 AI 模型</button><span>{settings?(settings.enabled?settings.providerLabel+' · '+settings.model:'模型尚未启用，请前往 AI 润色设置'):'尚未读取模型'}</span></div>
     <div className="space-y-1">
@@ -86,17 +86,17 @@ export function JobAiReviewPane(props:Props){
       <div className="flex gap-2"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送岗位 AI 分析</button><button type="button" onClick={()=>setPending(null)} className="rounded border px-2 py-1">取消岗位发送</button></div>
     </section>}
     {result&&current(result.request.basis)&&<section aria-label="岗位 AI 分析结果" className="space-y-2 rounded border border-teal-200 bg-teal-50/50 p-2">
-      <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong>
+      <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong><div className="flex flex-wrap gap-1">{Object.entries(JOB_AI_ASSESSMENTS).map(([key,label])=><span key={key} className="rounded border bg-white px-1.5 py-1">{label} {result.rows.filter(r=>r.assessment===key).length}</span>)}</div>
       <p aria-label="岗位 AI 调用回执" className="break-all text-slate-600">{formatAiCompletionReceipt(result.receipt)}</p>
       <p>逐字引用仅证明文字存在，不证明事实真实或满足招聘条件。未选中的自述、事实库和完整公告可能改变判断。请回到下方人工核对逐项确认。</p>
       {result.rows.map((r,i)=><article key={r.clause.id} aria-label={'岗位 AI 建议 '+(i+1)} className="space-y-1 rounded border bg-white p-2">
         <p className="font-semibold">第 {r.clause.line} 行 · {r.clause.quote}</p>
         <p className="font-semibold text-teal-900">模型建议：{JOB_AI_ASSESSMENTS[r.assessment]}</p>
         <p className="whitespace-pre-wrap break-words">模型理由（未验证）：{r.reason}</p>
-        {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote>{c.caution&&<p className="text-amber-800">引文含可能的否定、角色或范围限定，请特别核对。</p>}</div>)}
+        {r.citations.map((c,j)=><div key={j} className="rounded bg-slate-50 p-1"><p>逐字自述引用 · {c.evidence.label}</p><blockquote className="whitespace-pre-wrap break-words">{c.quote}</blockquote><details className="rounded border p-1"><summary className="cursor-pointer">引文上下文（发送版本，节选；出现 {c.occurrences} 次）</summary><p className="whitespace-pre-wrap break-words">{c.context}</p></details>{c.caution&&<p className="text-amber-800">该来源含可能的否定、角色或范围限定，即使逐字引用也须特别核对。<span className="block whitespace-pre-wrap">{c.context}</span></p>}</div>)}
         {!!r.missing.length&&<div><p className="font-semibold">待补／待核实</p>{r.missing.map((m,j)=><p key={j}>· {m}</p>)}</div>}
         <button type="button" disabled={locked} onClick={()=>props.onReview(r.clause.id)} className="rounded border px-2 py-1">定位到人工核对</button>
       </article>)}
     </section>}
-  </section>;
+  </details>;
 }

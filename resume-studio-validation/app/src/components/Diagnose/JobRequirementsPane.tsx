@@ -199,7 +199,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       </div>})}
     </div>}
     {current&&<>
-      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} onReview={select}/>
+      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>
       <div className="flex flex-wrap gap-2 text-slate-700"><span>候选 {session.clauses.length} 条</span><span>已记录 {totals.length} 条</span><span>本人标记硬条件 {totals.filter(r=>r.priority==='mandatory').length}</span><span>自述支持 {totals.filter(r=>r.outcome==='supported').length}</span><span>缺口 {totals.filter(r=>r.outcome==='gap').length}</span></div>
       <button type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1">加载 / 刷新岗位事实依据</button>
       <div className="text-slate-600">{bank?'本地事实版本已读取：'+checkedAt:'尚未加载独立事实库，仅显示简历自述。'} 事实库变化后请刷新；保存核对结果时再次校验已加载的版本。</div>
