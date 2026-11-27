@@ -413,8 +413,9 @@ export function JobCareerPane({
             <button type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1">重载磁盘台账</button>
           </div>
         </div>}
-        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时禁止复盘或克隆原始永久快照。</p>}
+        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
         {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
+        {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"><span className="text-[10px] text-slate-600">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40">刷新磁盘台账</button></div>}
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-500">
             <Loader2 size={16} className="mr-2 animate-spin" /> {ledger.error&&!ledger.loading?'台账尚未成功读取，请先重载。':'正在加载本地求职数据…'}
@@ -640,6 +641,7 @@ export function JobCareerPane({
                               {item.exportedFilePath && desktop && (
                                 <button
                                   type="button"
+                                  disabled={comparisonDisabled}
                                   title="台账记录的路径，未核验文件内容与封存时一致；打开前请自行核对。"
                                   onClick={() => void apiClient.openFile(item.exportedFilePath)}
                                   className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"

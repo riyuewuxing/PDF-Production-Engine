@@ -562,7 +562,7 @@ export default function App() {
                     void handleSafeSwitchVersion(slug).then(ok => {if(ok)setActiveTab('edit');});
                   }}
                   onCloneSnapshot={async (doc, suggestedTitle) => {
-                    await handleImportJson(doc, suggestedTitle);
+                    await handleImportJson({...doc,title:suggestedTitle}, suggestedTitle);
                     setActiveTab('edit');
                   }}
                   onExportStatus={setExportStatus}
