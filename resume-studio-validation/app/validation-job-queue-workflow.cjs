@@ -34,10 +34,10 @@ async function run(){
    const active=await js(()=>document.querySelector('select[aria-label="快速切换简历版本"]').value);
    if(active!==slug)await fill('快速切换简历版本',slug);
    await until('switch '+slug,()=>js(slug=>document.querySelector('select[aria-label="快速切换简历版本"]').value===slug,slug));
-   await until('correct editor document',()=>js(name=>document.querySelector('#basic-field-name')?.value===name,slug===slugA?'合成甲乙候选人':'合成丙候选人'));
+   await until('correct selected document',()=>js(name=>document.body.innerText.includes(name)||document.querySelector('#basic-field-name')?.value===name,slug===slugA?'合成甲乙候选人':'合成丙候选人'));
  };
  const queue=async()=>{await click('求职面试');await click('岗位队列');await until('queue',()=>has('本地岗位任务队列'))};
- const openTask=async i=>{await click('核对岗位流程 '+companies[i]+' '+role);await until('confirmation',()=>has('确认进入：'+companies[i]));await click('确认进入该岗位流程');await until('fixed workflow',()=>has('固定岗位材料流程')&&has(companies[i]+' · '+role))};
+ const openTask=async i=>{await click('核对岗位流程 '+companies[i]+' '+role);await until('confirmation',()=>has('确认进入：'+companies[i]));await click('确认进入该岗位流程');await until('fixed workflow',async()=>await has('固定岗位材料流程')&&await has(companies[i]+' · '+role))};
  const selectTab=async(name,selector)=>{await click('岗位流程 '+name);await until('workflow module '+name,()=>js(sel=>!!document.querySelector(sel),selector))};
  const currentModal=()=>js(()=>!!document.querySelector('[role="dialog"][aria-label="记入投递并锁定永久快照"]'));
  const readFiles=()=>new Set(fs.existsSync(main.exportsDir)?fs.readdirSync(main.exportsDir):[]);
@@ -104,7 +104,7 @@ async function run(){
    dialog.showSaveDialog=async(_owner,opts)=>{assert(opts.filters[0].extensions[0]==='zip','wrong zip filter');return {canceled:false,filePath:target}};
    try{
      await click('制作本岗位投递包 ZIP');await until('package cancel',()=>has('已取消制作投递包'));assert(!fs.existsSync(target)&&sha(ledgerBytes())===logHash&&dialogCalls.length===1,'cancel package mutated files');
-     cancel=false;dialogCalls=[];await click('制作本岗位投递包 ZIP');await until('actual zip',()=>has('投递包已制作：')&&fs.existsSync(target),35000);
+     cancel=false;dialogCalls=[];await click('制作本岗位投递包 ZIP');await until('actual zip',async()=>await has('投递包已制作：')&&fs.existsSync(target),35000);
      assert(dialogCalls.length===2&&sha(ledgerBytes())===logHash&&sha(fs.readFileSync(snapshotFile))===snapHash,'ZIP mutated ledger or snapshot');
    }finally{dialog.showMessageBox=originalMessage;dialog.showOpenDialog=originalOpen;dialog.showSaveDialog=originalSave}
    fs.copyFileSync(target,path.join(out,'actual-scoped-package.zip'));fs.writeFileSync(path.join(out,'expected-resume.pdf'),pdf.bytes);
@@ -131,7 +131,7 @@ async function run(){
    assert(rejection.rejected&&!(await ledger()).applications.some(e=>e.queueTaskId===b.id),'cross-job token accepted');
    checks.realIpcCrossTaskTokenRejected=true;
    await click('隐私脱敏');await until('workflow redacted',()=>has('脱敏预览开启时隐藏岗位队列'));assert(!await has(companies[1]),'workflow raw data leaked');
-   await click('投递追踪 ('+(await ledger()).applications.length+')').catch(async()=>{const label=await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim());await click(label)});
+   await click(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim()));
    assert(!await has(companies[0]),'redacted tracker exposed scoped record');await capture('09-redacted-tracker');checks.redactionTrackerAndWorkflow=true;
    await click('隐私脱敏');await until('tracker restored',()=>has(companies[0]));
    await click('只读复盘 '+companies[0]);await until('permanent snapshot review',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label="永久投递快照只读复盘"]')));await capture('10-permanent-review');

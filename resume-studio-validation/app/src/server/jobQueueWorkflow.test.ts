@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {promises as fs} from 'node:fs';
-import {createHash,randomUUID} from 'node:crypto';
+import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import {afterEach,describe,expect,it,vi} from 'vitest';
@@ -17,7 +17,6 @@ import {PdfReceiptVault} from '../../electron/pdfReceipt';
 const roots:string[]=[];
 afterEach(async()=>{vi.restoreAllMocks();await Promise.all(roots.splice(0).map(r=>fs.rm(r,{recursive:true,force:true})));});
 const jd='  必须具备教师资格。\n硕士优先。  ';
-const sha=(b:string|Buffer)=>createHash('sha256').update(b).digest('hex');
 const signal=()=>new AbortController().signal;
 const pdf=Buffer.from('%PDF-1.7\nsynthetic scope unit fixture\n%%EOF\n');
 async function fixture(){
@@ -73,7 +72,7 @@ describe('explicit prepared workflow gate',()=>{
     expect(await read(f)).toEqual(before);expect(await fs.readFile(source)).toEqual(changed);
     expect((await f.store.openPreparedJobQueue(open(f.z,f.ledger))).task).toEqual(f.z);
   });
-  it('rejects canceled and paused tasks and an aborted read without automatically re-running',async()=>{
+  it('rejects canceled tasks and an aborted read without automatically re-running',async()=>{
     const f=await fixture(),canceled=await f.store.commandJobQueue({...open(f.pending,f.ledger),action:'cancel'}),before=await read(f);
     await expect(f.store.openPreparedJobQueue(open(f.pending,canceled.store))).rejects.toMatchObject({code:'JOB_QUEUE_NOT_PREPARED'});
     const abort=new AbortController();abort.abort();

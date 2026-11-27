@@ -1,7 +1,7 @@
 name: Resume Studio Turn44 actual scoped workflow and cold restart
 on:
   push:
-    branches: ['resume-studio/v6-job-queue-workflow-native-turn44']
+    branches: ['resume-studio/v6-job-queue-final-turn44']
 permissions:
   contents: read
 jobs:
@@ -47,7 +47,7 @@ jobs:
       - name: Independently verify actual ZIP bytes
         timeout-minutes: 1
         run: |
-          python -c "import os, pathlib, zipfile, hashlib, json; p=pathlib.Path(os.environ['RESUME_STUDIO_EVIDENCE_OUT']); z=zipfile.ZipFile(p/'actual-scoped-package.zip'); assert z.namelist()==['resume.pdf','attachment-01.pdf']; assert z.testzip() is None; assert z.read('resume.pdf')==(p/'expected-resume.pdf').read_bytes(); assert z.read('attachment-01.pdf')==(p/'expected-letter.pdf').read_bytes(); (p/'independent-zip-verification.json').write_text(json.dumps({'crc':True,'entries':z.namelist(),'exactBytes':True,'sha256':hashlib.sha256((p/'actual-scoped-package.zip').read_bytes()).hexdigest()}))"
+          python -c "import os, pathlib, zipfile, hashlib, json; p=pathlib.Path(os.environ['GITHUB_WORKSPACE'])/'queue-workflow-evidence'; z=zipfile.ZipFile(p/'actual-scoped-package.zip'); assert z.namelist()==['resume.pdf','attachment-01.pdf']; assert z.testzip() is None; assert z.read('resume.pdf')==(p/'expected-resume.pdf').read_bytes(); assert z.read('attachment-01.pdf')==(p/'expected-letter.pdf').read_bytes(); (p/'independent-zip-verification.json').write_text(json.dumps({'crc':True,'entries':z.namelist(),'exactBytes':True,'sha256':hashlib.sha256((p/'actual-scoped-package.zip').read_bytes()).hexdigest()}))"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload actual evidence
         if: always()
