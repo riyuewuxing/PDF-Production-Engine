@@ -34,6 +34,21 @@ export const COVER_LETTER_HEADER_VARIANTS = [
 
 export type CoverLetterHeaderVariant = (typeof COVER_LETTER_HEADER_VARIANTS)[number];
 
+/** Receipt of the actual generated and reread PDF bytes, not evidence of delivery. */
+export const PdfArtifactReceiptSchema=z.object({
+  sha256:z.string().regex(/^[a-f0-9]{64}$/),
+  sizeBytes:z.number().int().positive().max(32*1024*1024),
+  documentSha256:z.string().regex(/^[a-f0-9]{64}$/),
+  exportedAt:z.string().datetime(),
+}).strict();
+export type PdfArtifactReceipt=z.infer<typeof PdfArtifactReceiptSchema>;
+export type ApplicationPdfCheck={status:'verified'|'changed'|'missing'|'unsafe'|'unavailable'|'unknown';checkedAt:string;opened?:boolean};
+export function samePdfReceipt(a:unknown,b:unknown):boolean{
+  if(a===undefined||b===undefined)return a===b;
+  const x=PdfArtifactReceiptSchema.safeParse(a),y=PdfArtifactReceiptSchema.safeParse(b);
+  return x.success&&y.success&&x.data.sha256===y.data.sha256&&x.data.sizeBytes===y.data.sizeBytes&&x.data.documentSha256===y.data.documentSha256&&x.data.exportedAt===y.data.exportedAt;
+}
+
 export const JobApplicationSchema = z.object({
   id: z.string().min(1),
   company: z.string().default(''),
@@ -47,6 +62,7 @@ export const JobApplicationSchema = z.object({
   jdText: z.string().default(''),
   snapshotId: z.string().default(''),
   exportedFilePath: z.string().default(''),
+  pdfReceipt: PdfArtifactReceiptSchema.optional(),
   interviewAt: z.string().default(''),
   interviewLocation: z.string().default(''),
   atsScore: z.number().min(0).max(100).nullable().default(null),
@@ -131,6 +147,7 @@ export interface ApplicationSnapshotMeta {
   applicationId: string;
   resumeSlug: string;
   exportedFilePath: string;
+  pdfReceipt?:PdfArtifactReceipt;
   createdAt: string;
   title: string;
   templateId: TemplateId;
@@ -144,4 +161,4 @@ export interface ApplicationSnapshotRecord {
 
 export interface ApplicationSnapshotLink { applicationId:string; snapshotId:string; ledgerRevision:string; }
 
-export interface ApplicationLogInput { entry:JobApplication; document:ResumeDocument; }
+export interface ApplicationLogInput { entry:JobApplication; document:ResumeDocument; pdfReceiptToken?:string; }

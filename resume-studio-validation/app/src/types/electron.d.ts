@@ -5,6 +5,8 @@ import type {
   ApplicationSnapshotMeta,
   ApplicationSnapshotRecord,
   ApplicationSnapshotLink,
+  PdfArtifactReceipt,
+  ApplicationPdfCheck,
   ApplicationsStoreData,
   ApplicationLogInput,
   JobApplication,
@@ -36,6 +38,9 @@ export interface PdfExportResult {
   canceled: boolean;
   filePath?: string;
   fileName?: string;
+  pdfReceipt?:PdfArtifactReceipt;
+  pdfReceiptToken?:string;
+  receiptWarning?:string;
   /** Artifact exists; its automatic history operation did not complete. */
   snapshotWarning?: string;
   /** A requested visible content resource could not be confirmed readable. */
@@ -100,6 +105,7 @@ export interface ResumeDesktopBridge {
     saveSnapshot: (input: SaveApplicationSnapshotInput) => Promise<ApplicationSnapshotMeta>;
     getSnapshot: (snapshotId: string) => Promise<ApplicationSnapshotRecord>;
     getLinkedSnapshot?: (link:ApplicationSnapshotLink)=>Promise<ApplicationSnapshotRecord>;
+    checkPdf?: (link:ApplicationSnapshotLink,action:'check'|'open'|'choose')=>Promise<ApplicationPdfCheck>;
     deleteSnapshot: (snapshotId: string) => Promise<{ deleted: boolean }>;
   };
   assets: {

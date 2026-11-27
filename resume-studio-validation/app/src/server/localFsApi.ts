@@ -10,6 +10,9 @@ import { adaptResumeOrLegacy } from '../schema/legacyAdapter';
 import {
   type ApplicationSnapshotMeta,
   type ApplicationSnapshotLink,
+  type PdfArtifactReceipt,
+  PdfArtifactReceiptSchema,
+  samePdfReceipt,
   type ApplicationSnapshotRecord,
   ApplicationsStoreSchema,
   JobApplicationSchema,
@@ -940,12 +943,15 @@ export class LocalResumeStore {
   /** Snapshot first, then ledger: a crash may leave an orphan, never a ledger pointing to a half-written snapshot.
    * Stable request/application id allows safe retries without duplicating snapshots or ledger entries.
    */
-  async logApplication(input:ApplicationLogInput):Promise<{entry:JobApplication;store:ApplicationsStoreData}>{
+  async logApplication(input:ApplicationLogInput,trustedReceipt?:PdfArtifactReceipt):Promise<{entry:JobApplication;store:ApplicationsStoreData}>{
     const entry=JobApplicationSchema.parse(input.entry);
     const doc=ResumeDocumentSchema.parse(input.document);
+    if(entry.pdfReceipt!==undefined||(!trustedReceipt&&input.pdfReceiptToken!==undefined))throw new LocalFsApiError(400,'PDF_RECEIPT_UNTRUSTED','PDF 凭证必须由桌面导出流程签发，不能直接提交哈希。');
+    const receipt=trustedReceipt===undefined?undefined:PdfArtifactReceiptSchema.parse(trustedReceipt);
+    if(receipt&&(!entry.exportedFilePath||receipt.documentSha256!==createHash('sha256').update(JSON.stringify(doc)).digest('hex')))throw new LocalFsApiError(409,'PDF_RECEIPT_MISMATCH','导出凭证与封存文档不一致。');
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.id)||!entry.company.trim())throw new LocalFsApiError(400,'INVALID_APPLICATION','投递记录标识或单位无效。');
     const snapshotId='app-'+entry.id;
-    const candidate={...entry,snapshotId};
+    const candidate={...entry,snapshotId,...(receipt?{pdfReceipt:receipt}:{})};
     const resumeSlug=assertSafeSlug(entry.resumeSlug);
     return withResumeWriteLock(this.dataDir,async()=>{
       const current=await this.getApplications();
@@ -953,16 +959,16 @@ export class LocalResumeStore {
       if(existing){
         if(existing.snapshotId!==snapshotId)throw new LocalFsApiError(409,'APPLICATION_EXISTS','投递标识已被其他记录使用。');
         const previous=await this.getApplicationSnapshot(snapshotId);
-        if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.resumeSlug!==resumeSlug||previous.meta.atsScore!==entry.atsScore)
+        if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.resumeSlug!==resumeSlug||previous.meta.atsScore!==entry.atsScore||!samePdfReceipt(previous.meta.pdfReceipt,receipt)||!samePdfReceipt(existing.pdfReceipt,receipt))
           throw new LocalFsApiError(409,'APPLICATION_EXISTS','该请求已记入不同投递资料，不会重复写入。');
         return {entry:existing,store:current};
       }
       await checkWorkspaceDirectory(this.dataDir,this.appSnapshotsDir,true);
       const target=resolveContainedPath(this.appSnapshotsDir,snapshotId+'.json');
-      const meta:ApplicationSnapshotMeta={id:snapshotId,applicationId:entry.id,resumeSlug,exportedFilePath:entry.exportedFilePath,createdAt:entry.updatedAt||new Date().toISOString(),title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore};
+      const meta:ApplicationSnapshotMeta={id:snapshotId,applicationId:entry.id,resumeSlug,exportedFilePath:entry.exportedFilePath,createdAt:entry.updatedAt||new Date().toISOString(),title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore,...(receipt?{pdfReceipt:receipt}:{})};
       if(await pathEntryExists(target)){
         const previous=await this.getApplicationSnapshot(snapshotId);
-        if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.resumeSlug!==resumeSlug||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.atsScore!==entry.atsScore)
+        if(JSON.stringify(previous.document)!==JSON.stringify(doc)||previous.meta.applicationId!==entry.id||previous.meta.resumeSlug!==resumeSlug||previous.meta.exportedFilePath!==entry.exportedFilePath||previous.meta.atsScore!==entry.atsScore||!samePdfReceipt(previous.meta.pdfReceipt,receipt))
           throw new LocalFsApiError(409,'SNAPSHOT_EXISTS','重试请求与已有永久快照不一致，未覆盖原快照。');
       }else await this.writeImmutableApplicationSnapshot(target,{meta,document:doc});
       const store=await this.writeApplications({...current,applications:[candidate,...current.applications]});
@@ -1026,7 +1032,8 @@ export class LocalResumeStore {
     catch(err){if(err instanceof LocalFsApiError)throw err;throw new LocalFsApiError(422,'APPLICATION_SNAPSHOT_INVALID','永久快照损坏或结构无效，原文件保留，未显示原稿。');}
     const meta=record.meta,doc=record.document;
     if(!meta||meta.id!==id||meta.applicationId!==entry.id||meta.resumeSlug!==slug||
-       meta.exportedFilePath!==entry.exportedFilePath||meta.atsScore!==entry.atsScore||
+       meta.exportedFilePath!==entry.exportedFilePath||meta.atsScore!==entry.atsScore||!samePdfReceipt(meta.pdfReceipt,entry.pdfReceipt)||
+       (entry.pdfReceipt!==undefined&&entry.pdfReceipt.documentSha256!==createHash('sha256').update(JSON.stringify(doc)).digest('hex'))||
        meta.title!==doc.title||meta.templateId!==doc.templateId||typeof meta.createdAt!=='string'||!Number.isFinite(Date.parse(meta.createdAt))){
       throw new LocalFsApiError(409,'APPLICATION_SNAPSHOT_LINK','永久快照与台账身份、导出关联或原稿元数据不一致，未显示原稿；请核对原件或备份。');
     }
@@ -1034,7 +1041,7 @@ export class LocalResumeStore {
     // verified. This is a point-in-time check, not a filesystem transaction.
     const after=await this.getApplications(false);
     if(after.revision!==current.revision)throw new LocalFsApiError(409,'APPLICATION_CONFLICT','读取期间投递台账已变化，请重新读取台账后复盘。');
-    return {meta:{id,applicationId:entry.id,resumeSlug:slug,exportedFilePath:entry.exportedFilePath,createdAt:meta.createdAt,title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore},document:doc};
+    return {meta:{id,applicationId:entry.id,resumeSlug:slug,exportedFilePath:entry.exportedFilePath,createdAt:meta.createdAt,title:doc.title,templateId:doc.templateId,atsScore:entry.atsScore,...(entry.pdfReceipt?{pdfReceipt:entry.pdfReceipt}:{})},document:doc};
   }
 
   async deleteApplicationSnapshot(rawSnapshotId: string): Promise<{ deleted: boolean }> {
@@ -1075,8 +1082,9 @@ export class LocalResumeStore {
       for(const a of validated.applications){
         if(ids.has(a.id))throw new LocalFsApiError(422,'DUPLICATE_APPLICATION','投递标识重复。');ids.add(a.id);
         const old=current.applications.find(x=>x.id===a.id);
-        if(old&&(a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore||a.jdText!==old.jdText))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联、原岗位原文及导出信息不能通过整表保存修改。');
-        if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
+        if(old&&(!samePdfReceipt(a.pdfReceipt,old.pdfReceipt)||a.snapshotId!==old.snapshotId||(old.snapshotId&&(a.resumeSlug!==old.resumeSlug||a.exportedFilePath!==old.exportedFilePath||a.atsScore!==old.atsScore||a.jdText!==old.jdText))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','已有永久快照关联、原岗位原文及导出信息不能通过整表保存修改。');
+        if(!old&&a.pdfReceipt&&!a.snapshotId)throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','PDF 凭证不能添加到无永久快照的记录。');
+        if(!old&&a.snapshotId){const snap=await this.getApplicationSnapshot(a.snapshotId);if(snap.meta.applicationId!==a.id||snap.meta.resumeSlug!==a.resumeSlug||!samePdfReceipt(snap.meta.pdfReceipt,a.pdfReceipt)||(a.pdfReceipt&&(snap.meta.exportedFilePath!==a.exportedFilePath||a.pdfReceipt.documentSha256!==createHash('sha256').update(JSON.stringify(snap.document)).digest('hex'))))throw new LocalFsApiError(409,'SNAPSHOT_LINK_PROTECTED','投递记录与永久快照身份不一致。');}
       }
       // Older clients omitting the optional field cannot silently erase local review archives.
       if(validated.jobReviews===undefined&&current.jobReviews!==undefined)validated={...validated,jobReviews:current.jobReviews};
