@@ -58,6 +58,7 @@ async function run(){
    await click('创建');
    await until('actual saved clone',async()=>{const summary=(await store.listResumes()).resumes.find(s=>s.title==='合成T48岗位版本');if(!summary)return false;slugA=summary.slug;return await js(slug=>document.querySelector('select[aria-label="快速切换简历版本"]')?.value===slug,slugA)});
    const clone=await store.getResume(slugA);assert(clone.id!==mother.id&&clone.basic.name===mother.basic.name&&clone.education[0].id===mother.education[0].id,'clone identity/content mismatch');
+   await capture('00a2-clone-created');await click('内容编辑');
    await until('clone edit field',()=>js(()=>document.querySelector('#basic-field-name')?.value==='合成母库候选人'));
    assert(await js(()=>{const e=document.querySelector('#basic-field-name');if(!e||e.disabled||e.readOnly)return false;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'合成甲乙候选人');e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true}),'clone edit missing');
    await until('clone saved to disk',async()=>(await store.getResume(slugA)).basic.name==='合成甲乙候选人'&&await has('已保存至本地硬盘'));
