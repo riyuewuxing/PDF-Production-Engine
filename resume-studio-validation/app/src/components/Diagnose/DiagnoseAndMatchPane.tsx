@@ -26,6 +26,8 @@ import {
   type PreparedTailorRequest,
 } from '../../lib/aiTailor';
 import { apiClient } from '../../lib/apiClient';
+import type { StudioThemeId } from '../../studio-theme/presets';
+import { surfaceStyle } from '../../studio-theme/surfaces';
 import { type AtsInspectionResult, runLiveAtsInspection } from '../../lib/atsInspector';
 import {
   BYOK_PROVIDER_PRESETS,
@@ -72,6 +74,7 @@ type PendingAiRequest =
   | { mode: 'tailor'; basis: TailorBasis; settings: ByokAiSettings; prepared: PreparedTailorRequest; masterRef: boolean };
 
 export function DiagnoseAndMatchPane({
+  studioThemeId = 'classic',
   document,
   activeSlug = '',
   overflowPx,
@@ -84,6 +87,7 @@ export function DiagnoseAndMatchPane({
   onFlushBeforeApply,
   getCurrentRevision,
 }: {
+  studioThemeId?: StudioThemeId;
   document: ResumeDocument;
   activeSlug?: string;
   overflowPx: number;
@@ -251,17 +255,17 @@ export function DiagnoseAndMatchPane({
 
   const scoreColor =
     diagnostic.score >= 85
-      ? 'text-emerald-600 border-emerald-500 bg-emerald-50'
+      ? 'text-emerald-600 studio-ui-success border-emerald-500 studio-ui-success-border bg-emerald-50 studio-ui-success-surface'
       : diagnostic.score >= 65
-        ? 'text-amber-600 border-amber-500 bg-amber-50'
-        : 'text-red-600 border-red-500 bg-red-50';
+        ? 'text-amber-600 studio-ui-warning border-amber-500 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface'
+        : 'text-red-600 studio-ui-error border-red-500 studio-ui-error-border bg-red-50 studio-ui-error-surface';
 
   const atsScoreColor = atsResult
     ? atsResult.score >= 85
-      ? 'text-emerald-600 border-emerald-500 bg-emerald-50'
+      ? 'text-emerald-600 studio-ui-success border-emerald-500 studio-ui-success-border bg-emerald-50 studio-ui-success-surface'
       : atsResult.score >= 65
-        ? 'text-amber-600 border-amber-500 bg-amber-50'
-        : 'text-red-600 border-red-500 bg-red-50'
+        ? 'text-amber-600 studio-ui-warning border-amber-500 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface'
+        : 'text-red-600 studio-ui-error border-red-500 studio-ui-error-border bg-red-50 studio-ui-error-surface'
     : '';
 
   const handleRunAtsInspection = async () => {
@@ -544,44 +548,44 @@ export function DiagnoseAndMatchPane({
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-slate-200 px-4 py-2.5">
-        <div className="text-xs font-bold text-slate-900">诊断优化中心</div>
-        <div className="text-[11px] text-slate-500">0 成本离线 HR 体检 · JD 关键词雷达 · 可选本地/BYOK 润色</div>
+    <div className="flex h-full flex-col bg-white studio-ui-surface">
+      <div data-studio-region="diagnose-header" data-studio-surface="panel" data-studio-theme={studioThemeId} style={surfaceStyle(studioThemeId, 'panel')} className="border-b border-slate-200 studio-ui-border px-4 py-2.5">
+        <div className="text-xs font-bold text-slate-900 studio-ui-primary">诊断优化中心</div>
+        <div className="text-[11px] text-slate-500 studio-ui-muted">0 成本离线 HR 体检 · JD 关键词雷达 · 可选本地/BYOK 润色</div>
 
-        <div className="mt-2.5 grid grid-cols-4 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium">
-          <button
+        <div className="mt-2.5 grid grid-cols-4 gap-1 rounded-md bg-slate-100 studio-ui-raised p-0.5 text-[11px] font-medium">
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('hr')}
             className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
-              subTab === 'hr' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'hr' ? 'bg-white studio-ui-selected text-slate-900 studio-ui-selected-text shadow-xs' : 'text-slate-600 studio-ui-muted hover:text-slate-900 studio-ui-hover-primary'
             }`}
           >
             <Stethoscope size={12} /> HR 体检
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('jd')}
             className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
-              subTab === 'jd' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'jd' ? 'bg-white studio-ui-selected text-slate-900 studio-ui-selected-text shadow-xs' : 'text-slate-600 studio-ui-muted hover:text-slate-900 studio-ui-hover-primary'
             }`}
           >
             <Radar size={12} /> JD 雷达
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('ats')}
             className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
-              subTab === 'ats' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'ats' ? 'bg-white studio-ui-selected text-slate-900 studio-ui-selected-text shadow-xs' : 'text-slate-600 studio-ui-muted hover:text-slate-900 studio-ui-hover-primary'
             }`}
           >
             <FileText size={12} /> 真 ATS 机读
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('ai')}
             className={`inline-flex items-center justify-center gap-1 rounded py-1 transition ${
-              subTab === 'ai' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'ai' ? 'bg-white studio-ui-selected text-slate-900 studio-ui-selected-text shadow-xs' : 'text-slate-600 studio-ui-muted hover:text-slate-900 studio-ui-hover-primary'
             }`}
           >
             <Sparkles size={12} /> AI 润色 Diff
@@ -589,11 +593,11 @@ export function DiagnoseAndMatchPane({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 text-xs">
+      <div data-studio-region={subTab === 'hr' || subTab === 'ats' ? 'diagnose-body' : undefined} data-studio-surface={subTab === 'hr' || subTab === 'ats' ? 'panel' : undefined} data-studio-theme={subTab === 'hr' || subTab === 'ats' ? studioThemeId : undefined} style={subTab === 'hr' || subTab === 'ats' ? surfaceStyle(studioThemeId, 'panel') : undefined} className="flex-1 overflow-y-auto p-4 text-xs">
         {subTab === 'hr' && (
           <div className="space-y-4">
             {/* Overall Score Card */}
-            <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 studio-ui-border bg-slate-50/70 studio-ui-raised p-3.5">
               <div
                 aria-label="HR体检综合分"
                 className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border-4 font-bold ${scoreColor}`}
@@ -602,8 +606,8 @@ export function DiagnoseAndMatchPane({
                 <span className="text-[9px] font-normal">分</span>
               </div>
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="font-bold text-slate-900">离线确定性简历体检评分</div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
+                <div className="font-bold text-slate-900 studio-ui-primary">离线确定性简历体检评分</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600 studio-ui-muted">
                   <span>有效字数：{diagnostic.metrics.totalChars} 字</span>
                   <span>经历量化率：{diagnostic.metrics.quantifiedRate}%</span>
                   <span>
@@ -619,24 +623,24 @@ export function DiagnoseAndMatchPane({
               {diagnostic.findings.map((finding) => {
                 const badgeStyle =
                   finding.severity === 'error'
-                    ? 'border-red-200 bg-red-50/80 text-red-900'
+                    ? 'border-red-200 studio-ui-error-border bg-red-50/80 studio-ui-error-surface text-red-900 studio-ui-error'
                     : finding.severity === 'warn'
-                      ? 'border-amber-200 bg-amber-50/80 text-amber-900'
-                      : 'border-emerald-200 bg-emerald-50/70 text-emerald-900';
+                      ? 'border-amber-200 studio-ui-warning-border bg-amber-50/80 studio-ui-warning-surface text-amber-900 studio-ui-warning'
+                      : 'border-emerald-200 studio-ui-success-border bg-emerald-50/70 studio-ui-success-surface text-emerald-900 studio-ui-success';
 
                 return (
                   <div key={finding.id} className={`rounded-lg border p-3 ${badgeStyle}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2">
                         {finding.severity === 'error' ? (
-                          <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600" />
+                          <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600 studio-ui-error" />
                         ) : finding.severity === 'warn' ? (
-                          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 studio-ui-warning" />
                         ) : (
-                          <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />
+                          <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600 studio-ui-success" />
                         )}
                         <div>
-                          <span className="mr-1.5 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold">
+                          <span className="mr-1.5 rounded bg-white/80 studio-ui-surface px-1.5 py-0.5 text-[10px] font-semibold">
                             {finding.category}
                           </span>
                           <span className="font-semibold">{finding.title}</span>
@@ -644,10 +648,10 @@ export function DiagnoseAndMatchPane({
                         </div>
                       </div>
                       {finding.sectionId && (
-                        <button
+                        <button data-studio-control="true"
                           type="button"
                           onClick={() => onJumpToSection(finding.sectionId!)}
-                          className="inline-flex shrink-0 items-center gap-0.5 rounded border border-current/25 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-slate-50"
+                          className="inline-flex shrink-0 items-center gap-0.5 rounded border border-current/25 bg-white studio-ui-surface px-2 py-1 text-[11px] font-semibold hover:bg-slate-50 studio-ui-hover"
                         >
                           定位修复 <ArrowUpRight size={11} />
                         </button>
@@ -736,32 +740,32 @@ export function DiagnoseAndMatchPane({
 
         {subTab === 'ats' && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
-              <div className="font-bold text-slate-900">把导出的 PDF 再读回来</div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+            <div className="rounded-xl border border-slate-200 studio-ui-border bg-slate-50/70 studio-ui-raised p-3.5">
+              <div className="font-bold text-slate-900 studio-ui-primary">把导出的 PDF 再读回来</div>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600 studio-ui-muted">
                 在内存中把当前简历渲染成与正式导出完全一致的矢量 A4 PDF，再解析出招聘系统真正读到的文本流。
                 全程不落盘、不产生快照、不改动原稿。
               </p>
-              <button
+              <button data-studio-control="true"
                 type="button"
                 disabled={atsRunning}
                 onClick={() => void handleRunAtsInspection()}
-                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-slate-900 py-2 font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-slate-900 studio-ui-fill py-2 font-semibold text-white studio-ui-on-fill hover:bg-slate-800 studio-ui-fill-hover disabled:opacity-50"
               >
                 <FileText size={13} />
                 {atsRunning ? '渲染并解析中…' : atsResult ? '重新体检' : '运行真 ATS 逆向体检'}
               </button>
               {jdText.trim() ? (
-                <p className="mt-1.5 text-[10px] text-emerald-700">
+                <p className="mt-1.5 text-[10px] text-emerald-700 studio-ui-success">
                   已自动带入「JD 雷达」中的 JD，将额外核验关键词机读命中。
                 </p>
               ) : (
-                <p className="mt-1.5 text-[10px] text-slate-400">
+                <p className="mt-1.5 text-[10px] text-slate-400 studio-ui-muted">
                   提示：先到「JD 雷达」粘贴 JD，可额外核验关键词是否真被机读。
                 </p>
               )}
               {atsError && (
-                <div className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                <div className="mt-2 rounded border border-red-200 studio-ui-error-border bg-red-50 studio-ui-error-surface px-3 py-2 text-[11px] text-red-700 studio-ui-error">
                   {atsError}
                 </div>
               )}
@@ -769,7 +773,7 @@ export function DiagnoseAndMatchPane({
 
             {atsResult && (
               <>
-                <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <div className="flex items-center gap-4 rounded-xl border border-slate-200 studio-ui-border bg-slate-50/70 studio-ui-raised p-3.5">
                   <div
                     aria-label="ATS 机读得分"
                     className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border-4 font-bold ${atsScoreColor}`}
@@ -778,8 +782,8 @@ export function DiagnoseAndMatchPane({
                     <span className="text-[9px] font-normal">分</span>
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <div className="font-bold text-slate-900">ATS 机读还原评分</div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600">
+                    <div className="font-bold text-slate-900 studio-ui-primary">ATS 机读还原评分</div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-600 studio-ui-muted">
                       <span>页数：{atsResult.pageCount}</span>
                       <span>有效字符：{atsResult.charCount}</span>
                       <span>
@@ -796,7 +800,7 @@ export function DiagnoseAndMatchPane({
                         <span>JD 机读命中：{atsResult.jdPdfHitRate}%</span>
                       )}
                       {atsResult.jdMissedInPdfOnly.length > 0 && (
-                        <span className="text-amber-700">
+                        <span className="text-amber-700 studio-ui-warning">
                           正文有但读不出：{atsResult.jdMissedInPdfOnly.length} 个词
                         </span>
                       )}
@@ -808,24 +812,24 @@ export function DiagnoseAndMatchPane({
                   {atsResult.checks.map((check) => {
                     const style =
                       check.severity === 'error'
-                        ? 'border-red-200 bg-red-50/80 text-red-900'
+                        ? 'border-red-200 studio-ui-error-border bg-red-50/80 studio-ui-error-surface text-red-900 studio-ui-error'
                         : check.severity === 'warn'
-                          ? 'border-amber-200 bg-amber-50/80 text-amber-900'
-                          : 'border-emerald-200 bg-emerald-50/70 text-emerald-900';
+                          ? 'border-amber-200 studio-ui-warning-border bg-amber-50/80 studio-ui-warning-surface text-amber-900 studio-ui-warning'
+                          : 'border-emerald-200 studio-ui-success-border bg-emerald-50/70 studio-ui-success-surface text-emerald-900 studio-ui-success';
                     return (
                       <div key={check.id} className={`rounded-lg border p-3 ${style}`}>
                         <div className="flex items-start gap-2">
                           {check.severity === 'error' ? (
-                            <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600" />
+                            <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-600 studio-ui-error" />
                           ) : check.severity === 'warn' ? (
-                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 studio-ui-warning" />
                           ) : (
-                            <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />
+                            <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600 studio-ui-success" />
                           )}
                           <div>
                             <span className="font-semibold">{check.label}</span>
                             {check.penalty > 0 && (
-                              <span className="ml-1.5 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold">
+                              <span className="ml-1.5 rounded bg-white/80 studio-ui-surface px-1.5 py-0.5 text-[10px] font-semibold">
                                 -{check.penalty}
                               </span>
                             )}
@@ -837,30 +841,30 @@ export function DiagnoseAndMatchPane({
                   })}
                 </div>
 
-                <div className="rounded-lg border border-slate-200">
-                  <button
+                <div className="rounded-lg border border-slate-200 studio-ui-border">
+                  <button data-studio-control="true"
                     type="button"
                     onClick={() => setShowAtsRawText((v) => !v)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    className="flex w-full items-center justify-between px-3 py-2 text-[11px] font-semibold text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover"
                   >
                     <span>{showAtsRawText ? '收起' : '查看'}原始 ATS 机读纯文本流</span>
-                    <span className="text-[10px] font-normal text-slate-400">只读</span>
+                    <span className="text-[10px] font-normal text-slate-400 studio-ui-muted">只读</span>
                   </button>
                   {showAtsRawText && (
-                    <div className="space-y-2 border-t border-slate-200 p-2.5">
+                    <div className="space-y-2 border-t border-slate-200 studio-ui-border p-2.5">
                       <div>
-                        <div className="mb-1 text-[10px] font-bold text-slate-500">
+                        <div className="mb-1 text-[10px] font-bold text-slate-500 studio-ui-muted">
                           ATS 原始流（朴素自上而下）
                         </div>
-                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700">
+                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-slate-200 studio-ui-border bg-slate-50 studio-ui-raised p-2 font-mono text-[10px] leading-relaxed text-slate-700 studio-ui-primary">
                           {atsResult.rawExtractedText || '（无文本）'}
                         </pre>
                       </div>
                       <div>
-                        <div className="mb-1 text-[10px] font-bold text-slate-500">
+                        <div className="mb-1 text-[10px] font-bold text-slate-500 studio-ui-muted">
                           双栏感知顺序（人类阅读顺序）
                         </div>
-                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-white p-2 font-mono text-[10px] leading-relaxed text-slate-700">
+                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface p-2 font-mono text-[10px] leading-relaxed text-slate-700 studio-ui-primary">
                           {atsResult.columnAwareText || '（无文本）'}
                         </pre>
                       </div>
