@@ -49,6 +49,7 @@ jobs:
       - name: Actual MCP transport with guarded network and malformed envelopes
         timeout-minutes: 3
         run: |
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't47-process'
           node validation-mcp-transport.cjs candidate
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload evidence
