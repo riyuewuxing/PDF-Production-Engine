@@ -49,7 +49,9 @@ export function samePdfReceipt(a:unknown,b:unknown):boolean{
   return x.success&&y.success&&x.data.sha256===y.data.sha256&&x.data.sizeBytes===y.data.sizeBytes&&x.data.documentSha256===y.data.documentSha256&&x.data.exportedAt===y.data.exportedAt;
 }
 
+const canonicalUuid=z.string().uuid().refine(s=>s===s.toLowerCase(),'任务标识必须规范');
 export const JobApplicationSchema = z.object({
+  queueTaskId:canonicalUuid.optional(),
   id: z.string().min(1),
   company: z.string().default(''),
   role: z.string().default(''),
@@ -72,6 +74,7 @@ export const JobApplicationSchema = z.object({
 export type JobApplication = z.infer<typeof JobApplicationSchema>;
 
 export const SavedCoverLetterSchema = z.object({
+  queueTaskId:canonicalUuid.optional(),
   id: z.string().min(1),
   title: z.string().default(''),
   company: z.string().default(''),
@@ -87,6 +90,7 @@ export type SavedCoverLetter = z.infer<typeof SavedCoverLetterSchema>;
 /** Historical, explicitly saved local job review. No source evidence text is duplicated. */
 export const JobReviewArchiveSchema = z.object({
   reviewVersion:z.literal(1),
+  queueTaskId:canonicalUuid.optional(),
   id:z.string().uuid(),
   slug:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/),
   docId:z.string().min(1).max(500),
@@ -120,7 +124,6 @@ export const MAX_JOB_REVIEW_ARCHIVE_CHARS=2000000;
 export const JOB_QUEUE_RUN_MS=30000;
 export const MAX_JOB_QUEUE_ATTEMPTS=5;
 export const JOB_QUEUE_STATES=['pending','running','paused','canceled','failed','prepared'] as const;
-const canonicalUuid=z.string().uuid().refine(s=>s===s.toLowerCase(),'任务标识必须规范');
 export const JobQueueFailureSchema=z.enum(['local-error','source-changed','invalid-source','timeout','interrupted']);
 export type JobQueueFailure=z.infer<typeof JobQueueFailureSchema>;
 export const JobQueueResultSchema=z.object({
@@ -144,6 +147,9 @@ export const JobQueueCommandSchema=z.object({
   action:z.enum(['start','retry','pause','cancel','recover']),
 }).strict();
 export type JobQueueCommand=z.infer<typeof JobQueueCommandSchema>;
+export const JobQueueOpenSchema=JobQueueCommandSchema.omit({action:true});
+export type JobQueueOpen=z.infer<typeof JobQueueOpenSchema>;
+export type JobQueueOpenResult={task:JobQueueTask;document:ResumeDocument;ledgerRevision:string};
 export const MAX_JOB_QUEUE_TASKS=30;
 export const MAX_JOB_QUEUE_BYTES=600000;
 export const MAX_JOB_QUEUE_JD_CHARS=20000;
@@ -216,6 +222,7 @@ export interface CoverLetterPdfPayload {
 }
 
 export interface ApplicationSnapshotMeta {
+  queueTaskId?:string;
   id: string;
   applicationId: string;
   resumeSlug: string;

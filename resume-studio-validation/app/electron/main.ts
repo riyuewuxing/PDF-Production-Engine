@@ -713,6 +713,14 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('applications:get', () => store.getApplications());
   trustedEditorHandle('applications:save', (_event, data: unknown,revision:string) => store.saveApplications(data,revision));
   trustedEditorHandle('applications:commandJobQueue',(_event,command:unknown)=>jobQueueExecutor.command(command));
+  let workflowReadBusy=false;
+  trustedEditorHandle('applications:openPreparedJobQueue',async(_event,input:unknown)=>{
+    if(workflowReadBusy)throw Error('上一项岗位流程读取仍未结束，请稍后重试。');
+    workflowReadBusy=true;
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(Error('岗位流程核验超时。')),10000);
+    try{return await store.openPreparedJobQueue(input,controller.signal);}
+    finally{clearTimeout(timer);workflowReadBusy=false;}
+  });
   trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>{
     if(input?.pdfReceiptToken===undefined)return store.logApplication(input);
     return boundedPdfCheck(async signal=>{

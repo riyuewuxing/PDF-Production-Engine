@@ -13,6 +13,7 @@ import type {
   ApplicationLogInput,
   JobApplication,
   JobQueueCommand,
+  JobQueueOpen,JobQueueOpenResult,
 } from '../schema/applicationSchema';
 import type { ResumeDocument, ResumeListResult } from '../schema/resumeSchema';
 import type { ResumeSnapshotMeta, ResumeSnapshotInventory, ResumeTrashList, ResumeWriteLockStatus } from '../server/localFsApi';
@@ -200,6 +201,11 @@ export const apiClient = {
     return handleJsonResponse<ApplicationsStoreData>(res);
   },
 
+  async openPreparedJobQueue(input:JobQueueOpen):Promise<JobQueueOpenResult>{
+    const method=window.resumeDesktop?.applications?.openPreparedJobQueue;
+    if(!method)throw Error('岗位流程仅支持已升级的桌面工作台。');
+    return method(input);
+  },
   async commandJobQueue(command:JobQueueCommand):Promise<ApplicationsStoreData>{
     const method=window.resumeDesktop?.applications?.commandJobQueue;
     if(!method)throw Error('岗位任务执行仅支持已升级的桌面工作台。');

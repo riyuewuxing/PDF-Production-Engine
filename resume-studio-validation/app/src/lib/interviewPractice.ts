@@ -6,10 +6,11 @@ import {collectLocalJobEvidence,splitJobRequirements,type LocalJobEvidence} from
 import {generateInterviewQuestions,type InterviewQuestionItem} from './jobToolkit';
 
 const PREFIX='interview-practice-v2:';
+export const QUEUE_PRACTICE_PREFIX='interview-practice-queue-v1:';
 export type PracticeSource={id:string;label:string;text:string};
 export type PracticeQuestion=InterviewQuestionItem&{identity:string;sources:PracticeSource[];basis:unknown;historical?:{archiveId:string;createdAt:string;status:string;note:string;location:string}};
 export type PreparedPractice=PracticeQuestion&{answerKey:string};
-export type PracticeKey={slug:string;docId:string;role:string;identity:string;question:string;digest:string};
+export type PracticeKey={slug:string;docId:string;role:string;identity:string;question:string;digest:string;queueTaskId?:string};
 export function interviewRole(doc:ResumeDocument,role:string){return role.trim()||visibleBasicValue(doc,'title').trim()||'目标岗位';}
 const status={unchecked:'当时待核对',supported:'当时本人标记已有自述依据',gap:'当时本人标记存在缺口'} as const;
 const compare=(a:string,b:string)=>a<b?-1:a>b?1:0;
@@ -50,39 +51,41 @@ export function archivedPracticeQuestions(doc:ResumeDocument,slug:string,input:J
     };
   });
 }
-export async function preparePracticeQuestions(doc:ResumeDocument,slug:string,roleInput:string,archive?:JobReviewArchive):Promise<PreparedPractice[]>{
+export async function preparePracticeQuestions(doc:ResumeDocument,slug:string,roleInput:string,archive?:JobReviewArchive,queueTaskId?:string):Promise<PreparedPractice[]>{
   if(!globalThis.crypto?.subtle)throw Error('当前环境无法校验面试草稿的依据。');
   const role=interviewRole(doc,roleInput);
+  if(archive&&archive.queueTaskId!==queueTaskId)throw Error('历史档案不属于当前岗位任务。');
   const rows=archive?archivedPracticeQuestions(doc,slug,archive):currentPracticeQuestions(doc,role);
   const prepared=await Promise.all(rows.map(async q=>{
     const bytes=new TextEncoder().encode(JSON.stringify([q.identity,q.question,q.intent,q.starHints,q.basis]));
     const hash=await globalThis.crypto.subtle.digest('SHA-256',bytes);
     const digest=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
     const historicalLabel=q.historical?q.sources[0]?.text+' — '+q.question:q.question;
-    return {...q,answerKey:PREFIX+JSON.stringify([slug,doc.id,role,q.identity,historicalLabel,digest])};
+    return {...q,answerKey:(queueTaskId?QUEUE_PRACTICE_PREFIX:PREFIX)+JSON.stringify([slug,doc.id,role,q.identity,historicalLabel,digest,...(queueTaskId?[queueTaskId]:[])])};
   }));
   if(new Set(prepared.map(q=>q.answerKey)).size!==prepared.length)throw Error('面试练习问题身份重复，未关联草稿。');
   return prepared;
 }
 export function parsePracticeKey(key:string):PracticeKey|null{
-  if(!key.startsWith(PREFIX))return null;
-  try{const v:unknown=JSON.parse(key.slice(PREFIX.length));
-    if(!Array.isArray(v)||v.length!==6||v.some(x=>typeof x!=='string'||!x)||!/^[a-f0-9]{64}$/.test(v[5]))return null;
-    const [slug,docId,role,identity,question,digest]=v as [string,string,string,string,string,string];
-    return {slug,docId,role,identity,question,digest};
+  const scoped=key.startsWith(QUEUE_PRACTICE_PREFIX);
+  if(!scoped&&!key.startsWith(PREFIX))return null;
+  try{const v:unknown=JSON.parse(key.slice((scoped?QUEUE_PRACTICE_PREFIX:PREFIX).length));
+    if(!Array.isArray(v)||v.length!==(scoped?7:6)||v.some(x=>typeof x!=='string'||!x)||!/^[a-f0-9]{64}$/.test(v[5])||(scoped&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v[6])))return null;
+    const [slug,docId,role,identity,question,digest,queueTaskId]=v as [string,string,string,string,string,string,string?];
+    return {slug,docId,role,identity,question,digest,...(queueTaskId?{queueTaskId}:{})};
   }catch{return null;}
 }
 /** Old ordinal keys are unbound; never infer which project or document they belonged to. */
-export function practiceHistory(answers:Readonly<Record<string,string>>,docId:string,slug:string,current:readonly PreparedPractice[]){
+export function practiceHistory(answers:Readonly<Record<string,string>>,docId:string,slug:string,current:readonly PreparedPractice[],queueTaskId?:string){
   const keys=new Set(current.map(q=>q.answerKey));
   const history:{key:string;meta:PracticeKey;answer:string}[]=[],legacy:{key:string;answer:string}[]=[];
   for(const [key,answer] of Object.entries(answers)){
     if(!answer.trim()||keys.has(key))continue;
     const meta=parsePracticeKey(key);
-    if(meta&&meta.slug===slug&&meta.docId===docId)history.push({key,meta,answer});
-    else if(!meta&&key.startsWith(slug+':q-'))legacy.push({key,answer});
+    if(meta&&meta.queueTaskId===queueTaskId&&meta.slug===slug&&meta.docId===docId)history.push({key,meta,answer});
+    else if(!queueTaskId&&!meta&&key.startsWith(slug+':q-'))legacy.push({key,answer});
   }
-  const foreignCount=Object.entries(answers).filter(([key,answer])=>{const m=parsePracticeKey(key);return !!answer.trim()&&!!m&&m.slug===slug&&m.docId!==docId;}).length;
+  const foreignCount=Object.entries(answers).filter(([key,answer])=>{const m=parsePracticeKey(key);return !!answer.trim()&&!!m&&m.queueTaskId===queueTaskId&&m.slug===slug&&m.docId!==docId;}).length;
   return {history,legacy,foreignCount};
 }
 
