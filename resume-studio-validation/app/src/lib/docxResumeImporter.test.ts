@@ -50,7 +50,7 @@ describe('bounded DOCX package and native XML extraction',()=>{
       new Paragraph({text:'Skills',heading:HeadingLevel.HEADING_1}),new Paragraph('Synthetic analysis')
     ]}]});
     const d=await parseDocxResume(await Packer.toBuffer(native),'native.docx');
-    expect(d.sourceKind).toBe('docx');expect(d.name).toBe('Demo Candidate');expect(d.email).toBe('candidate@example.invalid');expect(d.employmentStatus).toBe('');
+    expect(d.sourceKind).toBe('docx');expect(d.importWarnings?.join('')).toContain('不是视觉脱敏');expect(d.name).toBe('Demo Candidate');expect(d.email).toBe('candidate@example.invalid');expect(d.employmentStatus).toBe('');
     expect(d.unclassifiedText).toContain('UNCLASSIFIED_DOCX');expect(d.educationText).not.toContain('UNCLASSIFIED_DOCX');
     const out=buildResumeDocumentFromPdfDraft({...d,keepUnclassified:true});
     expect(out.education.map(e=>e.school)).toEqual(['Alpha Academy','Beta Academy']);expect(out.menuSections.find(s=>s.id==='custom-import-unclassified')?.enabled).toBe(false);

@@ -77,6 +77,7 @@ function extractBody(doc:Document,styles:Document|undefined):{paras:Para[];warni
   const warnings=new Set<string>();
   warnings.add('仅导入主正文文字；页眉、页脚、批注、脚注、尾注、图片、附件、编号样式和版式不会导入。');
   warnings.add('表格按行、单元格及段落顺序读取；非语义标题及复杂排版仍需人工分组。');
+  warnings.add('这不是视觉脱敏：白字、遮盖、颜色或其他排版隐藏的正文仍可能被提取。请与原件逐项核对。');
   const paras:Para[]=[];let chars=0;
   const note=(s:string)=>warnings.add(s);
   const is=(e:Element,name:string)=>e.namespaceURI===ns&&e.localName===name;

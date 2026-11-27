@@ -71,6 +71,8 @@ async function run(){
   await selectFile('从 DOCX 导入',docx);await until('DOCX preview',modal,25000);
   if(count()!==initial||await getField('姓名')!=='Demo Candidate'||await getField('邮箱')!=='docx@example.invalid'||await getField('意向岗位')!=='Teacher'||await getField('状态（可留空）')!=='')throw Error('candidate fields or preview disk state wrong');
   if(!await confirmDisabled()||await review())throw Error('DOCX acknowledgement not required');
+  if(!await js(()=>document.querySelector('[role="dialog"]')?.innerText.includes('不是视觉脱敏')))throw Error('DOCX visual privacy limitation absent');
+  checks.visualPrivacyLimitDisclosed=true;
   const raw=await js(()=>document.querySelector('[role="dialog"] pre')?.textContent??'');
   if(!raw.includes('Table Cell A\nTable Cell B')||!raw.includes('Visible link label')||/HEADER_PRIVATE_MARKER_37|FOOTER_PRIVATE_MARKER_37|DO_NOT_FETCH_DOCX_37/.test(raw))throw Error('DOCX extracted body mismatch');
   checks.previewNoWriteAndBodyBoundary=true;await capture('01-docx-review-required');
@@ -132,6 +134,5 @@ async function run(){
   fs.writeFileSync(path.join(out,'synthetic-imported.json'),JSON.stringify(doc,null,2));
 
   fs.writeFileSync(path.join(out,'docx-desktop-evidence.json'),JSON.stringify({sourceSha:manifest.sourceSha,runnerSha:process.env.GITHUB_SHA,platform:process.platform,checks},null,2));
-  fs.writeFileSync(path.join(out,'synthetic-markdown-imported.json'),JSON.stringify(doc,null,2));fs.writeFileSync(path.join(out,'synthetic-pdf-imported.json'),JSON.stringify(pdfDoc,null,2));
 }
 app.whenReady().then(run).then(()=>{clearTimeout(deadline);app.exit(0);}).catch(e=>{clearTimeout(deadline);console.error(e);fs.writeFileSync(path.join(out,'docx-desktop-failure.json'),JSON.stringify({checks,error:String(e)},null,2));app.exit(1);});
