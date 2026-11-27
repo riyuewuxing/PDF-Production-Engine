@@ -15,7 +15,12 @@ const status={unchecked:'当时待核对',supported:'当时本人标记已有自
 const compare=(a:string,b:string)=>a<b?-1:a>b?1:0;
 /** No independent fact bank or hidden sections are loaded into ordinary offline practice. */
 export function currentPracticeQuestions(doc:ResumeDocument,role:string):PracticeQuestion[]{
-  const evidence=collectLocalJobEvidence(doc,null).filter(e=>!e.id.startsWith('resume:basic:')||e.id==='resume:basic:employmentStatus');
+  const evidence=collectLocalJobEvidence(doc,null).filter(e=>!e.id.startsWith('resume:basic:')||e.id==='resume:basic:employmentStatus').map(e=>{
+    const edu=doc.education.find(x=>e.id==='resume:edu:'+x.id);
+    const proj=doc.projects.find(x=>e.id==='resume:proj:'+x.id);
+    const extra=[edu?.gpa,proj?.date].filter(Boolean);
+    return extra.length?{...e,text:[e.text,...extra].join('\n')}:e;
+  });
   const rowBasis=(e:LocalJobEvidence)=>[e.id,e.label,e.text,e.id.startsWith('resume:basic:')?null:factEntityId(doc,e.id.slice(7))];
   const all=evidence.map(rowBasis).sort((a,b)=>compare(String(a[0]),String(b[0])));
   return generateInterviewQuestions(doc,role).flatMap(q=>{
@@ -53,7 +58,8 @@ export async function preparePracticeQuestions(doc:ResumeDocument,slug:string,ro
     const bytes=new TextEncoder().encode(JSON.stringify([q.identity,q.question,q.intent,q.starHints,q.basis]));
     const hash=await globalThis.crypto.subtle.digest('SHA-256',bytes);
     const digest=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
-    return {...q,answerKey:PREFIX+JSON.stringify([slug,doc.id,role,q.identity,q.question,digest])};
+    const historicalLabel=q.historical?q.sources[0]?.text+' — '+q.question:q.question;
+    return {...q,answerKey:PREFIX+JSON.stringify([slug,doc.id,role,q.identity,historicalLabel,digest])};
   }));
   if(new Set(prepared.map(q=>q.answerKey)).size!==prepared.length)throw Error('面试练习问题身份重复，未关联草稿。');
   return prepared;

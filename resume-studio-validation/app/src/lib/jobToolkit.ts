@@ -153,7 +153,7 @@ export function generateInterviewQuestions(
   const role = targetRoleInput?.trim() || h.role;
   const isTeacherRole=/教师|老师|教研|教学|师范|teacher|teaching|educator/i.test(role);
   const isPhysicsTeacher=isTeacherRole&&/物理|physics/i.test(role);
-  const isResearchRole=!isTeacherRole&&/科研|研究|实验室|research|scientist|laboratory/i.test(role);
+  const isResearchRole=!isTeacherRole&&/科研|研究员|研究助理|研究岗位|实验室|researcher|research assistant|research scientist|scientist|laboratory/i.test(role);
   const topEdu=enabled(doc,'education')?doc.education.find(e=>e.visible):undefined;
   const questions: InterviewQuestionItem[] = [];
 
@@ -162,7 +162,7 @@ export function generateInterviewQuestions(
     id: 'q-edu-foundation',
     sourceKey:topEdu&&factEntityId(doc,'edu:'+topEdu.id)?'edu:'+topEdu.id:undefined,
     category: '专业能力',
-    question: h.topSchool?`请结合你在${h.topSchool}${h.topMajor ? `「${h.topMajor}」` : ''}的培养经历，谈谈这段学习背景对胜任「${role}」最大的帮助是什么？`:`请介绍与你申请「${role}」相关的教育或学习背景。`,
+    question: topEdu&&factEntityId(doc,'edu:'+topEdu.id)&&h.topSchool?`请结合你在${h.topSchool}${h.topMajor ? `「${h.topMajor}」` : ''}的培养经历，谈谈这段学习背景对胜任「${role}」最大的帮助是什么？`:`请介绍与你申请「${role}」相关的教育或学习背景。`,
     intent: '考察学历专业与目标岗位的底层迁移度，区分“只会考试”与“会转化运用”。',
     starHints: [
       '用 1 句话点明专业核心训练（实验设计 / 数学建模 / 严密推理）',
@@ -207,7 +207,7 @@ export function generateInterviewQuestions(
       {
         id: 'q-teach-difficult',
         category: '专业能力',
-        question: isPhysicsTeacher?'高中物理中如电磁感应或复合场运动，你会如何在试讲或分层辅导中帮助基础薄弱学生建立物理图像？':'请选择目标学科中一个学生常见的理解难点，说明如何设计教学、识别错因及检查学习效果。',
+        question: isPhysicsTeacher?'物理学科中如电磁感应或复合场运动，你会如何在试讲或分层辅导中帮助基础薄弱学生建立物理图像？':'请选择目标学科中一个学生常见的理解难点，说明如何设计教学、识别错因及检查学习效果。',
         intent: '练习学科教法与学情转化，不代表真实面试必问。',
         starHints: [
           isPhysicsTeacher?'给出“现象直观感知 → 物理模型抽象 → 典型错因辨析”三步法':'明确学习目标、教学活动和学习效果检验方式',

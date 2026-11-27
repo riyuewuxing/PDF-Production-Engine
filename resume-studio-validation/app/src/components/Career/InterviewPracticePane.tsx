@@ -61,7 +61,7 @@ export function InterviewPracticePane({document,slug}:{document:ResumeDocument;s
     {!!(history.length||legacy.length)&&<details aria-label="面试历史草稿" className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2"><summary className="cursor-pointer font-semibold">历史／旧版草稿 · {history.length+legacy.length} 条（不自动套用）</summary>
       <p>更换岗位、依据或简历内容后，原草稿保留。旧版编号未绑定经历或文档身份，不推断其所属问题；请核对后手动复制需要的内容。</p>
       <div className="max-h-72 space-y-2 overflow-auto">
-      {history.map(h=><article key={h.key} className="rounded border bg-white p-2"><strong>{h.meta.role} · {h.meta.question}</strong><textarea aria-label="历史面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1"/></article>)}
+      {history.map(h=><article key={h.key} className="rounded border bg-white p-2"><strong>{h.meta.role} · {h.meta.question}</strong><p className="break-all text-slate-500">原练习标识：{h.meta.identity} · {h.meta.digest.slice(0,8)}</p><textarea aria-label="历史面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1"/></article>)}
       {legacy.map(h=><article key={h.key} className="rounded border bg-white p-2"><strong>旧版未绑定 · {h.key.slice(slug.length+1)}</strong><textarea aria-label="旧版面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1"/></article>)}
       </div>
     </details>}
