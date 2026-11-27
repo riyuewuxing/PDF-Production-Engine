@@ -764,9 +764,15 @@ function registerIpcHandlers(): void {
       const record=await store.getLinkedApplicationSnapshot(link),receipt=record.meta.pdfReceipt;
       if(!receipt)throw Error('历史记录没有 PDF 字节凭证，不能制作核验投递包。');
       const original=record.meta.exportedFilePath;
+      const ledger=await store.getApplications(false);
+      if(ledger.revision!==link.ledgerRevision)throw Error('磁盘投递台账已变化，请刷新后再制作。');
+      const entry=ledger.applications.find(a=>a.id===link.applicationId);
+      if(!entry)throw Error('投递记录已不存在。');
+      const clean=(s:string)=>s.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,'�').slice(0,240);
+      const targetLabel=clean(entry.company||'未填写单位')+' / '+clean(entry.role||'未填写岗位');
       requireRecordedPath(original);
       assertTrustedEditor(event);
-      const choice=await dialog.showMessageBox(owner,{type:'question',title:'选择投递包内容',message:'为所选投递记录制作本地 ZIP',detail:'只包含封存 PDF 与您明确选择的附加 PDF。不会加入母库、台账、历史原稿、备注或其他岗位材料；不会发送。',buttons:['仅封存简历','另选附加 PDF','取消'],defaultId:2,cancelId:2});
+      const choice=await dialog.showMessageBox(owner,{type:'question',title:'选择投递包内容',message:'为所选投递记录制作本地 ZIP',detail:targetLabel+'\n\n只包含封存 PDF 与您明确选择的附加 PDF。不会加入母库、台账、历史原稿、备注或其他岗位材料；不会发送。',buttons:['仅封存简历','另选附加 PDF','取消'],defaultId:2,cancelId:2});
       assertTrustedEditor(event);
       if(choice.response!==0&&choice.response!==1)return {canceled:true};
       let attachments:string[]=[];
@@ -794,9 +800,8 @@ function registerIpcHandlers(): void {
         return buildSubmissionZip(buffers,signal);
       });
       assertTrustedEditor(event);
-      const clean=(s:string)=>s.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,'�').slice(0,240);
       const listing=chosen.map((file,i)=>packageEntryName(i)+' ← '+clean(path.basename(file))+' ('+archive.entries[i]!.sizeBytes+' 字节)').join('\n');
-      const confirm=await dialog.showMessageBox(owner,{type:'warning',title:'确认投递包文件清单',message:'确认仅将以下文件写入 ZIP？',detail:listing+'\n\n简历字节与封存凭证一致；附加 PDF 仅检查本地文件与格式标记，不验证内容、资格或安全性。压缩包未加密，请逐份核对。',buttons:['确认清单并另存','取消'],defaultId:1,cancelId:1});
+      const confirm=await dialog.showMessageBox(owner,{type:'warning',title:'确认投递包文件清单',message:'确认仅将以下文件写入 ZIP？',detail:targetLabel+'\n\n'+listing+'\n\n简历字节与封存凭证一致；附加 PDF 仅检查本地文件与格式标记，不验证内容、资格或安全性。压缩包未加密，请逐份核对。',buttons:['确认清单并另存','取消'],defaultId:1,cancelId:1});
       assertTrustedEditor(event);
       if(confirm.response!==0)return {canceled:true};
       const selected=await dialog.showSaveDialog(owner,{title:'另存投递包 ZIP（不覆盖现有文件）',defaultPath:path.join(exportsDir,'submission-package-'+Date.now()+'.zip'),filters:[{name:'ZIP 压缩包',extensions:['zip']}]});

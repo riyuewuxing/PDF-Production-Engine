@@ -178,7 +178,7 @@ export function JobCareerPane({
   };
 
   const handlePdfCheck=async(item:JobApplication,action:'check'|'open'|'choose')=>{
-    if(!canReview||!desktop||!item.snapshotId||!item.pdfReceipt||!storeData.revision||pdfTask.current)return;
+    if(!canReview||!desktop||!item.snapshotId||!item.pdfReceipt||!storeData.revision||pdfTask.current||packageTask.current)return;
     const revision=storeData.revision,slug=activeSlug,token=Symbol('pdf-check'),epoch=pdfEpoch.current;
     pdfTask.current=token;
     setPdfCheck({id:item.id,revision,action});
@@ -681,9 +681,9 @@ export function JobCareerPane({
                               )}
                               {cloningId===item.id&&clonePhase==='reading'&&<button type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900">取消读取快照</button>}
                               {item.pdfReceipt&&item.snapshotId&&item.exportedFilePath&&desktop&&<>
-                                <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">核验 PDF</button>
-                                <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40">核验并打开</button>
-                                <button type="button" disabled={!canReview||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40">选择文件核验</button>
+                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">核验 PDF</button>
+                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40">核验并打开</button>
+                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40">选择文件核验</button>
                                 <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>void handleSubmissionPackage(item)} aria-label={'制作投递包 '+item.company} className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">制作投递包 ZIP</button>
                               </>}
                               {item.exportedFilePath && !item.pdfReceipt && desktop && (

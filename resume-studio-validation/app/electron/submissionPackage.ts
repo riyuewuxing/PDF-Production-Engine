@@ -1,4 +1,4 @@
-import {promises as fs} from 'node:fs';
+import {constants,promises as fs,type BigIntStats} from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {MAX_RECEIPT_PDF_BYTES} from './pdfReceipt';
@@ -48,6 +48,28 @@ export function buildSubmissionZip(pdfs:readonly Buffer[],signal?:AbortSignal){
 function safeZipPath(filePath:string):boolean{
   return typeof filePath==='string'&&path.isAbsolute(filePath)&&!filePath.includes('\0')&&path.extname(filePath).toLowerCase()==='.zip'&&path.relative(path.resolve(filePath),filePath)===''&&!(process.platform==='win32'&&(/^[\\/]{2}/.test(filePath)||filePath.slice(2).includes(':')));
 }
+/** Exact bounded readback of an already-created ordinary file. */
+async function confirmZipBytes(file:string,bytes:Buffer,expected:BigIntStats,links:bigint,signal?:AbortSignal):Promise<void>{
+  const sameIdentity=(s:BigIntStats)=>s.isFile()&&!s.isSymbolicLink()&&s.dev===expected.dev&&s.ino===expected.ino&&s.size===BigInt(bytes.length)&&s.nlink===links;
+  const unchanged=(a:BigIntStats,b:BigIntStats)=>sameIdentity(a)&&sameIdentity(b)&&a.mtimeNs===b.mtimeNs&&a.ctimeNs===b.ctimeNs;
+  signal?.throwIfAborted();
+  const start=await fs.lstat(file,{bigint:true});
+  if(!sameIdentity(start))throw Error('ZIP 读回身份不一致。');
+  const handle=await fs.open(file,constants.O_RDONLY|(process.platform==='win32'?0:constants.O_NOFOLLOW));
+  try{
+    const opened=await handle.stat({bigint:true});if(!unchanged(start,opened))throw Error('ZIP 读回身份变化。');
+    const chunk=Buffer.alloc(256*1024);let offset=0;
+    while(offset<bytes.length){
+      signal?.throwIfAborted();
+      const {bytesRead}=await handle.read(chunk,0,Math.min(chunk.length,bytes.length-offset),offset);
+      if(!bytesRead||!chunk.subarray(0,bytesRead).equals(bytes.subarray(offset,offset+bytesRead)))throw Error('ZIP 读回字节不一致。');
+      offset+=bytesRead;
+    }
+    const end=await handle.stat({bigint:true}),again=await fs.lstat(file,{bigint:true});
+    if(!unchanged(opened,end)||!unchanged(opened,again))throw Error('ZIP 读回期间文件发生变化。');
+    signal?.throwIfAborted();
+  }finally{await handle.close();}
+}
 /** Same-directory staging and exclusive hard-link publication. No overwrite
  * fallback on filesystems without hard links. After publication a failed
  * readback is explicitly unconfirmed; never delete a potentially replaced
@@ -64,13 +86,11 @@ export async function publishSubmissionZip(filePath:string,bytes:Buffer,signal?:
     signal?.throwIfAborted();
     const stat=await fs.lstat(stage,{bigint:true});
     if(!stat.isFile()||stat.nlink!==1n||stat.size!==BigInt(bytes.length))throw Error('投递包暂存文件异常。');
-    const readback=await fs.readFile(stage,{signal});
-    if(!readback.equals(bytes))throw Error('投递包暂存字节不一致。');
+    await confirmZipBytes(stage,bytes,stat,1n,signal);
     signal?.throwIfAborted();
     await fs.link(stage,target);published=true; // refuses existing file or symlink
-    const linked=await fs.lstat(target,{bigint:true});
-    if(!linked.isFile()||linked.dev!==stat.dev||linked.ino!==stat.ino||linked.size!==stat.size)throw Error('目标关联无法确认。');
-    signal?.throwIfAborted();
+    await fs.unlink(stage);created=false;
+    await confirmZipBytes(target,bytes,stat,1n,signal);
   }catch(error){
     if(published)throw Error('ZIP 可能已写入，但无法确认最终状态，请手动检查：'+filePath);
     const code=(error as NodeJS.ErrnoException)?.code;
