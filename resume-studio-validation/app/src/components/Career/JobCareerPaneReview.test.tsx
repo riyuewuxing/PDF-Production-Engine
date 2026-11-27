@@ -3,7 +3,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {JobCareerPane} from './JobCareerPane';
 import {comparisonFixture,changedComparisonFixture} from '../../lib/comparisonSyntheticFixture';
 import {JobApplicationSchema,type ApplicationsStoreData,type ApplicationSnapshotRecord} from '../../schema/applicationSchema';
-import type {ResumeDocument,ResumeSummary} from '../../schema/resumeSchema';
+import type {ResumeSummary} from '../../schema/resumeSchema';
 import type {ResumeDesktopBridge} from '../../types/electron';
 type State={data:ApplicationsStoreData;ready:boolean;loading:boolean;saving:boolean;dirty:boolean;error:string|null;recoveryError:string|null};
 const session=vi.hoisted(()=>({state:null as unknown as State,listeners:new Set<()=>void>(),load:vi.fn(),update:vi.fn(),flush:vi.fn()}));
