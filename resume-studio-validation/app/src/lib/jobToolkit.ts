@@ -160,7 +160,7 @@ export function generateInterviewQuestions(
   // 1. Academic / Major grounding
   questions.push({
     id: 'q-edu-foundation',
-    sourceKey:topEdu&&factEntityId(doc,'edu:'+topEdu.id)?'edu:'+topEdu.id:undefined,
+    sourceKey:topEdu&&h.topSchool&&factEntityId(doc,'edu:'+topEdu.id)?'edu:'+topEdu.id:undefined,
     category: '专业能力',
     question: topEdu&&factEntityId(doc,'edu:'+topEdu.id)&&h.topSchool?`请结合你在${h.topSchool}${h.topMajor ? `「${h.topMajor}」` : ''}的培养经历，谈谈这段学习背景对胜任「${role}」最大的帮助是什么？`:`请介绍与你申请「${role}」相关的教育或学习背景。`,
     intent: '考察学历专业与目标岗位的底层迁移度，区分“只会考试”与“会转化运用”。',

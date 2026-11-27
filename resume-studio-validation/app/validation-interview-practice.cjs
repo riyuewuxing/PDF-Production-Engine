@@ -1,4 +1,4 @@
-const {app}=require('electron');
+const {app,dialog}=require('electron');
 const fs=require('node:fs'),path=require('node:path');
 const data=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
 if(!data||!out||!path.basename(data).startsWith('synthetic-interview-'))throw Error('isolated synthetic fixture required');
@@ -95,7 +95,9 @@ async function run(){
   // Historical archive deliberately stale after edits: only historical clauses and notes are shown.
   await setValue(basisSel,archiveId);await ready();
   assert(await js('document.querySelectorAll('+JSON.stringify(panel+' article[aria-label^="面试练习题 "]')+').length===2'),'archive nonrequirement became interview question');
-  assert(await has('历史档案原文')&&await has('当时本人标记存在缺口')&&await has('当时本人标记已有自述依据')&&await has('PDF 第 1 页')&&await has('PDF 第 3 页')&&await has('待核对证书原件')&&!await has('不要求班主任经历。'),'archive provenance wrong');
+  const archiveRows=await js('Array.from(document.querySelectorAll('+JSON.stringify(panel+' article[aria-label^="面试练习题 "]')+')).map(a=>a.textContent).join("\n")');
+  await capture('05-archive-provenance',panel+' article[aria-label="面试练习题 1"]');
+  assert(await has('历史档案原文')&&['当时本人标记存在缺口','当时本人标记已有自述依据','PDF 第 1 页','PDF 第 3 页','待核对证书原件'].every(x=>archiveRows.includes(x))&&!archiveRows.includes('不要求班主任经历。'),'archive provenance wrong '+archiveRows.slice(0,400));
   assert((await activeAnswers()).every(x=>x===''),'archive reused current practice answer');
   await setAnswer(clauses[0].quote,answerArchive);await until('archive draft persisted',()=>stored(answerArchive));await capture('05-historical-archive',panel+' article[aria-label="面试练习题 1"]');
   const arcKey=(await readKeys()).find(k=>k.answer===answerArchive);
@@ -105,6 +107,15 @@ async function run(){
   await setValue(basisSel,'');await ready();assert(await answerFor(names.changed)===answerNew&&await answerFor(names.b)===answerB,'current scope lost after archive');
   await setValue(basisSel,archiveId);await ready();assert(await answerFor(clauses[0].quote)===answerArchive,'archive answer not restored');
   report.checks.archiveAndCurrentScopeIsolation=true;
+  const oldDialog=dialog.showSaveDialog,archiveFile=path.join(out,'historical-practice.txt'),currentFile=path.join(out,'current-practice.txt');
+  try{
+    dialog.showSaveDialog=async()=>({canceled:false,filePath:archiveFile});await click('导出当前练习 TXT');await until('archive export',()=>fs.existsSync(archiveFile));
+    const txt=fs.readFileSync(archiveFile,'utf8');assert(txt.includes(answerArchive)&&txt.includes('PDF 第 1 页')&&txt.includes('历史岗位核对档案')&&!txt.includes(answerA)&&!txt.includes(oldAnswer),'archive export mixed scopes');
+    await setValue(basisSel,'');await ready();dialog.showSaveDialog=async()=>({canceled:false,filePath:currentFile});await click('导出当前练习 TXT');await until('current export',()=>fs.existsSync(currentFile));
+    const cur=fs.readFileSync(currentFile,'utf8');assert(cur.includes(answerNew)&&cur.includes(answerB)&&cur.includes(names.changed)&&!cur.includes(answerArchive)&&!cur.includes(oldAnswer)&&!cur.includes(names.hidden),'current export mixed scopes');
+    dialog.showSaveDialog=async()=>({canceled:true});await click('导出当前练习 TXT');await until('cancel export',()=>has('已取消导出'));
+    report.checks.exactScopedTxtAndCancel=true;await capture('05b-export-current',panel);
+  }finally{dialog.showSaveDialog=oldDialog;}
   await setValue(basisSel,'');await ready();
   // Real cross-version UI and save/reload; identical block IDs are not identity.
   await enter(other);assert((await activeAnswers()).every(x=>x===''),'other document reused draft');

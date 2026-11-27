@@ -13,6 +13,17 @@ function estimateMaxChars(text: string): number {
   return Math.max(80, Math.round(Math.max(len, 60) * 1.25));
 }
 
+/** Count identities across all raw rows, including hidden and disabled ones.
+ * Otherwise a visible row can accidentally read hidden metadata or a patch can write both. */
+function rawBlockKeyCounts(doc:ResumeDocument):Map<string,number>{
+  const counts=new Map<string,number>();
+  const add=(key:string)=>counts.set(key,(counts.get(key)??0)+1);
+  doc.education.forEach(e=>add('edu:'+e.id));
+  doc.experience.forEach(e=>add('exp:'+e.id));
+  doc.projects.forEach(e=>add('proj:'+e.id));
+  for(const [section,items] of Object.entries(doc.customData))items.forEach(item=>add('custom:'+section+':'+item.id));
+  add('skills');add('selfEvaluation');return counts;
+}
 export function collectEditableBlocks(doc: ResumeDocument): EditableBlockOption[] {
   const blocks: EditableBlockOption[] = [];
   const enabled = new Set(doc.menuSections.filter((section) => section.enabled).map((section) => section.id));
@@ -84,7 +95,9 @@ export function collectEditableBlocks(doc: ResumeDocument): EditableBlockOption[
     maxCharsHint: estimateMaxChars(doc.selfEvaluationContent),
   });
 
-  return blocks;
+  const raw=rawBlockKeyCounts(doc),visible=new Map<string,number>();
+  for(const b of blocks)visible.set(b.key,(visible.get(b.key)??0)+1);
+  return blocks.filter(b=>raw.get(b.key)===1&&visible.get(b.key)===1);
 }
 
 /**
@@ -98,6 +111,8 @@ export function applyBlockUpdates(
   const entries = Object.entries(updates);
   if (entries.length === 0) return next;
 
+  const allowed=new Map(collectEditableBlocks(doc).map(b=>[b.key,b]));
+  if(entries.some(([key])=>!allowed.has(key)))throw new Error('正文目标重复、隐藏、已禁用或不存在，未应用修改。');
   for (const [key, nextText] of entries) {
     if (key === 'skills') {
       next = { ...next, skillContent: nextText };
@@ -138,23 +153,11 @@ export function applyBlockUpdates(
       continue;
     }
     if (key.startsWith('custom:')) {
-      const rest = key.slice('custom:'.length);
-      const sepIdx = rest.indexOf(':');
-      if (sepIdx > 0) {
-        const secId = rest.slice(0, sepIdx);
-        const itemId = rest.slice(sepIdx + 1);
-        const existing = next.customData[secId];
-        if (Array.isArray(existing)) {
-          next = {
-            ...next,
-            customData: {
-              ...next.customData,
-              [secId]: existing.map((entry) =>
-                entry.id === itemId ? { ...entry, description: nextText } : entry,
-              ),
-            },
-          };
-        }
+      const secId=allowed.get(key)!.sectionId;
+      const existing=next.customData[secId];
+      if(Array.isArray(existing)){
+        next={...next,customData:{...next.customData,[secId]:existing.map(entry=>
+          'custom:'+secId+':'+entry.id===key?{...entry,description:nextText}:entry)}};
       }
     }
   }

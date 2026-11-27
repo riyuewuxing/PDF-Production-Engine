@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {ResumeDocumentSchema} from '../schema/resumeSchema';
 import {JobReviewArchiveSchema} from '../schema/applicationSchema';
 import {generateInterviewQuestions} from './jobToolkit';
-import {preparePracticeQuestions,parsePracticeKey,practiceHistory,archivedPracticeQuestions} from './interviewPractice';
+import {preparePracticeQuestions,parsePracticeKey,practiceHistory,archivedPracticeQuestions,buildPracticeText} from './interviewPractice';
 import {splitJobRequirements} from './jobRequirements';
 const doc=ResumeDocumentSchema.parse({id:'synthetic-doc',title:'合成',createdAt:'2026-01-01',updatedAt:'2026-01-01',basic:{title:'高中物理教师',name:'PRIVATE_MARKER'},menuSections:[{id:'basic',title:'基本',order:0},{id:'education',title:'教育',order:1},{id:'projects',title:'项目',order:2},{id:'experience',title:'工作',order:3},{id:'skills',title:'技能',order:4,enabled:false}],education:[{id:'e',school:'合成大学',major:'物理学',description:'整理12份记录'}],projects:[{id:'p1',name:'相同标题',role:'成员',description:'参与项目甲'},{id:'p2',name:'相同标题',role:'成员',description:'参与项目乙'},{id:'p3',name:'隐藏项目',visible:false,description:'HIDDEN_MARKER'}],experience:[{id:'x',company:'合成学校',position:'教学助理',description:'协助30课时，未独立主讲'}],skillContent:'DISABLED_MARKER',globalSettings:{}});
 const get=(rows:Awaited<ReturnType<typeof preparePracticeQuestions>>,id:string)=>rows.find(q=>q.identity===id)!;
@@ -60,4 +60,18 @@ describe('interview practice scope and historical preservation',()=>{
     const next=await preparePracticeQuestions(doc,'fixture','教师',{...a,rows:a.rows.map(r=>({...r,review:{...r.review,note:'修改'}}))});
     expect(next[0]!.answerKey).not.toBe(rows[0]!.answerKey);
   });
+});
+
+it('exports only current frozen questions, exact displayed source and selected answers with explicit draft state',async()=>{
+  const rows=await preparePracticeQuestions(doc,'fixture','科研助理');
+  const q=get(rows,'block:proj:p1');
+  const text=buildPracticeText({role:'科研助理',rows:[q],answers:{[q.answerKey]:'CURRENT_ANSWER',[get(rows,'block:proj:p2').answerKey]:'OTHER_ANSWER','fixture:q-proj-1':'LEGACY_ANSWER'},historical:false,unconfirmed:true});
+  expect(text).toContain('CURRENT_ANSWER');expect(text).toContain('参与项目甲');expect(text).toContain('尚未获得磁盘台账确认');expect(text).not.toMatch(/OTHER_ANSWER|LEGACY_ANSWER|参与项目乙|PRIVATE_MARKER|HIDDEN_MARKER/);
+});
+it('excludes a visible project whose raw identity is shared by a hidden project',async()=>{
+  const hidden={...doc.projects[0]!,visible:false,name:'HIDDEN_COLLISION_TITLE',description:'HIDDEN_COLLISION_BODY'};
+  const d={...doc,projects:[hidden,...doc.projects]};
+  const rows=await preparePracticeQuestions(d,'fixture','科研助理');
+  expect(rows.some(q=>q.identity==='block:proj:p1')).toBe(false);
+  expect(JSON.stringify(rows)).not.toContain('HIDDEN_COLLISION');
 });

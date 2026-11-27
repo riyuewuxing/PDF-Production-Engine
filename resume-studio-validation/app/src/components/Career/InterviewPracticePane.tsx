@@ -1,15 +1,17 @@
-import {useEffect,useMemo,useState,useSyncExternalStore} from 'react';
+import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import {JobReviewArchiveSchema} from '../../schema/applicationSchema';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {visibleBasicValue} from '../../lib/aiContext';
-import {interviewRole,preparePracticeQuestions,practiceHistory,type PreparedPractice} from '../../lib/interviewPractice';
-import {localErrorMessage} from '../../lib/apiClient';
+import {interviewRole,preparePracticeQuestions,practiceHistory,buildPracticeText,type PreparedPractice} from '../../lib/interviewPractice';
+import {apiClient,localErrorMessage} from '../../lib/apiClient';
 
 export function InterviewPracticePane({document,slug}:{document:ResumeDocument;slug:string}){
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const [role,setRole]=useState('');
   const [archiveId,setArchiveId]=useState('');
+  const exportGuard=useRef(false);
+  const [exporting,setExporting]=useState(false),[exportNotice,setExportNotice]=useState('');
   const archives=(ledger.data.jobReviews??[]).filter(a=>a.docId===document.id&&a.slug===slug);
   const archiveText=archiveId?JSON.stringify(archives.find(a=>a.id===archiveId)??null):'';
   const target=interviewRole(document,role);
@@ -28,12 +30,24 @@ export function InterviewPracticePane({document,slug}:{document:ResumeDocument;s
   },[basis]);
   const current=prepared?.basis===basis?prepared:null;
   const rows=current?.rows??[];
-  const {history,legacy}=practiceHistory(ledger.data.interviewAnswers,document.id,slug,rows);
+  const {history,legacy,foreignCount}=practiceHistory(ledger.data.interviewAnswers,document.id,slug,rows);
   const editable=!!current&&!current.error&&ledger.ready&&!ledger.loading;
   const answered=rows.filter(q=>ledger.data.interviewAnswers[q.answerKey]?.trim()).length;
   const write=(key:string,answer:string)=>{
     if(!editable||!rows.some(q=>q.answerKey===key))return;
     careerLedger.update(data=>({...data,interviewAnswers:{...data.interviewAnswers,[key]:answer}}));
+  };
+  const exportText=async()=>{
+    if(exportGuard.current||!editable||!rows.length)return;
+    exportGuard.current=true;setExporting(true);setExportNotice('');
+    const label=target+' · '+(archiveId?'历史档案':'当前自述');
+    try{
+      const snapshot=careerLedger.getSnapshot();
+      const content=buildPracticeText({role:target,rows,answers:snapshot.data.interviewAnswers,historical:!!archiveId,unconfirmed:snapshot.dirty||snapshot.saving||!!snapshot.error});
+      const result=await apiClient.saveTextFile({defaultFileName:'面试练习.txt',extension:'txt',content,dialogTitle:'导出当前面试练习（含本人草稿和显示依据）',saveAs:true});
+      setExportNotice(result.canceled?'已取消导出（'+label+'）':result.filePath?'已导出所选练习（'+label+'）：'+result.filePath:'已请求浏览器下载（'+label+'），未核验文件写入。');
+    }catch(e){setExportNotice(localErrorMessage(e,'导出面试练习失败'));}
+    finally{exportGuard.current=false;setExporting(false);}
   };
   return <section aria-label="本地面试练习" className="space-y-3">
     <div className="space-y-2 rounded-lg border border-teal-200 bg-teal-50 p-3">
@@ -46,6 +60,10 @@ export function InterviewPracticePane({document,slug}:{document:ResumeDocument;s
         {archives.map(a=><option key={a.id} value={a.id}>历史岗位核对 · {a.createdAt.slice(0,10)} · {a.rows.length}条 · {a.source.slice(0,45)}</option>)}
       </select></label>
       {!!archiveId&&<p className="rounded bg-amber-50 p-2 text-amber-900">使用历史档案原文和当时人工标记，不重新认定当前资格，不读取旧事实 ID 对应的当前事实；请回到岗位核对重新校验最新依据。当前输入岗位名仅用于区分练习草稿。</p>}
+      <button type="button" disabled={!editable||!rows.length||exporting} onClick={()=>void exportText()} className="rounded border border-teal-400 bg-white px-2 py-1 text-teal-800 disabled:opacity-40">{exporting?'正在导出练习…':'导出当前练习 TXT'}</button>
+      <p className="text-slate-600">仅导出当前选择的题目、显示依据与本人回答草稿；不含其他历史草稿。不自动发送。</p>
+      {exportNotice&&<p role="status" className="break-all">{exportNotice}</p>}
+      {!!foreignCount&&<p className="text-amber-900">同名文件另有 {foreignCount} 条其他简历身份的草稿，未在此展示或套用；恢复原文档身份或备份台账后可核查。</p>}
       <p role="status">{!current?'正在校验草稿依据…':current.error?'依据未通过校验':`已记录 ${answered}/${rows.length} 道练习；${ledger.error?'保存失败，草稿保留':ledger.dirty||ledger.saving?'正在等待台账保存':'以当前已读取台账为准'}`}</p>
     </div>
     {current?.error&&<p role="alert" className="rounded bg-red-50 p-2 text-red-800">{current.error}</p>}

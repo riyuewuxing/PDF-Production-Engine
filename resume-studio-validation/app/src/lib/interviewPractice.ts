@@ -82,5 +82,21 @@ export function practiceHistory(answers:Readonly<Record<string,string>>,docId:st
     if(meta&&meta.slug===slug&&meta.docId===docId)history.push({key,meta,answer});
     else if(!meta&&key.startsWith(slug+':q-'))legacy.push({key,answer});
   }
-  return {history,legacy};
+  const foreignCount=Object.entries(answers).filter(([key,answer])=>{const m=parsePracticeKey(key);return !!answer.trim()&&!!m&&m.slug===slug&&m.docId!==docId;}).length;
+  return {history,legacy,foreignCount};
+}
+
+/** Export only the frozen currently selected practice scope, never historical drafts from other scopes. */
+export function buildPracticeText(input:{role:string;rows:readonly PreparedPractice[];answers:Readonly<Record<string,string>>;historical:boolean;unconfirmed:boolean}):string{
+  if(!input.rows.length)throw Error('当前没有可导出的练习题。');
+  const lines=['面试练习（本人核对稿）','目标岗位：'+input.role,'依据：'+(input.historical?'历史岗位核对档案（不是当前资格结论）':'当前可见简历自述（非独立证明）'),'草稿状态：'+(input.unconfirmed?'当前内存草稿，尚未获得磁盘台账确认':'来自当前已读取台账；回答仍须本人核对'),'题目仅为离线练习建议，不代表真实面试必问。',''];
+  input.rows.forEach((q,i)=>{
+    lines.push('第 '+(i+1)+' 题 · '+q.category,q.question,'练习意图：'+q.intent);
+    if(q.historical)lines.push('历史记录：'+q.historical.createdAt+' · '+q.historical.location+' · '+q.historical.status,...(q.historical.note?['当时人工备注：'+q.historical.note]:[]));
+    for(const s of q.sources)lines.push('依据（'+s.label+'）：',s.text);
+    lines.push('练习提示：',...q.starHints.map(h=>'· '+h),'本人回答草稿：',input.answers[q.answerKey]?.trim()?input.answers[q.answerKey]!:'[待填写]','');
+  });
+  const text=lines.join('\n');
+  if(new TextEncoder().encode(text).byteLength>10*1024*1024)throw Error('练习文本超过10 MiB，请缩小当前练习范围。');
+  return text;
 }
