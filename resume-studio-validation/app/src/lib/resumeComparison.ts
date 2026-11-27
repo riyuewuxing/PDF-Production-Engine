@@ -69,7 +69,7 @@ export function compareResumeDocuments(before:ResumeDocument,after:ResumeDocumen
   const rows:ComparisonRow[]=[],counts:Record<ComparisonKind,number>={added:0,removed:0,modified:0,ambiguous:0};
   const warnings=new Set<string>();
   let hiddenFieldCount=0,fieldCount=0,textCount=0,serial=0;
-  const add=(category:ComparisonCategory,group:string,label:string,kind:ComparisonKind,left:Atom[],right:Atom[],beforePosition:number|null=null,afterPosition:number|null=null,relativeOrderChanged=false)=>{
+  const add=(category:ComparisonCategory,group:string,label:string,kind:ComparisonKind,left:Atom[],right:Atom[],beforePosition:number|null=null,afterPosition:number|null=null,relativeRanks?:{before:number;after:number})=>{
     const l=new Map(left.map(a=>[a.key,a])),r=new Map(right.map(a=>[a.key,a]));
     const fields:ComparisonField[]=[];
     for(const key of new Set([...l.keys(),...r.keys()])){
@@ -78,7 +78,7 @@ export function compareResumeDocuments(before:ResumeDocument,after:ResumeDocumen
       const bv=printable(a),av=printable(b);
       fields.push({label:(a??b)!.label,before:bv,after:av,referenceChanged:Boolean((a?.asset||b?.asset)&&a?.value!==b?.value)});
     }
-    if(relativeOrderChanged)fields.push({label:'共同条目中的相对顺序',before:printable(atom('order','',beforePosition??0)),after:printable(atom('order','',afterPosition??0)),referenceChanged:false});
+    if(relativeRanks)fields.push({label:'共同条目中的相对顺序',before:printable(atom('order','',relativeRanks.before)),after:printable(atom('order','',relativeRanks.after)),referenceChanged:false});
     if(!fields.length&&kind==='modified')return;
     for(const f of fields){
       if(f.before?.hidden||f.after?.hidden)hiddenFieldCount++;
@@ -101,7 +101,8 @@ export function compareResumeDocuments(before:ResumeDocument,after:ResumeDocumen
         for(const x of a)add(category,group,label+'（基准侧歧义）','ambiguous',x.entry.atoms,[],x.index+1,null);
         for(const x of b)add(category,group,label+'（对照侧歧义）','ambiguous',[],x.entry.atoms,null,x.index+1);
       }else if(a[0]&&b[0]){
-        const moved=relative&&lrank.get(id)!==rrank.get(id);
+        const beforeRank=lrank.get(id)!,afterRank=rrank.get(id)!;
+        const moved=relative&&beforeRank!==afterRank?{before:beforeRank,after:afterRank}:undefined;
         // Actual ordinal labels are separate from relative-order detection, so insertion alone is not called a move.
         add(category,group,label,'modified',a[0].entry.atoms,b[0].entry.atoms,a[0].index+1,b[0].index+1,moved);
       }else if(a[0])add(category,group,label,'removed',a[0].entry.atoms,[],a[0].index+1,null);
@@ -118,9 +119,9 @@ export function compareResumeDocuments(before:ResumeDocument,after:ResumeDocumen
   single('content','基本信息','照片引用',photo(before),photo(after));
   const customBasic=(doc:ResumeDocument):Entry[]=>doc.basic.customFields.map(f=>({id:f.id,atoms:[atom('visible','字段显示开关',f.visible),atom('label','字段名称',f.label,!section(doc,'basic').visible||!f.visible),atom('value','字段值',f.value,!section(doc,'basic').visible||!f.visible)]}));
   compareList('content','基本信息','自定义字段',customBasic(before),customBasic(after));
-  const sectionEntries=(doc:ResumeDocument):Entry[]=>[...doc.menuSections].sort((a,b)=>a.order-b.order).map(s=>({id:s.id,atoms:[atom('title','栏目名称',s.title,!section(doc,s.id).visible),atom('enabled','栏目启用',s.enabled),atom('order','排序值',s.order),atom('icon','图标',s.icon),atom('pageBreakBefore','栏目前分页',s.pageBreakBefore)]}));
+  const sectionEntries=(doc:ResumeDocument):Entry[]=>[...doc.menuSections].sort((a,b)=>a.order-b.order).map(s=>({id:s.id,atoms:[atom('title','栏目名称',s.title,!section(doc,s.id).visible),atom('enabled','栏目启用',s.enabled),atom('order','排序值',s.order),atom('icon','图标',s.icon,!section(doc,s.id).visible),atom('pageBreakBefore','栏目前分页',s.pageBreakBefore)]}));
   compareList('structure','栏目结构','栏目',sectionEntries(before),sectionEntries(after),false);
-  const fieldEntries=(doc:ResumeDocument):Entry[]=>doc.basic.fieldOrder.map(f=>({id:f.id,atoms:[atom('visible','字段显示开关',f.visible),atom('key','字段键',f.key,!basicVisible(doc,f.key)),atom('label','字段标签',f.label,!basicVisible(doc,f.key)),atom('type','字段类型',f.type)]}));
+  const fieldEntries=(doc:ResumeDocument):Entry[]=>doc.basic.fieldOrder.map(f=>({id:f.id,atoms:[atom('visible','字段显示开关',f.visible),atom('key','字段键',f.key,!basicVisible(doc,f.key)),atom('label','字段标签',f.label,!basicVisible(doc,f.key)),atom('type','字段类型',f.type,!basicVisible(doc,f.key))]}));
   compareList('structure','基本信息','字段布局',fieldEntries(before),fieldEntries(after));
   for(const [id,group,keys] of [['education','教育经历',EDUCATION],['experience','工作经历',EXPERIENCE],['projects','项目经历',PROJECT]] as const){
     const entries=(doc:ResumeDocument):Entry[]=>doc[id].map(item=>({id:item.id,atoms:itemAtoms(item,keys,!section(doc,id).visible||!item.visible)}));
@@ -139,7 +140,8 @@ export function compareResumeDocuments(before:ResumeDocument,after:ResumeDocumen
   single('style','模板与排版','模板',[atom('template','模板 ID',before.templateId)],[atom('template','模板 ID',after.templateId)]);
   single('style','模板与排版','全局排版',objectAtoms(before.globalSettings,SETTINGS),objectAtoms(after.globalSettings,SETTINGS));
   single('style','基本信息','基本信息排版',[atom('layout','对齐方式',before.basic.layout)],[atom('layout','对齐方式',after.basic.layout)]);
-  single('style','基本信息','照片排版',objectAtoms(before.basic.photoConfig,PHOTO),objectAtoms(after.basic.photoConfig,PHOTO));
+  const photoStyle=(doc:ResumeDocument)=>objectAtoms(doc.basic.photoConfig,PHOTO).map(a=>a.key==='bgBackdrop'?{...a,hidden:!section(doc,'basic').visible||!doc.basic.photoConfig.visible}:a);
+  single('style','基本信息','照片排版',photoStyle(before),photoStyle(after));
   const icons=(doc:ResumeDocument):Entry[]=>Object.entries(doc.basic.icons).sort(([a],[b])=>a.localeCompare(b)).map(([key,value])=>({id:key,atoms:[atom('key','字段键',key,!basicVisible(doc,key)),atom('icon','图标',value,!basicVisible(doc,key))]}));
   compareList('style','基本信息','字段图标',icons(before),icons(after),false);
   return {rows,counts,hiddenFieldCount,warnings:[...warnings]};

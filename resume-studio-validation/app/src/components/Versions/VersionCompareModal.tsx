@@ -6,7 +6,7 @@ import { apiClient, localErrorMessage } from '../../lib/apiClient';
 import { compareResumeDocuments, type ComparisonCategory, type ComparisonKind, type ComparisonValue, type ResumeComparison } from '../../lib/resumeComparison';
 
 type Target={key:string;label:string;slug:string;docId:string;kind:'disk'|'snapshot';snapshot?:ResumeSnapshotMeta};
-type Loaded={key:string;baselineTitle:string;baselineTime:string;targetTitle:string;targetTime:string;capturedAt:string;diff:ResumeComparison};
+type Loaded={key:string;targetDocId:string;targetSnapshotTime?:string;baselineTitle:string;baselineTime:string;targetTitle:string;targetTime:string;capturedAt:string;diff:ResumeComparison};
 type Props={activeSlug:string;activeDoc:ResumeDocument;summaries:ResumeSummary[];masterSummary:ResumeSummary|null;snapshots:ResumeSnapshotMeta[];initialSnapshotId?:string;onClose:()=>void};
 const CATEGORIES=[['all','全部'],['content','内容'],['structure','结构'],['style','样式']] as const;
 const KINDS:Record<ComparisonKind,string>={added:'对照新增',removed:'对照移除',modified:'差异',ambiguous:'身份歧义'};
@@ -17,7 +17,7 @@ function Value({value,reveal}:{value:ComparisonValue|null;reveal:boolean}){
   if(!value)return <span className="text-slate-400">（不存在）</span>;
   return <div className="min-w-0 space-y-1">
     {value.hidden&&<span className="inline-block rounded bg-amber-100 px-1.5 text-[10px] text-amber-900">隐藏 / 禁用或未确认</span>}
-    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all font-sans text-xs">{value.hidden&&!reveal?'（已遮蔽）':value.text===''?'（空值）':value.text}</pre>
+    <pre tabIndex={(!value.hidden||reveal)&&value.text.length>200?0:undefined} className="max-h-40 overflow-auto whitespace-pre-wrap break-all font-sans text-xs">{value.hidden&&!reveal?'（已遮蔽）':value.text===''?'（空值）':value.text}</pre>
   </div>;
 }
 
@@ -54,7 +54,8 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
   const changeTarget=(key:string)=>{cancelRead();setTargetKey(key);setResult(null);setError(null);resetFilters();};
   const read=async()=>{
     if(!target||request.current)return;
-    const basis=structuredClone(activeDoc),selected=target,capturedAt=new Date().toISOString();
+    let basis:ResumeDocument;try{basis=structuredClone(activeDoc);}catch{setResult(null);setError('无法冻结当前内存稿，未读取对照文件。');return;}
+    const selected=target,capturedAt=new Date().toISOString();
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
     let rejectPending:((err:Error)=>void)|undefined;
     const cancel=()=>{controller.abort();rejectPending?.(new Error('已取消对照。'));};
@@ -76,16 +77,16 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
       if(request.current!==token||controller.signal.aborted)return;
       const diff=compareResumeDocuments(basis,fetched.document);
       if(request.current!==token)return;
-      setResult({key:selected.key,baselineTitle:basis.title,baselineTime:basis.updatedAt,targetTitle:fetched.document.title,targetTime:fetched.time,capturedAt,diff});
+      setResult({key:selected.key,targetDocId:fetched.document.id,targetSnapshotTime:selected.snapshot?.createdAt,baselineTitle:basis.title,baselineTime:basis.updatedAt,targetTitle:fetched.document.title,targetTime:fetched.time,capturedAt,diff});
     }catch(err){if(request.current===token)setError(localErrorMessage(err,'读取或计算差异失败。'));}
     finally{if(timer!==undefined)clearTimeout(timer);if(request.current===token){request.current=null;setBusy(false);}}
   };
-  const shown=result?.key===targetKey&&target?result:null;
+  const shown=result?.key===targetKey&&target&&result.targetDocId===target.docId&&result.targetSnapshotTime===target.snapshot?.createdAt?result:null;
   const filtered=shown?.diff.rows.filter(r=>(category==='all'||r.category===category)&&(kind==='all'||r.kind===kind))??[];
   const pageCount=Math.max(1,Math.ceil(filtered.length/PAGE)),actualPage=Math.min(page,pageCount-1);
   const changePage=(next:number)=>{setPage(next);scroll.current?.scrollTo({top:0});};
   return <div role="dialog" aria-modal="true" aria-label="只读版本差异对照" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-3" onClick={close}
-    onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}if(e.key==='Tab'){
+    onKeyDown={e=>{e.stopPropagation();if((e.ctrlKey||e.metaKey)&&['s','k','z','y'].includes(e.key.toLowerCase()))e.preventDefault();if(e.key==='Escape'){close();}if(e.key==='Tab'){
       const focusable=[...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]),select:not([disabled]),input:not([disabled]),[tabindex="0"]')].filter(el=>el.getClientRects().length>0);
       const firstEl=focusable[0],lastEl=focusable.at(-1);
       if(e.shiftKey&&document.activeElement===firstEl){e.preventDefault();lastEl?.focus();}
