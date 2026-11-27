@@ -2,13 +2,14 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {RequirementClause} from '../../lib/jobRequirements';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
-import {assertAiPreviewSettings,describeAiRequest,formatAiCompletionReceipt,requestByokCompletionWithReceipt,validateByokBaseUrl,type AiCompletionReceipt,type ByokAiSettings} from '../../lib/byokAiClient';
+import {AiTaskReceiptView,receivedAiTask,failedAiTask,type AiTaskReceipt} from './AiTaskReceiptView';
+import {assertAiPreviewSettings,describeAiRequest,requestByokCompletionWithReceipt,validateByokBaseUrl,type AiCompletionResult,type ByokAiSettings} from '../../lib/byokAiClient';
 import {collectJobAiEvidence,prepareJobAiReview,parseJobAiReview,JOB_AI_ASSESSMENTS,JOB_AI_MAX_CLAUSES,JOB_AI_MAX_EVIDENCE,type PreparedJobAiReview,type JobAiRow} from '../../lib/jobAiReview';
 
 type Props={document:ResumeDocument;slug:string;source:string;clauses:readonly RequirementClause[];disabled:boolean;onReview:(clauseId:string)=>void};
 type Basis=Pick<Props,'document'|'slug'|'source'|'clauses'>;
 type Pending={basis:Basis;settings:ByokAiSettings;prepared:PreparedJobAiReview};
-type Result={request:Pending;rows:JobAiRow[];receipt:AiCompletionReceipt|null};
+type Result={request:Pending;rows:JobAiRow[]};
 const sameSettings=(a:ByokAiSettings,b:ByokAiSettings)=>JSON.stringify(a)===JSON.stringify(b);
 const shortAssessment={supported:'支持线索',partial:'部分线索',gap:'未见依据',uncertain:'待核实','not-requirement':'非条件线索'} as const;
 const priorityHints={mandatory:'硬条件线索',preferred:'优先条件线索',unknown:'条件类型待判定','not-requirement':'非条件线索'} as const;
@@ -23,6 +24,7 @@ export function JobAiReviewPane(props:Props){
   const [settings,setSettings]=useState<ByokAiSettings|null>(null);
   const [pending,setPending]=useState<Pending|null>(null);
   const [result,setResult]=useState<Result|null>(null);
+  const [attempt,setAttempt]=useState<{basis:Basis;value:AiTaskReceipt}|null>(null);
   const [busy,setBusy]=useState<'load'|'send'|null>(null);
   const [error,setError]=useState('');
   const mounted=useRef(false),active=useRef(false),abort=useRef<AbortController|null>(null);
@@ -30,8 +32,8 @@ export function JobAiReviewPane(props:Props){
   const current=(b:Basis)=>mounted.current&&latest.current.document===b.document&&latest.current.slug===b.slug&&latest.current.source===b.source&&latest.current.clauses===b.clauses;
   const basis=():Basis=>({document,slug,source,clauses});
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;abort.current?.abort();};},[]);
-  useEffect(()=>{abort.current?.abort();setClauseIds([]);setEvidenceIds([]);setSettings(null);setPending(null);setResult(null);setError('');},[document,slug,source,clauses]);
-  const clear=()=>{setPending(null);setResult(null);setError('');};
+  useEffect(()=>{abort.current?.abort();setClauseIds([]);setEvidenceIds([]);setSettings(null);setPending(null);setResult(null);setAttempt(null);setError('');},[document,slug,source,clauses]);
+  const clear=()=>{setPending(null);setResult(null);setAttempt(null);setError('');};
   const locked=!!busy||props.disabled;
   const load=async()=>{
     if(active.current||props.disabled)return;
@@ -52,19 +54,20 @@ export function JobAiReviewPane(props:Props){
     if(!pending||active.current||locked)return;
     const req=pending;setPending(null);setResult(null);setError('');
     if(!current(req.basis)){setError('岗位原文或简历已变化，请重新预览。');return;}
-    const ctrl=new AbortController();abort.current=ctrl;active.current=true;setBusy('send');
+    const ctrl=new AbortController();abort.current=ctrl;active.current=true;setBusy('send');setAttempt(null);
+    let reply:AiCompletionResult|undefined;
     try{
       const saved=await apiClient.getAiSettings();
       if(!sameSettings(saved,req.settings))throw new Error('已保存模型档案发生变化，请重新读取并预览。');
       if(ctrl.signal.aborted||!current(req.basis))return;
-      const reply=await requestByokCompletionWithReceipt({...req.prepared.options,settings:req.settings,signal:ctrl.signal});
+      reply=await requestByokCompletionWithReceipt({...req.prepared.options,settings:req.settings,signal:ctrl.signal});
       if(ctrl.signal.aborted||!current(req.basis))return;
       const after=await apiClient.getAiSettings();
       if(!sameSettings(after,req.settings))throw new Error('模型档案已变化，旧分析未展示。');
       if(ctrl.signal.aborted||!current(req.basis))return;
-      setResult({request:req,rows:parseJobAiReview(reply.text,req.prepared),receipt:reply.receipt});
-    }catch(e){if(!ctrl.signal.aborted&&current(req.basis))setError(localErrorMessage(e,'岗位 AI 分析失败'));}
-    finally{abort.current=null;active.current=false;if(mounted.current)setBusy(null);}
+      setResult({request:req,rows:parseJobAiReview(reply.text,req.prepared)});setAttempt({basis:req.basis,value:receivedAiTask(reply)});
+    }catch(e){if(!ctrl.signal.aborted&&current(req.basis)){setAttempt({basis:req.basis,value:failedAiTask(reply,e)});setError(localErrorMessage(e,'岗位 AI 分析失败'));}}
+    finally{if(ctrl.signal.aborted&&current(req.basis))setAttempt({basis:req.basis,value:{status:'cancelled'}});abort.current=null;active.current=false;if(mounted.current)setBusy(null);}
   };
   const choose=(id:string,checked:boolean,kind:'clause'|'evidence')=>{
     clear();const setter=kind==='clause'?setClauseIds:setEvidenceIds;
@@ -84,6 +87,7 @@ export function JobAiReviewPane(props:Props){
     </div>
     <div className="flex items-center gap-2"><button type="button" disabled={locked||!settings?.enabled||!clauseIds.length||!evidenceIds.length} onClick={prepare} className="rounded bg-teal-700 px-2 py-1 font-semibold text-white disabled:opacity-40">预览岗位 AI 分析</button>{busy==='send'&&<button type="button" onClick={()=>abort.current?.abort()} className="rounded border px-2 py-1">取消岗位 AI 分析</button>}</div>
     {busy&&<p role="status">{busy==='load'?'读取本地模型档案…':'等待模型分析…'}</p>}
+    {attempt&&current(attempt.basis)&&<AiTaskReceiptView label="岗位 AI 调用回执" attempt={attempt.value}/>}
     {error&&<p role="alert" className="rounded bg-red-50 p-2 text-red-800">{error}</p>}
     {pending&&current(pending.basis)&&<section aria-label="岗位 AI 发送预览" className="space-y-2 rounded border border-amber-300 bg-amber-50 p-2">
       <strong>岗位 AI 发送前确认（尚未调用模型）</strong><p className="break-all">{pending.settings.providerLabel} · {pending.settings.model} · {validateByokBaseUrl(pending.settings.baseUrl).baseUrl}/chat/completions</p>
@@ -93,7 +97,6 @@ export function JobAiReviewPane(props:Props){
     </section>}
     {result&&current(result.request.basis)&&<section aria-label="岗位 AI 分析结果" className="space-y-2 rounded border border-teal-200 bg-teal-50/50 p-2">
       <strong>AI 建议 · {result.rows.length} 条（未经人工核对）</strong><div className="flex flex-wrap gap-1">{Object.entries(shortAssessment).map(([key,label])=><span key={key} className="rounded border bg-white px-1.5 py-1">{label} {result.rows.filter(r=>r.reviewAssessment===key).length}</span>)}</div>
-      <p aria-label="岗位 AI 调用回执" className="break-all text-slate-600">{formatAiCompletionReceipt(result.receipt)}</p>
       <p>逐字引用仅证明文字存在，不证明事实真实或满足招聘条件。未选中的自述、事实库和完整公告可能改变判断。请回到下方人工核对逐项确认。</p>
       <section aria-label="岗位待补材料清单" className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2">
         <strong>待补材料与待核实项 · {actionRows(result.rows).length} 条</strong>

@@ -3,9 +3,10 @@ import {BookOpen,ClipboardList,Sparkles} from 'lucide-react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {collectEditableBlocks} from '../../lib/resumeBlocks';
-import {assertAiPreviewSettings,requestByokCompletionWithReceipt,describeAiRequest,formatAiCompletionReceipt,validateByokBaseUrl,type ByokAiSettings,type AiCompletionReceipt} from '../../lib/byokAiClient';
+import {assertAiPreviewSettings,requestByokCompletionWithReceipt,describeAiRequest,validateByokBaseUrl,type ByokAiSettings,type AiCompletionResult} from '../../lib/byokAiClient';
 import {ASSISTANT_MODES,prepareAssistantTask,parseAssistantReply,type AssistantMode,type PreparedAssistantTask} from '../../lib/aiAssistant';
 import {formatProposalDiagnostics} from '../../lib/aiTailor';
+import {AiTaskReceiptView,receivedAiTask,failedAiTask,type AiTaskReceipt} from './AiTaskReceiptView';
 import {AI_TOOL_CATALOG,AI_SKILL_VERSION} from '../../lib/aiSkills';
 import {buildTextPatchEnvelope,previewTextPatch} from '../../lib/aiTextPatch';
 import {scanScopedProposalWarnings,type TailorBlockProposal} from '../../lib/aiTailor';
@@ -19,7 +20,7 @@ import {WORKFLOW_ACTIONS,createWorkflowSession,isWorkflowCurrent,workflowDocumen
 type Props={document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void;assertSettings:(settings:ByokAiSettings)=>void};
 type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string;records:FactRecord[];bankRevision:string|null};
 type Pending={basis:Basis;prepared:PreparedAssistantTask};
-type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>;receipt:AiCompletionReceipt|null};
+type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>};
 export function ResumeAiAssistantPane(props:Props){
   const blocks=useMemo(()=>collectEditableBlocks(props.document),[props.document]);
   const [mode,setMode]=useState<AssistantMode>('ask');
@@ -35,6 +36,7 @@ export function ResumeAiAssistantPane(props:Props){
   const [factsBusy,setFactsBusy]=useState(false);
   const [pending,setPending]=useState<Pending|null>(null);
   const [result,setResult]=useState<Result|null>(null);
+  const [attempt,setAttempt]=useState<{basis:Basis;value:AiTaskReceipt}|null>(null);
   const [accepted,setAccepted]=useState<string[]>([]);
   const [busy,setBusy]=useState(false);
   const [applying,setApplying]=useState(false);
@@ -45,6 +47,7 @@ export function ResumeAiAssistantPane(props:Props){
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const abortRef=useRef<AbortController|null>(null);
+  const activeBasis=useRef<Basis|null>(null);
   const applyRef=useRef(false);
   const mounted=useRef(false);
   const current=useRef({props,mode,goal,keys,includeJd,bank,factIds,workflow});current.current={props,mode,goal,keys,includeJd,bank,factIds,workflow};
@@ -60,7 +63,13 @@ export function ResumeAiAssistantPane(props:Props){
     await assertFreshFactSelection(b.document,{records:b.records,binding:b.bankRevision?{slug:b.slug,docId:b.document.id,bankRevision:b.bankRevision,ids:b.records.map(r=>r.id),selectedKeys:b.keys}:undefined},loadLocalFactBank);
     if(!isCurrent(b))throw new Error('事实选择或简历已变化。');
   };
-  const reset=()=>{setPending(null);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice(null);setError(null);};
+  const reset=()=>{setPending(null);setResult(null);setAttempt(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setNotice(null);setError(null);};
+  useEffect(()=>{
+    if(activeBasis.current&&!isCurrent(activeBasis.current))abortRef.current?.abort();
+    if(pending&&!isCurrent(pending.basis))setPending(null);
+    if(attempt&&!isCurrent(attempt.basis))setAttempt(null);
+    if(result&&!isCurrent(result.request.basis)){setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);renderAbort.current?.abort();}
+  },[props.document,props.slug,props.settings,props.jdText,props.overflowPx,mode,goal,keys,includeJd,bank,factIds]);
   const workflowCurrent=workflow?isWorkflowCurrent(workflow,props.document,props.slug,props.settings,props.jdText):false;
   const canPrepare=(!workflow||workflow.stage==='active')&&(!workflow||workflowCurrent);
   const moveWorkflow=async()=>{
@@ -103,20 +112,22 @@ export function ResumeAiAssistantPane(props:Props){
     if(!pending||abortRef.current||applyRef.current||factsBusy||rendering)return;
     const req=pending;setPending(null);
     if(!isCurrent(req.basis)){setError('任务范围或模型已经变化，请重新预览。');return;}
-    const ctrl=new AbortController();abortRef.current=ctrl;setBusy(true);setError(null);
+    const ctrl=new AbortController();abortRef.current=ctrl;activeBasis.current=req.basis;setBusy(true);setError(null);setAttempt(null);
+    let response:AiCompletionResult|undefined;
     try{
       await assertFactsFresh(req.basis);
       if(ctrl.signal.aborted||!isCurrent(req.basis))return;
-      const response=await requestByokCompletionWithReceipt({...req.prepared.options,settings:req.basis.settings,signal:ctrl.signal});
+      response=await requestByokCompletionWithReceipt({...req.prepared.options,settings:req.basis.settings,signal:ctrl.signal});
       if(ctrl.signal.aborted)return;
       if(!isCurrent(req.basis))throw new Error('任务目标或简历已变化，旧结果未采纳。');
       await assertFactsFresh(req.basis);
-      if(ctrl.signal.aborted)return;
-      const reply=parseAssistantReply(response.text,req.prepared);setResult({request:req,reply,receipt:response.receipt});setAccepted([]);
+      if(ctrl.signal.aborted||!isCurrent(req.basis))return;
+      const reply=parseAssistantReply(response.text,req.prepared);setResult({request:req,reply});setAccepted([]);
+      setAttempt({basis:req.basis,value:reply.kind==='proposals'&&!reply.proposals.length?failedAiTask(response):receivedAiTask(response)});
       if(reply.kind==='workflow')setWorkflow(createWorkflowSession({document:req.basis.document,slug:req.basis.slug,settings:req.basis.settings,goal:req.basis.goal,jdText:req.basis.jdText,steps:reply.steps}));
       if(reply.kind==='proposals'&&!reply.proposals.length)setNotice('未返回可用正文提案；不代表简历已达到目标。');
-    }catch(err){if(mounted.current)setError(localErrorMessage(err,'AI 任务失败'));}
-    finally{if(abortRef.current===ctrl){abortRef.current=null;if(mounted.current)setBusy(false);}}
+    }catch(err){if(isCurrent(req.basis)&&!ctrl.signal.aborted){setAttempt({basis:req.basis,value:failedAiTask(response,err)});setError(localErrorMessage(err,'AI 任务失败'));}}
+    finally{if(abortRef.current===ctrl){if(ctrl.signal.aborted&&isCurrent(req.basis))setAttempt({basis:req.basis,value:{status:'cancelled'}});abortRef.current=null;activeBasis.current=null;if(mounted.current)setBusy(false);}}
   };
   const toggle=(p:TailorBlockProposal,checked:boolean)=>{
     if(p.suggestedText.includes(PRIVACY_PLACEHOLDER))return;
@@ -168,7 +179,7 @@ export function ResumeAiAssistantPane(props:Props){
       await apiClient.createSnapshot(props.slug,'AI 协作任务前快照',revision);
       await assertFactsFresh(request.basis).catch(err=>{setReview(null);setPdfConfirmed(false);throw err;});
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
-      props.onImmediateChange(next);setResult(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setFactIds([]);
+      props.onImmediateChange(next);setResult(null);setAttempt(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setFactIds([]);
       if(session)setWorkflow(finishWorkflowStep(session,next,'applied'));
       setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');
     }catch(err){if(mounted.current)setError(localErrorMessage(err,'提案应用失败'));}
@@ -207,7 +218,8 @@ export function ResumeAiAssistantPane(props:Props){
     {busy&&<div className="flex items-center justify-between"><span>正在运行模型任务…</span><button type="button" onClick={()=>abortRef.current?.abort()} className="rounded border px-2 py-1">取消自由任务</button></div>}
     {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800">{error}</div>}
     {notice&&<div role="status" className="rounded bg-teal-50 p-2 text-teal-800">{notice}</div>}
-    {result&&<p aria-label="自由任务调用回执" className="break-all rounded border border-slate-200 bg-white p-2 text-[10px] text-slate-600">{formatAiCompletionReceipt(result.receipt)}</p>}
+    {attempt&&isCurrent(attempt.basis)&&<AiTaskReceiptView label="自由任务调用回执" attempt={attempt.value}/>}
+
     {pending&&<section aria-label="自由任务发送预览" className="rounded border border-amber-300 bg-amber-50 p-2 space-y-2">
       <div className="font-bold">自由任务发送前确认</div><div className="break-all">{pending.basis.settings.providerLabel} · {pending.basis.settings.model} · {validateByokBaseUrl(pending.basis.settings.baseUrl).baseUrl}/chat/completions</div><p>{describeAiRequest(pending.basis.settings,pending.prepared.options)}</p>
       {pending.basis.records.length>0&&<div aria-label="本次外发事实清单" className="max-h-40 overflow-auto space-y-1 rounded border border-amber-200 bg-white p-2"><div className="font-semibold">本次明确外发 {pending.basis.records.length} 条本人确认事实（证据位置不外发）</div>{pending.prepared.blocks.flatMap(b=>pending.prepared.sourceMap[b.key]??[]).filter(s=>s.scope==='record').map(s=><div key={s.id} className="border-t pt-1"><div className="font-mono text-teal-800">{s.id} · 本人确认</div><div className="whitespace-pre-wrap break-words">{s.facts}</div></div>)}</div>}

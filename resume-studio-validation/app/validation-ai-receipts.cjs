@@ -31,6 +31,7 @@ global.fetch=async(url,init)=>{
   if(kind==='whole')content=mode==='reject'?'非 JSON 文本':mode==='empty'?'[]':JSON.stringify([{blockKey:user.blocks[0].blockKey,suggestedText:user.blocks[0].text+'\n- 合成资料复核。',reason:'合成候选',factIds:[user.blocks[0].sources[0].id]}]);
   if(kind==='layout')content=mode==='reject'?'非法版式格式':JSON.stringify({reason:'合成微调',changes:{pagePadding:24,baseFontSize:14,lineHeight:1.2}});
   if(kind==='career')content=mode==='reject'?'【隐私已省略】':'感谢审阅。\n'+user.draftText;
+  if(kind==='assistant')content=mode==='reject'?'无效 JSON':JSON.stringify([{blockKey:user.toolResults.list_visible_blocks[0].blockKey,suggestedText:user.toolResults.list_visible_blocks[0].text+'\n- 合成资料复核。',reason:'合成自由任务候选',factIds:[user.toolResults.inspect_block_facts[0].sources[0].id]}]);
   const usage=mode==='unknown'?{}:{prompt_tokens:321,completion_tokens:123,total_tokens:444,prompt_tokens_details:{cached_tokens:32}};
   return new Response(JSON.stringify({model:mode==='unknown'?undefined:'synthetic-returned-model',usage,choices:[{finish_reason:mode==='limit'?'length':'stop',message:{content}}]}),{status:200});
 };
@@ -39,6 +40,7 @@ const configs={
   single:{tab:'单段精修',prepare:'生成润色对比 Diff',preview:'[aria-label="AI 数据发送预览"]',confirm:'确认发送给模型',cancelPreview:'取消发送',cancel:'取消单段请求',receipt:'单段调用回执',candidate:'原文 vs 建议 Diff 审阅'},
   whole:{tab:'整卷 JD 改写',prepare:'生成整卷 JD 定向提案',preview:'[aria-label="AI 数据发送预览"]',confirm:'确认发送给模型',cancelPreview:'取消发送',cancel:'取消',receipt:'整卷调用回执',candidate:'合成候选'},
   layout:{tab:'AI 版式优化',prepare:'预览版式请求',preview:'[aria-label="版式 AI 数据发送预览"]',confirm:'确认发送版式请求',cancelPreview:'取消发送',cancel:'取消版式任务',receipt:'版式调用回执',candidate:'版式候选（尚未应用）'},
+  assistant:{tab:'AI 自由任务',prepare:'预览 AI 自由任务',preview:'[aria-label="自由任务发送预览"]',confirm:'确认发送自由任务',cancelPreview:'取消预览',cancel:'取消自由任务',receipt:'自由任务调用回执',candidate:'合成自由任务候选'},
   career:{prepare:'预览文案精修请求',preview:'[aria-label="文案 AI 数据发送预览"]',confirm:'确认发送文案给模型',cancelPreview:'取消文案发送',cancel:'取消文案请求',receipt:'文案调用回执',candidate:'候选文案（本地还原）'},
 };
 async function run(){
@@ -67,6 +69,7 @@ async function run(){
     await click(configs[kind].tab);
     if(kind==='whole')await setValue('textarea[placeholder^="请在此或"]','合成岗位：实验教学经验优先');
     if(kind==='layout')await setValue('textarea[aria-label="AI 版式目标"]','合成：适度紧凑');
+    if(kind==='assistant'){await click('协作改写');await setValue('textarea[aria-label="AI 自由任务目标"]','检查合成教育经历');}
   };
   const prepare=async kind=>{
     const c=configs[kind],n=report.calls;await click(c.prepare);
@@ -107,7 +110,7 @@ async function run(){
     obs.calls=active.calls;obs.aborted=!!active.aborted;active=null;
     await verifyDisk();write();
   };
-  for(const kind of ['single','whole','layout','career']){
+  for(const kind of ['single','whole','layout','assistant','career']){
     await enter(kind);
     await evaluate(kind,'success');
     await evaluate(kind,'reject');

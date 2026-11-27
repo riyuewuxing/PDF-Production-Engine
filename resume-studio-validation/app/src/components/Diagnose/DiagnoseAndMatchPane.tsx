@@ -35,7 +35,6 @@ import {
   assertAiPreviewSettings,
   describeAiRequest,
   requestByokCompletionWithReceipt,
-  formatAiCompletionReceipt,
   DEFAULT_BYOK_SETTINGS,
   type PolishMode,
   computeLineDiff,
@@ -115,8 +114,9 @@ export function DiagnoseAndMatchPane({
   const [profileBusy,setProfileBusy]=useState(false);
   const [testingConnection,setTestingConnection]=useState(false);
   const [connectionTip,setConnectionTip]=useState<string|null>(null);
-  useEffect(()=>{setConnectionTip(null);},[aiSettings]);
+  const [connectionAttempt,setConnectionAttempt]=useState<{settings:ByokAiSettings;value:AiTaskReceipt}|null>(null);
   const testAbort=useRef<AbortController|null>(null);
+  useEffect(()=>{setConnectionTip(null);setConnectionAttempt(null);testAbort.current?.abort();},[aiSettings,subTab]);
   const [settingsSavedMsg, setSettingsSavedMsg] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [showAiConfig, setShowAiConfig] = useState(false);
@@ -311,17 +311,17 @@ export function DiagnoseAndMatchPane({
 
   const testConnection=async()=>{
     if(testAbort.current||profileBusy||polishing||tailoring)return;
-    setConnectionTip(null);setSettingsError(null);
-    let ctrl:AbortController|undefined;
+    setConnectionTip(null);setConnectionAttempt(null);setSettingsError(null);
+    let ctrl:AbortController|undefined,response:AiCompletionResult|undefined;
     const settings=aiSettings;
     try{
       const options=connectionProbeOptions(settings);
       assertPreviewSettings(settings,options);
       ctrl=new AbortController();testAbort.current=ctrl;setTestingConnection(true);
-      const result=await requestByokCompletionWithReceipt({...options,settings,signal:ctrl.signal});
-      if(mountedRef.current&&contextRef.current.aiSettings===settings&&!ctrl.signal.aborted)setConnectionTip((result.text.trim()==='OK'?'连接成功 · 合成探针返回 OK':'连接成功 · 收到非空文本（尚未验证其他能力）')+'。'+formatAiCompletionReceipt(result.receipt));
-    }catch(err){if(mountedRef.current)setSettingsError(err instanceof Error?err.message:'连接测试失败。');}
-    finally{if(testAbort.current===ctrl){testAbort.current=null;if(mountedRef.current)setTestingConnection(false);}}
+      response=await requestByokCompletionWithReceipt({...options,settings,signal:ctrl.signal});
+      if(mountedRef.current&&contextRef.current.aiSettings===settings&&contextRef.current.subTab==='ai'&&!ctrl.signal.aborted){setConnectionTip(response.text.trim()==='OK'?'连接成功 · 合成探针返回 OK':'连接成功 · 收到非空文本（尚未验证其他能力）');setConnectionAttempt({settings,value:receivedAiTask(response)});}
+    }catch(err){if(mountedRef.current&&contextRef.current.aiSettings===settings&&contextRef.current.subTab==='ai'&&!ctrl?.signal.aborted){if(ctrl)setConnectionAttempt({settings,value:failedAiTask(response,err)});setSettingsError(err instanceof Error?err.message:'连接测试失败。');}}
+    finally{if(testAbort.current===ctrl){if(ctrl?.signal.aborted&&mountedRef.current&&contextRef.current.aiSettings===settings&&contextRef.current.subTab==='ai')setConnectionAttempt({settings,value:{status:'cancelled'}});testAbort.current=null;if(mountedRef.current)setTestingConnection(false);}}
   };
   const handlePreparePolish = () => {
     if (!selectedBlock || applyingRef.current || polishing || factsBusy) return;
@@ -996,6 +996,7 @@ export function DiagnoseAndMatchPane({
                     <p className="text-[10px] text-slate-500">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），输出上限为64或1024 tokens，并受档案上限约束。</p>
                     <div className="flex items-center gap-2"><button type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50">测试模型连接</button>{testingConnection&&<button type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1">取消连接测试</button>}</div>
                     {connectionTip&&<p role="status" className="text-emerald-700">{connectionTip}</p>}
+                     {connectionAttempt?.settings===aiSettings&&<AiTaskReceiptView label="连接测试调用回执" attempt={connectionAttempt.value}/>}
                   </div>
                 </div>
               )}
