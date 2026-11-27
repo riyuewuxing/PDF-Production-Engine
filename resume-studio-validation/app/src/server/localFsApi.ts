@@ -1582,8 +1582,14 @@ export async function ensureInitialDataFromLegacy(options: {
   const hasMaster = await pathEntryExists(masterPath);
   const hasResume = await pathEntryExists(resumePath);
 
-  if (!options.force && hasMaster && hasResume) {
-    return { initialized: false, masterPath, resumePath };
+  // A missing default version is not permission to reconstruct it from the
+  // preserved legacy source. Normal startup initializes only an empty live workspace.
+  if (!options.force) {
+    if (hasMaster || hasResume) return { initialized: false, masterPath, resumePath };
+    const existingList = await store.listResumes();
+    if (existingList.master || existingList.resumes.length > 0 || existingList.issues?.length) {
+      return { initialized: false, masterPath, resumePath };
+    }
   }
 
   // Explicit force still does not authorize replacing a linked file.
@@ -1593,9 +1599,11 @@ export async function ensureInitialDataFromLegacy(options: {
   }
 
   if (!(await pathEntryExists(legacyFile))) {
-    const existingList = await store.listResumes();
-    if (existingList.master || existingList.resumes.length > 0 || existingList.issues?.length) {
-      return { initialized: false, masterPath, resumePath };
+    if (options.force) {
+      const existingList = await store.listResumes();
+      if (existingList.master || existingList.resumes.length > 0 || existingList.issues?.length) {
+        return { initialized: false, masterPath, resumePath };
+      }
     }
     const nowIso = new Date().toISOString();
     const starterDoc = ResumeDocumentSchema.parse({
