@@ -1,0 +1,89 @@
+name: Resume Studio T49 actual early/current binary upgrade and isolated rollback
+on:
+  push:
+    branches: ['resume-studio/v6-upgrade-rollback-turn49']
+permissions:
+  contents: read
+jobs:
+  upgrade:
+    runs-on: windows-latest
+    timeout-minutes: 28
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: '7e390c4b64143d39632071a07d6eccd7beded9d8'
+          path: t49-old-synthetic
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Build earlier public synthetic portable
+        timeout-minutes: 9
+        working-directory: t49-old-synthetic/resume-studio-validation/app
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'resume-studio-validation/app/scripts/generate-icon.cjs') -Destination 'scripts/generate-icon.cjs'
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          & .\node_modules\.bin\electron.cmd .\scripts\generate-icon.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec electron-builder --win --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build current portable candidate
+        timeout-minutes: 9
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\node_modules\.bin\electron.cmd .\scripts\generate-icon.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:pack
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify real locked replacement preserves both binaries
+        timeout-minutes: 2
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 't49-upgrade-evidence'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $old = Join-Path $env:GITHUB_WORKSPACE 't49-old-synthetic/resume-studio-validation/app/release/Resume Studio.exe'
+          $new = (Resolve-Path 'Resume Studio.exe').Path
+          $script = (Resolve-Path 'scripts/postpack-win.mjs').Path
+          $dir = Join-Path $env:RUNNER_TEMP ('t49-lock-'+[guid]::NewGuid().ToString())
+          New-Item -ItemType Directory -Path (Join-Path $dir 'release') -Force | Out-Null
+          $target = Join-Path $dir 'Resume Studio.exe'
+          $source = Join-Path $dir 'release/Resume Studio.exe'
+          Copy-Item -LiteralPath $old -Destination $target
+          Copy-Item -LiteralPath $new -Destination $source
+          $beforeOld=(Get-FileHash -LiteralPath $target).Hash
+          $beforeNew=(Get-FileHash -LiteralPath $source).Hash
+          $lock=[IO.File]::Open($target,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)
+          Push-Location $dir
+          try { $PSNativeCommandUseErrorActionPreference=$false; & node $script *> (Join-Path $out 'locked-replacement.log'); $code=$LASTEXITCODE } finally { Pop-Location; $lock.Dispose() }
+          if ($code -eq 0 -or (Get-FileHash -LiteralPath $target).Hash -ne $beforeOld -or (Get-FileHash -LiteralPath $source).Hash -ne $beforeNew) { throw 'locked replacement lost or replaced binary' }
+          [ordered]@{exitCode=$code;oldPreserved=$true;newPreserved=$true;oldSha256=$beforeOld.ToLower();newSha256=$beforeNew.ToLower()} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $out 'locked-replacement.json')
+          Remove-Item -LiteralPath $dir -Recurse -Force
+      - name: Actual old binary, upgrade copy and isolated rollback
+        timeout-minutes: 6
+        run: |
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 't49-upgrade-evidence'
+          $env:RESUME_STUDIO_T49_OLD_EXE = Join-Path $env:GITHUB_WORKSPACE 't49-old-synthetic/resume-studio-validation/app/release/Resume Studio.exe'
+          $env:RESUME_STUDIO_T49_OLD_FIXTURE = Join-Path $env:GITHUB_WORKSPACE 't49-old-synthetic/resume-studio-validation/app/runner-fixture.json'
+          node validation-upgrade-turn49.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload synthetic evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t49-upgrade-evidence
+          path: t49-upgrade-evidence/
+          if-no-files-found: warn
+          retention-days: 3
