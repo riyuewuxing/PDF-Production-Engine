@@ -370,6 +370,67 @@ async function listInstalledSystemFonts(): Promise<SystemFontResult> {
   return cachedSystemFonts;
 }
 
+// A managed portrait must be read and decoded before its receipt can be green.
+// Freeze the bytes used for rendering; keep the original document for history.
+// The local Chromium decoder also supports WebP, unlike nativeImage on some
+// platforms. The script contains only a serialized data URL and fixed logic.
+async function prepareManagedExportPortrait(
+  doc: ResumeDocument,
+  ext: 'pdf' | 'png' | 'docx' | 'md' | 'html',
+): Promise<{ document: ResumeDocument; warning?: string }> {
+  const photo = doc.basic.photo.trim();
+  if (ext === 'md' || !doc.basic.photoConfig.visible ||
+      !doc.menuSections.some(s => s.id === 'basic' && s.enabled) ||
+      !photo.startsWith('/api/assets/')) return { document: doc };
+  const omit = (reason: string) => ({
+    document: { ...doc, basic: { ...doc.basic, photo: '' } },
+    warning: '可见的本地头像资源' + reason + '，导出成品可能缺少照片。请检查成品、恢复头像或明确隐藏照片后再投递。',
+  });
+  let asset: Awaited<ReturnType<LocalResumeStore['readAsset']>>;
+  try {
+    asset = await store.readAsset(decodeURIComponent(photo.slice('/api/assets/'.length)));
+  } catch {
+    return omit('无法读取');
+  }
+  const { buffer, mimeType } = asset;
+  if (!buffer.length || !['image/png', 'image/jpeg', 'image/webp'].includes(mimeType)) {
+    return omit('无法解码');
+  }
+  const source = 'data:' + mimeType + ';base64,' + buffer.toString('base64');
+  const convert = mimeType === 'image/webp' && (ext === 'docx' || ext === 'html');
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return omit('无法解码');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const decoded = await Promise.race([
+      win.webContents.executeJavaScript(`(async()=>{
+        const image=new Image();
+        image.src=${JSON.stringify(source)};
+        await image.decode();
+        if (!image.naturalWidth || !image.naturalHeight) return null;
+        if (!${JSON.stringify(convert)}) return true;
+        // Bound the intermediate raster used for conversion.
+        if (image.naturalWidth * image.naturalHeight > 16000000) return null;
+        const canvas=document.createElement('canvas');
+        canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+        const ctx=canvas.getContext('2d');
+        if(!ctx)return null;
+        ctx.drawImage(image,0,0);
+        return canvas.toDataURL('image/png');
+      })()`),
+      new Promise<null>(resolve => { timer=setTimeout(() => resolve(null), 8000); }),
+    ]);
+    if (convert ? typeof decoded !== 'string' || !decoded.startsWith('data:image/png;base64,') : decoded !== true) {
+      return omit('无法解码');
+    }
+    return { document: { ...doc, basic: { ...doc.basic, photo: convert ? decoded as string : source } } };
+  } catch {
+    return omit('无法解码');
+  } finally {
+    if(timer) clearTimeout(timer);
+  }
+}
+
 async function resolveDocxPhotoOptions(doc: ResumeDocument): Promise<DocxExportOptions | undefined> {
   if (!doc.menuSections.some(s => s.id === 'basic' && s.enabled) || !doc.basic.photoConfig.visible) return undefined;
   const rawPhoto = doc.basic.photo.trim();
@@ -684,18 +745,9 @@ function registerIpcHandlers(): void {
       explicitPath = true;
     }
 
-    // These four formats can contain the visible portrait. Markdown does
-    // not. Check only managed local references; never read a hidden portrait.
-    let contentWarning:string|undefined;
-    const photo=targetDoc.basic.photo.trim();
-    if(spec.ext!=='md'&&targetDoc.basic.photoConfig.visible&&targetDoc.menuSections.some(s=>s.id==='basic'&&s.enabled)&&photo.startsWith('/api/assets/')){
-      try{
-        await store.readAsset(decodeURIComponent(photo.slice('/api/assets/'.length)));
-      }catch{
-        contentWarning='可见的本地头像资源无法读取，导出成品可能缺少照片。请检查成品、恢复头像或明确隐藏照片后再投递。';
-      }
-    }
-    const content = await spec.produce(targetDoc);
+    const prepared = await prepareManagedExportPortrait(targetDoc, spec.ext);
+    const contentWarning = prepared.warning;
+    const content = await spec.produce(prepared.document);
     const writtenPath = explicitPath ? await writeFileSafely(targetPath, content) : await writeUniqueExportFile(targetPath, content);
     await rememberOutput(writtenPath);
 

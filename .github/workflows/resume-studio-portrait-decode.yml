@@ -7,7 +7,7 @@ permissions:
 jobs:
   decode:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 13
     defaults:
       run:
         working-directory: resume-studio-validation/app
@@ -39,8 +39,32 @@ jobs:
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-decode-' + [guid]::NewGuid().ToString())
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'portrait-decode'
-          $env:PORTRAIT_EXPECT = 'baseline'
+          $env:PORTRAIT_EXPECT = 'fixed'
           & .\node_modules\.bin\electron.cmd .\validation-portrait-decode.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full Windows unit regression
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'portrait-decode'
+          pnpm exec vitest run --reporter=json --outputFile="$out/candidate-vitest.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Previous missing and linked portrait regression
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-contained-export-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'portrait-decode/previous'
+          & .\node_modules\.bin\electron.cmd .\validation-managed-export.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install pinned PDF audit dependency
+        timeout-minutes: 2
+        run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.7
+      - name: Audit previous and new actual output files
+        timeout-minutes: 2
+        run: |
+          python validation-managed-export-audit.py --root (Join-Path $env:GITHUB_WORKSPACE 'portrait-decode/previous') --runner-sha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python validation-portrait-decode-audit.py --root (Join-Path $env:GITHUB_WORKSPACE 'portrait-decode') --runner-sha $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload actual evidence
         if: always()
