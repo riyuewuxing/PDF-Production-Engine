@@ -209,6 +209,51 @@ async function run() {
     await capture('warm-ui-export-complete');
     assert.equal(sha(fs.readFileSync(disk)),originalDisk,'UI export altered document');
     checks.realUiPdfExport=true;
+
+    // Exercise the supported minimum native window size and actual keyboard events.
+    win.setSize(1080,720); await sleep(450);
+    const narrow=await js('({width:innerWidth,height:innerHeight})');
+    assert.ok(narrow.width<=1080&&narrow.height<=720,'minimum window resize did not take effect');
+    results.narrow={viewport:narrow,themes:{}};
+    for(const id of ['classic','dark','light','warm']){
+      await selectTheme(id);
+      const c=await inspectChrome(id);
+      const layout=await js(`(()=>{
+        const h=document.querySelector('[data-studio-surface="header"]');
+        const box=h.getBoundingClientRect();
+        return [...h.querySelectorAll('button,select')].filter(e=>e.getClientRects().length>0).map(e=>{
+          const r=e.getBoundingClientRect();return {name:e.getAttribute('aria-label')||e.innerText||e.title,
+            visible:r.width>0&&r.height>0&&r.left>=box.left-1&&r.right<=box.right+1&&r.top>=box.top-1&&r.bottom<=box.bottom+1};
+        });
+      })()`);
+      assert.ok(layout.length>5&&layout.every(e=>e.visible),'header control clipped at minimum size '+id+': '+JSON.stringify(layout.filter(e=>!e.visible)));
+      results.narrow.themes[id]={chrome:c,controls:layout.length,sheet:await captureSheet('minimum-'+id)};
+      await capture('minimum-'+id);
+    }
+    const focus=await js(`(()=>{const e=document.querySelector('select[aria-label="切换工作台主题"]');e.focus();return document.activeElement===e})()`);
+    assert.ok(focus,'theme selector keyboard focus unavailable');
+    await capture('minimum-keyboard-focus');
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Home'});
+    win.webContents.sendInputEvent({type:'keyUp',keyCode:'Home'});
+    await until('keyboard native select Home classic',()=>js('document.querySelector(".studio-shell")?.dataset.studioTheme==="classic"'),6000);
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'End'});
+    win.webContents.sendInputEvent({type:'keyUp',keyCode:'End'});
+    await until('keyboard native select End warm',()=>js('document.querySelector(".studio-shell")?.dataset.studioTheme==="warm"'),6000);
+    checks.minimumKeyboardSelect=true;
+    await clickByAria('更多导出格式');
+    await until('minimum export menu open',()=>js('!!document.querySelector("[role=menu]")'));
+    const menu=await js(`(()=>{const r=document.querySelector('[role=menu]').getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight}})()`);
+    results.narrow.menu=menu;
+    assert.ok(menu.left>=0&&menu.right<=menu.width+1&&menu.top>=0&&menu.bottom<=menu.height+1,'minimum menu outside viewport');
+    await capture('minimum-export-menu');await clickByAria('更多导出格式');
+    await clickByAria('设置自定义脱敏敏感词');
+    await until('minimum privacy popover open',()=>js('!!document.querySelector(\'[aria-label="脱敏敏感词设置"]\')'));
+    const pop=await js(`(()=>{const r=document.querySelector('[aria-label="脱敏敏感词设置"]').getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight}})()`);
+    results.narrow.privacy=pop;
+    assert.ok(pop.left>=0&&pop.right<=pop.width+1&&pop.top>=0&&pop.bottom<=pop.height+1,'minimum privacy popover outside viewport');
+    await capture('minimum-privacy-popover');await clickByAria('设置自定义脱敏敏感词');
+    assert.equal(sha(fs.readFileSync(disk)),originalDisk,'minimum controls changed document');
+    checks.minimumViewport=true;
   }
   fs.writeFileSync(path.join(out,'result-'+phase+'.json'),JSON.stringify({phase,runnerSha:process.env.GITHUB_SHA||null,checks,results,diskHash:originalDisk},null,2));
   console.log(JSON.stringify({phase,checks,results},null,2));
