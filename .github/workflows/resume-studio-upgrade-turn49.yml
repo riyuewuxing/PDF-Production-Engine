@@ -71,6 +71,7 @@ jobs:
           if ($code -eq 0 -or (Get-FileHash -LiteralPath $target).Hash -ne $beforeOld -or (Get-FileHash -LiteralPath $source).Hash -ne $beforeNew) { throw 'locked replacement lost or replaced binary' }
           [ordered]@{exitCode=$code;oldPreserved=$true;newPreserved=$true;oldSha256=$beforeOld.ToLower();newSha256=$beforeNew.ToLower()} | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $out 'locked-replacement.json')
           Remove-Item -LiteralPath $dir -Recurse -Force
+          exit 0
       - name: Actual old binary, upgrade copy and isolated rollback
         timeout-minutes: 6
         run: |
