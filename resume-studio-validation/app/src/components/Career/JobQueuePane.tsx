@@ -139,7 +139,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
     }
   };
   const execute=async(task:JobQueueTask,action:JobQueueCommand['action'])=>{
-    if(!supportsExecution||!ready||redacted||readRef.current||writeRef.current||candidate||!ledger.data.revision||!isReady(ledger.data.revision))return;
+    if(!supportsExecution||!ready||redacted||readRef.current||writeRef.current||candidate||workflowCandidate||!ledger.data.revision||!isReady(ledger.data.revision))return;
     writeRef.current=true;setBusy('execute');setMessage(null);setCheck(null);
     const watchdog=setTimeout(()=>{if(mounted.current&&!scope.current.redacted)setMessage({error:true,text:'等待任务回执超过10秒；结果未确认，不会自动重试。请勿重复提交。'});},10000);
     try{

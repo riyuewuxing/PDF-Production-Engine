@@ -1,11 +1,11 @@
-import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
+import {useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {verifyQueueWorkflowOpen} from '../../lib/jobQueueWorkflow';
 import {generateCoverLetterBundle} from '../../lib/jobToolkit';
 import {visibleBasicValue} from '../../lib/aiContext';
 import {resolveCoverLetterHeaderVariant} from '../../lib/careerExporter';
-import {PdfArtifactReceiptSchema,type JobQueueOpenResult,type SavedCoverLetter,type JobApplication} from '../../schema/applicationSchema';
+import {PdfArtifactReceiptSchema,SavedCoverLetterSchema,type JobQueueOpenResult,type JobApplication} from '../../schema/applicationSchema';
 import {JobRequirementsPane} from '../Diagnose/JobRequirementsPane';
 import {InterviewPracticePane} from './InterviewPracticePane';
 import {QuickLogApplicationModal,type FrozenPdfExportSnapshot} from './QuickLogApplicationModal';
@@ -25,7 +25,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
   const [invalid,setInvalid]=useState(false);
   const [snapshot,setSnapshot]=useState<FrozenPdfExportSnapshot|null>(null),[logOpen,setLogOpen]=useState(false);
   const mounted=useRef(false),action=useRef(false),readBusy=useRef(false);
-  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  useLayoutEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const clean=ledger.ready&&!ledger.loading&&!ledger.saving&&!ledger.dirty&&!ledger.error&&!!ledger.data.revision;
   const bundle=useMemo(()=>generateCoverLetterBundle(document,{company:task.company,role:task.role}),[document,task]);
   const [letter,setLetter]=useState(bundle.coverLetterText),[letterTitle,setLetterTitle]=useState('');
@@ -64,7 +64,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
   const saveLetter=()=>void run(async()=>{
     await verify();
     if(!letter.trim()||letter.length>50000)throw Error('自荐信正文须为非空且不超过50000字符。');
-    const entry:SavedCoverLetter={id:crypto.randomUUID(),queueTaskId:task.id,title:letterTitle.trim()||task.company+'-'+task.role+'-'+new Date().toISOString().slice(0,10),company:task.company,role:task.role,resumeSlug:task.slug,bodyText:letter,headerVariant,updatedAt:new Date().toISOString()};
+    const entry=SavedCoverLetterSchema.parse({id:crypto.randomUUID(),queueTaskId:task.id,title:letterTitle.trim()||task.company+'-'+task.role+'-'+new Date().toISOString().slice(0,10),company:task.company,role:task.role,resumeSlug:task.slug,bodyText:letter,headerVariant,updatedAt:new Date().toISOString()});
     if(!careerLedger.update(d=>({...d,coverLetters:[entry,...d.coverLetters]})))throw Error('台账未就绪，未保存。');
     await careerLedger.flush();
     const saved=careerLedger.getSnapshot();
@@ -81,7 +81,9 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
     const doc=await verify();setSnapshot(null);setLogOpen(false);
     // Pass the verified disk document, not a mutable editor draft; the existing
     // desktop PDF producer creates its normal history and actual byte receipt.
-    const result=await apiClient.exportPdf({slug:task.slug,document:doc,saveAs:false,skipSave:false});
+    const revision=careerLedger.getSnapshot().data.revision;
+    if(!revision)throw Error('缺少已确认台账版本。');
+    const result=await apiClient.exportPdf({slug:task.slug,document:doc,saveAs:false,skipSave:false,queueScope:{taskId:task.id,ledgerRevision:revision}});
     if(!mounted.current)return;
     if(result.canceled){setNotice('已取消导出。');return;}
     const receipt=PdfArtifactReceiptSchema.safeParse(result.pdfReceipt);

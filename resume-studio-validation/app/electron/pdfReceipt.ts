@@ -72,23 +72,23 @@ export async function canCheckRecordedRealPdf(file:string,real:string,exportsDir
   return isPathInside(root,real)&&path.relative(expected,real)==='';
 }
 
-type BoundReceipt={filePath:string;slug:string;receipt:PdfArtifactReceipt;expires:number};
+type BoundReceipt={filePath:string;slug:string;receipt:PdfArtifactReceipt;expires:number;queueTaskId?:string};
 export class PdfReceiptVault{
   private entries=new Map<string,BoundReceipt>();
   constructor(private now=()=>Date.now()){}
-  async issue(filePath:string,slug:string,document:unknown,bytes:Buffer,signal?:AbortSignal,allowReal?:(real:string)=>Promise<boolean>):Promise<{pdfReceipt:PdfArtifactReceipt;pdfReceiptToken:string}>{
+  async issue(filePath:string,slug:string,document:unknown,bytes:Buffer,signal?:AbortSignal,allowReal?:(real:string)=>Promise<boolean>,queueTaskId?:string):Promise<{pdfReceipt:PdfArtifactReceipt;pdfReceiptToken:string}>{
     if(!Buffer.isBuffer(bytes)||bytes.length>MAX_RECEIPT_PDF_BYTES||bytes.subarray(0,5).toString('ascii')!=='%PDF-'||!slug)throw Error('PDF 输出不支持建立字节凭证。');
     const pdfReceipt=PdfArtifactReceiptSchema.parse({sha256:createHash('sha256').update(bytes).digest('hex'),sizeBytes:bytes.length,documentSha256:documentSha256(document),exportedAt:new Date(this.now()).toISOString()});
     if(checkFingerprint(await readPdfFingerprint(filePath,signal,allowReal),pdfReceipt).status!=='verified')throw Error('PDF 文件已写出，但落盘字节未能确认与生成内容相同。');
     const token=randomUUID(),now=this.now();
     for(const [id,value] of this.entries)if(value.expires<=now)this.entries.delete(id);
     while(this.entries.size>=128){const first=this.entries.keys().next().value;if(first===undefined)break;this.entries.delete(first);}
-    this.entries.set(token,{filePath,slug,receipt:pdfReceipt,expires:now+24*60*60*1000});
+    this.entries.set(token,{filePath,slug,receipt:pdfReceipt,expires:now+24*60*60*1000,queueTaskId});
     return {pdfReceipt:{...pdfReceipt},pdfReceiptToken:token};
   }
-  resolve(token:unknown,filePath:string,slug:string,document:unknown):PdfArtifactReceipt{
+  resolve(token:unknown,filePath:string,slug:string,document:unknown,queueTaskId?:string):PdfArtifactReceipt{
     const entry=typeof token==='string'?this.entries.get(token):undefined;
-    if(!entry||entry.expires<=this.now()||entry.filePath!==filePath||entry.slug!==slug||entry.receipt.documentSha256!==documentSha256(document))throw Error('PDF 导出凭证已失效或与路径、版本、封存原稿不一致，请重新导出。');
+    if(!entry||entry.expires<=this.now()||entry.filePath!==filePath||entry.slug!==slug||entry.queueTaskId!==queueTaskId||entry.receipt.documentSha256!==documentSha256(document))throw Error('PDF 导出凭证已失效或与路径、版本、封存原稿不一致，请重新导出。');
     return {...entry.receipt};
   }
 }

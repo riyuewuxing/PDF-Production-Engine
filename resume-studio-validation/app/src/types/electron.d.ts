@@ -30,6 +30,7 @@ export interface PdfExportOptions {
   saveAs?: boolean;
   skipSave?: boolean;
   fileNameSuffix?: string;
+  queueScope?:JobQueueOpen;
 }
 
 export interface CoverLetterExportOptions {

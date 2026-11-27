@@ -20,7 +20,8 @@ import { type DocxExportOptions, exportResumeToDocxBuffer } from '../src/lib/doc
 import { buildStandaloneResumeHtml } from '../src/lib/htmlExporter';
 import { resumeToMarkdown } from '../src/lib/markdownExporter';
 import { buildResumeExportFilename, formatLocalDate, sanitizeFilePart } from '../src/lib/resumeExportNaming';
-import type { CoverLetterPdfPayload, ApplicationLogInput, ApplicationSnapshotLink,ApplicationPdfCheck,SubmissionPackageResult } from '../src/schema/applicationSchema';
+import {JobQueueOpenSchema,type CoverLetterPdfPayload,type ApplicationLogInput,type ApplicationSnapshotLink,type ApplicationPdfCheck,type SubmissionPackageResult} from '../src/schema/applicationSchema';
+import {jobQueueDocumentText} from '../src/lib/jobQueueBinding';
 import { type ResumeDocument, ResumeDocumentSchema } from '../src/schema/resumeSchema';
 import { LocalResumeStore, LocalFsApiError, ensureInitialDataFromLegacy, inspectResumeWriteLock, recoverResumeWriteLock } from '../src/server/localFsApi';
 import {JobQueueExecutor} from '../src/server/jobQueueExecutor';
@@ -724,7 +725,7 @@ function registerIpcHandlers(): void {
   trustedEditorHandle('applications:log',(_event,input:ApplicationLogInput)=>{
     if(input?.pdfReceiptToken===undefined)return store.logApplication(input);
     return boundedPdfCheck(async signal=>{
-      const receipt=pdfReceipts.resolve(input.pdfReceiptToken,input.entry.exportedFilePath,input.entry.resumeSlug,input.document);
+      const receipt=pdfReceipts.resolve(input.pdfReceiptToken,input.entry.exportedFilePath,input.entry.resumeSlug,input.document,input.entry.queueTaskId);
       requireRecordedPath(input.entry.exportedFilePath);
       const result=checkFingerprint(await readPdfFingerprint(input.entry.exportedFilePath,signal,real=>canCheckRecordedRealPdf(input.entry.exportedFilePath,real,exportsDir,authorizedOutputPaths)),receipt);
       if(result.status!=='verified')throw new Error('PDF 已变更、缺失或无法核验；未封存投递记录，请重新导出。');
@@ -878,6 +879,14 @@ function registerIpcHandlers(): void {
   ) {
     // The editor flushes before export. Export itself is read-only with respect to the original document.
     const targetDoc = ResumeDocumentSchema.parse(options.document);
+    const queueScope=options.queueScope===undefined?undefined:JobQueueOpenSchema.parse(options.queueScope);
+    const verifyQueueExport=async()=>{
+      if(!queueScope)return;
+      if(spec.ext!=='pdf'||options.skipSave===true)throw Error('岗位原稿凭证仅支持未脱敏原稿 PDF。');
+      const {task,document}=await store.openPreparedJobQueue(queueScope,AbortSignal.timeout(10000));
+      if(task.slug!==options.slug||jobQueueDocumentText(document)!==jobQueueDocumentText(targetDoc))throw Error('PDF 导出与固定岗位原稿不一致，未导出。');
+    };
+    await verifyQueueExport();
     const defaultFileName = buildResumeExportFilename(
       targetDoc,
       spec.ext,
@@ -929,7 +938,8 @@ function registerIpcHandlers(): void {
     let receiptWarning=outputWarning;
     if(spec.ext==='pdf'&&options.skipSave!==true&&options.slug&&!snapshotWarning&&!contentWarning&&!receiptWarning){
       try{
-        receiptResult=await boundedPdfCheck(signal=>pdfReceipts.issue(writtenPath,options.slug!,targetDoc,Buffer.isBuffer(content)?content:Buffer.from(content),signal,real=>canCheckRecordedRealPdf(writtenPath,real,exportsDir,authorizedOutputPaths)));
+        await verifyQueueExport();
+        receiptResult=await boundedPdfCheck(signal=>pdfReceipts.issue(writtenPath,options.slug!,targetDoc,Buffer.isBuffer(content)?content:Buffer.from(content),signal,real=>canCheckRecordedRealPdf(writtenPath,real,exportsDir,authorizedOutputPaths),queueScope?.taskId));
       }catch{receiptWarning='PDF 文件已写出，但无法确认字节凭证；请重新导出后再封存投递。';}
     }
     return {

@@ -246,7 +246,7 @@ export function JobCareerPane({
   const handleExportCsv = async () => {
     setErrorMsg(null);
     try {
-      const csv = buildApplicationsCsv(storeData.applications);
+      const csv = buildApplicationsCsv(visibleApplications);
       const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '');
       const res = await apiClient.saveTextFile({
         defaultFileName: `求职投递台账-${stamp}.csv`,
@@ -389,15 +389,16 @@ export function JobCareerPane({
     careerLedger.update(current=>({...current,coverLetters:current.coverLetters.filter(item=>item.id!==id)}));
   };
 
+  const visibleApplications=useMemo(()=>comparisonDisabled?storeData.applications.filter(a=>!a.queueTaskId):storeData.applications,[storeData.applications,comparisonDisabled]);
   const funnel = useMemo(
-    () => computeApplicationFunnel(storeData.applications),
-    [storeData.applications],
+    () => computeApplicationFunnel(visibleApplications),
+    [visibleApplications],
   );
   const activeFollowups = funnel.wishlist + funnel.applied + funnel.written + funnel.interview;
   const filteredApps =
     statusFilter === 'all'
-      ? storeData.applications
-      : storeData.applications.filter((a) => a.status === statusFilter);
+      ? visibleApplications
+      : visibleApplications.filter((a) => a.status === statusFilter);
   const desktop = isDesktopMode();
 
   return (
@@ -458,7 +459,7 @@ export function JobCareerPane({
             <button type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1">重载磁盘台账</button>
           </div>
         </div>}
-        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
+        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时隐藏队列关联投递，禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
         {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
         {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"><span className="text-[10px] text-slate-600">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40">刷新磁盘台账</button></div>}
         {loading ? (
@@ -492,7 +493,7 @@ export function JobCareerPane({
                     </span>
                     <button
                       type="button"
-                      disabled={storeData.applications.length === 0}
+                      disabled={visibleApplications.length === 0}
                       onClick={() => void handleExportCsv()}
                       className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
                     >
@@ -623,7 +624,7 @@ export function JobCareerPane({
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-900">
                                 <span>
-                                  {item.company} · {item.role}
+                                  {item.company} · {item.role}{item.queueTaskId&&<span className="ml-1 rounded bg-teal-50 px-1 text-[10px] text-teal-800">固定岗位</span>}
                                 </span>
                                 {item.snapshotId && (
                                   <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
