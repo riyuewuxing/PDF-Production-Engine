@@ -185,6 +185,7 @@ async function run() {
   results.fixture={kind,stableHash:sha(JSON.stringify(stableDoc)),template:doc.templateId,experienceCount:doc.experience.length};
   for(const id of phase==='baseline'?['classic']:['classic','warm']){
     if(phase==='candidate'&&id!=='classic')await selectTheme(id);
+    await js(`(()=>{const v=document.querySelector('.print-workspace.overflow-auto');v.scrollTop=0;v.scrollLeft=0;return true})()`);await sleep(250);
     await capture(id+'-scroll');
     const sheet=await captureSheet(id+'-scroll');
     const exp=await exportNative(id);
@@ -192,6 +193,7 @@ async function run() {
     await clickByAria('双页并排总览');
     await until('spread selected',()=>js(`!!document.querySelector('button[aria-label="切回单列滚动"]')`));
     await sleep(350);
+    await js(`(()=>{const v=document.querySelector('.print-workspace.overflow-auto');v.scrollTop=0;v.scrollLeft=0;return true})()`);await sleep(250);
     const spread=await spreadProof();
     assert.ok(spread.length>=1);
     assert.ok(spread.every(x=>x.markers===0),'studio marker inside spread paper');
