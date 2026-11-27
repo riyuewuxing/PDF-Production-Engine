@@ -46,7 +46,8 @@ export interface PdfImportDraft {
   selfEvaluationText: string;
   honorsText: string;
   rawText: string;
-  sourceKind?: 'pdf' | 'text';
+  sourceKind?: 'pdf' | 'text' | 'docx';
+  importWarnings?: string[];
   markdownHeadings?: boolean;
   employmentStatus?: string;
   unclassifiedText?: string;
@@ -214,7 +215,7 @@ const SECTION_HEADER_RULES: Array<{
     },
   ];
 
-function matchHeadingLine(
+export function matchHeadingLine(
   line: string,
 ): 'education' | 'experience' | 'projects' | 'skills' | 'selfEvaluation' | 'honors' | 'ignore' | null {
   const clean = line.replace(/[:：\-\s|•·]+$/g, '').replace(/^[#*\-\s•·]+/g, '').trim();
@@ -328,6 +329,7 @@ function splitParagraphBlocks(raw: string): string[] {
 
 export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDocument {
   const nowIso = new Date().toISOString();
+  const cleanDocxLiteral = (value: string) => draft.sourceKind==='docx' ? value.replace(/\u200b(?=\s*(?:#|~{3}|\x60{3}))/g,'') : value;
   const splitEntries = (raw: string): string[][] => {
     const lines = splitParagraphBlocks(raw);
     if (!draft.markdownHeadings) return lines.length ? [lines] : [];
@@ -344,12 +346,12 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
       else active.push(line);
     }
     if (active.length) entries.push(active);
-    return entries;
+    return entries.map(entry=>entry.map(cleanDocxLiteral));
   };
   const eduEntries = splitEntries(draft.educationText);
   const expEntries = splitEntries(draft.experienceText);
   const projEntries = splitEntries(draft.projectsText);
-  const honorsLines = splitParagraphBlocks(draft.honorsText);
+  const honorsLines = splitParagraphBlocks(cleanDocxLiteral(draft.honorsText));
 
   const education: EducationItem[] = eduEntries.map(eduLines => ({
           id: crypto.randomUUID(),
@@ -418,7 +420,7 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
 
   if (draft.keepUnclassified && draft.unclassifiedText?.trim()) {
     menuSections.push({ id: 'custom-import-unclassified', title: '未分类导入原文（待核对）', icon: 'FileText', enabled: false, order: menuSections.length, pageBreakBefore: false });
-    customData['custom-import-unclassified'] = [{ id: crypto.randomUUID(), title: '未分类原文', subtitle: '', dateRange: '', description: draft.unclassifiedText, visible: true }];
+    customData['custom-import-unclassified'] = [{ id: crypto.randomUUID(), title: '未分类原文', subtitle: '', dateRange: '', description: cleanDocxLiteral(draft.unclassifiedText), visible: true }];
   }
 
   return ResumeDocumentSchema.parse({
@@ -443,8 +445,8 @@ export function buildResumeDocumentFromPdfDraft(draft: PdfImportDraft): ResumeDo
     education,
     experience,
     projects,
-    skillContent: draft.skillsText.trim(),
-    selfEvaluationContent: draft.selfEvaluationText.trim(),
+    skillContent: cleanDocxLiteral(draft.skillsText).trim(),
+    selfEvaluationContent: cleanDocxLiteral(draft.selfEvaluationText).trim(),
     customData,
     globalSettings: {
       themeColor: '#167883',

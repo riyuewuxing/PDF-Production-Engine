@@ -26,6 +26,7 @@ import {
 import type { ResumeDocument, ResumeSummary } from '../../schema/resumeSchema';
 import type { ResumeSnapshotMeta } from '../../server/localFsApi';
 import { PdfImportModal } from './PdfImportModal';
+import { parseDocxResume, RESUME_IMPORT_DOCX_MAX_BYTES } from '../../lib/docxResumeImporter';
 import { RecycleBinPanel } from './RecycleBinPanel';
 import {WorkspaceBackupPane} from './WorkspaceBackupPane';
 import { WriteLockPanel } from './WriteLockPanel';
@@ -92,6 +93,7 @@ export function VersionAndMasterPane({
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
+  const docxInputRef = useRef<HTMLInputElement>(null);
   const parsingImport = useRef<AbortController|null>(null);
   const [parsingTextualImport, setParsingTextualImport] = useState(false);
   const importMounted=useRef(false);
@@ -215,7 +217,7 @@ export function VersionAndMasterPane({
     }
   };
 
-  const handleTextualImport = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'pdf'|'text') => {
+  const handleTextualImport = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'pdf'|'text'|'docx') => {
     const input = e.currentTarget;
     const file = input.files?.[0];
     input.value = '';
@@ -226,11 +228,11 @@ export function VersionAndMasterPane({
     setError(null);
     setBusy(true);
     try {
-      const limit = kind === 'pdf' ? RESUME_IMPORT_PDF_MAX_BYTES : RESUME_IMPORT_TEXT_MAX_BYTES;
-      if (file.size > limit) throw new Error(kind === 'pdf' ? 'PDF 文件超过 20 MiB 上限。' : '文本文件超过 1 MiB 上限。');
+      const limit = kind === 'pdf' ? RESUME_IMPORT_PDF_MAX_BYTES : kind === 'docx' ? RESUME_IMPORT_DOCX_MAX_BYTES : RESUME_IMPORT_TEXT_MAX_BYTES;
+      if (file.size > limit) throw new Error(kind === 'pdf' ? 'PDF 文件超过 20 MiB 上限。' : kind === 'docx' ? 'DOCX 文件超过 20 MiB 上限。' : '文本文件超过 1 MiB 上限。');
       const buffer = await readImportFile(file,controller.signal);
       if(controller.signal.aborted)throw new Error('本地导入解析已取消。');
-      const draft = kind === 'pdf' ? await extractAndParsePdfResume(buffer, file.name,controller.signal) : parseResumeTextFile(buffer, file.name);
+      const draft = kind === 'pdf' ? await extractAndParsePdfResume(buffer, file.name,controller.signal) : kind === 'docx' ? await parseDocxResume(buffer,file.name,controller.signal) : parseResumeTextFile(buffer, file.name);
       if(importMounted.current&&!controller.signal.aborted)setPdfDraft(draft);
     } catch (err) {
       if(importMounted.current)setError(err instanceof Error ? err.message : '本地导入解析失败。');
@@ -547,6 +549,7 @@ export function VersionAndMasterPane({
             className="hidden"
           />
           <input ref={textInputRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={e=>void handleTextualImport(e,'text')} className="hidden" />
+          <input ref={docxInputRef} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e=>void handleTextualImport(e,'docx')} className="hidden" />
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -565,6 +568,7 @@ export function VersionAndMasterPane({
               <FileText size={13} /> 从旧 PDF 导入
             </button>
             <button type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">从 TXT / Markdown 导入</button>
+            <button type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>docxInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 bg-white py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">从 DOCX 导入</button>
           </div>
           {parsingTextualImport && <button type="button" onClick={()=>parsingImport.current?.abort()} className="w-full rounded border border-amber-300 bg-amber-50 py-1.5 text-amber-900">取消本地解析</button>}
           <button

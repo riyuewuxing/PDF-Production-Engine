@@ -17,11 +17,13 @@ export function PdfImportModal({
 }) {
   const [form, setForm] = useState<PdfImportDraft | null>(draft);
   const [busy, setBusy] = useState(false);
+  const [docxReviewed,setDocxReviewed] = useState(false);
   const confirming = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(draft);
+    setDocxReviewed(false);
     setError(null);
   }, [draft]);
 
@@ -32,8 +34,9 @@ export function PdfImportModal({
   };
 
   const needsUnclassifiedDecision = Boolean(form.unclassifiedText?.trim()) && form.keepUnclassified===undefined;
+  const needsDocxReview = form.sourceKind === 'docx' && !docxReviewed;
   const handleConfirm = async () => {
-    if (confirming.current || needsUnclassifiedDecision) return;
+    if (confirming.current || needsUnclassifiedDecision || needsDocxReview) return;
     confirming.current = true;
     setBusy(true);
     setError(null);
@@ -49,12 +52,12 @@ export function PdfImportModal({
   };
 
   const cancel = () => { if (!confirming.current) onCancel(); };
-  const sourceLabel = form.sourceKind === 'text' ? 'TXT / Markdown' : 'PDF';
+  const sourceLabel = form.sourceKind === 'docx' ? 'DOCX' : form.sourceKind === 'text' ? 'TXT / Markdown' : 'PDF';
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={form.sourceKind === 'text' ? 'TXT / Markdown 简历解析导入确认' : '旧版 PDF 简历解析导入确认'}
+      aria-label={form.sourceKind === 'pdf' || !form.sourceKind ? '旧版 PDF 简历解析导入确认' : sourceLabel+' 简历解析导入确认'}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
       onClick={cancel}
     >
@@ -68,7 +71,7 @@ export function PdfImportModal({
               <FileText size={15} className="text-teal-600" /> 本地离线 {sourceLabel} 解析导入确认
             </h2>
             <p className="text-[11px] text-slate-500">
-              本地启发式提取，所有字段均为待核对候选，并非事实验证。Markdown 仅识别常见二级章节、三级经历标题；原文件不变。确认后另建独立版本。
+              本地启发式提取，所有字段均为待核对候选，并非事实验证。{form.sourceKind==='docx'?'仅提取正文文字及可识别标题，不复刻 Word 版式。':'Markdown 仅识别常见二级章节、三级经历标题。'} 原文件不变。确认后另建独立版本。
             </p>
           </div>
           <button
@@ -89,6 +92,11 @@ export function PdfImportModal({
             </div>
           )}
 
+          {form.sourceKind==='docx' && <div className="col-span-full space-y-1 rounded border border-amber-300 bg-amber-50 p-2 text-amber-950">
+            <p className="font-semibold">DOCX 文字导入范围（请与原始 Word 文件核对）</p>
+            <ul className="list-disc pl-5">{(form.importWarnings??[]).map((warning,i)=><li key={i}>{warning}</li>)}</ul>
+            <label className="flex items-start gap-2"><input type="checkbox" checked={docxReviewed} disabled={busy} onChange={e=>setDocxReviewed(e.target.checked)} />我已了解提取范围及未导入部分，并核对正文候选内容。</label>
+          </div>}
           {/* Left: Editable parsed blocks */}
           <fieldset disabled={busy} className="min-w-0 space-y-2.5">
             <div className="grid grid-cols-2 gap-2">
@@ -212,7 +220,7 @@ export function PdfImportModal({
 
           {/* Right: Raw extracted lines for verification */}
           <div className="flex flex-col gap-1.5">
-            <span className="font-semibold text-slate-700">{sourceLabel} 原文提取对照</span>
+            <span className="font-semibold text-slate-700">{sourceLabel} {form.sourceKind==='docx'?'正文文字提取对照（非原版式）':'原文提取对照'}</span>
             <pre className="max-h-[60vh] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700">
               {form.rawText || '（未检测到可提取的文本）'}
             </pre>
@@ -220,7 +228,7 @@ export function PdfImportModal({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs">
-          {needsUnclassifiedDecision && <p role="status" className="mr-auto text-amber-800">请先选择未分类原文的处理方式。</p>}
+          {(needsUnclassifiedDecision || needsDocxReview) && <p role="status" className="mr-auto text-amber-800">{needsDocxReview?'请先确认 DOCX 提取范围。 ':''}{needsUnclassifiedDecision?'请先选择未分类原文的处理方式。':''}</p>}
           <button
             type="button"
             onClick={cancel}
@@ -231,7 +239,7 @@ export function PdfImportModal({
           </button>
           <button
             type="button"
-            disabled={busy || needsUnclassifiedDecision}
+            disabled={busy || needsUnclassifiedDecision || needsDocxReview}
             onClick={() => void handleConfirm()}
             className="inline-flex items-center gap-1.5 rounded bg-teal-600 px-3.5 py-1.5 font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
           >
