@@ -153,7 +153,7 @@ async function run(){
    await click(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim()));
    assert(!await has(companies[0]),'redacted tracker exposed scoped record');await capture('09-redacted-tracker');checks.redactionTrackerAndWorkflow=true;
    await click('脱敏模式中');await until('tracker restored',()=>has(companies[0]));
-   await click('只读复盘 '+companies[0]);await until('permanent snapshot review',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label="永久投递快照只读复盘"]')));await capture('10-permanent-review');
+   await click('只读复盘 '+companies[0]);await until('permanent snapshot review',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label="永久投递快照只读复盘"]')));await click('读取并对比');await until('actual sealed comparison',()=>has('所比较的存储内容、结构和样式字段没有差异。'));await capture('10-permanent-review');
    assert(sha(fs.readFileSync(snapshotFile))===snapHash,'review mutated snapshot');
    assert(sourceHash(slugA)===originalHashes[0]&&sourceHash(slugC)===originalHashes[1],'source documents mutated');
    const final=await ledger();assert(final.applications.length===2&&final.jobQueue.every(t=>t.status==='prepared'),'unexpected application or task state');
@@ -177,6 +177,32 @@ async function run(){
    checks.staleSourceRefusedNoWrite=true;await capture('12-stale-refused');
    await switchTo(slugC);await queue();await openTask(2);
    assert(sha(ledgerBytes())===initialHash&&sourceHash(slugC)===originalHashes[1],'other version stale contamination');
+   await click('返回岗位队列');
+   await click(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('))?.innerText.trim()));
+   await until('cold tracker restored',()=>has(companies[0]));
+   const entry=(await ledger()).applications.find(e=>e.id===expected.applicationId);
+   assert(entry&&entry.snapshotId===expected.snapshotId&&entry.status==='wishlist','cold archive identity/status changed');
+   const archiveFile=path.join(store.appSnapshotsDir,expected.snapshotId+'.json'),pdfFile=entry.exportedFilePath,pdfBytes=fs.readFileSync(pdfFile);
+   assert(sha(pdfBytes)===entry.pdfReceipt.sha256,'cold PDF bytes mismatch');
+   await click('只读复盘 '+companies[0]);
+   await until('cold review modal',()=>has('对照稿不是台账原关联版本'));
+   await click('读取并对比');
+   await until('cold actual comparison',()=>js(()=>!!document.querySelector('[aria-label="差异统计"]')&&[...document.querySelectorAll('[data-compare-side="before"]')].some(e=>e.innerText.includes('合成甲乙候选人'))&&[...document.querySelectorAll('[data-compare-side="after"]')].some(e=>e.innerText.includes('合成丙候选人'))));
+   await capture('12a-cold-sealed-compare');
+   await click('关闭版本对照');
+   await until('review closed',()=>js(()=>!document.querySelector('[aria-label="永久投递快照只读复盘"]')));
+   await click('核验 PDF '+companies[0]);await until('cold receipt verified',()=>has('记录路径字节一致'));await capture('12b-cold-pdf-verified');
+   const tampered=Buffer.from(pdfBytes);tampered[tampered.length-10]^=1;
+   try {
+     fs.writeFileSync(pdfFile,tampered);
+     await click('核验 PDF '+companies[0]);await until('cold tamper refused',()=>has('文件字节与封存凭证不一致，未打开'));await capture('12c-cold-pdf-tampered');
+     fs.unlinkSync(pdfFile);
+     await click('核验 PDF '+companies[0]);await until('cold missing refused',()=>has('记录文件缺失，未打开'));await capture('12d-cold-pdf-missing');
+   } finally {fs.writeFileSync(pdfFile,pdfBytes)}
+   await click('核验 PDF '+companies[0]);await until('restored receipt verified',()=>has('记录路径字节一致'));
+   assert(sha(ledgerBytes())===initialHash&&sha(fs.readFileSync(archiveFile))===expected.snapshotHash&&sourceHash(slugA)===changed&&sourceHash(slugC)===originalHashes[1]&&sha(fs.readFileSync(pdfFile))===entry.pdfReceipt.sha256,'cold read-only operation mutated artifacts');
+   checks.coldSealedCompareAndPdfTamperMissingRestore=true;await capture('12e-cold-pdf-restored');
+   await queue();await openTask(2);
    const beforeZoom=await js(()=>window.innerWidth);win.webContents.setZoomFactor(1.3);await sleep(300);
    const narrow=await js(()=>({width:window.innerWidth,height:window.innerHeight,scrollWidth:document.documentElement.scrollWidth}));
    assert(narrow.width<beforeZoom,'narrow CSS viewport not exercised');observations.narrowCssViewport=narrow;await capture('13-narrow-viewport','[aria-label="固定岗位材料流程"]');checks.otherVersionStillUsableAndNarrowViewport=true;
