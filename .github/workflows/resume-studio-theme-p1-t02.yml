@@ -70,6 +70,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: theme-t02-${{ matrix.phase }}
-          path: theme-p1-evidence/
-          if-no-files-found: warn
+          path: theme-t02-evidence/
+          if-no-files-found: error
           retention-days: 3
