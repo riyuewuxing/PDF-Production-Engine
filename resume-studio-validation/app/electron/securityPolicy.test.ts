@@ -12,7 +12,7 @@ describe('Electron trust boundaries',()=>{
   it('accepts only the unreserved tilde spelling of a local portable file pathname',()=>{
     const literal='file:///C:/Users/RUNNER~1/AppData/Local/Temp/nsrEF44.tmp/app/resources/app.asar/dist/index.html';
     const encoded=literal.replace('~','%7E'),lower=literal.replace('~','%7e');
-    for(const [url,expectedUrl] of [[literal,encoded],[encoded,literal],[lower,encoded]]){
+    for(const [url,expectedUrl] of [[literal,encoded],[encoded,literal],[lower,encoded]] as const){
       expect(isTrustedRendererFrame({...valid,url,expectedUrl})).toBe(true);
     }
     for(const url of [literal.replace('~','%257E'),literal.replace('RUNNER~1','RUNNER~2'),literal.replace('~','%2F'),literal.replace('~','%5C'),literal.replace('index.html','other.html'),literal+'?mode=print',literal+'#x',literal.replace('C:/','D:/'),literal.replace('file:///','file://server/'),literal.replace('file:///','https://')]){
