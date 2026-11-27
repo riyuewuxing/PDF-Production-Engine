@@ -26,6 +26,8 @@ jobs:
         working-directory: .
         timeout-minutes: 1
         run: |
+          git fetch --no-tags --depth=1 origin ad2082aa3359bfcd0a28f5442ecbb6dafec4f727
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git restore --source=ad2082aa3359bfcd0a28f5442ecbb6dafec4f727 --worktree --staged -- resume-studio-validation/app/src
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
