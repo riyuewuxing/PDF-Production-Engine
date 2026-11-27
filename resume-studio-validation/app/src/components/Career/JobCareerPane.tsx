@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { apiClient, isDesktopMode, localErrorMessage } from '../../lib/apiClient';
 import { careerLedger } from '../../lib/careerLedgerSession';
 import { CareerAiPanel } from './CareerAiPanel';
+import { InterviewPracticePane } from './InterviewPracticePane';
 import {visibleBasicValue} from '../../lib/aiContext';
 import {
   COVER_LETTER_VARIANT_LABELS,
@@ -32,7 +33,6 @@ import {
 } from '../../lib/careerExporter';
 import {
   generateCoverLetterBundle,
-  generateInterviewQuestions,
 } from '../../lib/jobToolkit';
 import {
   APPLICATION_STATUSES,
@@ -231,11 +231,6 @@ export function JobCareerPane({
       ? resolveCoverLetterHeaderVariant(activeDoc.templateId)
       : headerVariantMode;
 
-  const interviewQuestions = useMemo(
-    () => generateInterviewQuestions(activeDoc, letterRole || visibleBasicValue(activeDoc,'title')),
-    [activeDoc, letterRole],
-  );
-
   const copyText = async (key: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -363,7 +358,7 @@ export function JobCareerPane({
               subTab === 'interview' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            面试追问 ({interviewQuestions.length})
+            面试追问
           </button>
         </div>
       </div>
@@ -909,52 +904,7 @@ export function JobCareerPane({
             )}
 
             {subTab === 'interview' && (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="font-semibold text-slate-900">
-                    基于当前简历生成的 {interviewQuestions.length} 道高频追问（草稿自动落盘）
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    针对你的院校专业、代表性项目与时间线特征离线定制；下方草稿随时自动保存至 <code className="font-mono">data/applications.json</code>。
-                  </p>
-                </div>
-
-                {interviewQuestions.map((q, idx) => {
-                  const answerKey = `${activeSlug}:${q.id}`;
-                  return (
-                    <div key={q.id} className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-semibold text-slate-900">
-                          <span className="mr-1.5 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-800">
-                            Q{idx + 1} · {q.category}
-                          </span>
-                          {q.question}
-                        </div>
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        <strong className="text-slate-700">考察意图：</strong>
-                        {q.intent}
-                      </div>
-                      <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-slate-600">
-                        {q.starHints.map((hint, hIdx) => (
-                          <li key={hIdx}>{hint}</li>
-                        ))}
-                      </ul>
-                      <textarea
-                        rows={2}
-                        data-native-undo="true"
-                        value={storeData.interviewAnswers[answerKey] ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          careerLedger.update(current=>({...current,interviewAnswers:{...current.interviewAnswers,[answerKey]:val}}));
-                        }}
-                        placeholder="在此记录你的 STAR 逐字稿或核心关键词..."
-                        className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-900 focus:bg-white focus:outline-none"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+              <InterviewPracticePane key={JSON.stringify([activeSlug,activeDoc.id])} document={activeDoc} slug={activeSlug}/>
             )}
           </>
         )}

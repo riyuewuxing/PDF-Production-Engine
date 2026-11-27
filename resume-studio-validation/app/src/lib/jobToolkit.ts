@@ -1,5 +1,5 @@
 import type { ResumeDocument } from '../schema/resumeSchema';
-import {visibleBasicValue} from './aiContext';
+import {visibleBasicValue,factEntityId} from './aiContext';
 function enabled(doc:ResumeDocument,id:string):boolean{return doc.menuSections.some(s=>s.id===id&&s.enabled);}
 
 
@@ -16,6 +16,8 @@ export interface InterviewQuestionItem {
   question: string;
   intent: string;
   starHints: string[];
+  /** Stable editable block identity, separate from legacy ordinal ID. */
+  sourceKey?:string;
 }
 
 function stripMarkdownTokens(text: string): string {
@@ -149,53 +151,49 @@ export function generateInterviewQuestions(
 ): InterviewQuestionItem[] {
   const h = extractHighlights(doc);
   const role = targetRoleInput?.trim() || h.role;
-  const fullText = JSON.stringify({
-    title: role,
-    edu: enabled(doc,'education')?doc.education.filter(e=>e.visible):[],
-    exp: enabled(doc,'experience')?doc.experience.filter(e=>e.visible):[],
-    proj: enabled(doc,'projects')?doc.projects.filter(e=>e.visible):[],
-    skill: enabled(doc,'skills')?doc.skillContent:'',
-    eval: enabled(doc,'selfEvaluation')?doc.selfEvaluationContent:'',
-    custom: Object.fromEntries(Object.entries(doc.customData).filter(([id])=>enabled(doc,id)).map(([id,items])=>[id,items.filter(i=>i.visible)])),
-  });
-
-  const isTeacherRole = /教师|老师|物理|教研|中学|师范|教学/.test(fullText);
+  const isTeacherRole=/教师|老师|教研|教学|师范|teacher|teaching|educator/i.test(role);
+  const isPhysicsTeacher=isTeacherRole&&/物理|physics/i.test(role);
+  const isResearchRole=!isTeacherRole&&/科研|研究|实验室|research|scientist|laboratory/i.test(role);
+  const topEdu=enabled(doc,'education')?doc.education.find(e=>e.visible):undefined;
   const questions: InterviewQuestionItem[] = [];
 
   // 1. Academic / Major grounding
   questions.push({
     id: 'q-edu-foundation',
+    sourceKey:topEdu&&factEntityId(doc,'edu:'+topEdu.id)?'edu:'+topEdu.id:undefined,
     category: '专业能力',
     question: h.topSchool?`请结合你在${h.topSchool}${h.topMajor ? `「${h.topMajor}」` : ''}的培养经历，谈谈这段学习背景对胜任「${role}」最大的帮助是什么？`:`请介绍与你申请「${role}」相关的教育或学习背景。`,
     intent: '考察学历专业与目标岗位的底层迁移度，区分“只会考试”与“会转化运用”。',
     starHints: [
       '用 1 句话点明专业核心训练（实验设计 / 数学建模 / 严密推理）',
       '将专业方法映射到目标岗位痛点',
-      '落到 1 个具体成果指标或课程/竞赛表现上',
+      '如有真实可核对成果则举例；否则说明实际训练过程，不补造指标',
     ],
   });
 
   // 2. Top projects probe (up to 2)
-  const visibleProjects = doc.projects.filter((p) => enabled(doc,'projects') && p.visible && p.name.trim()).slice(0, 2);
+  const visibleProjects = doc.projects.filter((p) => enabled(doc,'projects') && p.visible && p.name.trim() && factEntityId(doc,'proj:'+p.id)).slice(0, 2);
   visibleProjects.forEach((proj, idx) => {
     questions.push({
       id: `q-proj-${idx + 1}`,
+      sourceKey:'proj:'+proj.id,
       category: '项目深挖',
       question: `简历中提到你担任「${proj.name.trim()}」${proj.role ? `（${proj.role}）` : ''}，如果由你复盘其中遇到的最大技术或执行卡点，你是如何定位并解决的？`,
       intent: '验证项目真实参与度与个人独立贡献，过滤“只写名词不懂细节”。',
       starHints: [
         'S/T：交代该项目的明确目标与边界约束',
         'A：重点讲清你亲自做过的方案取舍与迭代动作',
-        'R：用数据/演示效果/他人反馈证明有效性',
+        'R：如有数据、演示效果或反馈则说明来源；没有结果时坦陈进展与限制',
       ],
     });
   });
 
   // 3. Experience probe
-  const visibleExps = doc.experience.filter((e) => enabled(doc,'experience') && e.visible && e.company.trim()).slice(0, 2);
+  const visibleExps = doc.experience.filter((e) => enabled(doc,'experience') && e.visible && e.company.trim() && factEntityId(doc,'exp:'+e.id)).slice(0, 2);
   visibleExps.forEach((exp, idx) => {
     questions.push({
       id: `q-exp-${idx + 1}`,
+      sourceKey:'exp:'+exp.id,
       category: '项目深挖',
       question: `在「${exp.company.trim()}」${exp.position?`担任「${exp.position}」`:'的经历'}中，哪一次具体任务或反馈让你成长最快？如果重做一次会怎么优化？`,
       intent: '考察一线工作成熟度、复盘习惯以及高压环境下的抗挫力。',
@@ -209,10 +207,10 @@ export function generateInterviewQuestions(
       {
         id: 'q-teach-difficult',
         category: '专业能力',
-        question: '高中物理中诸如电磁感应/带电粒子在复合场中运动是高频失分点，你在无生试讲或分层辅导时如何帮助基础薄弱学生建立物理图像？',
-        intent: '高频学科教法与学情转化能力考察，重点中学必问。',
+        question: isPhysicsTeacher?'高中物理中如电磁感应或复合场运动，你会如何在试讲或分层辅导中帮助基础薄弱学生建立物理图像？':'请选择目标学科中一个学生常见的理解难点，说明如何设计教学、识别错因及检查学习效果。',
+        intent: '练习学科教法与学情转化，不代表真实面试必问。',
         starHints: [
-          '给出“现象直观感知 → 物理模型抽象 → 典型错因辨析”三步法',
+          isPhysicsTeacher?'给出“现象直观感知 → 物理模型抽象 → 典型错因辨析”三步法':'明确学习目标、教学活动和学习效果检验方式',
           '如实际做过仿真课件或可视化实验，可结合实例；否则说明拟采用的方法',
         ],
       },
@@ -231,6 +229,8 @@ export function generateInterviewQuestions(
         starHints: ['明确工具只服务于“传统器材难以演示的微观/瞬时过程”', '保留学生动手推导与板书主线'],
       },
     );
+  } else if(isResearchRole){
+    questions.push({id:'q-research-method',category:'专业能力',question:'请选取一项真实科研或实验经历，说明你负责的任务、关键假设、数据处理和如何判断结果可靠。',intent:'考察研究方法、可复现性与个人贡献边界。',starHints:['区分本人完成、协作完成及尚未完成的工作','说明误差来源、验证方法和实际可核对的产物；不虚构论文、独立主持或定量结果']},{id:'q-research-transfer',category:'综合素质',question:'如果研究假设未得到支持或结果难以复现，你会如何安排后续验证并向团队沟通？',intent:'考察科研诚信、证据意识及协作。',starHints:['区分实际经历与拟采用的方法','保留失败结果和限制，说明下一步验证而不是编造成功']});
   } else {
     questions.push(
       {
@@ -268,7 +268,7 @@ export function generateInterviewQuestions(
     category: '综合素质',
     question: '请举一个你实际经历过的、主动提高工作或学习质量的例子。如果没有量化数据，如何说明改进效果？',
     intent: '区分泛泛套话与真实高标准自驱力。',
-    starHints: ['选取具体作品或教学材料从零到一打磨经历', '量化对比优化前后差异'],
+    starHints: ['选取具体作品或教学材料从零到一打磨经历', '有实际数据再量化；没有数据则说明可核对的过程、产物与局限'],
   });
 
   // 7. 90-day onboarding & closing question
