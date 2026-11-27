@@ -1,0 +1,58 @@
+name: Resume Studio baseline actual interview draft and hidden key collision reproduction
+on:
+  push:
+    branches: ['resume-studio/v6-interview-baseline-turn35']
+permissions:
+  contents: read
+jobs:
+  mock-regression:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Strict typecheck and build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reproduce legacy interview and hidden duplicate identity defects
+        timeout-minutes: 5
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-interview-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'ai-mock-regression/interview-practice'
+          try {
+            pnpm exec esbuild validation-interview-baseline-adapter.ts --bundle --platform=node --format=cjs --outfile=validation-interview-baseline-adapter.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & .\node_modules\.bin\electron.cmd .\validation-interview-baseline.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Upload mock evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ai-mock-regression
+          path: ai-mock-regression/
+          if-no-files-found: error
+          retention-days: 3
+
