@@ -148,6 +148,13 @@ async function run(){
   await until('stale settings blocked apply',()=>has('岗位定向改写的已保存模型档案已变化'));assert(report.calls===beforeStale&&await applyDisabled(),'stale profile allowed application');await capture('general-stale-profile',rewrite);await noWrite();report.checks.staleProfileBlocksApply=true;await close();
   // Reanalyse with current profile; approved rewrite changes exactly one body and creates a real prewrite snapshot.
   await analyze('teacher');await open('teacher');await success('teacher');await pdfReview('teacher');const beforeApplyCalls=report.calls;
+  // A new unsaved manual draft must require explicit confirmation before it can be invalidated.
+  await setValue('textarea[aria-label="岗位核对说明"]','尚未记录的合成人工草稿');
+  await js('window.__guidedConfirm=[];window.confirm=s=>{window.__guidedConfirm.push(s);return false}');
+  await click('应用已核对提案（1）',rewrite);await until('manual invalidation confirmation',()=>js('window.__guidedConfirm.some(s=>s.includes("未记录草稿"))'));
+  assert(await button('应用已核对提案（1）',rewrite)&&await js(q('textarea[aria-label="岗位核对说明"]')+'?.value==="尚未记录的合成人工草稿"'),'cancelled confirmation lost draft or candidate');
+  await noWrite();report.checks.manualDraftInvalidationRequiresConfirmation=true;
+  await js('window.confirm=s=>{window.__guidedConfirm.push(s);return true}');
   await click('应用已核对提案（1）',rewrite);
   await until('saved guided body',async()=> (await main.store.getResume('runner-fixture')).experience[0].description===scenarios.teacher.next,30000);
   const after=await main.store.getResume('runner-fixture'),expected={...before,updatedAt:after.updatedAt,experience:before.experience.map((x,i)=>i===0?{...x,description:scenarios.teacher.next}:x)};

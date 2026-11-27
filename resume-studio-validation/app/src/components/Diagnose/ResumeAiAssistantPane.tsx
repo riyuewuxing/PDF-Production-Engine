@@ -19,7 +19,8 @@ import {AiPdfComparisonView} from './AiPdfComparisonView';
 import {WORKFLOW_ACTIONS,createWorkflowSession,isWorkflowCurrent,workflowDocumentContent,workflowStepGoal,beginWorkflowStep,finishWorkflowStep,completeWorkflow,type WorkflowSession} from '../../lib/aiWorkflow';
 import type {JobRewriteDraft} from '../../lib/jobAiReview';
 export type AiTextReviewActions={overflowPx:number;onFlushBeforeApply:()=>Promise<void>;getCurrentRevision:()=>string;onImmediateChange:(next:ResumeDocument)=>void};
-type Props=AiTextReviewActions&{document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;assertSettings:(settings:ByokAiSettings)=>void;jobScope?:JobRewriteDraft};
+export type JobReviewApplyGuard={confirm:()=>string|null;isCurrent:(token:string)=>boolean};
+type Props=AiTextReviewActions&{document:ResumeDocument;slug:string;settings:ByokAiSettings;jdText:string;assertSettings:(settings:ByokAiSettings)=>void;jobScope?:JobRewriteDraft;jobApplyGuard?:JobReviewApplyGuard};
 type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:string;mode:AssistantMode;keys:string[];jdText?:string;overflowPx:number;requestId:string;records:FactRecord[];bankRevision:string|null;jobScope?:JobRewriteDraft};
 type Pending={basis:Basis;prepared:PreparedAssistantTask};
 type Result={request:Pending;reply:ReturnType<typeof parseAssistantReply>};
@@ -167,6 +168,9 @@ export function ResumeAiAssistantPane(props:Props){
     const {request,reply}=result;
     if(!isCurrent(request.basis)){setError('简历或任务范围已变化，禁止应用旧提案。');return;}
     if(props.slug==='master'&&!window.confirm('当前目标是母库。确认在创建本地快照后应用已逐项核对的正文修改？'))return;
+    const manualToken=request.basis.jobScope?props.jobApplyGuard?.confirm():undefined;
+    if(request.basis.jobScope&&typeof manualToken!=='string')return;
+    const assertManualReviewCurrent=()=>{if(request.basis.jobScope&&(typeof manualToken!=='string'||!props.jobApplyGuard?.isCurrent(manualToken)))throw new Error('人工岗位核对已变化或仍在保存，请重新确认后再应用。');};
     const selected=reply.proposals.filter(p=>accepted.includes(p.id));
     const session=workflowRef.current;
     if(session&&(!isWorkflowCurrent(session,props.document,props.slug,props.settings,props.jdText)||session.stage!=='active')){setError('分步计划已过期。');return;}
@@ -184,9 +188,12 @@ export function ResumeAiAssistantPane(props:Props){
       const next=await previewTextPatch({document:props.document,slug:props.slug,revision,envelope});
       if(JSON.stringify(next)!==JSON.stringify(review.next))throw new Error('候选已变化，请重新试渲染。');
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
+      if(request.basis.jobScope){await assertFactsFresh(request.basis);if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');}
+      assertManualReviewCurrent();
       await apiClient.createSnapshot(props.slug,request.basis.jobScope?'岗位定向改写前快照':'AI 协作任务前快照',revision);
       await assertFactsFresh(request.basis).catch(err=>{setReview(null);setPdfConfirmed(false);throw err;});
       if(!isCurrent(request.basis)||props.getCurrentRevision()!==revision)throw new Error('简历版本已变化。');
+      assertManualReviewCurrent();
       props.onImmediateChange(next);setResult(null);setAttempt(null);setAccepted([]);setReview(null);setPdfConfirmed(false);setFactIds([]);
       if(session)setWorkflow(finishWorkflowStep(session,next,'applied'));
       setNotice('已应用 '+selected.length+' 条已核对正文提案，可使用 Ctrl+Z 撤回。');

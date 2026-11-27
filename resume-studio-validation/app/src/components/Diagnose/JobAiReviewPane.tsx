@@ -5,9 +5,9 @@ import {apiClient,localErrorMessage} from '../../lib/apiClient';
 import {AiTaskReceiptView,receivedAiTask,failedAiTask,type AiTaskReceipt} from './AiTaskReceiptView';
 import {assertAiPreviewSettings,describeAiRequest,requestByokCompletionWithReceipt,validateByokBaseUrl,type AiCompletionResult,type ByokAiSettings} from '../../lib/byokAiClient';
 import {collectJobAiEvidence,prepareJobAiReview,parseJobAiReview,JOB_AI_ASSESSMENTS,JOB_AI_MAX_CLAUSES,JOB_AI_MAX_EVIDENCE,jobRewriteTargets,createJobRewriteDraft,type PreparedJobAiReview,type JobAiRow,type JobRewriteDraft} from '../../lib/jobAiReview';
-import {ResumeAiAssistantPane,type AiTextReviewActions} from './ResumeAiAssistantPane';
+import {ResumeAiAssistantPane,type AiTextReviewActions,type JobReviewApplyGuard} from './ResumeAiAssistantPane';
 
-type Props={document:ResumeDocument;slug:string;source:string;clauses:readonly RequirementClause[];disabled:boolean;onReview:(clauseId:string)=>void;rewriteActions:AiTextReviewActions};
+type Props={document:ResumeDocument;slug:string;source:string;clauses:readonly RequirementClause[];disabled:boolean;onReview:(clauseId:string)=>void;rewriteActions:AiTextReviewActions;jobApplyGuard:JobReviewApplyGuard};
 type Basis=Pick<Props,'document'|'slug'|'source'|'clauses'>;
 type Pending={basis:Basis;settings:ByokAiSettings;prepared:PreparedJobAiReview};
 type Result={request:Pending;rows:JobAiRow[]};
@@ -131,7 +131,7 @@ export function JobAiReviewPane(props:Props){
     {rewrite&&current(rewrite.request.basis)&&<section ref={rewriteElement} aria-label="岗位定向改写工作区" className="space-y-2 rounded border-2 border-teal-300 bg-teal-50 p-2">
       <div className="flex items-start justify-between gap-2"><strong>岗位定向改写 · 独立任务</strong><button type="button" onClick={()=>setRewrite(null)} className="shrink-0 rounded border px-2 py-1">关闭定向改写</button></div>
       <p>仅准备本条公告与本段正文。原模型理由、缺口与核对审批不继承；不新增事实、资质或经历。采纳后简历变化，当前岗位核对会话将失效，请先归档需要保留的人工核对。</p>
-      <ResumeAiAssistantPane {...props.rewriteActions} document={document} slug={slug} settings={rewrite.request.settings} jdText={rewrite.draft.clause.quote} jobScope={rewrite.draft} assertSettings={assertAiPreviewSettings}/>
+      <ResumeAiAssistantPane {...props.rewriteActions} document={document} slug={slug} settings={rewrite.request.settings} jdText={rewrite.draft.clause.quote} jobScope={rewrite.draft} jobApplyGuard={props.jobApplyGuard} assertSettings={assertAiPreviewSettings}/>
     </section>}
   </details>;
 }

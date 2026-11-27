@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {JobAiReviewPane} from './JobAiReviewPane';
-import type {AiTextReviewActions} from './ResumeAiAssistantPane';
+import type {AiTextReviewActions,JobReviewApplyGuard} from './ResumeAiAssistantPane';
 import {resumeRevision,type ResumeDocument} from '../../schema/resumeSchema';
 import {ApplicationsStoreSchema,JobReviewArchiveSchema,MAX_JOB_REVIEW_ARCHIVES,type JobReviewArchive} from '../../schema/applicationSchema';
 import {jobPdfPageForRange,sameJobPdfOrigin,type JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
@@ -167,6 +167,19 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
   };
   const toggle=(id:string,on:boolean)=>setDraft(d=>({...d,evidenceIds:on?[...d.evidenceIds,id]:d.evidenceIds.filter(x=>x!==id)}));
   const totals=Object.values(reviews);
+  // The asynchronous apply operation must not discard a newer manual-review draft or an in-flight archive operation.
+  const manualBasis=useRef({current,reviews,draft,active});manualBasis.current={current,reviews,draft,active};
+  const manualSignature=()=>JSON.stringify([manualBasis.current.reviews,manualBasis.current.active,manualBasis.current.draft]);
+  const jobApplyGuard:JobReviewApplyGuard={
+    confirm:()=>{
+      const m=manualBasis.current;
+      if(!mounted.current||!m.current||guard.current)return null;
+      const count=Object.keys(m.reviews).length,dirtyDraft=JSON.stringify(m.draft)!==JSON.stringify(m.reviews[m.active]??blankRequirementReview());
+      if((count||dirtyDraft)&&!window.confirm('采纳正文后，本次岗位核对会话将失效（'+count+' 条已记录；'+(dirtyDraft?'另有未记录草稿':'无额外草稿')+'）。已归档历史不受影响；如需保留，请先取消并保存本地核对档案。确认继续？'))return null;
+      return manualSignature();
+    },
+    isCurrent:token=>mounted.current&&manualBasis.current.current&&!guard.current&&manualSignature()===token,
+  };
   return <section aria-label="岗位原文与证据核对" className="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs break-words">
     <div className="font-bold text-indigo-900">岗位原文与证据核对（离线）</div>
     <p>按原文行、分号和句号列出候选条款，保留原文位置。关键词只是检索线索，不是资格判定；复合条件、例外、专业目录与公告上下文须人工核对。</p>
@@ -200,7 +213,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       </div>})}
     </div>}
     {current&&<>
-      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} rewriteActions={rewriteActions} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>
+      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} rewriteActions={rewriteActions} jobApplyGuard={jobApplyGuard} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>
       <div className="flex flex-wrap gap-2 text-slate-700"><span>候选 {session.clauses.length} 条</span><span>已记录 {totals.length} 条</span><span>本人标记硬条件 {totals.filter(r=>r.priority==='mandatory').length}</span><span>自述支持 {totals.filter(r=>r.outcome==='supported').length}</span><span>缺口 {totals.filter(r=>r.outcome==='gap').length}</span></div>
       <button type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1">加载 / 刷新岗位事实依据</button>
       <div className="text-slate-600">{bank?'本地事实版本已读取：'+checkedAt:'尚未加载独立事实库，仅显示简历自述。'} 事实库变化后请刷新；保存核对结果时再次校验已加载的版本。</div>
