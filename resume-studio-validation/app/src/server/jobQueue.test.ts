@@ -17,6 +17,7 @@ async function fixture(){
   const root=path.join(parent,'live'),data=path.join(root,'data'),dest=path.join(parent,'copies');
   await fs.mkdir(dest,{recursive:true});
   const store=new LocalResumeStore(data);
+  await store.saveResume('master',document('synthetic-master'));
   const a=await store.saveResume('demo-a',document('synthetic-a'));
   const b=await store.saveResume('demo-b',document('synthetic-b'));
   return {store,root,data,dest,a,b};
