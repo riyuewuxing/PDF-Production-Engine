@@ -1,6 +1,6 @@
 import { BrowserWindow, app, dialog, ipcMain, nativeImage, protocol, shell, safeStorage, type IpcMainInvokeEvent } from 'electron';
 import { execFile } from 'node:child_process';
-import { promises as fs, lstatSync, realpathSync, mkdirSync } from 'node:fs';
+import { promises as fs, lstatSync, realpathSync, mkdirSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createWorkspaceBackup,inspectWorkspaceBackup,restoreWorkspaceBackup,inspectRestoredWorkspace} from '../src/server/workspaceBackup';
@@ -518,10 +518,13 @@ const aiCompletionSchema = z.object({
 
 function frameMatches(event:IpcMainInvokeEvent, senderId:number, expectedUrl:string):boolean {
   const frame=event.senderFrame;
-  return Boolean(frame && isTrustedRendererFrame({
-    senderId:event.sender.id,expectedSenderId:senderId,
-    isMainFrame:frame===event.sender.mainFrame,url:frame.url,expectedUrl,
-  }));
+  const input=frame?{senderId:event.sender.id,expectedSenderId:senderId,isMainFrame:frame===event.sender.mainFrame,url:frame.url,expectedUrl}:null;
+  const result=Boolean(input&&isTrustedRendererFrame(input));
+  // TEMPORARY public synthetic diagnosis only. Never transfer this file to private source.
+  if(!result&&process.env.RESUME_STUDIO_T49_TRUST_DIAG){
+    try{appendFileSync(process.env.RESUME_STUDIO_T49_TRUST_DIAG,JSON.stringify({input,appPath:app.getAppPath(),exe:app.getPath('exe'),cwd:process.cwd(),isPackaged:app.isPackaged})+'\n');}catch{}
+  }
+  return result;
 }
 function assertTrustedEditor(event:IpcMainInvokeEvent):void {
   if (!mainWindow || mainWindow.isDestroyed() ||
