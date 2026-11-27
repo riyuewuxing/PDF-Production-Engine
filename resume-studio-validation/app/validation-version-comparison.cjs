@@ -121,7 +121,14 @@ async function run(){
  }finally{if(debug.isAttached()){await debug.sendCommand('Emulation.clearDeviceMetricsOverride').catch(()=>{});debug.detach();}}
  await until('wide viewport restored',()=>js(()=>innerWidth>=768));
  // Closing or turning on the privacy redaction mode must discard raw comparison output.
- await close();await click('隐私脱敏');
+ await close();
+ // The row-specific comparison action must select the exact snapshot without triggering rollback.
+ const directOpened=await js(()=>{const row=[...document.querySelectorAll('button[aria-label^="对比历史快照"]')].find(b=>b.parentElement?.textContent.includes('合成历史基准'));if(!row||row.disabled)return false;row.click();return true;});
+ assert(directOpened,'direct historical comparison button missing');
+ await until('direct snapshot comparison',modal);
+ assert(await js(id=>document.querySelector('select[aria-label="对照来源"]')?.value==='snapshot:'+id,snap.id),'direct action selected wrong historical record');
+ await read();await until('direct snapshot read',()=>has('history@example.invalid'));unchanged();checks.directSnapshotEntryReadOnly=true;await close();
+ await click('隐私脱敏');
  await until('privacy comparison gate',()=>js(()=>[...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='对比版本 / 历史快照'&&b.disabled)));
  assert(!await modal(),'comparison visible in redaction mode');await capture('12-redaction-disabled');checks.redactionBlocksRawComparison=true;
  await click('脱敏模式中');await open();await select('对照来源','disk:target-compare');await read();await until('comparison after reopening',()=>has('target@example.invalid'));

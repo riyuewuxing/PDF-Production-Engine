@@ -1213,8 +1213,9 @@ export function createLocalFsMiddleware(store: LocalResumeStore) {
           const host=req.headers.host??'',origin=req.headers.origin,site=req.headers['sec-fetch-site'];
           const localPeer=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress??'');
           const localHost=/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$/i.test(host);
+          const scheme='encrypted' in req.socket&&req.socket.encrypted?'https:':'http:';
           let originMatches=true;
-          if(origin!==undefined){try{const u=new URL(origin);originMatches=['http:','https:'].includes(u.protocol)&&u.host.toLowerCase()===host.toLowerCase()&&!u.username&&!u.password;}catch{originMatches=false;}}
+          if(origin!==undefined){try{const u=new URL(origin);originMatches=u.protocol===scheme&&u.host.toLowerCase()===host.toLowerCase()&&!u.username&&!u.password&&u.pathname==='/'&&!u.search&&!u.hash;}catch{originMatches=false;}}
           if(!localPeer||!localHost||!originMatches||(site!==undefined&&site!=='same-origin'&&site!=='none'))throw new LocalFsApiError(403,'SNAPSHOT_LOCAL_ONLY','历史快照对照仅允许本地同源读取。');
           if(method!=='GET'){res.setHeader('Allow','GET');throw new LocalFsApiError(405,'METHOD_NOT_ALLOWED','历史快照对照只支持 GET，不执行任何写入。');}
           sendJson(res,200,await store.getSnapshotForComparison(previewMatch[1],previewMatch[2]));return;
