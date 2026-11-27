@@ -1,0 +1,253 @@
+name: Resume Studio T46 final security and recovery release gate
+on:
+  push:
+    branches: ['resume-studio/v6-security-final-turn46']
+permissions:
+  contents: read
+concurrency:
+  group: resume-studio-t46-security-final
+  cancel-in-progress: true
+jobs:
+  storage:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Candidate typecheck
+        timeout-minutes: 2
+        run: pnpm typecheck
+      - name: Fixed-source storage and containment tests
+        timeout-minutes: 3
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'security-evidence'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          if ($IsWindows) { pnpm exec vitest run --reporter=json --outputFile="$out/storage-vitest.json" } else { pnpm exec vitest run src/server --reporter=json --outputFile="$out/storage-vitest.json" }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload storage evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-final-storage-${{ matrix.os }}
+          path: security-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  recovery:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Electron
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Damaged startup backup restore
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-list-backup-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/backup'
+          & .\node_modules\.bin\electron.cmd .\validation-startup-backup.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Forced process termination and restart
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_CRASH_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/crash'
+          node scripts/qa-crash-draft.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-final-recovery
+          path: security-evidence/
+          if-no-files-found: error
+          retention-days: 3
+  containment:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Electron
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Actual redirected workspace refuses startup
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_BOOTSTRAP_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/startup'
+          node validation-workspace-containment.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native editor and archive containment
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-contained-editor-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/editor'
+          & .\node_modules\.bin\electron.cmd .\validation-managed-editor.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native snapshot rotation and rollback
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-snapshot-ui-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/snapshot'
+          & .\node_modules\.bin\electron.cmd .\validation-snapshot-integrity.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-final-containment
+          path: security-evidence/
+          if-no-files-found: error
+          retention-days: 3
+
+  scoped-backup:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Electron
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Real scoped backup, warning and independent restore
+        timeout-minutes: 3
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t46-queue-backup-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'security-evidence/scoped-backup'
+          & .\node_modules\.bin\electron.cmd .\validation-scoped-backup-turn46.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-final-scoped-backup
+          path: security-evidence/
+          if-no-files-found: error
+          retention-days: 3
+
+  actual-execution:
+    runs-on: windows-latest
+    timeout-minutes: 14
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real desktop control, failure and actual timeout
+        timeout-minutes: 5
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-queue-execution-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'queue-execution-evidence/control'
+          $env:QUEUE_PHASE = 'control'
+          & .\node_modules\.bin\electron.cmd .\validation-job-queue-execution.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Completion write fault and independent cold restart
+        timeout-minutes: 5
+        run: |
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-queue-execution-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'queue-execution-evidence/restart'
+          $env:QUEUE_PHASE = 'interrupt'
+          & .\node_modules\.bin\electron.cmd .\validation-job-queue-execution.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:QUEUE_PHASE = 'restart'
+          & .\node_modules\.bin\electron.cmd .\validation-job-queue-execution.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload actual evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t46-final-queue-execution
+          path: queue-execution-evidence/
+          if-no-files-found: warn
+          retention-days: 3

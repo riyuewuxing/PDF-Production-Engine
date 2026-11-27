@@ -1,0 +1,91 @@
+const {app,dialog}=require('electron');
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
+if(!root||!out||!path.basename(root).startsWith('synthetic-t46-queue-backup-'))throw Error('isolated scoped backup fixture required');
+fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
+const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
+const checks={},observations={},sleep=ms=>new Promise(r=>setTimeout(r,ms)),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const parent=fs.mkdtempSync(path.join(path.dirname(root),'synthetic-t46-backup-target-')),originalDialog=dialog.showOpenDialog;
+const report=error=>fs.writeFileSync(path.join(out,'scoped-backup-evidence.json'),JSON.stringify({runnerSha:process.env.GITHUB_SHA,platform:process.platform,checks,observations,...(error?{error:String(error)}:{})},null,2));
+const watchdog=setTimeout(()=>{console.error('scoped backup watchdog');report(Error('watchdog'));app.exit(2)},155000);
+const assert=(v,m)=>{if(!v)throw Error(m)};
+async function until(label,fn,ms=18000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(150)}throw Error('timeout '+label)}
+const canonical=doc=>JSON.stringify(doc,(_k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);
+async function run(){
+  const store=main.store,slug='runner-fixture';
+  await store.saveResume('master',{...fixture,id:'synthetic-t46-master',title:'合成备份母库'});
+  const doc=await store.saveResume(slug,{...fixture,id:'synthetic-t46-job',title:'合成岗位备份原稿'});
+  const task=company=>({taskVersion:1,id:crypto.randomUUID(),company,role:'合成物理教师',jdText:'必须具备教师资格。',slug,docId:doc.id,documentRevision:JSON.stringify([doc.id,doc.updatedAt]),documentSha256:sha(canonical(doc)),createdAt:new Date().toISOString(),status:'pending'});
+  const x=task('合成备份甲校'),y=task('合成备份乙校');
+  let ledger=await store.getApplications();
+  ledger=await store.saveApplications({...ledger,jobQueue:[x,y]},ledger.revision);
+  for(const t of [x,y]){
+    const started=await store.commandJobQueue({taskId:t.id,ledgerRevision:ledger.revision,action:'start'});
+    const result=await store.prepareJobQueueAttempt(started.started,new AbortController().signal);
+    ledger=await store.finishJobQueueAttempt(t.id,started.started.execution.attemptId,{result});
+  }
+  await main.registerAssetProtocol();main.registerIpcHandlers();
+  const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
+  const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(v=>JSON.stringify(v)).join(',')+')');
+  const has=t=>js(t=>document.body.innerText.includes(t),t);
+  const enabled=label=>js(label=>[...document.querySelectorAll('button')].some(b=>b.innerText.trim()===label&&!b.disabled),label);
+  const click=async label=>{await until('button '+label,()=>enabled(label));assert(await js(label=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===label&&!b.disabled);if(!b)return false;b.scrollIntoView({block:'center'});b.click();return true},label),'missing '+label)};
+  const capture=async (name,word)=>{if(word)await js(word=>{const e=[...document.querySelectorAll('p')].find(x=>x.innerText.includes(word));e?.scrollIntoView({block:'center'})},word);await js(()=>document.fonts.ready.then(()=>true));await sleep(350);const shot=await win.webContents.capturePage();assert(!shot.isEmpty(),'empty screenshot');fs.writeFileSync(path.join(out,name+'.png'),shot.toPNG())};
+  await until('editor ready',()=>js(()=>!!document.querySelector('#basic-field-name')));
+  const exported=await js(async ({doc,x,revision})=>window.resumeDesktop.pdf.export({slug:x.slug,document:doc,queueScope:{taskId:x.id,ledgerRevision:revision},saveAs:false}),{doc,x,revision:ledger.revision});
+  assert(exported.filePath&&exported.pdfReceiptToken&&exported.pdfReceipt,'real PDF receipt unavailable');
+  const pdf=fs.readFileSync(exported.filePath);assert(pdf.subarray(0,5).toString()==='%PDF-'&&sha(pdf)===exported.pdfReceipt.sha256,'PDF bytes mismatch');
+  const entry={id:crypto.randomUUID(),queueTaskId:x.id,company:x.company,role:x.role,resumeSlug:x.slug,jdText:x.jdText,status:'wishlist',exportedFilePath:exported.filePath};
+  await js(input=>window.resumeDesktop.applications.log(input),{entry,document:doc,pdfReceiptToken:exported.pdfReceiptToken});
+  ledger=await store.getApplications();const archived=ledger.applications.find(a=>a.id===entry.id);assert(archived?.snapshotId,'sealed record missing');
+  const snapshotFile=path.join(store.appSnapshotsDir,archived.snapshotId+'.json'),originalSnapshot=fs.readFileSync(snapshotFile),source=store.resolveResumePath(slug).filePath;
+  const raw=JSON.parse(fs.readFileSync(store.applicationsPath,'utf8'));raw.applications.find(a=>a.id===entry.id).snapshotId=archived.snapshotId+'.json';
+  fs.writeFileSync(store.applicationsPath,JSON.stringify(raw));
+  ledger=await store.getApplications();
+  const link={applicationId:entry.id,snapshotId:archived.snapshotId+'.json',ledgerRevision:ledger.revision};
+  assert((await js(link=>window.resumeDesktop.applications.getLinkedSnapshot(link),link)).meta.queueTaskId===x.id,'legacy suffix link not readable');
+  const ledgerBytes=fs.readFileSync(store.applicationsPath),sourceBytes=fs.readFileSync(source);
+  const preserve=()=>{assert(fs.readFileSync(store.applicationsPath).equals(ledgerBytes),'source ledger changed');assert(fs.readFileSync(source).equals(sourceBytes),'source document changed');assert(fs.readFileSync(exported.filePath).equals(pdf),'original PDF changed')};
+  // All native folder selections are synthetic injected choices. The trusted IPC,
+  // renderer, manifest verification and on-disk backup/restore paths are real.
+  const choose=dir=>{dialog.showOpenDialog=async(_owner,options)=>{assert(options.properties.includes('openDirectory'),'expected directory picker');return {canceled:false,filePaths:[dir]}}};
+  win.webContents.reload();await until('editor reloaded',()=>js(()=>!!document.querySelector('#basic-field-name')));
+  await click('版本母库');
+  const backups=()=>fs.readdirSync(parent).filter(n=>n.startsWith('resume-studio-backup-v1-')).sort();
+  const create=async()=>{const before=new Set(backups());choose(parent);await click('创建本地工作区备份');await until('actual backup result',()=>has('已创建并校验工作区备份。'));const added=backups().filter(n=>!before.has(n));assert(added.length===1,'expected one new backup');return path.join(parent,added[0])};
+  const verifyCopy=(folder,manifest)=>{for(const f of manifest.files){const b=fs.readFileSync(path.join(folder,'data',...f.path.split('/')));assert(b.length===f.size&&sha(b)===f.sha256,'copy digest mismatch '+f.path)}};
+  const healthy=await create(),healthyManifest=JSON.parse(fs.readFileSync(path.join(healthy,'workspace-backup-v1.json'),'utf8'));
+  verifyCopy(healthy,healthyManifest);preserve();
+  assert(!await has('原数据存在异常，备份不会修复这些问题'),'valid suffix false warning');
+  assert(fs.readFileSync(path.join(healthy,'data','.application-snapshots',path.basename(snapshotFile))).equals(originalSnapshot),'healthy snapshot bytes mismatch');
+  checks.healthyLegacyLinkNoWarning=true;await capture('01-valid-legacy-backup','已校验');
+  const snap=JSON.parse(originalSnapshot.toString('utf8'));snap.meta.queueTaskId=y.id;const altered=Buffer.from(JSON.stringify(snap));
+  fs.writeFileSync(snapshotFile,altered);
+  const denied=await js(link=>window.resumeDesktop.applications.getLinkedSnapshot(link).then(()=>false,e=>String(e).includes('不一致')),link);
+  assert(denied,'misbound snapshot unexpectedly readable');preserve();
+  const damaged=await create(),damagedManifest=JSON.parse(fs.readFileSync(path.join(damaged,'workspace-backup-v1.json'),'utf8'));
+  const warning='原数据已有永久投递快照关联异常：'+link.snapshotId;
+  await until('actual corruption warning in backup',()=>has(warning));verifyCopy(damaged,damagedManifest);preserve();
+  assert(fs.readFileSync(snapshotFile).equals(altered),'backup repaired or changed source snapshot');
+  checks.misboundSnapshotWarnedWithoutRepair=true;await capture('02-misbound-backup-warning',warning);
+  choose(damaged);await click('检查已有备份');await until('inspection complete',()=>has('备份文件清单及内容校验完成'));await until('inspection warning',()=>has(warning));
+  assert(await js(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='恢复到独立新工作区')?.disabled===true),'restore allowed without approval');
+  checks.inspectionRetainsWarningAndRequiresApproval=true;await capture('03-inspection-warning',warning);
+  assert(await js(()=>{const e=document.querySelector('input[aria-label="确认恢复到独立新工作区"]');if(!e||e.disabled)return false;e.click();return e.checked}),'restore approval unavailable');
+  choose(parent);await click('恢复到独立新工作区');await until('restore complete',()=>has('已恢复并校验独立新工作区'));await until('restored warning',()=>has(warning));
+  const copies=fs.readdirSync(parent).filter(n=>n.startsWith('resume-studio-restored-v1-'));assert(copies.length===1,'expected one independent restored folder');
+  const restored=path.join(parent,copies[0]);verifyCopy(restored,damagedManifest);preserve();
+  const copy=new store.constructor(path.join(restored,'data'));const read=await copy.getApplications();
+  assert(read.revision===ledger.revision&&read.jobQueue.every(t=>t.status==='prepared'),'restored ledger changed');
+  const rejected=await copy.getLinkedApplicationSnapshot(link).then(()=>false,e=>e.code==='APPLICATION_SNAPSHOT_LINK');
+  assert(rejected,'restored misbound snapshot readable');
+  assert((await copy.openPreparedJobQueue({taskId:y.id,ledgerRevision:ledger.revision})).task.id===y.id,'other job not usable');
+  assert(fs.readFileSync(snapshotFile).equals(altered)&&fs.readFileSync(path.join(healthy,'data','.application-snapshots',path.basename(snapshotFile))).equals(originalSnapshot),'source or healthy backup changed');
+  assert(!fs.existsSync(path.join(restored,'exports'))&&!fs.existsSync(path.join(restored,'data','.ai-settings.json')),'excluded output or credentials copied');
+  checks.restoreByteExactAndStillRefusesMisboundLink=true;await capture('04-independent-restore-warning',warning);
+  Object.assign(observations,{ledgerSha256:sha(ledgerBytes),healthySnapshotSha256:sha(originalSnapshot),alteredSnapshotSha256:sha(altered),pdfSha256:sha(pdf),healthyFiles:healthyManifest.files.length,damagedFiles:damagedManifest.files.length});
+  // Keep independent raw-byte evidence, not credentials, personal data or an actual user's workspace.
+  for(const [name,bytes] of Object.entries({'actual.pdf':pdf,'source-ledger.json':ledgerBytes,'restored-ledger.json':fs.readFileSync(copy.applicationsPath),'healthy-snapshot.json':originalSnapshot,'altered-source-snapshot.json':altered,'restored-snapshot.json':fs.readFileSync(path.join(copy.appSnapshotsDir,path.basename(snapshotFile))),'healthy-manifest.json':JSON.stringify(healthyManifest),'damaged-manifest.json':JSON.stringify(damagedManifest)}))fs.writeFileSync(path.join(out,name),bytes);
+  report();
+}
+app.whenReady().then(run).then(()=>{clearTimeout(watchdog);dialog.showOpenDialog=originalDialog;fs.rmSync(parent,{recursive:true,force:true});app.exit(0)}).catch(e=>{clearTimeout(watchdog);console.error(e);report(e);dialog.showOpenDialog=originalDialog;app.exit(1)});
