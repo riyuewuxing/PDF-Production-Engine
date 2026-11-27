@@ -930,14 +930,14 @@ export function JobCareerPane({
                     </button>
                   </div>
 
-                  {(storeData.coverLetters ?? []).length > 0 && (
+                  {(storeData.coverLetters ?? []).some(l=>!l.queueTaskId) && (
                     <div className="space-y-1.5 border-t border-slate-100 pt-2">
                       <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
                         <Bookmark size={11} className="text-teal-600" />
-                        已存自荐信版本库 ({storeData.coverLetters.length})
+                        已存自荐信版本库 ({storeData.coverLetters.filter(l=>!l.queueTaskId).length})
                       </div>
                       <div className="space-y-1">
-                        {storeData.coverLetters.map((saved) => (
+                        {storeData.coverLetters.filter(l=>!l.queueTaskId).map((saved) => (
                           <div
                             key={saved.id}
                             className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px]"

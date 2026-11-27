@@ -8,6 +8,7 @@ import {
   type ApplicationStatus,
   type JobApplication,
   type PdfArtifactReceipt,
+  type JobQueueTask,
 } from '../../schema/applicationSchema';
 import type { ResumeDocument } from '../../schema/resumeSchema';
 
@@ -25,6 +26,8 @@ interface QuickLogApplicationModalProps {
   snapshot: FrozenPdfExportSnapshot | null;
   defaultJdText?: string;
   defaultAtsScore?: number | null;
+  queueTask?:JobQueueTask;
+  beforeSubmit?:()=>Promise<unknown>;
   onClose: () => void;
   onLogged: (entry: JobApplication) => void;
 }
@@ -34,6 +37,7 @@ export function QuickLogApplicationModal({
   snapshot,
   defaultJdText = '',
   defaultAtsScore = null,
+  queueTask,beforeSubmit,
   onClose,
   onLogged,
 }: QuickLogApplicationModalProps) {
@@ -52,15 +56,15 @@ export function QuickLogApplicationModal({
   useEffect(() => {
     if (!isOpen || !snapshot) return;
     requestId.current=null;
-    setCompany('');
-    setRole(snapshot.document.basic.title || '');
+    setCompany(queueTask?.company??'');
+    setRole(queueTask?.role??snapshot.document.basic.title??'');
     setCity(snapshot.document.basic.location || '');
     setSalary('');
-    setStatus('applied');
-    setJdText(defaultJdText);
+    setStatus(queueTask?'wishlist':'applied');
+    setJdText(queueTask?.jdText??defaultJdText);
     setNotes('');
     setErrorMsg(null);
-  }, [defaultJdText, isOpen, snapshot]);
+  }, [defaultJdText, isOpen, snapshot,queueTask]);
 
   if (!isOpen || !snapshot) return null;
 
@@ -75,18 +79,20 @@ export function QuickLogApplicationModal({
     setSaving(true);
     setErrorMsg(null);
     try {
+      if(queueTask){if(!beforeSubmit)throw Error('缺少岗位流程重新核验。');await beforeSubmit();}
       const now = new Date().toISOString();
       const appId=requestId.current??crypto.randomUUID();
       requestId.current=appId;
       const entry: JobApplication = {
         id: appId,
+        ...(queueTask?{queueTaskId:queueTask.id}:{}),
         company: company.trim(),
         role: role.trim() || snapshot.document.basic.title || '目标岗位',
         city: city.trim(),
         salary: salary.trim(),
         resumeSlug: snapshot.slug || 'resume',
         status,
-        appliedDate: now.slice(0, 10),
+        appliedDate: queueTask&&status==='wishlist'?'':now.slice(0, 10),
         notes: notes.trim(),
         // Keep the exact pasted source: review offsets and sealed-JD linkage depend on it.
         jdText,
@@ -94,7 +100,7 @@ export function QuickLogApplicationModal({
         exportedFilePath: snapshot.filePath,
         interviewAt: '',
         interviewLocation: '',
-        atsScore: defaultAtsScore,
+        atsScore: queueTask?null:defaultAtsScore,
         updatedAt: now,
       };
       if(snapshot.isRedacted||!snapshot.pdfReceiptToken)throw Error('当前导出没有可用的原稿字节凭证，请重新导出。');
@@ -118,7 +124,7 @@ export function QuickLogApplicationModal({
     >
       <form
         onSubmit={(e) => void handleSubmit(e)}
-        className="w-full max-w-lg rounded-xl border border-slate-700 bg-[#19202c] p-5 text-xs text-slate-100 shadow-2xl space-y-3.5"
+        className="max-h-[90vh] overflow-y-auto w-full max-w-lg rounded-xl border border-slate-700 bg-[#19202c] p-5 text-xs text-slate-100 shadow-2xl space-y-3.5"
       >
         <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
           <div className="flex items-center gap-2 text-sm font-bold text-white">
@@ -145,6 +151,7 @@ export function QuickLogApplicationModal({
           </div>
           <div className="mt-1 break-all text-emerald-200/90">SHA256：{snapshot.pdfReceipt.sha256} · {snapshot.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>
           <div className="mt-1 text-slate-300">封存前将重新核验 PDF 字节；不证明实际发送或送达。</div>
+          {queueTask&&<p className="mt-1 break-words">固定岗位：{queueTask.company} · {queueTask.role}。默认待投递，须本人确认实际状态；不发送材料。</p>}
         </div>
 
         {errorMsg && (
@@ -159,7 +166,7 @@ export function QuickLogApplicationModal({
             <input
               type="text"
               data-native-undo="true"
-              value={company}
+              readOnly={!!queueTask} value={company}
               onChange={(e) => setCompany(e.target.value)}
               placeholder="如：示例第一中学"
               className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
@@ -170,7 +177,7 @@ export function QuickLogApplicationModal({
             <input
               type="text"
               data-native-undo="true"
-              value={role}
+              readOnly={!!queueTask} value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder="如：高中物理教师"
               className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
@@ -219,7 +226,7 @@ export function QuickLogApplicationModal({
           <textarea
             rows={3}
             data-native-undo="true"
-            value={jdText}
+            readOnly={!!queueTask} value={jdText}
             onChange={(e) => setJdText(e.target.value)}
             placeholder="可粘贴本岗位招聘启事或考核要求..."
             className="w-full rounded border border-slate-700 bg-slate-900 p-2 text-white focus:border-teal-400 focus:outline-none"

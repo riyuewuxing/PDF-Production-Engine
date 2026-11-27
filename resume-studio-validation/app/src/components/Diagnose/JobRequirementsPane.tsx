@@ -2,7 +2,7 @@ import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {JobAiReviewPane} from './JobAiReviewPane';
 import type {AiTextReviewActions,JobReviewApplyGuard} from './ResumeAiAssistantPane';
 import {resumeRevision,type ResumeDocument} from '../../schema/resumeSchema';
-import {ApplicationsStoreSchema,JobReviewArchiveSchema,MAX_JOB_REVIEW_ARCHIVES,type JobReviewArchive} from '../../schema/applicationSchema';
+import {ApplicationsStoreSchema,JobReviewArchiveSchema,MAX_JOB_REVIEW_ARCHIVES,type JobReviewArchive,type JobQueueTask} from '../../schema/applicationSchema';
 import {jobPdfPageForRange,sameJobPdfOrigin,type JobPdfOrigin} from '../../schema/jobPdfSourceSchema';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import type {FactBank} from '../../schema/factBankSchema';
@@ -13,18 +13,19 @@ import {splitJobRequirements,collectLocalJobEvidence,evidenceKeywordHints,blankR
 const priorityLabel:Record<RequirementPriority,string>={unknown:'待判定',mandatory:'硬条件',preferred:'优先条件','not-requirement':'非招聘条件'};
 const outcomeLabel:Record<RequirementOutcome,string>={unchecked:'待核对',supported:'本人核对：已有自述依据',gap:'本人标记：存在缺口'};
 function historicalClauses(a:JobReviewArchive){try{return new Map(splitJobRequirements(a.source).map(c=>[c.id,c]));}catch{return new Map<string,RequirementClause>();}}
-type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string;rewriteActions:AiTextReviewActions};
+type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string;rewriteActions?:AiTextReviewActions;queueTask?:JobQueueTask};
 type Session={source:string;pdfOrigin?:JobPdfOrigin;doc:ResumeDocument;slug:string;clauses:RequirementClause[]};
-export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision,rewriteActions}:Props){
+export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision,rewriteActions,queueTask}:Props){
   const desktop=isDesktopMode();
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const [applicationId,setApplicationId]=useState('');
   const [showAllArchives,setShowAllArchives]=useState(false);
   const canUseLedger=desktop&&ledger.ready&&!ledger.dirty&&!ledger.saving&&!ledger.loading&&!ledger.error;
-  const archives=(ledger.data.jobReviews??[]).filter(a=>a.slug===slug&&a.docId===document.id);
-  const visibleArchives=showAllArchives?(ledger.data.jobReviews??[]):archives;
-  const eligibleApplications=ledger.data.applications.filter(a=>a.resumeSlug===slug&&a.jdText===jdText&&!!a.snapshotId);
-  useEffect(()=>{if(desktop)void careerLedger.load().catch(()=>{});},[desktop]);
+  const scopeArchives=(ledger.data.jobReviews??[]).filter(a=>a.queueTaskId===queueTask?.id);
+  const archives=scopeArchives.filter(a=>a.slug===slug&&a.docId===document.id);
+  const visibleArchives=showAllArchives&&!queueTask?scopeArchives:archives;
+  const eligibleApplications=ledger.data.applications.filter(a=>a.queueTaskId===queueTask?.id&&a.resumeSlug===slug&&a.jdText===jdText&&!!a.snapshotId);
+  useEffect(()=>{if(desktop&&!queueTask)void careerLedger.load().catch(()=>{});},[desktop,queueTask]);
   const [session,setSession]=useState<Session|null>(null);
   const [bank,setBank]=useState<FactBank|null>(null);
   const [reviews,setReviews]=useState<Record<string,RequirementReview>>({});
@@ -121,11 +122,11 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       }
       const linked=selected?before.applications.find(a=>a.id===selected):undefined;
       if(selected){
-        if(!linked||!linked.snapshotId||linked.resumeSlug!==s.slug||linked.jdText!==s.source)throw new Error('投递记录与岗位原文或版本不一致，未关联。');
+        if(!linked||linked.queueTaskId!==queueTask?.id||!linked.snapshotId||linked.resumeSlug!==s.slug||linked.jdText!==s.source)throw new Error('投递记录与岗位原文或版本不一致，未关联。');
         const snap=await apiClient.getApplicationSnapshot(linked.snapshotId);
-        if(snap.meta.applicationId!==linked.id||snap.meta.resumeSlug!==s.slug||!sameJobReviewDocument(snap.document,doc))throw new Error('永久投递快照与当前简历内容不一致，不能关联。');
+        if(snap.meta.queueTaskId!==queueTask?.id||snap.meta.applicationId!==linked.id||snap.meta.resumeSlug!==s.slug||!sameJobReviewDocument(snap.document,doc))throw new Error('永久投递快照与当前简历内容不一致，不能关联。');
       }
-      const archive=JobReviewArchiveSchema.parse({reviewVersion:1,id:crypto.randomUUID(),slug:s.slug,docId:doc.id,documentRevision:revision,factRevision:fresh?.revision??null,basisHash:hash,source:s.source,pdfOrigin:s.pdfOrigin,createdAt:new Date().toISOString(),applicationId:linked?.id??null,snapshotId:linked?.snapshotId??null,rows:Object.entries(records).map(([clauseId,review])=>({clauseId,review}))});
+      const archive=JobReviewArchiveSchema.parse({reviewVersion:1,...(queueTask?{queueTaskId:queueTask.id}:{}),id:crypto.randomUUID(),slug:s.slug,docId:doc.id,documentRevision:revision,factRevision:fresh?.revision??null,basisHash:hash,source:s.source,pdfOrigin:s.pdfOrigin,createdAt:new Date().toISOString(),applicationId:linked?.id??null,snapshotId:linked?.snapshotId??null,rows:Object.entries(records).map(([clauseId,review])=>({clauseId,review}))});
       await restoreArchivedJobReview(archive,doc,fresh,revision);
       if(!stillCurrent(s)||getRevision()!==revision||requireLedger().revision!==before.revision)throw new Error('岗位、简历或台账已变化，未保存档案。');
       const proposed=[archive,...(before.jobReviews??[])];
@@ -138,7 +139,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
     });
   };
   const restoreArchive=(archive:JobReviewArchive)=>{
-    if(archive.source!==jdText||archive.slug!==slug||archive.docId!==document.id||!sameJobPdfOrigin(archive.pdfOrigin,pdfOrigin))return;
+    if(archive.queueTaskId!==queueTask?.id||archive.source!==jdText||archive.slug!==slug||archive.docId!==document.id||!sameJobPdfOrigin(archive.pdfOrigin,pdfOrigin))return;
     const s:Session={source:jdText,pdfOrigin,doc:document,slug,clauses:[]};
     void task(async()=>{
       requireLedger();
@@ -192,7 +193,8 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
       <p>历史档案不会自动成为当前结论；恢复时重新校验原文、版本、事实和内容。仅本地保存，不进入模型请求。</p>
       {!canUseLedger&&<p className="text-amber-800">{ledger.error||'台账尚未就绪或存在未保存草稿。'} 请在投递台账处理保存、重试或重载。</p>}
       <button type="button" disabled={busy||ledger.loading||ledger.saving||ledger.dirty} onClick={()=>void task(async()=>{await careerLedger.load();setNotice('已读取本地核对档案。');})} className="rounded border px-2 py-1">刷新本地核对档案</button>
-      <label className="flex items-center gap-1"><input type="checkbox" checked={showAllArchives} disabled={busy} onChange={e=>setShowAllArchives(e.target.checked)}/>显示全部简历版本的历史档案</label>
+      {!queueTask&&<label className="flex items-center gap-1"><input type="checkbox" checked={showAllArchives} disabled={busy} onChange={e=>setShowAllArchives(e.target.checked)}/>显示全部简历版本的历史档案</label>}
+      {queueTask&&<p>仅显示当前岗位任务的核对档案，不会载入其他岗位的原文或记录。</p>}
       {visibleArchives.map(a=>{const clauses=historicalClauses(a);return <div key={a.id} className="space-y-1 rounded border p-2">
         <div className="font-medium">{new Date(a.createdAt).toLocaleString()} · {a.rows.length} 条人工核对 · {a.slug===slug&&a.docId===document.id?'当前简历':a.slug+'（其他版本）'}</div>
         {a.pdfOrigin&&<p className="text-indigo-800">PDF 提取来源：{a.pdfOrigin.fileName} · 第 {a.pdfOrigin.pages.map(p=>p.page).join('、')} 页 / 共 {a.pdfOrigin.totalPages} 页（历史选择）</p>}
@@ -206,14 +208,14 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
           </div>
         </details>
         <div className="flex flex-wrap gap-1">
-          <button type="button" disabled={busy||!canUseLedger||a.slug!==slug||a.docId!==document.id} onClick={()=>onJdTextChange(a.source,a.pdfOrigin)} className="rounded border px-2 py-1">载入档案原文</button>
+          {!queueTask&&<button type="button" disabled={busy||!canUseLedger||a.slug!==slug||a.docId!==document.id} onClick={()=>onJdTextChange(a.source,a.pdfOrigin)} className="rounded border px-2 py-1">载入档案原文</button>}
           <button type="button" disabled={busy||!canUseLedger||a.source!==jdText||!sameJobPdfOrigin(a.pdfOrigin,pdfOrigin)||a.slug!==slug||a.docId!==document.id} onClick={()=>restoreArchive(a)} className="rounded border px-2 py-1">恢复档案核对</button>
           <button type="button" disabled={busy||!canUseLedger} onClick={()=>deleteArchive(a)} className="rounded border px-2 py-1 text-red-700">删除核对档案</button>
         </div>
       </div>})}
     </div>}
     {current&&<>
-      <JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} rewriteActions={rewriteActions} jobApplyGuard={jobApplyGuard} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>
+      {!queueTask&&rewriteActions&&<JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} rewriteActions={rewriteActions} jobApplyGuard={jobApplyGuard} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>}
       <div className="flex flex-wrap gap-2 text-slate-700"><span>候选 {session.clauses.length} 条</span><span>已记录 {totals.length} 条</span><span>本人标记硬条件 {totals.filter(r=>r.priority==='mandatory').length}</span><span>自述支持 {totals.filter(r=>r.outcome==='supported').length}</span><span>缺口 {totals.filter(r=>r.outcome==='gap').length}</span></div>
       <button type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1">加载 / 刷新岗位事实依据</button>
       <div className="text-slate-600">{bank?'本地事实版本已读取：'+checkedAt:'尚未加载独立事实库，仅显示简历自述。'} 事实库变化后请刷新；保存核对结果时再次校验已加载的版本。</div>

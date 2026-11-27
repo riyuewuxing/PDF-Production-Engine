@@ -1,28 +1,28 @@
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
-import {JobReviewArchiveSchema} from '../../schema/applicationSchema';
+import {JobReviewArchiveSchema,type JobQueueTask} from '../../schema/applicationSchema';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {visibleBasicValue} from '../../lib/aiContext';
 import {interviewRole,preparePracticeQuestions,practiceHistory,buildPracticeText,type PreparedPractice} from '../../lib/interviewPractice';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
 
-export function InterviewPracticePane({document,slug}:{document:ResumeDocument;slug:string}){
+export function InterviewPracticePane({document,slug,queueTask,beforeQueueExport}:{document:ResumeDocument;slug:string;queueTask?:JobQueueTask;beforeQueueExport?:()=>Promise<unknown>}){
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
-  const [role,setRole]=useState('');
+  const [role,setRole]=useState(queueTask?.role??'');
   const [archiveId,setArchiveId]=useState('');
   const exportGuard=useRef(false);
   const [exporting,setExporting]=useState(false),[exportNotice,setExportNotice]=useState('');
-  const archives=(ledger.data.jobReviews??[]).filter(a=>a.docId===document.id&&a.slug===slug);
+  const archives=(ledger.data.jobReviews??[]).filter(a=>a.queueTaskId===queueTask?.id&&a.docId===document.id&&a.slug===slug);
   const archiveText=archiveId?JSON.stringify(archives.find(a=>a.id===archiveId)??null):'';
-  const target=interviewRole(document,role);
-  const basis=useMemo(()=>({document,slug,target,archiveText}),[document,slug,target,archiveText]);
+  const target=interviewRole(document,queueTask?.role??role);
+  const basis=useMemo(()=>({document,slug,target,archiveText,queueTaskId:queueTask?.id}),[document,slug,target,archiveText,queueTask?.id]);
   const [prepared,setPrepared]=useState<{basis:typeof basis;rows:PreparedPractice[];error?:string}|null>(null);
   useEffect(()=>{
     let alive=true;
     void (async()=>{
       try{
         const archive=basis.archiveText?JobReviewArchiveSchema.parse(JSON.parse(basis.archiveText)):undefined;
-        const rows=await preparePracticeQuestions(basis.document,basis.slug,basis.target,archive);
+        const rows=await preparePracticeQuestions(basis.document,basis.slug,basis.target,archive,basis.queueTaskId);
         if(alive)setPrepared({basis,rows});
       }catch(e){if(alive)setPrepared({basis,rows:[],error:localErrorMessage(e,'无法核对面试练习依据')});}
     })();
@@ -30,7 +30,7 @@ export function InterviewPracticePane({document,slug}:{document:ResumeDocument;s
   },[basis]);
   const current=prepared?.basis===basis?prepared:null;
   const rows=current?.rows??[];
-  const {history,legacy,foreignCount}=practiceHistory(ledger.data.interviewAnswers,document.id,slug,rows);
+  const {history,legacy,foreignCount}=practiceHistory(ledger.data.interviewAnswers,document.id,slug,rows,queueTask?.id);
   const editable=!!current&&!current.error&&ledger.ready&&!ledger.loading;
   const answered=rows.filter(q=>ledger.data.interviewAnswers[q.answerKey]?.trim()).length;
   const write=(key:string,answer:string)=>{
@@ -42,9 +42,10 @@ export function InterviewPracticePane({document,slug}:{document:ResumeDocument;s
     exportGuard.current=true;setExporting(true);setExportNotice('');
     const label=target+' · '+(archiveId?'历史档案':'当前自述');
     try{
+      if(queueTask)await beforeQueueExport?.();
       const snapshot=careerLedger.getSnapshot();
       const content=buildPracticeText({role:target,rows,answers:snapshot.data.interviewAnswers,historical:!!archiveId,unconfirmed:snapshot.dirty||snapshot.saving||!!snapshot.error});
-      const result=await apiClient.saveTextFile({defaultFileName:'面试练习.txt',extension:'txt',content,dialogTitle:'导出当前面试练习（含本人草稿和显示依据）',saveAs:true});
+      const result=await apiClient.saveTextFile({defaultFileName:'面试练习.txt',extension:'txt',content:queueTask?'岗位单位：'+queueTask.company+'\n任务 ID：'+queueTask.id+'\n'+content:content,dialogTitle:'导出当前面试练习（含本人草稿和显示依据）',saveAs:true});
       setExportNotice(result.canceled?'已取消导出（'+label+'）':result.filePath?'已导出所选练习（'+label+'）：'+result.filePath:'已请求浏览器下载（'+label+'），未核验文件写入。');
     }catch(e){setExportNotice(localErrorMessage(e,'导出面试练习失败'));}
     finally{exportGuard.current=false;setExporting(false);}
@@ -52,8 +53,8 @@ export function InterviewPracticePane({document,slug}:{document:ResumeDocument;s
   return <section aria-label="本地面试练习" className="space-y-3">
     <div className="space-y-2 rounded-lg border border-teal-200 bg-teal-50 p-3">
       <strong className="text-teal-900">面试练习 · 本地生成，不调用 AI</strong>
-      <label className="block">练习目标岗位<input aria-label="面试练习目标岗位" value={role} onChange={e=>setRole(e.target.value)} placeholder={visibleBasicValue(document,'title')||'目标岗位'} className="mt-1 w-full rounded border bg-white p-1.5"/></label>
-      <p className="text-slate-600">当前目标：{target}。与自荐信目标独立；题目是练习建议，并非真实面试必问。只使用当前可见自述或明确选中的历史核对档案，不补造事实。</p>
+      <label className="block">练习目标岗位<input aria-label="面试练习目标岗位" readOnly={!!queueTask} value={queueTask?.role??role} onChange={e=>setRole(e.target.value)} placeholder={visibleBasicValue(document,'title')||'目标岗位'} className="mt-1 w-full rounded border bg-white p-1.5"/></label>
+      <p className="text-slate-600">当前目标：{queueTask?queueTask.company+' · ':''}{target}。{queueTask?'与固定岗位任务绑定，草稿按任务独立保存。':'与自荐信目标独立；'}题目是练习建议，并非真实面试必问。只使用当前可见自述或明确选中的历史核对档案，不补造事实。</p>
       <label className="block">练习依据<select aria-label="面试练习依据" value={archiveId} onChange={e=>setArchiveId(e.target.value)} className="mt-1 w-full rounded border bg-white p-1.5">
         <option value="">当前可见简历自述</option>
         {archiveId&&!archives.some(a=>a.id===archiveId)&&<option value={archiveId}>所选历史档案已不存在</option>}
