@@ -87,16 +87,17 @@ export function JobCareerPane({
   const [statusFilter, setStatusFilter] = useState<'all' | ApplicationStatus>('all');
   const [expandedJdId, setExpandedJdId] = useState<string | null>(null);
   const [cloningId, setCloningId] = useState<string | null>(null);
-  const [review,setReview]=useState<{activeSlug:string;source:ApplicationReviewSource}|null>(null);
-  const cloneRead=useRef<{controller:AbortController;cancel:()=>void}|null>(null);
-  const cloneScope=useRef({activeSlug,comparisonDisabled});cloneScope.current={activeSlug,comparisonDisabled};
+  const [review,setReview]=useState<{activeSlug:string;activeDocId:string;source:ApplicationReviewSource}|null>(null);
+  const [clonePhase,setClonePhase]=useState<'reading'|'writing'|null>(null);
+  const cloneRead=useRef<{controller:AbortController;cancel:()=>void;phase:'reading'|'writing'}|null>(null);
+  const cloneScope=useRef({activeSlug,activeDocId:activeDoc.id,comparisonDisabled,subTab});cloneScope.current={activeSlug,activeDocId:activeDoc.id,comparisonDisabled,subTab};
   const mounted=useRef(false);
-  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;cloneRead.current?.cancel();};},[]);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();};},[]);
   const ledgerReviewReady=ledger.ready&&!ledger.loading&&!ledger.saving&&!ledger.dirty&&!ledger.error&&typeof storeData.revision==='string'&&/^[a-f0-9]{64}$/.test(storeData.revision);
   const canReview=ledgerReviewReady&&!comparisonDisabled;
-  const reviewValid=Boolean(review&&canReview&&subTab==='tracker'&&review.activeSlug===activeSlug&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
+  const reviewValid=Boolean(review&&canReview&&subTab==='tracker'&&review.activeSlug===activeSlug&&review.activeDocId===activeDoc.id&&review.source.ledgerRevision===storeData.revision&&storeData.applications.filter(a=>a.id===review.source.id&&a.snapshotId===review.source.snapshotId).length===1);
   useEffect(()=>{if(!reviewValid)setReview(null);},[reviewValid]);
-  useEffect(()=>{cloneRead.current?.cancel();},[activeSlug,comparisonDisabled]);
+  useEffect(()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();},[activeSlug,activeDoc.id,comparisonDisabled,subTab]);
 
   // Cover letter & Interview state
   const [letterCompany, setLetterCompany] = useState('');
@@ -167,16 +168,16 @@ export function JobCareerPane({
 
   const openApplicationReview=(item:JobApplication)=>{
     if(!canReview||!item.snapshotId||!storeData.revision)return;
-    setReview({activeSlug,source:{id:item.id,snapshotId:item.snapshotId,resumeSlug:item.resumeSlug,company:item.company,role:item.role,exportedFilePath:item.exportedFilePath,atsScore:item.atsScore,ledgerRevision:storeData.revision}});
+    setReview({activeSlug,activeDocId:activeDoc.id,source:{id:item.id,snapshotId:item.snapshotId,resumeSlug:item.resumeSlug,company:item.company,role:item.role,exportedFilePath:item.exportedFilePath,atsScore:item.atsScore,ledgerRevision:storeData.revision}});
   };
   const handleCloneSnapshotToWorkspace = async (item: JobApplication) => {
     if (!item.snapshotId || !onCloneSnapshot||!canReview||!storeData.revision||cloneRead.current) return;
-    const revision=storeData.revision,slug=activeSlug;
+    const revision=storeData.revision,slug=activeSlug,docId=activeDoc.id;
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
     let rejectPending:((err:Error)=>void)|undefined;
     const cancel=()=>{controller.abort();rejectPending?.(new Error('已取消读取永久快照。'));};
-    const token={controller,cancel};cloneRead.current=token;
-    setCloningId(item.id);
+    const token:{controller:AbortController;cancel:()=>void;phase:'reading'|'writing'}={controller,cancel,phase:'reading'};cloneRead.current=token;
+    setCloningId(item.id);setClonePhase('reading');
     setErrorMsg(null);
     try {
       const record=await Promise.race([
@@ -186,18 +187,19 @@ export function JobCareerPane({
       if(timer!==undefined)clearTimeout(timer);
       if(!mounted.current||controller.signal.aborted)return;
       const current=careerLedger.getSnapshot();
-      if(cloneScope.current.activeSlug!==slug||cloneScope.current.comparisonDisabled||current.dirty||current.saving||current.loading||current.error||current.data.revision!==revision)throw new Error('当前版本或台账状态已变化，未克隆永久快照。');
+      if(cloneScope.current.activeSlug!==slug||cloneScope.current.activeDocId!==docId||cloneScope.current.subTab!=='tracker'||cloneScope.current.comparisonDisabled||current.dirty||current.saving||current.loading||current.error||current.data.revision!==revision)throw new Error('当前版本或台账状态已变化，未克隆永久快照。');
       if(record.meta.id!==item.snapshotId.replace(/\.json$/i,'')||record.meta.applicationId!==item.id||record.meta.resumeSlug!==item.resumeSlug||record.meta.exportedFilePath!==item.exportedFilePath||record.meta.atsScore!==item.atsScore||record.meta.title!==record.document.title||record.meta.templateId!==record.document.templateId||!Number.isFinite(Date.parse(record.meta.createdAt)))throw new Error('永久快照关联身份校验失败，未克隆。');
       const cleanName = item.company+'-'+(item.role||record.document.title)+'-复盘版';
       // The explicit clone command is a separate, normal version-create operation.
       // The 10-second deadline applies only to the read, never claims to cancel a write already started.
+      token.phase='writing';setClonePhase('writing');
       await onCloneSnapshot(record.document, cleanName);
     } catch (err) {
       if(mounted.current)setErrorMsg(localErrorMessage(err,'读取永久快照失败'));
     } finally {
       if(timer!==undefined)clearTimeout(timer);
       if(cloneRead.current===token)cloneRead.current=null;
-      if(mounted.current)setCloningId(null);
+      if(mounted.current){setCloningId(null);setClonePhase(null);}
     }
   };
 
@@ -635,9 +637,10 @@ export function JobCareerPane({
                                   className="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100"
                                 >
                                   <History size={10} />
-                                  {cloningId === item.id ? '恢复中...' : '克隆回工作台'}
+                                  {cloningId===item.id?(clonePhase==='reading'?'读取核验中…':'创建复盘版…'):'克隆回工作台'}
                                 </button>
                               )}
+                              {cloningId===item.id&&clonePhase==='reading'&&<button type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900">取消读取快照</button>}
                               {item.exportedFilePath && desktop && (
                                 <button
                                   type="button"

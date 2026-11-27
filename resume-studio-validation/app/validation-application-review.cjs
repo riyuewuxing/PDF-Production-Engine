@@ -45,7 +45,7 @@ async function run(){
  const inventory=()=>{const fsnap=fs.readdirSync(store.appSnapshotsDir).filter(n=>n.endsWith('.json')).map(n=>path.join(store.appSnapshotsDir,n));const all=[...files,...fsnap].sort();return Object.fromEntries(all.map(f=>[path.relative(root,f),sha(f)]));};
  let before=inventory(),resumesBefore=fs.readdirSync(store.resumesDir).sort();
  const unchanged=()=>{assert(JSON.stringify(inventory())===JSON.stringify(before),'review changed document, ledger or permanent archive bytes');assert(JSON.stringify(fs.readdirSync(store.resumesDir).sort())===JSON.stringify(resumesBefore),'review created or removed editable versions');};
- let linkedReads=0;const rawRead=store.getLinkedApplicationSnapshot.bind(store);store.getLinkedApplicationSnapshot=async input=>{linkedReads++;return rawRead(input)};
+ let linkedReads=0,holdNext=false,heldRelease=null;const rawRead=store.getLinkedApplicationSnapshot.bind(store);store.getLinkedApplicationSnapshot=async input=>{linkedReads++;const record=await rawRead(input);if(holdNext){holdNext=false;await new Promise(resolve=>{heldRelease=resolve});heldRelease=null;}return record};
  await main.registerAssetProtocol();main.registerIpcHandlers();
  const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);
  const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(x=>JSON.stringify(x)).join(',')+')');
@@ -124,6 +124,21 @@ async function run(){
  assert(await js(()=>document.querySelector('button[aria-label="只读复盘 合成已投学校"]')?.disabled&&[...document.querySelectorAll('button')].filter(b=>b.innerText.trim()==='克隆回工作台'||b.innerText.trim()==='关联 PDF').every(b=>b.disabled)),'redaction left raw actions enabled');
  await capture('11-redaction-gate');checks.redactionBlocksAndCloses=true;unchanged();
  await click('脱敏模式中');await until('raw review re-enabled',()=>js(()=>!!document.querySelector('button[aria-label="只读复盘 合成已投学校"]:not([disabled])')));
+ // Deliberately hold a completed trusted read response, so explicit cancellation and
+ // leaving the tracker can be tested without changing production read logic.
+ holdNext=true;await rowAction('合成已投学校','clone');await until('held linked read',()=>heldRelease!==null);
+ await until('cancel control',()=>js(()=>[...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='取消读取快照'&&!b.disabled)));
+ await capture('12-clone-read-cancel');await click('取消读取快照');
+ await until('cancelled clone feedback',()=>js(()=>document.body.innerText.includes('已取消读取永久快照')));
+ const releaseA=heldRelease;releaseA();await until('held response settled',()=>heldRelease===null);
+ unchanged();assert(await active()==='runner-fixture','cancelled read switched version');checks.explicitCloneReadCancellation=true;
+ holdNext=true;await rowAction('合成已投学校','clone');await until('second held read',()=>heldRelease!==null);
+ await click('自荐信 / 话术');await until('context change cancels read',()=>js(()=>document.body.innerText.includes('已取消读取永久快照')));
+ const releaseB=heldRelease;releaseB();await until('second held response settled',()=>heldRelease===null);
+ unchanged();assert(await active()==='runner-fixture','late read created version after context change');
+ assert(await js(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim().startsWith('投递追踪 ('));if(!b)return false;b.click();return true}),'tracker return missing');
+ await until('tracker restored',()=>js(()=>!!document.querySelector('button[aria-label="只读复盘 合成已投学校"]:not([disabled])')));
+ checks.cloneReadContextChangeCancellation=true;
  // Only an explicit valid clone action may create a new independently identified version.
  await rowAction('合成已移除学校','clone');let createdSlug,created;
  await until('valid clone created',async()=>{createdSlug=await active();if(!createdSlug||createdSlug==='runner-fixture'||createdSlug==='master'||createdSlug==='gone-version')return false;const f=store.resolveResumePath(createdSlug).filePath;if(!fs.existsSync(f))return false;created=JSON.parse(fs.readFileSync(f,'utf8'));return created.basic.email==='gone-archive@example.invalid';});
@@ -131,7 +146,7 @@ async function run(){
  assert(fs.readdirSync(store.resumesDir).filter(n=>n.endsWith('.json')).length===resumesBefore.filter(n=>n.endsWith('.json')).length+1,'clone created unexpected number of copies');
  assert(JSON.stringify(inventory())===JSON.stringify(before),'explicit clone mutated original ledger or archive');
  assert(!fs.existsSync(store.resolveResumePath('gone-version').filePath),'clone restored deleted slug instead of independent copy');
- checks.validCloneIndependentCopy=true;checks.allOriginalHashesPreserved=true;await capture('12-cloned-independent-copy');
+ checks.validCloneIndependentCopy=true;checks.allOriginalHashesPreserved=true;await capture('13-cloned-independent-copy');
  fs.writeFileSync(path.join(out,'application-review-native.json'),JSON.stringify({runnerSha:process.env.GITHUB_SHA,sourceSha:manifest.sourceSha,platform:process.platform,checks,linkedReads,originalHashes:before,created:{slug:createdSlug,id:created.id,title:created.title}},null,2));
 }
 app.whenReady().then(run).then(()=>{clearTimeout(watchdog);app.exit(0)}).catch(error=>{clearTimeout(watchdog);console.error(error);fs.writeFileSync(path.join(out,'application-review-failure.json'),JSON.stringify({checks,error:String(error)},null,2));app.exit(1)});
