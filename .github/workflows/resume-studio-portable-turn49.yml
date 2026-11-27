@@ -26,6 +26,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Trust policy targeted and full unit tests
+        timeout-minutes: 5
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 't49-portable-evidence'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          pnpm test --reporter=default --reporter=json --outputFile=(Join-Path $out 'unit.json')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Generate original multiresolution icon from existing public SVG
         timeout-minutes: 2
         run: |
@@ -52,6 +59,11 @@ jobs:
           if (($sizes -join ',') -ne '256,128,64,48,32,16') { throw 'wrong icon resolutions' }
           [ordered]@{runnerSha=$env:GITHUB_SHA;name=$exe.Name;bytes=$exe.Length;sha256=(Get-FileHash -LiteralPath $exe.FullName -Algorithm SHA256).Hash.ToLower();authenticode=$sig.Status.ToString();iconSizes=$sizes;releaseArtifactConsumed=!(Test-Path -LiteralPath 'release/Resume Studio.exe')} | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $env:RESUME_STUDIO_PORTABLE_EVIDENCE 'release-file.json')
           Copy-Item -LiteralPath 'build/icon.png' -Destination $env:RESUME_STUDIO_PORTABLE_EVIDENCE
+          Add-Type -AssemblyName System.Drawing
+          $embedded = [System.Drawing.Icon]::ExtractAssociatedIcon($exe.FullName)
+          if ($null -eq $embedded) { throw 'portable wrapper has no associated icon' }
+          $bmp = $embedded.ToBitmap()
+          try { $bmp.Save((Join-Path $env:RESUME_STUDIO_PORTABLE_EVIDENCE 'actual-wrapper-icon.png'),[System.Drawing.Imaging.ImageFormat]::Png) } finally { $bmp.Dispose(); $embedded.Dispose() }
       - name: Real portable migration, edit, cold reopen and separate prior copy
         timeout-minutes: 6
         run: |

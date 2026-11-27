@@ -13,7 +13,18 @@ export function isTrustedRendererFrame(input:{
   senderId:number; expectedSenderId:number; isMainFrame:boolean; url:string; expectedUrl:string;
 }):boolean {
   if(input.senderId!==input.expectedSenderId||!input.isMainFrame)return false;
-  try {return new URL(input.url).href===new URL(input.expectedUrl).href;}catch{return false;}
+  try {
+    const actual=new URL(input.url),expected=new URL(input.expectedUrl);
+    // Node pathToFileURL may encode '~' as %7E while Electron loadFile
+    // leaves it literal (e.g. the Windows portable 8.3 unpack path).
+    // Only normalize this unreserved character in local file pathnames.
+    // Never decode other escapes, the query/fragment, or a network URL.
+    if(actual.protocol==='file:'&&expected.protocol==='file:'&&!actual.host&&!expected.host){
+      actual.pathname=actual.pathname.replace(/%7e/gi,'~');
+      expected.pathname=expected.pathname.replace(/%7e/gi,'~');
+    }
+    return actual.href===expected.href;
+  }catch{return false;}
 }
 
 const SAFE_EXTENSIONS=new Set(['.pdf','.png','.jpg','.jpeg','.webp','.docx','.md','.txt','.json','.csv','.ics','.html']);
