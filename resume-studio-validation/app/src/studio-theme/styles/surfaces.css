@@ -7,7 +7,7 @@
     color: var(--studio-text);
     border-color: var(--studio-border);
   }
-  [data-studio-surface="panel"][data-studio-status="warning"][data-studio-theme]:not([data-studio-theme="classic"]) {
+  :is([data-studio-surface="panel"],[data-studio-surface="preview"])[data-studio-status="warning"][data-studio-theme]:not([data-studio-theme="classic"]) {
     background-color: var(--studio-warning-surface);
     color: var(--studio-warning);
     border-color: var(--studio-warning);
@@ -109,6 +109,12 @@
     :is([data-studio-region="career-main"],[data-studio-region="career-ai"],[data-studio-region="interview-practice"],[data-studio-region="job-queue"],[data-studio-region="job-workflow"],[data-studio-region="quick-log-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) { scrollbar-color: auto; }
   }
 
+  /* Gallery controls lie over the paper, not inside the template renderer.
+     Keep the neutral scrim and actual recommended-color swatches unchanged. */
+  [data-studio-surface="gallery"][data-studio-theme]:not([data-studio-theme="classic"]) [data-studio-gallery-favorite="true"] {
+    opacity: 1;
+    box-shadow: 0 0 0 1px var(--studio-border), 0 2px 5px rgb(0 0 0 / 0.22);
+  }
   /* Only background is set on the stage. Do not set foreground, font,
      color-scheme, filter, opacity, transform, animation, zoom or layout here. */
   [data-studio-stage="themed"] { background-color: var(--studio-stage-background); }

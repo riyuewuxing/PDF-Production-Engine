@@ -530,7 +530,7 @@ export function A4PreviewPane({
             </div>
 
             {estimatedPages > 2 && (
-              <div className="no-print rounded-md border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs text-amber-200">
+              <div data-studio-region="preview-spread-warning" data-studio-surface="preview" data-studio-theme={studioThemeId} data-studio-status="warning" style={previewStyle} className="no-print rounded-md border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs text-amber-200">
                 提示：当前简历预估共 {estimatedPages} 页（双页总览仅展示第 1–2 页）。建议精简条目或点击顶部「一键压回一页」。
               </div>
             )}

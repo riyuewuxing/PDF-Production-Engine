@@ -209,7 +209,7 @@ function LiveThumbnailCard({
             <TemplateComponent document={cardDoc} />
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center bg-slate-100 text-[11px] text-slate-400">
+          <div data-studio-gallery-placeholder="true" className="flex h-full items-center justify-center bg-slate-100 text-[11px] text-slate-400 studio-ui-raised studio-ui-muted">
             加载实时预览...
           </div>
         )}
@@ -232,23 +232,23 @@ function LiveThumbnailCard({
             e.stopPropagation();
             onToggleFavorite();
           }}
-          aria-label={isFavorite ? `取消收藏 ${meta.name}` : `收藏 ${meta.name}`}
+          aria-label={isFavorite ? `取消收藏 ${meta.name}` : `收藏 ${meta.name}`} aria-pressed={isFavorite} data-studio-gallery-favorite="true"
           title={isFavorite ? '已收藏，点击取消' : '收藏到我的模板'}
           className={`absolute top-1.5 right-1.5 z-30 rounded-full p-1 shadow transition ${
             isFavorite
-              ? 'bg-amber-400 text-slate-950'
-              : 'bg-slate-900/70 text-slate-200 opacity-85 hover:bg-slate-900 hover:text-amber-300'
+              ? 'bg-amber-400 text-slate-950 studio-ui-warning-surface studio-ui-warning'
+              : 'bg-slate-900/70 text-slate-200 opacity-85 hover:bg-slate-900 hover:text-amber-300 studio-ui-surface studio-ui-primary studio-ui-hover studio-ui-hover-primary'
           }`}
         >
           <Star size={12} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
 
         {/* Glassmorphic hover/focus action overlay */}
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-slate-950/60 opacity-0 backdrop-blur-[1.5px] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <div data-studio-region="gallery-card-actions" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-slate-950/60 opacity-0 backdrop-blur-[1.5px] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button data-studio-control="true"
             type="button"
             onClick={onSelect}
-            className="inline-flex items-center gap-1.5 rounded-full bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-teal-400"
+            className="inline-flex items-center gap-1.5 rounded-full bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-teal-400 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
           >
             <Check size={13} />
             一键应用
@@ -256,7 +256,7 @@ function LiveThumbnailCard({
           <button data-studio-control="true"
             type="button"
             onClick={onInspect}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-slate-900/80 px-3.5 py-1.5 text-xs font-medium text-white shadow hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-slate-900/80 px-3.5 py-1.5 text-xs font-medium text-white shadow hover:bg-slate-800 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
           >
             <Maximize2 size={12} />
             大图放大对比
