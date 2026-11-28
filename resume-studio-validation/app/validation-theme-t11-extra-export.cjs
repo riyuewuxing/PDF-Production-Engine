@@ -4,7 +4,7 @@ const {app,nativeImage}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
 const group=process.env.STUDIO_THEME_GROUP,phase=process.env.STUDIO_MATRIX_PHASE||'main';
-const groups={pilot:['classic','dark','light','warm'],batch1:['classic','graphite','obsidian','ocean','porcelain'],batch2:['classic','aurora','forest','lavender','highContrast']};
+const groups={baseline:['classic'],pilot:['classic','dark','light','warm'],batch1:['classic','graphite','obsidian','ocean','porcelain'],batch2:['classic','aurora','forest','lavender','highContrast']};
 if(!root||!out||!path.basename(root).startsWith('synthetic-theme-t11-export-')||!groups[group]||!['main','restart'].includes(phase))throw Error('isolated fixture/group required');
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
