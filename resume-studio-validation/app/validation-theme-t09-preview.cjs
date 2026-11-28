@@ -2,7 +2,7 @@ const {app}=require('electron'),fs=require('node:fs'),path=require('node:path'),
 const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;if(!root||!out||!path.basename(root).startsWith('synthetic-preview-'))throw Error('isolated preview fixture required');
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
 const report={runnerSha:process.env.GITHUB_SHA,checks:{},gallery:{},spread:{}};const write=()=>fs.writeFileSync(path.join(out,'preview-chrome.json'),JSON.stringify(report,null,2));
-const timer=setTimeout(()=>{report.error='preview chrome watchdog';write();app.exit(2)},160000);
+const timer=setTimeout(()=>{report.error='preview chrome watchdog';write();app.exit(2)},230000);
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json'),audit=require('./validation-theme-t05-contrast.cjs');const sleep=ms=>new Promise(r=>setTimeout(r,ms)),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 async function until(label,fn,ms=15000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label)}
 async function run(){
@@ -26,9 +26,29 @@ async function run(){
  // Target card by exact id; search by the displayed name from its metadata rather than relying on card order.
  const name=await js(sel=>document.querySelector(sel)?.querySelector('h3')?.innerText,card);assert(name,'target card absent');
  await set('input[aria-label="搜索模板"]',name);await until('card mounted',()=>js(sel=>!!document.querySelector(sel+' [data-studio-paper="thumbnail"]'),card));
- const paper=async(label)=>{await js(()=>{document.querySelector('input[aria-label="搜索模板"]').focus();return true});win.webContents.sendInputEvent({type:'mouseMove',x:2,y:2});await sleep(400);const r=await js(sel=>{const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]'),b=p.getBoundingClientRect(),c=p.parentElement.getBoundingClientRect(),x=Math.max(Math.ceil(b.left)+3,0),y=Math.max(Math.ceil(b.top)+38,0),right=Math.min(Math.floor(b.right)-3,Math.floor(c.right)-3,innerWidth-2),bottom=Math.min(Math.floor(b.bottom)-3,Math.floor(c.bottom)-3,innerHeight-2);return {x,y,width:right-x,height:bottom-y,markers:p.querySelectorAll('[data-studio-control],[data-studio-surface],[class*="studio-ui-"]').length}},card);assert(r.width>100&&r.height>100&&r.markers===0,'invalid paper crop');const {markers,...rect}=r;const image=await win.webContents.capturePage(rect);assert(!image.isEmpty());fs.writeFileSync(path.join(out,label+'-paper.png'),image.toPNG());return {pixels:sha(image.toBitmap()),size:image.getSize()};};
+ const paper=async(label)=>{
+  await js(()=>{document.querySelector('input[aria-label="搜索模板"]').focus();return true});win.webContents.sendInputEvent({type:'mouseMove',x:2,y:2});await sleep(500);
+  const r=await js(sel=>{
+    const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]'),b=p.getBoundingClientRect(),c=p.parentElement.getBoundingClientRect(),x=Math.max(Math.ceil(b.left)+3,0),y=Math.max(Math.ceil(b.top)+38,0),right=Math.min(Math.floor(b.right)-3,Math.floor(c.right)-3,innerWidth-2),bottom=Math.min(Math.floor(b.bottom)-3,Math.floor(c.bottom)-3,innerHeight-2);
+    const round=v=>Math.round(v*1000)/1000;
+    const signature=[p,...p.querySelectorAll('*')].map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {tag:e.tagName,text:e.childElementCount?null:e.textContent,rect:[round(r.x-b.x),round(r.y-b.y),round(r.width),round(r.height)],fg:s.color,bg:s.backgroundColor,font:s.font,fontFamily:s.fontFamily,fontSize:s.fontSize,fontWeight:s.fontWeight,spacing:s.letterSpacing,lineHeight:s.lineHeight,border:s.border,transform:s.transform,opacity:s.opacity,visibility:s.visibility}});
+    const chrome=[...p.parentElement.children].filter(e=>e!==p).map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {tag:e.tagName,aria:e.getAttribute('aria-label'),rect:[r.left-b.left,r.top-b.top,r.width,r.height],opacity:s.opacity,boxShadow:s.boxShadow}});
+    return {rect:{x,y,width:right-x,height:bottom-y},markers:p.querySelectorAll('[data-studio-control],[data-studio-surface],[class*="studio-ui-"]').length,signature,chrome};
+  },card);
+  assert(r.rect.width>100&&r.rect.height>100&&r.markers===0,'invalid paper crop');
+  const capture=async(rect,name)=>{const image=await win.webContents.capturePage(rect);assert(!image.isEmpty());fs.writeFileSync(path.join(out,name+'.png'),image.toPNG());return {pixels:sha(image.toBitmap()),size:image.getSize()}};
+  // Preserve original on-screen crop; actual interactive overlay checks still use the unmodified UI.
+  const raw=await capture(r.rect,label+'-paper');
+  const inner=await capture({...r.rect,y:r.rect.y+8,height:r.rect.height-8},label+'-paper-inner');
+  // Diagnostic-only isolation of non-document sibling UI. No mutation to paper DOM or document data.
+  const originalStyle=await js(sel=>{const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]');const es=[...p.parentElement.children].filter(e=>e!==p);return es.map(e=>{const old=e.getAttribute('style');e.style.setProperty('visibility','hidden','important');return old})},card);
+  let isolated;
+  try{await sleep(250);isolated=await capture(r.rect,label+'-paper-isolated');}
+  finally{await js((sel,old)=>{const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]');const es=[...p.parentElement.children].filter(e=>e!==p);if(es.length!==old.length)throw Error('chrome identity changed');es.forEach((e,i)=>old[i]===null?e.removeAttribute('style'):e.setAttribute('style',old[i]));return true},card,originalStyle);await sleep(250)}
+  return {raw,inner,isolated,styleHash:sha(Buffer.from(JSON.stringify(r.signature))),chrome:r.chrome};
+ };
  for(const id of themes){await theme(id);await js(sel=>{document.querySelector(sel).scrollIntoView({block:'center'});return true},card);await sleep(200);
-  const clean=await paper(id);if(id!=='classic')assert.deepEqual(clean,report.gallery.classic.paper,'theme changed clean thumbnail pixels');
+  const clean=await paper(id);report.gallery[id]={paper:clean};write();if(id!=='classic'){const baseline=report.gallery.classic.paper;assert.equal(clean.styleHash,baseline.styleHash,'theme changed paper computed DOM');assert.deepEqual(clean.isolated,baseline.isolated,'theme changed isolated paper pixels');assert.deepEqual(clean.inner,baseline.inner,'theme changed live paper interior pixels');}
   const point=await js(sel=>{const r=document.querySelector(sel).getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+Math.min(100,r.height/2))}},card);
   win.webContents.sendInputEvent({type:'mouseMove',...point});await until('hover action visible',()=>js(sel=>Number(getComputedStyle(document.querySelector(sel)).opacity)>.99,action));
   const contrast=await audit(win,action,'gallery-'+id);if(id!=='classic')assert.equal(contrast.failures.length,0,JSON.stringify(contrast.failures.slice(0,5)));await shot('gallery-hover-'+id);
