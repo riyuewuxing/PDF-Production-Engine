@@ -76,7 +76,7 @@ export function FactBankPane(props:Props){
     const bankRevision=props.bank.revision;
     void task(()=>bridge.revoke({id,bankRevision,confirmation:'REVOKE_FACT'}),'事实已撤销，旧 AI 审批已失效。');
   };
-  const field=(label:string,key:'value'|'unit'|'timeframe'|'evidenceRef',maxLength:number)=><label className="block">{label}<input {...(key==='value'||key==='timeframe'?{}:fieldSkin(skins,'text'))} data-studio-control="true" aria-label={label} disabled={props.locked} value={draft[key]} maxLength={maxLength} onChange={e=>edit(key,e.target.value)} className="mt-1 w-full rounded border p-1.5"/></label>;
+  const field=(label:string,key:'value'|'unit'|'timeframe'|'evidenceRef',maxLength:number)=><label className="block">{label}<input {...(key==='value'||key==='timeframe'?{}:fieldSkin(skins,'text'))} aria-label={label} disabled={props.locked} value={draft[key]} maxLength={maxLength} onChange={e=>edit(key,e.target.value)} className="mt-1 w-full rounded border p-1.5"/></label>;
   return <details className="rounded border border-slate-200 p-2 space-y-2 studio-ui-border">
     <summary data-studio-control="true" className="cursor-pointer font-semibold">本地事实资料库（{records.filter(r=>r.verifiedStatus==='user-confirmed').length} 条）</summary>
     <p className="text-slate-600 studio-ui-muted">与简历正文、母库分开保存。人工确认仅表示本人核对，不是独立证据验证。证据位置只保存在本机，默认不外发；每次任务还需单独勾选可外发事实。</p>
