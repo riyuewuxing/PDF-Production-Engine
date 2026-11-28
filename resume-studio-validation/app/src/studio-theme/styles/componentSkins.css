@@ -103,7 +103,7 @@
     box-shadow:none;cursor:not-allowed;text-decoration: none;
   }
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:disabled svg {opacity:.65;}
-  .studio-component-dialog {max-width:min(720px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); width:720px; overflow:auto; margin:auto; padding:16px; border:1px solid var(--studio-border); border-radius:12px; background:var(--studio-surface); color:var(--studio-text); color-scheme:var(--studio-scheme); box-shadow:0 12px 48px rgb(0 0 0 / .30);}
+  .studio-component-dialog {white-space:normal; text-align:left; max-width:min(720px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); width:720px; overflow:auto; margin:auto; padding:16px; border:1px solid var(--studio-border); border-radius:12px; background:var(--studio-surface); color:var(--studio-text); color-scheme:var(--studio-scheme); box-shadow:0 12px 48px rgb(0 0 0 / .30);}
   .studio-component-dialog::backdrop {background:rgb(0 0 0 / .55);}
   .studio-component-dialog select,.studio-component-dialog input:not([type="checkbox"]) {background:var(--studio-field);color:var(--studio-text);border:1px solid var(--studio-border);border-radius:6px;padding:4px 8px;}
   .studio-component-dialog :is(button,select,input):focus-visible {outline:2px solid var(--studio-focus);outline-offset:2px;}
