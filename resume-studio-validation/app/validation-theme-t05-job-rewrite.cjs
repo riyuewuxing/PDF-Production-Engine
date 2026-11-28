@@ -104,16 +104,32 @@ async function run(){
       if(id!=='classic'){const ref=report.themePortal.classic;assert(JSON.stringify(images)===JSON.stringify(ref.images),'portal source/geometry/pixels changed '+id);assert(JSON.stringify(inline)===JSON.stringify(ref.inline),'inline source/geometry changed '+id);}
       report.themePortal[id]={portal,images,inline,contrast:await auditContrast(win,portalSelector,id+'-portal')};
       win.webContents.focus();
-      const press=async(keyCode,modifiers=[])=>{win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});await sleep(60);win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await sleep(150);};
-      const focused=()=>js('(()=>{const e=document.activeElement;return {inside:!!e.closest('+JSON.stringify(portalSelector)+'),text:e.innerText?.trim()?.slice(0,80)||"",tag:e.tagName}})()');
-      const initial=await focused();await press('Tab');const tab=await focused();await press('Tab',['shift']);const reverse=await focused();
-      await press('Escape');const closed=await js('!document.querySelector('+JSON.stringify(portalSelector)+')');const returned=await focused();
-      report.themePortal[id].keyboard={initial,tab,reverse,closed,returned};
-      if(!closed)await click('关闭全屏对照',portalSelector);
-      await until('portal closed',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      const press=async(keyCode,modifiers=[])=>{win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});if(keyCode==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'Enter',modifiers});await sleep(60);win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await sleep(100);};
+      const focused=()=>js('(()=>{const e=document.activeElement;return {inside:!!e.closest('+JSON.stringify(portalSelector)+'),label:e.getAttribute("aria-label")||e.innerText?.trim()?.slice(0,80)||"",tag:e.tagName}})()');
+      const initial=await focused();
+      const expected=await js('Array.from(document.querySelector('+JSON.stringify(portalSelector)+').querySelectorAll(\'button:not(:disabled),[tabindex]:not([tabindex="-1"])\')).filter(e=>e.tabIndex>=0&&e.getClientRects().length).map(e=>e.getAttribute("aria-label")||e.innerText.trim())');
+      assert(expected.length>=3&&expected.includes('原版 PDF 滚动区域')&&expected.includes('候选 PDF 滚动区域'),'missing scroll controls');
+      assert(initial.inside&&initial.label==='关闭全屏对照','initial focus missing');
+      const forward=[],reverse=[];
+      const origin=expected.indexOf(initial.label);
+      for(let k=1;k<=expected.length;k++){await press('Tab');const f=await focused();forward.push(f);assert(f.inside&&f.label===expected[(origin+k)%expected.length],'forward focus escaped '+id+' '+JSON.stringify(f));}
+      for(let k=1;k<=expected.length;k++){await press('Tab',['shift']);const f=await focused();reverse.push(f);assert(f.inside&&f.label===expected[(origin-k+expected.length)%expected.length],'reverse focus escaped '+id);}
+      // Programmatic focus outside is redirected without triggering approval.
+      await js('document.querySelector('+JSON.stringify(sourceSel)+').focus();true');assert((await focused()).inside,'background focus escaped');
+      await press('K',['control']);assert(await js('!!document.querySelector('+JSON.stringify(portalSelector)+')&&!document.querySelector(\'[aria-label="命令面板"]\')'),'command palette opened over portal');
+      await press('Escape');await until('escape closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      const returned=await focused();assert(returned.label==='展开全屏 PDF 对照','Escape did not restore opener '+id+' '+JSON.stringify(returned));
+      await press('Enter');await until('Enter reopens portal',()=>js('!!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      assert((await focused()).label==='关闭全屏对照','reopen focus missing');
+      await click('关闭全屏对照',portalSelector);await until('button closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      const buttonReturn=await focused();assert(buttonReturn.label==='展开全屏 PDF 对照','button did not restore opener');
+      await press('Space');await until('Space reopens portal',()=>js('!!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      await press('Escape');await until('second Escape closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      assert((await focused()).label==='展开全屏 PDF 对照','repeated focus restoration failed');
+      report.themePortal[id].keyboard={initial,expected,forward,reverse,returned,buttonReturn,backgroundFocusContained:true,shortcutBlocked:true,enterReopen:true,spaceReopen:true,repeatedReturn:true};write();
       assert(await applyDisabled(),'closing portal enabled approval');await noWrite();
     }
-    await selectTheme('classic');report.checks.themePortalExact=true;report.portalKeyboardDiagnostic=themes.map(id=>({id,...report.themePortal[id].keyboard}));write();
+    await selectTheme('classic');report.checks.themePortalExact=true;report.checks.portalKeyboardGate=true;report.portalKeyboardDiagnostic=themes.map(id=>({id,...report.themePortal[id].keyboard}));write();
   }
   await until('editor',()=>js('document.querySelector("#basic-field-name")?.value==='+JSON.stringify(markers[0])));
   const before=await main.store.getResume('runner-fixture');
