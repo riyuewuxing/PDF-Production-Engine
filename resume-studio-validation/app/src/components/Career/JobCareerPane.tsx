@@ -1,3 +1,5 @@
+import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
+import {surfaceStyle} from '../../studio-theme/surfaces';
 import {
   ArrowUpRight,
   Bookmark,
@@ -75,6 +77,7 @@ export function JobCareerPane({
   onCloneSnapshot,
   onExportStatus,
 }: JobCareerPaneProps) {
+  const themeId=useStudioThemeId();
   const [subTab, setSubTab] = useState<CareerSubTab>('tracker');
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const storeData=ledger.data;
@@ -402,44 +405,44 @@ export function JobCareerPane({
   const desktop = isDesktopMode();
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-slate-200 px-4 py-2.5">
+    <div data-studio-region="career-main" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} className="flex h-full flex-col bg-white studio-ui-surface studio-ui-primary">
+      <div className="border-b border-slate-200 px-4 py-2.5 studio-ui-border">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-            <BriefcaseBusiness size={14} className="text-teal-700" />
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 studio-ui-primary">
+            <BriefcaseBusiness size={14} className="text-teal-700 studio-ui-selected-text" />
             <span>求职与面试全周期工作台</span>
           </div>
-          {saveTip && <span className={'text-[10px] '+(ledger.dirty?'text-amber-700':'text-emerald-600')}>{saveTip}</span>}
+          {saveTip && <span className={'text-[10px] '+(ledger.dirty?'text-amber-700 studio-ui-warning':'text-emerald-600 studio-ui-success')}>{saveTip}</span>}
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium">
-          <button
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-0.5 text-[11px] font-medium studio-ui-raised">
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('tracker')}
             className={`rounded py-1 transition ${
-              subTab === 'tracker' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'tracker' ? 'bg-white text-slate-900 shadow-xs studio-ui-surface studio-ui-primary' : 'text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary'
             }`}
           >
             投递追踪 ({funnel.total})
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('letters')}
             className={`rounded py-1 transition ${
-              subTab === 'letters' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'letters' ? 'bg-white text-slate-900 shadow-xs studio-ui-surface studio-ui-primary' : 'text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary'
             }`}
           >
             自荐信 / 话术
           </button>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={() => setSubTab('interview')}
             className={`rounded py-1 transition ${
-              subTab === 'interview' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              subTab === 'interview' ? 'bg-white text-slate-900 shadow-xs studio-ui-surface studio-ui-primary' : 'text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary'
             }`}
           >
             面试追问
           </button>
-          <button type="button" aria-label="岗位队列" onClick={()=>setSubTab('queue')} className={`rounded py-1 transition ${subTab==='queue'?'bg-white text-slate-900 shadow-xs':'text-slate-600 hover:text-slate-900'}`}>
+          <button data-studio-control="true" type="button" aria-label="岗位队列" onClick={()=>setSubTab('queue')} className={`rounded py-1 transition ${subTab==='queue'?'bg-white text-slate-900 shadow-xs studio-ui-surface studio-ui-primary':'text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary'}`}>
             岗位队列 ({storeData.jobQueue?.length??0})
           </button>
         </div>
@@ -447,25 +450,25 @@ export function JobCareerPane({
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4 text-xs">
         {errorMsg && (
-          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 studio-ui-error-border studio-ui-error-surface studio-ui-error">
             {errorMsg}
           </div>
         )}
 
-        {(ledger.error||ledger.dirty)&&<div role="alert" className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-2">
+        {(ledger.error||ledger.dirty)&&<div role="alert" className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-2 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">
           <div className="font-semibold">{ledger.error||'台账草稿等待保存'}</div>
           <div className="flex flex-wrap gap-2">
-            {ledger.dirty&&<><button type="button" disabled={ledger.saving} onClick={()=>void careerLedger.flush().catch(()=>{})} className="rounded border px-2 py-1">重试保存台账</button><button type="button" onClick={()=>void backupLedger()} className="rounded border px-2 py-1">另存台账草稿</button></>}
-            <button type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1">重载磁盘台账</button>
+            {ledger.dirty&&<><button data-studio-control="true" type="button" disabled={ledger.saving} onClick={()=>void careerLedger.flush().catch(()=>{})} className="rounded border px-2 py-1 studio-ui-border">重试保存台账</button><button data-studio-control="true" type="button" onClick={()=>void backupLedger()} className="rounded border px-2 py-1 studio-ui-border">另存台账草稿</button></>}
+            <button data-studio-control="true" type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1 studio-ui-border">重载磁盘台账</button>
           </div>
         </div>}
-        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">脱敏预览开启时隐藏队列关联投递，禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
-        {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
-        {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"><span className="text-[10px] text-slate-600">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40">刷新磁盘台账</button></div>}
+        {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700 studio-ui-border studio-ui-raised studio-ui-primary">脱敏预览开启时隐藏队列关联投递，禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
+        {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600 studio-ui-muted">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
+        {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 studio-ui-border studio-ui-raised"><span className="text-[10px] text-slate-600 studio-ui-muted">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button data-studio-control="true" type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40 studio-ui-border studio-ui-surface studio-ui-primary">刷新磁盘台账</button></div>}
         {/* Preserve a previously loaded queue session while refreshing the ledger.
             Its own guards block new reads/writes; other tabs retain the old loading behavior. */}
         {loading&&!(ledger.ready&&subTab==='queue') ? (
-          <div className="flex items-center justify-center py-12 text-slate-500">
+          <div className="flex items-center justify-center py-12 text-slate-500 studio-ui-muted">
             <Loader2 size={16} className="mr-2 animate-spin" /> {ledger.error&&!ledger.loading?'台账尚未成功读取，请先重载。':'正在加载本地求职数据…'}
           </div>
         ) : (
@@ -473,31 +476,31 @@ export function JobCareerPane({
             {subTab === 'tracker' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center">
-                    <div className="text-[10px] text-slate-500">累计投递</div>
-                    <div className="mt-0.5 text-base font-bold text-slate-900">{funnel.total}</div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center studio-ui-border studio-ui-raised">
+                    <div className="text-[10px] text-slate-500 studio-ui-muted">累计投递</div>
+                    <div className="mt-0.5 text-base font-bold text-slate-900 studio-ui-primary">{funnel.total}</div>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center">
-                    <div className="text-[10px] text-slate-500">推进转化率</div>
-                    <div className="mt-0.5 text-base font-bold text-teal-700">{funnel.progressedRate}%</div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center studio-ui-border studio-ui-raised">
+                    <div className="text-[10px] text-slate-500 studio-ui-muted">推进转化率</div>
+                    <div className="mt-0.5 text-base font-bold text-teal-700 studio-ui-selected-text">{funnel.progressedRate}%</div>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center">
-                    <div className="text-[10px] text-slate-500">待跟进流程</div>
-                    <div className="mt-0.5 text-base font-bold text-amber-700">{activeFollowups}</div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center studio-ui-border studio-ui-raised">
+                    <div className="text-[10px] text-slate-500 studio-ui-muted">待跟进流程</div>
+                    <div className="mt-0.5 text-base font-bold text-amber-700 studio-ui-warning">{activeFollowups}</div>
                   </div>
                 </div>
 
                 {/* 5-Stage Conversion Funnel + Export CSV */}
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2 studio-ui-border studio-ui-raised">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-slate-700">
+                    <span className="text-[11px] font-semibold text-slate-700 studio-ui-primary">
                       5 阶段漏斗（面邀 {funnel.interviewRate}% · Offer {funnel.offerRate}%）
                     </span>
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       disabled={visibleApplications.length === 0}
                       onClick={() => void handleExportCsv()}
-                      className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                      className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
                     >
                       <Download size={10} /> 导出 CSV
                     </button>
@@ -512,57 +515,57 @@ export function JobCareerPane({
                         ['offer', 'Offer'],
                       ] as const
                     ).map(([st, shortLabel]) => (
-                      <div key={st} className="rounded border border-slate-200 bg-white py-1">
-                        <div className="text-slate-500">{shortLabel}</div>
-                        <div className="font-bold text-slate-900">{funnel[st]}</div>
+                      <div key={st} className="rounded border border-slate-200 bg-white py-1 studio-ui-border studio-ui-surface studio-ui-primary">
+                        <div className="text-slate-500 studio-ui-muted">{shortLabel}</div>
+                        <div className="font-bold text-slate-900 studio-ui-primary">{funnel[st]}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Add Application Card */}
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2">
-                  <div className="font-semibold text-slate-800">新增投递记录</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2 studio-ui-border studio-ui-raised">
+                  <div className="font-semibold text-slate-800 studio-ui-primary">新增投递记录</div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={companyDraft}
                       onChange={(e) => setCompanyDraft(e.target.value)}
                       placeholder="单位/学校名称（必填）"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={roleDraft}
                       onChange={(e) => setRoleDraft(e.target.value)}
                       placeholder="投递岗位名称"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={cityDraft}
                       onChange={(e) => setCityDraft(e.target.value)}
                       placeholder="城市（如：示例城市）"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={salaryDraft}
                       onChange={(e) => setSalaryDraft(e.target.value)}
                       placeholder="薪资/编制情况"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <select
+                    <select data-studio-control="true"
                       aria-label="关联本地简历版本"
                       value={slugDraft}
                       onChange={(e) => setSlugDraft(e.target.value)}
-                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     >
                       {activeSlug==='master'&&<option value="master">关联母库：{activeDoc.title}</option>}
                       {summaries.map((s) => (
@@ -571,10 +574,10 @@ export function JobCareerPane({
                         </option>
                       ))}
                     </select>
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={handleAddApplication}
-                      className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 px-3 py-1.5 font-medium text-white hover:bg-slate-800"
+                      className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 px-3 py-1.5 font-medium text-white hover:bg-slate-800 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
                     >
                       <Plus size={13} /> 记一笔
                     </button>
@@ -583,26 +586,26 @@ export function JobCareerPane({
 
                 {/* Filter Tabs */}
                 <div className="flex flex-wrap gap-1">
-                  <button
+                  <button data-studio-control="true"
                     type="button"
                     onClick={() => setStatusFilter('all')}
                     className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                       statusFilter === 'all'
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-slate-900 text-white studio-ui-fill studio-ui-on-fill'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 studio-ui-raised studio-ui-muted studio-ui-hover'
                     }`}
                   >
                     全部 ({funnel.total})
                   </button>
                   {APPLICATION_STATUSES.map((st) => (
-                    <button
+                    <button data-studio-control="true"
                       key={st}
                       type="button"
                       onClick={() => setStatusFilter(st)}
                       className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                         statusFilter === st
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          ? 'bg-slate-900 text-white studio-ui-fill studio-ui-on-fill'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 studio-ui-raised studio-ui-muted studio-ui-hover'
                       }`}
                     >
                       {APPLICATION_STATUS_META[st].label}
@@ -613,7 +616,7 @@ export function JobCareerPane({
                 {/* Tracker List */}
                 <div className="space-y-2.5">
                   {filteredApps.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-slate-200 p-5 text-center text-[11px] text-slate-400">
+                    <div className="rounded-lg border border-dashed border-slate-200 p-5 text-center text-[11px] text-slate-400 studio-ui-border studio-ui-muted">
                       暂无投递记录。导出 PDF 后可一键“记入投递并锁定快照”，也可在上方手动记一笔。
                     </div>
                   ) : (
@@ -621,49 +624,49 @@ export function JobCareerPane({
                       const linked = summaries.find((s) => s.slug === item.resumeSlug);
                       const isJdExpanded = expandedJdId === item.id;
                       return (
-                        <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+                        <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3 space-y-2 studio-ui-border studio-ui-surface studio-ui-primary">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-900">
+                              <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-900 studio-ui-primary">
                                 <span>
-                                  {item.company} · {item.role}{item.queueTaskId&&<span className="ml-1 rounded bg-teal-50 px-1 text-[10px] text-teal-800">固定岗位</span>}
+                                  {item.company} · {item.role}{item.queueTaskId&&<span className="ml-1 rounded bg-teal-50 px-1 text-[10px] text-teal-800 studio-ui-selected studio-ui-selected-text">固定岗位</span>}
                                 </span>
                                 {item.snapshotId && (
-                                  <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                                  <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 studio-ui-success-border studio-ui-success-surface studio-ui-success">
                                     <Lock size={9} /> 已关联永久快照
                                   </span>
                                 )}
                                 {item.atsScore !== null && item.atsScore !== undefined && (
-                                  <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
+                                  <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 studio-ui-info-border studio-ui-info-surface studio-ui-info">
                                     ATS {item.atsScore}分
                                   </span>
                                 )}
                               </div>
-                              <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-slate-500">
+                              <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-slate-500 studio-ui-muted">
                                 {item.city && <span>{item.city}</span>}
                                 {item.salary && <span>{item.salary}</span>}
                                 {item.appliedDate && <span>{item.appliedDate}</span>}
                               </div>
                             </div>
-                            <button
+                            <button data-studio-control="true"
                               type="button"
                               onClick={() => void deleteApplication(item)}
                               aria-label={`删除投递 ${item.company}`}
-                              className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                              className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 studio-ui-muted studio-ui-error-hover studio-ui-error-hover-text"
                             >
                               <Trash2 size={13} />
                             </button>
                           </div>
 
                           <div className="flex flex-wrap items-center justify-between gap-1.5">
-                            <select
-                              aria-label={`${item.company} 状态`}
+                            <select data-studio-control="true"
+                              aria-label={`${item.company} 状态`} data-studio-career-status={item.status}
                               value={item.status}
                               onChange={(e) =>
                                 updateApplication(item.id, { status: e.target.value as ApplicationStatus })
                               }
                               className={`rounded border px-2 py-0.5 text-[11px] font-medium ${
-                                APPLICATION_STATUS_META[item.status].badgeClass
+                                APPLICATION_STATUS_META[item.status].badgeClass + ' studio-career-status'
                               }`}
                             >
                               {APPLICATION_STATUSES.map((st) => (
@@ -674,41 +677,41 @@ export function JobCareerPane({
                             </select>
 
                             <div className="flex flex-wrap items-center gap-1">
-                              {item.snapshotId&&<button type="button" disabled={!canReview||Boolean(cloningId)} onClick={()=>openApplicationReview(item)} aria-label={'只读复盘 '+item.company} className="inline-flex items-center gap-0.5 rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40"><History size={10}/> 只读复盘</button>}
+                              {item.snapshotId&&<button data-studio-control="true" type="button" disabled={!canReview||Boolean(cloningId)} onClick={()=>openApplicationReview(item)} aria-label={'只读复盘 '+item.company} className="inline-flex items-center gap-0.5 rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-info-surface studio-ui-info"><History size={10}/> 只读复盘</button>}
                               {item.snapshotId && onCloneSnapshot && (
-                                <button
+                                <button data-studio-control="true"
                                   type="button"
                                   disabled={!canReview||Boolean(cloningId)}
                                   onClick={() => void handleCloneSnapshotToWorkspace(item)}
-                                  className="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100"
+                                  className="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 studio-ui-success-border studio-ui-success-surface studio-ui-success studio-ui-success-hover"
                                 >
                                   <History size={10} />
                                   {cloningId===item.id?(clonePhase==='reading'?'读取核验中…':'创建复盘版…'):'克隆回工作台'}
                                 </button>
                               )}
-                              {cloningId===item.id&&clonePhase==='reading'&&<button type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900">取消读取快照</button>}
+                              {cloningId===item.id&&clonePhase==='reading'&&<button data-studio-control="true" type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">取消读取快照</button>}
                               {item.pdfReceipt&&item.snapshotId&&item.exportedFilePath&&desktop&&<>
-                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">核验 PDF</button>
-                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40">核验并打开</button>
-                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40">选择文件核验</button>
-                                <button type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>void handleSubmissionPackage(item)} aria-label={'制作投递包 '+item.company} className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40">制作投递包 ZIP</button>
+                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-info-surface studio-ui-info">核验 PDF</button>
+                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">核验并打开</button>
+                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40 studio-ui-border studio-ui-primary">选择文件核验</button>
+                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>void handleSubmissionPackage(item)} aria-label={'制作投递包 '+item.company} className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-surface studio-ui-info">制作投递包 ZIP</button>
                               </>}
                               {item.exportedFilePath && !item.pdfReceipt && desktop && (
-                                <button
+                                <button data-studio-control="true"
                                   type="button"
                                   disabled={comparisonDisabled}
                                   title="台账记录的路径，未核验文件内容与封存时一致；打开前请自行核对。"
                                   onClick={() => void apiClient.openFile(item.exportedFilePath)}
-                                  className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
+                                  className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100 studio-ui-border studio-ui-raised studio-ui-primary studio-ui-hover"
                                 >
                                   <FileText size={10} /> 关联 PDF
                                 </button>
                               )}
                               {item.resumeSlug && (
-                                <button
+                                <button data-studio-control="true"
                                   type="button"
                                   onClick={() => onSwitchToResumeForEdit(item.resumeSlug)}
-                                  className="inline-flex items-center gap-0.5 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100"
+                                  className="inline-flex items-center gap-0.5 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 studio-ui-selected-border studio-ui-selected studio-ui-selected-text studio-ui-selected-hover"
                                 >
                                   编辑关联：{linked?.title || item.resumeSlug}
                                   <ArrowUpRight size={11} />
@@ -717,7 +720,7 @@ export function JobCareerPane({
                             </div>
                           </div>
 
-                          {!comparisonDisabled&&packageStatus?.id===item.id&&packageStatus.revision===storeData.revision&&<div role={packageStatus.error?'alert':'status'} className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-900 space-y-1">
+                          {!comparisonDisabled&&packageStatus?.id===item.id&&packageStatus.revision===storeData.revision&&<div role={packageStatus.error?'alert':'status'} className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-900 space-y-1 studio-ui-info-border studio-ui-info-surface studio-ui-info">
                             {packageStatus.error??(!packageStatus.result?'正在制作投递包，请在系统窗口选择、确认或取消。':packageStatus.result.canceled?'已取消制作投递包。':'本地投递包 ZIP 已生成（未发送）')}
                             {packageStatus.result&&!packageStatus.result.canceled&&<>
                               <div className="break-all">{packageStatus.result.filePath}</div>
@@ -726,11 +729,11 @@ export function JobCareerPane({
                               <div>请在发送前自行核对压缩包中全部文件；未修改投递台账。</div>
                             </>}
                           </div>}
-                          {item.exportedFilePath&&<div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700">
-                            {item.pdfReceipt?<><div className="font-semibold text-indigo-800">已封存导出字节凭证 · 尚需按需核验</div>
+                          {item.exportedFilePath&&<div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700 studio-ui-border studio-ui-raised studio-ui-primary">
+                            {item.pdfReceipt?<><div className="font-semibold text-indigo-800 studio-ui-info">已封存导出字节凭证 · 尚需按需核验</div>
                               <div className="break-all font-mono text-[10px]" title={item.pdfReceipt.sha256}>SHA256 {item.pdfReceipt.sha256.slice(0,16)}… · {item.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>
                               {!desktop&&<div>文件字节核验仅支持桌面工作台。</div>}
-                              {!comparisonDisabled&&pdfCheck?.id===item.id&&pdfCheck.revision===storeData.revision&&<div role={pdfCheck.error?'alert':'status'} className="mt-1 rounded bg-white p-1.5">
+                              {!comparisonDisabled&&pdfCheck?.id===item.id&&pdfCheck.revision===storeData.revision&&<div role={pdfCheck.error?'alert':'status'} className="mt-1 rounded bg-white p-1.5 studio-ui-surface studio-ui-primary">
                                 {pdfCheck.error??(!pdfCheck.result?'正在核验…':{
                                   verified:pdfCheck.action==='choose'?'所选文件字节一致（未修改台账路径）':pdfCheck.result.opened?'记录路径字节一致，已请求系统打开':'记录路径字节一致',
                                   changed:'文件字节与封存凭证不一致，未打开',
@@ -739,22 +742,22 @@ export function JobCareerPane({
                                   unavailable:'无法核验（可能是外部路径、权限、大小上限或取消选择）；可显式选择文件',
                                   unknown:'没有可核验的历史字节凭证'
                                 }[pdfCheck.result.status])}
-                                {pdfCheck.result&&<div className="text-[10px] text-slate-500">核验时间 {new Date(pdfCheck.result.checkedAt).toLocaleString('zh-CN',{hour12:false})}；仅本次观察，不证明发送或送达。</div>}
+                                {pdfCheck.result&&<div className="text-[10px] text-slate-500 studio-ui-muted">核验时间 {new Date(pdfCheck.result.checkedAt).toLocaleString('zh-CN',{hour12:false})}；仅本次观察，不证明发送或送达。</div>}
                               </div>}
                             </>:<span>历史 PDF 路径 · 无字节凭证（内容未验证）</span>}
                           </div>}
                           {/* Interview schedule + .ics */}
                           <div className="grid grid-cols-5 items-center gap-1.5">
-                            <input
+                            <input data-studio-control="true"
                               type="text"
                               data-native-undo="true"
                               value={item.interviewAt}
                               onChange={(e) => updateApplication(item.id, { interviewAt: e.target.value })}
                               placeholder="面试时间 (如 2026-11-25 14:30)"
                               aria-label={`${item.company} 面试时间`}
-                              className="col-span-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-800"
+                              className="col-span-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-800 studio-ui-border studio-ui-raised studio-ui-primary"
                             />
-                            <input
+                            <input data-studio-control="true"
                               type="text"
                               data-native-undo="true"
                               value={item.interviewLocation}
@@ -763,29 +766,29 @@ export function JobCareerPane({
                               }
                               placeholder="面试地点/会议链接"
                               aria-label={`${item.company} 面试地点`}
-                              className="col-span-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-800"
+                              className="col-span-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-800 studio-ui-border studio-ui-raised studio-ui-primary"
                             />
-                            <button
+                            <button data-studio-control="true"
                               type="button"
                               onClick={() => void handleExportIcs(item)}
                               title="导出 RFC 5545 标准日历日程（含提前 30 分钟提醒）"
-                              className="inline-flex items-center justify-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[10px] font-medium text-amber-800 hover:bg-amber-100"
+                              className="inline-flex items-center justify-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[10px] font-medium text-amber-800 hover:bg-amber-100 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning studio-ui-warning-hover"
                             >
                               <CalendarPlus size={11} /> .ics
                             </button>
                           </div>
 
                           {!ledger.dirty&&(storeData.jobReviews??[]).some(a=>a.applicationId===item.id&&a.snapshotId===item.snapshotId)&&(
-                            <div className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-900">
+                            <div className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-900 studio-ui-info-border studio-ui-info-surface studio-ui-info">
                               已关联 {(storeData.jobReviews??[]).filter(a=>a.applicationId===item.id&&a.snapshotId===item.snapshotId).length} 份历史岗位人工核对档案（非当前资格结论）。在 JD 雷达中按原版本恢复并重新校验。
                             </div>
                           )}
                           {item.jdText && (
-                            <div className="rounded border border-slate-200 bg-slate-50/70">
-                              <button
+                            <div className="rounded border border-slate-200 bg-slate-50/70 studio-ui-border studio-ui-raised">
+                              <button data-studio-control="true"
                                 type="button"
                                 onClick={() => setExpandedJdId(isJdExpanded ? null : item.id)}
-                                className="flex w-full items-center justify-between px-2 py-1 text-[10px] font-medium text-slate-600 hover:text-slate-900"
+                                className="flex w-full items-center justify-between px-2 py-1 text-[10px] font-medium text-slate-600 hover:text-slate-900 studio-ui-muted studio-ui-hover-primary"
                               >
                                 <span>已封存岗位 JD（{item.jdText.length} 字）</span>
                                 <ChevronDown
@@ -794,20 +797,20 @@ export function JobCareerPane({
                                 />
                               </button>
                               {isJdExpanded && (
-                                <pre className="max-h-36 overflow-auto whitespace-pre-wrap border-t border-slate-200 p-2 font-sans text-[10px] leading-relaxed text-slate-700">
+                                <pre className="max-h-36 overflow-auto whitespace-pre-wrap border-t border-slate-200 p-2 font-sans text-[10px] leading-relaxed text-slate-700 studio-ui-border studio-ui-primary">
                                   {item.jdText}
                                 </pre>
                               )}
                             </div>
                           )}
 
-                          <textarea
+                          <textarea data-studio-control="true"
                             rows={2}
                             data-native-undo="true"
                             value={item.notes}
                             onChange={(e) => updateApplication(item.id, { notes: e.target.value })}
                             placeholder="记录笔试真题、试讲课题或面试复盘..."
-                            className="w-full rounded border border-slate-200 bg-slate-50 p-1.5 text-[11px] text-slate-800 focus:bg-white focus:outline-none"
+                            className="w-full rounded border border-slate-200 bg-slate-50 p-1.5 text-[11px] text-slate-800 focus:bg-white focus:outline-none studio-ui-border studio-ui-raised studio-ui-primary studio-ui-field-focus"
                           />
                         </div>
                       );
@@ -819,10 +822,10 @@ export function JobCareerPane({
 
             {subTab === 'letters' && (
               <div className="space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2">
-                  <div className="font-semibold text-slate-800">设定目标单位、岗位与页眉风格</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2 studio-ui-border studio-ui-raised">
+                  <div className="font-semibold text-slate-800 studio-ui-primary">设定目标单位、岗位与页眉风格</div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={letterCompany}
@@ -833,9 +836,9 @@ export function JobCareerPane({
                         setBossOverride(null);
                       }}
                       placeholder="目标单位（如：示例一中）"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={letterRole}
@@ -846,18 +849,18 @@ export function JobCareerPane({
                         setBossOverride(null);
                       }}
                       placeholder="目标岗位（如：高中物理教师）"
-                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900"
+                      className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
                   </div>
-                  <label className="flex items-center justify-between gap-2 text-[11px] text-slate-700">
+                  <label className="flex items-center justify-between gap-2 text-[11px] text-slate-700 studio-ui-primary">
                     <span className="shrink-0">PDF 页眉风格</span>
-                    <select
+                    <select data-studio-control="true"
                       aria-label="自荐信页眉风格"
                       value={headerVariantMode}
                       onChange={(e) =>
                         setHeaderVariantMode(e.target.value as 'auto' | CoverLetterHeaderVariant)
                       }
-                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-slate-900"
+                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     >
                       <option value="auto">
                         自动匹配当前简历（
@@ -870,13 +873,13 @@ export function JobCareerPane({
                       ))}
                     </select>
                   </label>
-                  <textarea
+                  <textarea data-studio-control="true"
                     rows={2}
                     data-native-undo="true"
                     value={jdOptional}
                     onChange={(e) => setJdOptional(e.target.value)}
                     placeholder="（可选）粘贴招聘 JD 关键词，搭配已配置的 BYOK 大模型深度定制"
-                    className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800"
+                    className="w-full rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-800 studio-ui-border studio-ui-surface studio-ui-primary"
                   />
                 </div>
 
@@ -884,80 +887,80 @@ export function JobCareerPane({
                   drafts={{coverLetter:effectiveCoverLetter,email:effectiveEmailBody,boss:effectiveBossText}}
                   onApply={(kind,text)=>{if(kind==='coverLetter')setCoverLetterOverride(text);else if(kind==='email')setEmailBodyOverride(text);else setBossOverride(text);}}/>
                 {/* 1. Formal Cover Letter + Version Save */}
-                <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                <div className="rounded-lg border border-slate-200 p-3 space-y-2 studio-ui-border">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-slate-900">1. 正式自荐信 / 求职信</span>
+                    <span className="font-bold text-slate-900 studio-ui-primary">1. 正式自荐信 / 求职信</span>
                     <div className="flex items-center gap-1.5">
-                      <button
+                      <button data-studio-control="true"
                         type="button"
                         onClick={() => void copyText('cover', effectiveCoverLetter)}
-                        className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+                        className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-primary studio-ui-hover"
                       >
                         {copiedKey === 'cover' ? <Check size={11} /> : <Copy size={11} />}
                         {copiedKey === 'cover' ? '已复制' : '复制'}
                       </button>
-                      <button
+                      <button data-studio-control="true"
                         type="button"
                         disabled={exportingLetter}
                         onClick={() => void handleExportCoverLetter()}
-                        className="inline-flex items-center gap-1 rounded bg-teal-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-teal-500 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded bg-teal-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-teal-500 disabled:opacity-50 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
                       >
                         <FileDown size={11} /> {exportingLetter ? '导出中...' : '导出自荐信 PDF'}
                       </button>
                     </div>
                   </div>
-                  <textarea
+                  <textarea data-studio-control="true"
                     rows={8}
                     data-native-undo="true"
                     value={effectiveCoverLetter}
                     onChange={(e) => setCoverLetterOverride(e.target.value)}
-                    className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-900"
+                    className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-900 studio-ui-border studio-ui-raised studio-ui-primary"
                   />
 
                   {/* Save to coverLetters library */}
                   <div className="flex items-center gap-1.5 pt-1">
-                    <input
+                    <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={letterTitleDraft}
                       onChange={(e) => setLetterTitleDraft(e.target.value)}
                       placeholder="版本标题（留空则按单位-岗位-日期自动命名）"
-                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-900"
+                      className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={handleSaveCoverLetterVersion}
-                      className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-800 hover:bg-slate-100"
+                      className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-800 hover:bg-slate-100 studio-ui-border studio-ui-raised studio-ui-primary studio-ui-hover"
                     >
                       <Save size={11} /> 存为模板版本
                     </button>
                   </div>
 
                   {(storeData.coverLetters ?? []).some(l=>!l.queueTaskId) && (
-                    <div className="space-y-1.5 border-t border-slate-100 pt-2">
-                      <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
-                        <Bookmark size={11} className="text-teal-600" />
+                    <div className="space-y-1.5 border-t border-slate-100 pt-2 studio-ui-border">
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-700 studio-ui-primary">
+                        <Bookmark size={11} className="text-teal-600 studio-ui-selected-text" />
                         已存自荐信版本库 ({storeData.coverLetters.filter(l=>!l.queueTaskId).length})
                       </div>
                       <div className="space-y-1">
                         {storeData.coverLetters.filter(l=>!l.queueTaskId).map((saved) => (
                           <div
                             key={saved.id}
-                            className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px]"
+                            className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] studio-ui-border studio-ui-raised"
                           >
-                            <button
+                            <button data-studio-control="true"
                               type="button"
                               onClick={() => handleLoadCoverLetterVersion(saved)}
-                              className="min-w-0 flex-1 truncate text-left font-medium text-slate-800 hover:text-teal-700"
+                              className="min-w-0 flex-1 truncate text-left font-medium text-slate-800 hover:text-teal-700 studio-ui-primary studio-ui-hover-primary"
                               title="点击载入编辑器"
                             >
                               {saved.title}（{saved.headerVariant}）
                             </button>
-                            <button
+                            <button data-studio-control="true"
                               type="button"
                               aria-label={`删除自荐信版本 ${saved.title}`}
                               onClick={() => handleDeleteCoverLetterVersion(saved.id)}
-                              className="rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                              className="rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600 studio-ui-muted studio-ui-error-hover studio-ui-error-hover-text"
                             >
                               <Trash2 size={11} />
                             </button>
@@ -969,12 +972,12 @@ export function JobCareerPane({
                 </div>
 
                 {/* 2. Email Subject + Body */}
-                <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                <div className="rounded-lg border border-slate-200 p-3 space-y-2 studio-ui-border">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 font-bold text-slate-900">
-                      <Mail size={13} className="text-sky-600" /> 2. 规范投递邮件主题与正文
+                    <span className="inline-flex items-center gap-1 font-bold text-slate-900 studio-ui-primary">
+                      <Mail size={13} className="text-sky-600 studio-ui-info" /> 2. 规范投递邮件主题与正文
                     </span>
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() =>
                         void copyText(
@@ -982,45 +985,45 @@ export function JobCareerPane({
                           `主题：${letterBundle.emailSubject}\n\n${effectiveEmailBody}`,
                         )
                       }
-                      className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+                      className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-primary studio-ui-hover"
                     >
                       {copiedKey === 'email' ? <Check size={11} /> : <Copy size={11} />}
                       {copiedKey === 'email' ? '已复制' : '复制全套邮件'}
                     </button>
                   </div>
-                  <div className="rounded border border-slate-200 bg-slate-100 px-2.5 py-1.5 font-mono text-[11px] text-slate-800">
+                  <div className="rounded border border-slate-200 bg-slate-100 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 studio-ui-border studio-ui-raised studio-ui-primary">
                     主题：{letterBundle.emailSubject}
                   </div>
-                  <textarea
+                  <textarea data-studio-control="true"
                     rows={5}
                     data-native-undo="true"
                     value={effectiveEmailBody}
                     onChange={(e) => setEmailBodyOverride(e.target.value)}
-                    className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-900"
+                    className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-900 studio-ui-border studio-ui-raised studio-ui-primary"
                   />
                 </div>
 
                 {/* 3. BOSS / Platform 3-sentence Opener */}
-                <div className="rounded-lg border border-slate-200 p-3 space-y-2">
+                <div className="rounded-lg border border-slate-200 p-3 space-y-2 studio-ui-border">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 font-bold text-slate-900">
-                      <MessageSquareText size={13} className="text-emerald-600" /> 3. BOSS直聘 / 招聘平台 3 句话开场白
+                    <span className="inline-flex items-center gap-1 font-bold text-slate-900 studio-ui-primary">
+                      <MessageSquareText size={13} className="text-emerald-600 studio-ui-success" /> 3. BOSS直聘 / 招聘平台 3 句话开场白
                     </span>
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       onClick={() => void copyText('boss', effectiveBossText)}
-                      className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+                      className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-primary studio-ui-hover"
                     >
                       {copiedKey === 'boss' ? <Check size={11} /> : <Copy size={11} />}
                       {copiedKey === 'boss' ? '已复制' : '复制话术'}
                     </button>
                   </div>
-                  <textarea
+                  <textarea data-studio-control="true"
                     rows={3}
                     data-native-undo="true"
                     value={effectiveBossText}
                     onChange={(e) => setBossOverride(e.target.value)}
-                    className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-900"
+                    className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-900 studio-ui-border studio-ui-raised studio-ui-primary"
                   />
                 </div>
               </div>

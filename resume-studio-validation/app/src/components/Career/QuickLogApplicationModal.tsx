@@ -1,3 +1,5 @@
+import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
+import {surfaceStyle} from '../../studio-theme/surfaces';
 import { BookmarkCheck, Loader2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { localErrorMessage } from '../../lib/apiClient';
@@ -42,6 +44,7 @@ export function QuickLogApplicationModal({
   onClose,
   onLogged,
 }: QuickLogApplicationModalProps) {
+  const themeId=useStudioThemeId();
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
   const [city, setCity] = useState('');
@@ -140,95 +143,95 @@ export function QuickLogApplicationModal({
       aria-label="记入投递并锁定永久快照"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
     >
-      <form
+      <form data-studio-region="quick-log-dialog" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')}
         onSubmit={(e) => void handleSubmit(e)}
-        className="max-h-[90vh] overflow-y-auto w-full max-w-lg rounded-xl border border-slate-700 bg-[#19202c] p-5 text-xs text-slate-100 shadow-2xl space-y-3.5"
+        className="max-h-[90vh] overflow-y-auto w-full max-w-lg rounded-xl border border-slate-700 bg-[#19202c] p-5 text-xs text-slate-100 shadow-2xl space-y-3.5 studio-ui-border studio-ui-surface studio-ui-primary"
       >
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-          <div className="flex items-center gap-2 text-sm font-bold text-white">
-            <BookmarkCheck size={16} className="text-emerald-400" />
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 studio-ui-border">
+          <div className="flex items-center gap-2 text-sm font-bold text-white studio-ui-primary">
+            <BookmarkCheck size={16} className="text-emerald-400 studio-ui-success" />
             记入投递并锁定永久原稿快照
           </div>
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={onClose} disabled={saving||refreshing}
             aria-label="关闭记入投递弹窗"
-            className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white studio-ui-muted studio-ui-hover studio-ui-hover-primary"
           >
             <X size={15} />
           </button>
         </div>
 
-        <div className="rounded border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-[11px] text-emerald-200">
+        <div className="rounded border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-[11px] text-emerald-200 studio-ui-success-border studio-ui-success-surface studio-ui-success">
           <div>
             将永久封存当时导出的原稿 JSON 至{' '}
             <code className="font-mono">data/.application-snapshots/</code>（不受 15 份滚动覆盖）。
           </div>
-          <div className="mt-1 truncate text-emerald-300/90" title={snapshot.filePath}>
+          <div className="mt-1 truncate text-emerald-300/90 studio-ui-success" title={snapshot.filePath}>
             PDF：{snapshot.filePath}
           </div>
-          <div className="mt-1 break-all text-emerald-200/90">SHA256：{snapshot.pdfReceipt.sha256} · {snapshot.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>
-          <div className="mt-1 text-slate-300">封存前将重新核验 PDF 字节；不证明实际发送或送达。</div>
+          <div className="mt-1 break-all text-emerald-200/90 studio-ui-success">SHA256：{snapshot.pdfReceipt.sha256} · {snapshot.pdfReceipt.sizeBytes.toLocaleString()} 字节</div>
+          <div className="mt-1 text-slate-300 studio-ui-muted">封存前将重新核验 PDF 字节；不证明实际发送或送达。</div>
           {queueTask&&<p className="mt-1 break-words">固定岗位：{queueTask.company} · {queueTask.role}。默认待投递，须本人确认实际状态；不发送材料。</p>}
         </div>
 
         {feedback && (
-          <div role={feedback.kind==='error'?'alert':'status'} className={`rounded border px-3 py-2 text-[11px] ${feedback.kind==='success'?'border-emerald-500/40 bg-emerald-950/60 text-emerald-200':feedback.kind==='warn'?'border-amber-500/40 bg-amber-950/60 text-amber-200':'border-red-500/40 bg-red-950/60 text-red-200'}`}>
+          <div role={feedback.kind==='error'?'alert':'status'} className={`rounded border px-3 py-2 text-[11px] ${feedback.kind==='success'?'border-emerald-500/40 bg-emerald-950/60 text-emerald-200 studio-ui-success-border studio-ui-success-surface studio-ui-success':feedback.kind==='warn'?'border-amber-500/40 bg-amber-950/60 text-amber-200 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning':'border-red-500/40 bg-red-950/60 text-red-200 studio-ui-error-border studio-ui-error-surface studio-ui-error'}`}>
             {feedback.message}
-            {queueTask&&<button type="button" disabled={saving||refreshing} className="ml-2 rounded border px-2 py-1" onClick={()=>void refreshQueueLedger()}>{refreshing?'读取台账中…':'刷新岗位归档台账'}</button>}
+            {queueTask&&<button data-studio-control="true" type="button" disabled={saving||refreshing} className="ml-2 rounded border px-2 py-1 studio-ui-border" onClick={()=>void refreshQueueLedger()}>{refreshing?'读取台账中…':'刷新岗位归档台账'}</button>}
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-2.5">
           <label className="flex flex-col gap-1">
-            <span className="text-slate-300">单位 / 学校名称 *</span>
-            <input
+            <span className="text-slate-300 studio-ui-muted">单位 / 学校名称 *</span>
+            <input data-studio-control="true"
               type="text"
               data-native-undo="true"
               readOnly={!!queueTask} value={company}
               onChange={(e) => setCompany(e.target.value)}
               placeholder="如：示例第一中学"
-              className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
+              className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-slate-300">投递岗位</span>
-            <input
+            <span className="text-slate-300 studio-ui-muted">投递岗位</span>
+            <input data-studio-control="true"
               type="text"
               data-native-undo="true"
               readOnly={!!queueTask} value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder="如：高中物理教师"
-              className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
+              className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-slate-300">城市</span>
-            <input
+            <span className="text-slate-300 studio-ui-muted">城市</span>
+            <input data-studio-control="true"
               type="text"
               data-native-undo="true"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="如：示例城市"
-              className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
+              className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-slate-300">薪资 / 编制 / 状态</span>
+            <span className="text-slate-300 studio-ui-muted">薪资 / 编制 / 状态</span>
             <div className="flex gap-1.5">
-              <input
+              <input data-studio-control="true"
                 type="text"
                 data-native-undo="true"
                 value={salary}
                 onChange={(e) => setSalary(e.target.value)}
                 placeholder="编内 / 薪资"
-                className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-white focus:border-teal-400 focus:outline-none"
+                className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
               />
-              <select
+              <select data-studio-control="true"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as ApplicationStatus)}
                 aria-label="初始投递状态"
-                className="rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-white focus:border-teal-400 focus:outline-none"
+                className="rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
               >
                 {APPLICATION_STATUSES.map((st) => (
                   <option key={st} value={st}>
@@ -241,41 +244,41 @@ export function QuickLogApplicationModal({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-slate-300">岗位 JD / 公告原文（可选，便于日后复盘当年要求）</span>
-          <textarea
+          <span className="text-slate-300 studio-ui-muted">岗位 JD / 公告原文（可选，便于日后复盘当年要求）</span>
+          <textarea data-studio-control="true"
             rows={3}
             data-native-undo="true"
             readOnly={!!queueTask} value={jdText}
             onChange={(e) => setJdText(e.target.value)}
             placeholder="可粘贴本岗位招聘启事或考核要求..."
-            className="w-full rounded border border-slate-700 bg-slate-900 p-2 text-white focus:border-teal-400 focus:outline-none"
+            className="w-full rounded border border-slate-700 bg-slate-900 p-2 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
           />
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-slate-300">投递备注（可选）</span>
-          <input
+          <span className="text-slate-300 studio-ui-muted">投递备注（可选）</span>
+          <input data-studio-control="true"
             type="text"
             data-native-undo="true"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="例如：官网网申 / 校长邮箱直投"
-            className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none"
+            className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-white focus:border-teal-400 focus:outline-none studio-ui-border studio-ui-fill studio-ui-on-fill studio-ui-focus-border"
           />
         </label>
 
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={onClose} disabled={saving||refreshing}
-            className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800"
+            className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800 studio-ui-border studio-ui-muted studio-ui-hover"
           >
             取消
           </button>
-          <button
+          <button data-studio-control="true"
             type="submit"
             disabled={saving||refreshing}
-            className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-4 py-1.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-4 py-1.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <BookmarkCheck size={13} />}
             {saving ? '归档中...' : '确认记入并锁定快照'}

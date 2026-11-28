@@ -93,6 +93,22 @@
     scrollbar-color: var(--studio-border) var(--studio-surface);
   }
 
+  /* Career chrome only. Explicit controls and status markers; no document or export styling. */
+  :is([data-studio-region="career-main"],[data-studio-region="career-ai"],[data-studio-region="interview-practice"],[data-studio-region="job-queue"],[data-studio-region="job-workflow"],[data-studio-region="quick-log-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+    scrollbar-color: var(--studio-border) var(--studio-surface);
+    & :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),textarea,select)[data-studio-control] { color: var(--studio-text); border-color: var(--studio-border); }
+    & :is(input,textarea)[data-studio-control].studio-ui-field-focus:focus { background-color: var(--studio-field); }
+    & [data-studio-control]:focus-visible { outline-offset: 1px; }
+    & select.studio-career-status[data-studio-career-status="wishlist"] { background-color: var(--studio-raised); color: var(--studio-text); }
+    & select.studio-career-status:is([data-studio-career-status="applied"],[data-studio-career-status="written"]) { background-color: var(--studio-info-surface); color: var(--studio-info); }
+    & select.studio-career-status[data-studio-career-status="interview"] { background-color: var(--studio-warning-surface); color: var(--studio-warning); }
+    & select.studio-career-status[data-studio-career-status="offer"] { background-color: var(--studio-success-surface); color: var(--studio-success); }
+    & select.studio-career-status[data-studio-career-status="closed"] { background-color: var(--studio-danger-surface); color: var(--studio-error); }
+  }
+  @media (forced-colors: active) {
+    :is([data-studio-region="career-main"],[data-studio-region="career-ai"],[data-studio-region="interview-practice"],[data-studio-region="job-queue"],[data-studio-region="job-workflow"],[data-studio-region="quick-log-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) { scrollbar-color: auto; }
+  }
+
   /* Only background is set on the stage. Do not set foreground, font,
      color-scheme, filter, opacity, transform, animation, zoom or layout here. */
   [data-studio-stage="themed"] { background-color: var(--studio-stage-background); }

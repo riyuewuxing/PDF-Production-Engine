@@ -1,3 +1,5 @@
+import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
+import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useEffect,useRef,useState} from 'react';
 import {Sparkles,ShieldCheck} from 'lucide-react';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
@@ -14,6 +16,7 @@ type Basis={document:ResumeDocument;slug:string;company:string;role:string;jdTex
 type Prepared={basis:Basis;request:CareerRefinePrepared};
 type Proposal=Prepared&ReturnType<typeof restoreCareerRefine>;
 export function CareerAiPanel(props:Props){
+  const themeId=useStudioThemeId();
   const [catalog,setCatalog]=useState<AiProfileCatalog|null>(null);
   const [profileId,setProfileId]=useState('');
   const [kind,setKind]=useState<CareerAiKind>('coverLetter');
@@ -93,40 +96,40 @@ export function CareerAiPanel(props:Props){
     }catch(err){if(mounted.current){clearApprovals();setError(localErrorMessage(err,'旧文案审批已失效，未替换草稿。'));}}
     finally{applyRef.current=false;if(mounted.current)setApplying(false);}
   };
-  return <section aria-label="求职文案 AI 精修" className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/60 p-3 text-[11px] text-slate-800">
-    <div className="flex items-center gap-1.5 font-bold text-teal-900"><Sparkles size={14}/>求职文案 AI 精修</div>
+  return <section data-studio-region="career-ai" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} aria-label="求职文案 AI 精修" className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/60 p-3 text-[11px] text-slate-800 studio-ui-selected-border studio-ui-selected studio-ui-primary">
+    <div className="flex items-center gap-1.5 font-bold text-teal-900 studio-ui-selected-text"><Sparkles size={14}/>求职文案 AI 精修</div>
     <p>独立选择已保存的模型档案；发送前逐字预览，身份信息使用本地占位符。结果仅供审阅，不会自动覆盖或投递。</p>
-    {catalog?<><label className="block">本次文案模型<select aria-label="本次文案模型" value={profileId} disabled={locked} onChange={e=>{setProfileId(e.target.value);setPreview(null);setProposal(null);setConfirmed(false);}} className="mt-1 w-full rounded border bg-white p-1.5">{catalog.profiles.map(p=><option key={p.profileId} value={p.profileId}>{p.providerLabel} · {p.model}{p.enabled?'':'（未启用）'}</option>)}</select></label>
-      <label className="block">精修对象<select aria-label="文案精修对象" value={kind} disabled={locked} onChange={e=>{setKind(e.target.value as CareerAiKind);setPreview(null);setProposal(null);setConfirmed(false);}} className="mt-1 w-full rounded border bg-white p-1.5">{Object.entries(CAREER_AI_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
-      <details className="rounded border border-slate-200 bg-white p-2 space-y-2">
-        <summary className="cursor-pointer font-semibold">本地事实资料库 · 文案选择（{factIds.length} 条）</summary>
+    {catalog?<><label className="block">本次文案模型<select data-studio-control="true" aria-label="本次文案模型" value={profileId} disabled={locked} onChange={e=>{setProfileId(e.target.value);setPreview(null);setProposal(null);setConfirmed(false);}} className="mt-1 w-full rounded border bg-white p-1.5 studio-ui-surface studio-ui-border studio-ui-primary">{catalog.profiles.map(p=><option key={p.profileId} value={p.profileId}>{p.providerLabel} · {p.model}{p.enabled?'':'（未启用）'}</option>)}</select></label>
+      <label className="block">精修对象<select data-studio-control="true" aria-label="文案精修对象" value={kind} disabled={locked} onChange={e=>{setKind(e.target.value as CareerAiKind);setPreview(null);setProposal(null);setConfirmed(false);}} className="mt-1 w-full rounded border bg-white p-1.5 studio-ui-surface studio-ui-border studio-ui-primary">{Object.entries(CAREER_AI_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+      <details className="rounded border border-slate-200 bg-white p-2 space-y-2 studio-ui-border studio-ui-surface studio-ui-primary">
+        <summary data-studio-control="true" className="cursor-pointer font-semibold">本地事实资料库 · 文案选择（{factIds.length} 条）</summary>
         <p>仅当前版本关联的本人确认、允许外发的事实可逐次选择。默认不发送；证据位置仅本地展示。新增、更正或撤销请前往诊断优化。</p>
-        <button type="button" disabled={locked||!window.resumeDesktop?.facts} onClick={()=>void refreshFacts()} className="rounded border px-2 py-1">加载 / 刷新文案事实</button>
-        {bank&&<div aria-label="文案事实选择" className="max-h-48 overflow-auto space-y-1">{!eligible.length&&<p>当前版本没有可选择外发的事实。</p>}{eligible.map(r=><label key={r.id} className="block rounded border p-2 break-words"><span className="flex items-start gap-1"><input type="checkbox" aria-label={'文案选择事实 '+r.assertion} disabled={locked||(!factIds.includes(r.id)&&factIds.length>=20)} checked={factIds.includes(r.id)} onChange={e=>{setFactIds(ids=>e.target.checked?[...ids,r.id]:ids.filter(id=>id!==r.id));clearApprovals();}}/>{r.assertion}</span><span className="block text-slate-600">{blocks.find(b=>b.key===r.blockKey)?.label} · {r.evidenceRef}</span></label>)}</div>}
+        <button data-studio-control="true" type="button" disabled={locked||!window.resumeDesktop?.facts} onClick={()=>void refreshFacts()} className="rounded border px-2 py-1 studio-ui-border">加载 / 刷新文案事实</button>
+        {bank&&<div aria-label="文案事实选择" className="max-h-48 overflow-auto space-y-1">{!eligible.length&&<p>当前版本没有可选择外发的事实。</p>}{eligible.map(r=><label key={r.id} className="block rounded border p-2 break-words studio-ui-border"><span className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" aria-label={'文案选择事实 '+r.assertion} disabled={locked||(!factIds.includes(r.id)&&factIds.length>=20)} checked={factIds.includes(r.id)} onChange={e=>{setFactIds(ids=>e.target.checked?[...ids,r.id]:ids.filter(id=>id!==r.id));clearApprovals();}}/>{r.assertion}</span><span className="block text-slate-600 studio-ui-muted">{blocks.find(b=>b.key===r.blockKey)?.label} · {r.evidenceRef}</span></label>)}</div>}
       </details>
-      <button type="button" disabled={locked||!selected?.enabled} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50">预览文案精修请求</button>
-      {!selected?.enabled&&<p className="text-slate-500">请先在「诊断优化 → AI 润色 Diff」启用模型档案。</p>}
+      <button data-studio-control="true" type="button" disabled={locked||!selected?.enabled} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">预览文案精修请求</button>
+      {!selected?.enabled&&<p className="text-slate-500 studio-ui-muted">请先在「诊断优化 → AI 润色 Diff」启用模型档案。</p>}
     </>:<p>桌面端模型档案尚未加载。离线文案仍可编辑。</p>}
-    {busy&&<div className="flex items-center justify-between"><span>模型正在处理…</span><button type="button" onClick={()=>controller.current?.abort()} className="rounded border px-2 py-1">取消文案请求</button></div>}
+    {busy&&<div className="flex items-center justify-between"><span>模型正在处理…</span><button data-studio-control="true" type="button" onClick={()=>controller.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消文案请求</button></div>}
     {attempt&&isCurrent(attempt.basis)&&<AiTaskReceiptView label="文案调用回执" attempt={attempt.value}/>}
-    {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800">{error}</div>}
-    {preview&&isCurrent(preview.basis)&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2">
-      <div className="font-bold text-amber-900">文案发送前确认（尚未调用模型）</div>
+    {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800 studio-ui-error-border studio-ui-error-surface studio-ui-error">{error}</div>}
+    {preview&&isCurrent(preview.basis)&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2 studio-ui-warning-border studio-ui-surface studio-ui-primary">
+      <div className="font-bold text-amber-900 studio-ui-warning">文案发送前确认（尚未调用模型）</div>
       <p className="break-all">接收方：{validateByokBaseUrl(preview.basis.settings.baseUrl).baseUrl}/chat/completions</p>
       <p>模型：{preview.basis.settings.model} · {preview.basis.settings.providerLabel}</p><p>{describeAiRequest(preview.basis.settings,preview.request.options)}</p>
       <p>{preview.request.replacements.length} 类身份字段在本地替换，不发送真实映射。</p>
-      {preview.request.providedFacts.length>0&&<div aria-label="文案外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 p-2"><p className="font-semibold">本次外发 {preview.request.providedFacts.length} 条本人确认事实</p>{preview.request.providedFacts.map(r=><div key={r.id} className="border-t py-1 whitespace-pre-wrap break-words">{r.id} · {r.label}<div>{r.facts}</div></div>)}</div>}
-      <div className="max-h-64 space-y-1 overflow-auto rounded bg-slate-100 p-2"><p className="font-semibold">系统指令</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.systemPrompt}</pre><p className="font-semibold">发送内容</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.userPrompt}</pre></div>
-      <div className="flex flex-wrap gap-2"><button type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white">确认发送文案给模型</button><button type="button" onClick={()=>setPreview(null)} className="rounded border px-2 py-1">取消文案发送</button></div>
+      {preview.request.providedFacts.length>0&&<div aria-label="文案外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 p-2 studio-ui-warning-border"><p className="font-semibold">本次外发 {preview.request.providedFacts.length} 条本人确认事实</p>{preview.request.providedFacts.map(r=><div key={r.id} className="border-t py-1 whitespace-pre-wrap break-words">{r.id} · {r.label}<div>{r.facts}</div></div>)}</div>}
+      <div className="max-h-64 space-y-1 overflow-auto rounded bg-slate-100 p-2 studio-ui-raised"><p className="font-semibold">系统指令</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.systemPrompt}</pre><p className="font-semibold">发送内容</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.userPrompt}</pre></div>
+      <div className="flex flex-wrap gap-2"><button data-studio-control="true" type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white studio-ui-fill studio-ui-on-fill">确认发送文案给模型</button><button data-studio-control="true" type="button" onClick={()=>setPreview(null)} className="rounded border px-2 py-1 studio-ui-border">取消文案发送</button></div>
     </section>}
-    {proposal&&isCurrent(proposal.basis)&&<section aria-label="文案 AI 审核" className="space-y-2 rounded border border-slate-300 bg-white p-2">
+    {proposal&&isCurrent(proposal.basis)&&<section aria-label="文案 AI 审核" className="space-y-2 rounded border border-slate-300 bg-white p-2 studio-ui-border studio-ui-surface studio-ui-primary">
       <div className="flex items-center gap-1 font-bold"><ShieldCheck size={13}/>原文与候选文案</div>
-      <div className="space-y-1 max-h-72 overflow-auto"><p className="font-semibold text-slate-600">原文</p><pre className="whitespace-pre-wrap break-words rounded bg-slate-100 p-2">{proposal.request.original}</pre><p className="font-semibold text-teal-800">候选文案（本地还原）</p><pre className="whitespace-pre-wrap break-words rounded bg-teal-50 p-2">{proposal.text}</pre></div>
-      {proposal.request.providedFacts.length>0&&<div className="rounded bg-amber-50 p-2 break-words"><p>已提供的事实（纯文本结果不能证明模型实际引用）：</p>{proposal.basis.selection.records.map((r,i)=><div key={r.id}>record-{i+1} · {r.assertion}<div>本地证据：{r.evidenceRef}</div></div>)}</div>}
-      {proposal.warnings.map((w,i)=><p key={i} className="text-amber-800">{w.message}</p>)}
+      <div className="space-y-1 max-h-72 overflow-auto"><p className="font-semibold text-slate-600 studio-ui-muted">原文</p><pre className="whitespace-pre-wrap break-words rounded bg-slate-100 p-2 studio-ui-raised">{proposal.request.original}</pre><p className="font-semibold text-teal-800 studio-ui-selected-text">候选文案（本地还原）</p><pre className="whitespace-pre-wrap break-words rounded bg-teal-50 p-2 studio-ui-selected studio-ui-selected-text">{proposal.text}</pre></div>
+      {proposal.request.providedFacts.length>0&&<div className="rounded bg-amber-50 p-2 break-words studio-ui-warning-surface"><p>已提供的事实（纯文本结果不能证明模型实际引用）：</p>{proposal.basis.selection.records.map((r,i)=><div key={r.id}>record-{i+1} · {r.assertion}<div>本地证据：{r.evidenceRef}</div></div>)}</div>}
+      {proposal.warnings.map((w,i)=><p key={i} className="text-amber-800 studio-ui-warning">{w.message}</p>)}
       <p>机械检测不能证明语义事实，所有改写均需人工核对。</p>
-      <label className="flex items-start gap-2"><input type="checkbox" disabled={locked} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>我已核对候选文案的身份、经历、数字及其他事实，确认仅替换当前文案草稿。</label>
-      <div className="flex flex-wrap gap-2"><button type="button" disabled={!confirmed||locked} onClick={()=>void apply()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50">采纳文案草稿</button><button type="button" onClick={()=>{setProposal(null);setConfirmed(false);}} className="rounded border px-2 py-1">放弃候选文案</button></div>
+      <label className="flex items-start gap-2"><input data-studio-control="true" type="checkbox" disabled={locked} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>我已核对候选文案的身份、经历、数字及其他事实，确认仅替换当前文案草稿。</label>
+      <div className="flex flex-wrap gap-2"><button data-studio-control="true" type="button" disabled={!confirmed||locked} onClick={()=>void apply()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">采纳文案草稿</button><button data-studio-control="true" type="button" onClick={()=>{setProposal(null);setConfirmed(false);}} className="rounded border px-2 py-1 studio-ui-border">放弃候选文案</button></div>
     </section>}
   </section>;
 }
