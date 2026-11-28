@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { BookmarkCheck, Loader2, X } from 'lucide-react';
@@ -235,7 +235,7 @@ export function QuickLogApplicationModal({
         <div className="grid grid-cols-2 gap-2.5">
           <label className="flex flex-col gap-1">
             <span className="text-slate-300 studio-ui-muted">单位 / 学校名称 *</span>
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               data-native-undo="true"
               readOnly={!!queueTask} value={company}
@@ -246,7 +246,7 @@ export function QuickLogApplicationModal({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-slate-300 studio-ui-muted">投递岗位</span>
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               data-native-undo="true"
               readOnly={!!queueTask} value={role}
@@ -257,7 +257,7 @@ export function QuickLogApplicationModal({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-slate-300 studio-ui-muted">城市</span>
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               data-native-undo="true"
               value={city}
@@ -269,7 +269,7 @@ export function QuickLogApplicationModal({
           <label className="flex flex-col gap-1">
             <span className="text-slate-300 studio-ui-muted">薪资 / 编制 / 状态</span>
             <div className="flex gap-1.5">
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 data-native-undo="true"
                 value={salary}
@@ -295,7 +295,7 @@ export function QuickLogApplicationModal({
 
         <label className="flex flex-col gap-1">
           <span className="text-slate-300 studio-ui-muted">岗位 JD / 公告原文（可选，便于日后复盘当年要求）</span>
-          <textarea data-studio-control="true"
+          <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
             rows={3}
             data-native-undo="true"
             readOnly={!!queueTask} value={jdText}
@@ -307,7 +307,7 @@ export function QuickLogApplicationModal({
 
         <label className="flex flex-col gap-1">
           <span className="text-slate-300 studio-ui-muted">投递备注（可选）</span>
-          <input data-studio-control="true"
+          <input {...fieldSkin(skins,'text')} data-studio-control="true"
             type="text"
             data-native-undo="true"
             value={notes}
