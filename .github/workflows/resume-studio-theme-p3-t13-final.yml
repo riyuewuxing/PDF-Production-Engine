@@ -1,7 +1,7 @@
 name: Resume Studio T13 final native independent component skins
 on:
   push:
-    branches: ['resume-studio/theme-p3-t13-regression']
+    branches: ['resume-studio/theme-p3-t13-native-final']
 permissions:
   contents: read
 jobs:
@@ -50,7 +50,7 @@ jobs:
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t13-skins-' + [guid]::NewGuid().ToString())
           $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t13-final'
           $env:STUDIO_SKIN_THEME = '${{ matrix.theme }}'
-          $entry = '.\validation-theme-t13-final.cjs'
+          $entry = '.\validation-theme-t13-skins.cjs'
           node .\validation-theme-t11-preflight.cjs $entry
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           try {

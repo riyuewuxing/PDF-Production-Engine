@@ -1,0 +1,8 @@
+{
+  "initialRun": 46120176472,
+  "initialProblem": "base specificity suppressed geometry; duplicate signature assertion",
+  "secondRun": 46120257007,
+  "secondProblem": "broad artifact prefix rename accidentally renamed entry; preflight rejected missing file",
+  "prevent": "change artifact output/name by anchored YAML lines only; verify entry exact path exists in candidate tree before push; do not lower preflight or visual signature checks",
+  "entry": "validation-theme-t13-skins.cjs"
+}
