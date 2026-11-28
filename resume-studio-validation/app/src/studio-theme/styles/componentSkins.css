@@ -1,0 +1,120 @@
+/* Explicit opt-in controls only. No selectors targeting document renderers.
+ * Visual roles remain semantic. Inherit mode has no skin marker. */
+@media screen {
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role] {
+    --skin-bg: var(--studio-field);
+    --skin-fg: var(--studio-text);
+    --skin-border: var(--studio-border);
+    --skin-hover: var(--studio-hover);
+    --skin-hover-fg: var(--studio-text);
+    border: 1px solid var(--skin-border);
+    background-color: var(--skin-bg);
+    color: var(--skin-fg);
+    background-image: none;
+    box-shadow: none;
+    border-radius: 6px;
+    transition: none;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role="primary"] {
+    --skin-bg: var(--studio-accent-fill);
+    --skin-fg: var(--studio-on-accent);
+    --skin-border: var(--studio-focus);
+    --skin-hover: var(--studio-accent-hover);
+    --skin-hover-fg: var(--studio-on-accent);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role="danger"] {
+    --skin-bg: var(--studio-error-fill);
+    --skin-fg: var(--studio-on-error);
+    --skin-border: var(--studio-error);
+    --skin-hover: var(--studio-error-fill);
+    --skin-hover-fg: var(--studio-on-error);
+  }
+  /* Ordinary controls: six distinct material and geometry implementations. */
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin="solid"] {
+    border-radius: 6px;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin="outline"] {
+    --skin-bg: var(--studio-surface); --skin-fg: var(--studio-text);
+    --skin-hover: var(--studio-hover); --skin-hover-fg: var(--studio-text);
+    border-radius: 4px; border-width: 2px;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin="soft"] {
+    --skin-bg: var(--studio-raised); --skin-fg: var(--studio-text);
+    --skin-hover: var(--studio-hover); --skin-hover-fg: var(--studio-text);
+    border-radius: 12px; border-color: transparent;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin="flat"] {
+    --skin-bg: var(--studio-surface); --skin-fg: var(--studio-text);
+    --skin-hover: var(--studio-hover); --skin-hover-fg: var(--studio-text);
+    border-radius: 0; border-color: transparent; border-bottom-color: var(--skin-border);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin="raised"] {
+    border-radius: 8px; box-shadow: 0 2px 0 var(--skin-border), 0 3px 6px rgb(0 0 0 / .16);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin="gradient"] {
+    border-radius: 10px; border-color: transparent;
+    background-image: linear-gradient(var(--skin-bg),var(--skin-bg)), linear-gradient(135deg,var(--studio-focus),var(--studio-border));
+    background-origin: border-box; background-clip: padding-box,border-box;
+  }
+  /* Maintain primary/danger semantic distinction for outline/soft/flat. */
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="primary"]:is([data-studio-skin="outline"],[data-studio-skin="soft"],[data-studio-skin="flat"]) {
+    --skin-fg: var(--studio-accent-text); --skin-hover-fg: var(--studio-accent-text);
+    border-color: var(--studio-focus);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="danger"]:is([data-studio-skin="outline"],[data-studio-skin="soft"],[data-studio-skin="flat"]) {
+    --skin-fg: var(--studio-error); --skin-hover-fg: var(--studio-error);
+    border-color: var(--studio-error);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="danger"][data-studio-skin="gradient"] {
+    background-image: linear-gradient(var(--skin-bg),var(--skin-bg)),linear-gradient(135deg,var(--studio-error),var(--studio-border));
+  }
+  /* Independent icon family. Keep existing visible text/counts and target size. */
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin] {
+    min-width: 26px; min-height: 26px; justify-content:center;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="square"] {border-radius: 3px;}
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="round"] {border-radius: 50%; min-width: 28px; min-height:28px;}
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="pill"] {border-radius: 999px; min-width:36px;}
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="ghost"] {border-radius: 5px; border-color:transparent; --skin-bg:var(--studio-surface);}
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="floating"] {border-radius:9px; box-shadow:0 2px 4px rgb(0 0 0 / .22);}
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="fine-outline"] {border-radius: 2px; --skin-bg:var(--studio-surface); outline:1px solid var(--skin-border); outline-offset:-3px;}
+  /* Danger retains a readable error foreground on neutral icon backgrounds. */
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin-role="danger"]:is([data-studio-skin="ghost"],[data-studio-skin="fine-outline"]) {
+    --skin-fg:var(--studio-error);--skin-hover-fg:var(--studio-error);--skin-hover:var(--studio-hover);
+    border-color:var(--studio-error);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:hover:not(:disabled) {
+    background-color:var(--skin-hover);color:var(--skin-hover-fg);border-color:var(--skin-border);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin="gradient"][data-studio-skin-role]:hover:not(:disabled) {
+    background-image:linear-gradient(var(--skin-hover),var(--skin-hover)),linear-gradient(135deg,var(--studio-focus),var(--skin-border));
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin="gradient"][data-studio-skin-role="danger"]:hover:not(:disabled) {
+    background-image:linear-gradient(var(--skin-hover),var(--skin-hover)),linear-gradient(135deg,var(--studio-error),var(--studio-border));
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:active:not(:disabled) {
+    box-shadow:inset 0 0 0 2px var(--skin-border);
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:focus-visible {
+    outline:2px solid var(--studio-focus);outline-offset:2px;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:disabled {
+    opacity:1;color:var(--studio-muted);background:var(--studio-field);border-color:var(--studio-border);
+    box-shadow:none;cursor:not-allowed;text-decoration: none;
+  }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:disabled svg {opacity:.65;}
+  .studio-component-dialog {max-width:min(720px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); width:720px; overflow:auto; margin:auto; padding:16px; border:1px solid var(--studio-border); border-radius:12px; background:var(--studio-surface); color:var(--studio-text); color-scheme:var(--studio-scheme); box-shadow:0 12px 48px rgb(0 0 0 / .30);}
+  .studio-component-dialog::backdrop {background:rgb(0 0 0 / .55);}
+  .studio-component-dialog select,.studio-component-dialog input:not([type="checkbox"]) {background:var(--studio-field);color:var(--studio-text);border:1px solid var(--studio-border);border-radius:6px;padding:4px 8px;}
+  .studio-component-dialog :is(button,select,input):focus-visible {outline:2px solid var(--studio-focus);outline-offset:2px;}
+  .studio-component-dialog .studio-skin-neutral {border:1px solid var(--studio-border);background:var(--studio-field);color:var(--studio-text);border-radius:6px;padding:6px 10px;}
+  .studio-component-dialog .studio-skin-apply {background:var(--studio-accent-fill);color:var(--studio-on-accent);border:1px solid var(--studio-focus);border-radius:6px;padding:6px 12px;}
+  .studio-component-dialog .studio-skin-notice {color:var(--studio-warning);}
+  @media (forced-colors:active) {
+    [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role] {
+      background:ButtonFace;color:ButtonText;border:1px solid ButtonText;box-shadow:none;forced-color-adjust:auto;
+    }
+    [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:focus-visible {outline:2px solid Highlight;}
+    [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:disabled {color:GrayText;}
+  }
+}
