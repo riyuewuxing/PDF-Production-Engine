@@ -37,12 +37,12 @@ async function run(){
  const clean=()=>js(()=>[...document.querySelectorAll('.a4-sheet [data-studio-skin],[data-studio-paper] [data-studio-skin],.a4-sheet[data-studio-skin]')].length===0);
  const canvas=()=>js(s=>document.querySelector(s+' canvas')?.toDataURL('image/png'),crop);
  await until('editor ready',()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人'&&document.querySelector('.studio-shell')?.getAttribute('aria-busy')==='false'));
- await until('photo loaded',()=>js(()=>document.querySelector('img[alt="证件照预览"]')?.naturalWidth>0));
+ await set('select[aria-label="快速切换简历版本"]','runner-fixture');await until('exact active fixture',()=>js(()=>document.querySelector('select[aria-label="快速切换简历版本"]')?.value==='runner-fixture'&&document.querySelector('.studio-shell')?.getAttribute('aria-busy')==='false'));
  await until('native window shown',()=>win.isVisible());await sleep(1600);await until('stable native content 1440x900',async()=>{if(win.isMaximized()){win.unmaximize();await sleep(300);return false;}win.setContentSize(1440,900);await sleep(300);return !win.isMaximized()&&JSON.stringify(win.getContentSize())==='[1440,900]'},8000);await sleep(350);assert.deepEqual(win.getContentSize(),[1440,900]);
  await set('select[aria-label="切换工作台主题"]',id);await until('theme',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
 
  await nav('版本母库');await until('versions',()=>js(()=>!![...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='重命名')));
- const title=source.title, victim=path.join(main.store.resumesDir,'synthetic-victim.json'),victimOriginal=fs.readFileSync(victim),canonical=d=>{const x={...d};delete x.updatedAt;delete x.title;return x};
+ const title=(await main.store.getResume('runner-fixture')).title, victim=path.join(main.store.resumesDir,'synthetic-victim.json'),victimOriginal=fs.readFileSync(victim),canonical=d=>{const x={...d};delete x.updatedAt;delete x.title;return x};
  const initial=await main.store.getResume('runner-fixture');const versionTitle=()=>main.store.getResume('runner-fixture').then(d=>d.title);
  const bin='section[aria-label="本地版本回收站"]';
  const confirm=async answers=>js(a=>{window.__answers=a;window.__confirmCalls=[];window.confirm=m=>{window.__confirmCalls.push(m);return window.__answers.shift()??false}},answers);
