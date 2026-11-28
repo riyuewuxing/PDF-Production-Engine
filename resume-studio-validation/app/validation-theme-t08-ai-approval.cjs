@@ -132,7 +132,7 @@ async function run(){
   await add('合成仅本地事实 PRIVATE_T08_LOCAL_FACT','PRIVATE_T08_LOCAL_EVIDENCE','local-only');
   const chosen=bank.records.find(r=>r.sensitivity==='shareable');assert(chosen,'shareable fact missing');
   const refresh=async()=>{
-    await js('(()=>{const d=document.querySelector('+JSON.stringify(form)+' details');d.open=true;return true})()');
+    await js(q(form+' details')+'.open=true');
     await click('加载 / 刷新文案事实');await until('fact selection',()=>js('!!'+q(factSel)));
     assert(!await has('PRIVATE_T08_LOCAL_FACT'),'local-only fact offered');
     const n=await js('Array.from('+q(factSel)+'.querySelectorAll("input[type=checkbox]")).length');assert(n===1,'wrong eligible fact count');
