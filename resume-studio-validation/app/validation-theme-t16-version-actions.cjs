@@ -1,0 +1,65 @@
+// T15 native foundation actions; synthetic fixture only. UI settings via real controls, native pointer/keyboard for representative actions.
+const {app,nativeImage}=require('electron'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
+const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT,id=process.env.STUDIO_SKIN_THEME;
+if(!root||!out||!path.basename(root).startsWith('synthetic-t16-versions-')||!['classic','light','dark','highContrast'].includes(id))throw Error('isolated fixture required');
+fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
+const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const report={runnerSha:process.env.GITHUB_SHA,theme:id,rows:[],checks:{},network:[]};const write=()=>fs.writeFileSync(path.join(out,'version-actions.json'),JSON.stringify(report,null,2));
+const timer=setTimeout(()=>{report.error='version actions watchdog';write();app.exit(2)},360000);
+async function until(label,fn,ms=18000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(90)}throw Error('timeout '+label)}
+const pairs=[['solid','square'],['outline','round'],['soft','pill'],['flat','ghost'],['raised','floating'],['gradient','fine-outline']];
+const lum=s=>{const a=s.match(/[\d.]+/g).map(Number);return a.slice(0,3).map(x=>x/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((v,x,i)=>v+x*[.2126,.7152,.0722][i],0)};
+async function run(){
+ const rgba=Buffer.alloc(137*193*4);for(let y=0;y<193;y++)for(let x=0;x<137;x++){const i=(y*137+x)*4;rgba[i]=(x*3+y)%256;rgba[i+1]=(y*5+x)%256;rgba[i+2]=(x*7+y*2)%256;rgba[i+3]=255;}
+ const png=nativeImage.createFromBitmap(rgba,{width:137,height:193}).toPNG(),assets=path.join(main.dataDir,'assets');fs.mkdirSync(assets,{recursive:true});fs.writeFileSync(path.join(assets,'synthetic-t15-photo.png'),png);
+ const source={...fixture,basic:{...fixture.basic,photo:'/api/assets/synthetic-t15-photo.png',photoConfig:{visible:true,aspectRatio:'3:4',borderRadius:'sm',bgBackdrop:'',frameStyle:'none',width:88,height:116}}};
+ await main.store.saveResume('master',{...fixture,id:'synthetic-master',title:'合成母库'});await main.store.saveResume('runner-fixture',source);await main.store.saveResume('synthetic-victim',{...fixture,id:'synthetic-victim',title:'合成待回收版本'});
+ const disk=path.join(main.store.resumesDir,'runner-fixture.json'),hashes=()=>({resume:sha(fs.readFileSync(disk)),photo:sha(fs.readFileSync(path.join(assets,'synthetic-t15-photo.png'))),files:fs.readdirSync(assets).sort()}),before=hashes(),snapshots=JSON.stringify(await main.store.listSnapshots('runner-fixture')),ledger=JSON.stringify(await main.store.getApplications());
+ await main.registerAssetProtocol();main.registerIpcHandlers();const win=await main.createMainWindow();win.focus();
+ win.webContents.session.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']},(d,cb)=>{report.network.push(d.url);cb({cancel:true})});
+ const js=(fn,...a)=>win.webContents.executeJavaScript('('+fn.toString()+')('+a.map(x=>JSON.stringify(x)).join(',')+')');
+ const dlg='dialog[aria-label="组件外观工坊"]',crop='[role="dialog"][aria-label="证件照裁剪与底色工作台"]',lightbox='[role="dialog"][aria-label^="模板大图对比"]',card='[data-studio-gallery-card="vip-cyber-dark"]',actions=card+' [data-studio-region="gallery-card-actions"]';
+ const key=async(keyCode)=>{win.webContents.sendInputEvent({type:'keyDown',keyCode});if(keyCode==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'Enter'});await sleep(35);win.webContents.sendInputEvent({type:'keyUp',keyCode});await sleep(120)};
+ const setupClick=async(label,scope='body')=>{assert(await js((label,scope)=>{const b=[...document.querySelectorAll(scope+' button')].find(e=>(e.innerText.trim()===label||e.getAttribute('aria-label')===label)&&!e.disabled&&e.getClientRects().length);if(!b)return false;b.click();return true},label,scope),'setup '+label);await sleep(120)};
+ const set=async(sel,value)=>{assert(await js((sel,v)=>{const e=document.querySelector(sel);if(!e||e.disabled)return false;const proto=e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,v);e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));return true},sel,value),'set '+sel);await sleep(120)};
+ const shot=async n=>{await js(()=>document.fonts.ready.then(()=>true));await sleep(150);const im=await win.webContents.capturePage();assert(!im.isEmpty());fs.writeFileSync(path.join(out,n+'.png'),im.toPNG());return im.getSize()};
+ const exists=sel=>js(sel=>!!document.querySelector(sel),sel);
+ const pref=()=>js(()=>JSON.parse(localStorage.getItem('resume-studio-ui-component-skins-v1')||'null'));
+ const noWrite=async()=>{assert.deepEqual(hashes(),before);assert.equal(JSON.stringify(await main.store.listSnapshots('runner-fixture')),snapshots);assert.equal(JSON.stringify(await main.store.getApplications()),ledger);assert.deepEqual(report.network,[])};
+ const nav=async text=>{await setupClick(text,'nav');await sleep(200)};
+ const skin=async(b,i)=>{await setupClick('组件外观');await until('modal',()=>js(d=>document.querySelector(d)?.matches(':modal'),dlg));await set(dlg+' select[aria-label="普通按钮皮肤"]',b);await set(dlg+' select[aria-label="图标按钮皮肤"]',i);await setupClick('应用组件外观',dlg);await until('workshop closed',async()=>!(await exists(dlg)));assert.deepEqual(await pref(),{schemaVersion:1,skins:{button:b,icon:i}})};
+ const check=async(label,scope,family,variant)=>{const r=await js((l,s)=>{const e=[...document.querySelectorAll(s+' button')].find(e=>(e.innerText.trim()===l||e.getAttribute('aria-label')===l)&&e.getClientRects().length);if(!e)return null;const c=getComputedStyle(e),b=e.getBoundingClientRect(),root=e.closest('[data-studio-surface][data-studio-theme]');return {label:l,family:e.dataset.studioSkinFamily,variant:e.dataset.studioSkin,role:e.dataset.studioSkinRole,disabled:e.disabled,fg:c.color,bg:c.backgroundColor,border:c.borderRadius,outline:c.outline,width:b.width,height:b.height,surface:root?.dataset.studioSurface,protected:!!e.closest('.a4-sheet,[data-studio-paper]')}} ,label,scope);
+ assert(r,'missing actual button '+label);assert.equal(r.family,family,label);assert.equal(r.variant,variant,label);assert(r.surface&&!r.protected,'scope '+label);if(!r.disabled){const a=lum(r.fg),b=lum(r.bg);r.contrast=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);assert(r.contrast>=4.5,'button color contrast '+JSON.stringify(r));}return r};
+ const native=async(label,scope='body',mode='pointer')=>{const s=await js((l,s)=>{const e=[...document.querySelectorAll(s+' button')].find(e=>(e.innerText.trim()===l||e.getAttribute('aria-label')===l)&&!e.disabled&&e.getClientRects().length);if(!e)return null;e.scrollIntoView({block:'nearest',inline:'nearest'});e.focus();const r=e.getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2),focused:document.activeElement===e}},label,scope);assert(s?.focused,'focus '+label);await sleep(180);
+ if(mode==='keyboard'){await key('Enter');return}
+ const hit=await js((l,s,x,y)=>{const e=[...document.querySelectorAll(s+' button')].find(e=>(e.innerText.trim()===l||e.getAttribute('aria-label')===l)&&!e.disabled&&e.getClientRects().length);const h=document.elementFromPoint(x,y);return !!e&&!!h&&(h===e||e.contains(h))},label,scope,s.x,s.y);assert(hit,'pointer hit '+label+' '+JSON.stringify(s));win.webContents.sendInputEvent({type:'mouseMove',x:s.x,y:s.y});win.webContents.sendInputEvent({type:'mouseDown',x:s.x,y:s.y,button:'left',clickCount:1});win.webContents.sendInputEvent({type:'mouseUp',x:s.x,y:s.y,button:'left',clickCount:1});await sleep(130)};
+ const clean=()=>js(()=>[...document.querySelectorAll('.a4-sheet [data-studio-skin],[data-studio-paper] [data-studio-skin],.a4-sheet[data-studio-skin]')].length===0);
+ const canvas=()=>js(s=>document.querySelector(s+' canvas')?.toDataURL('image/png'),crop);
+ await until('editor ready',()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人'&&document.querySelector('.studio-shell')?.getAttribute('aria-busy')==='false'));
+ await until('photo loaded',()=>js(()=>document.querySelector('img[alt="证件照预览"]')?.naturalWidth>0));
+ await until('native window shown',()=>win.isVisible());await sleep(1600);await until('stable native content 1440x900',async()=>{if(win.isMaximized()){win.unmaximize();await sleep(300);return false;}win.setContentSize(1440,900);await sleep(300);return !win.isMaximized()&&JSON.stringify(win.getContentSize())==='[1440,900]'},8000);await sleep(350);assert.deepEqual(win.getContentSize(),[1440,900]);
+ await set('select[aria-label="切换工作台主题"]',id);await until('theme',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
+
+ await nav('版本母库');await until('versions',()=>js(()=>!![...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='重命名')));
+ const title=source.title, victim=path.join(main.store.resumesDir,'synthetic-victim.json'),victimOriginal=fs.readFileSync(victim),canonical=d=>{const x={...d};delete x.updatedAt;delete x.title;return x};
+ const initial=await main.store.getResume('runner-fixture');const versionTitle=()=>main.store.getResume('runner-fixture').then(d=>d.title);
+ const bin='section[aria-label="本地版本回收站"]';
+ const confirm=async answers=>js(a=>{window.__answers=a;window.__confirmCalls=[];window.confirm=m=>{window.__confirmCalls.push(m);return window.__answers.shift()??false}},answers);
+ const calls=()=>js(()=>window.__confirmCalls.slice());
+ const openBin=async()=>{await js(sel=>{const e=document.querySelector(sel+' button[aria-expanded]');if(e?.getAttribute('aria-expanded')==='false')e.click()},bin);await until('bin ready',()=>exists(bin+' button[data-studio-skin]'))};
+ const safe=async()=>{assert.deepEqual(canonical(await main.store.getResume('runner-fixture')),canonical(initial));assert.equal(JSON.stringify(await main.store.getApplications()),ledger);assert.deepEqual(report.network,[]);assert(await clean())};
+ for(const [b,i] of pairs){const row={button:b,icon:i,controls:[],actions:{}};report.rows.push(row);write();await skin(b,i);
+ row.controls.push(await check('重命名','body','button',b));await native('重命名','body','keyboard');await until('rename',()=>exists('input[aria-label="版本标题"]'));await set('input[aria-label="版本标题"]','不应保存');
+ const primary=await check('确认重命名','body','icon',i);assert.equal(primary.role,'primary');row.controls.push(primary,await check('取消重命名','body','icon',i));await shot(b+'-rename');await native('取消重命名','body','keyboard');assert.equal(await versionTitle(),title);row.actions.cancelRename=true;
+ await native('重命名','body','keyboard');await set('input[aria-label="版本标题"]','合成版本-'+b);await native('确认重命名','body','keyboard');await until('rename persisted',async()=>await versionTitle()==='合成版本-'+b);row.actions.confirmRename=true;
+ await native('重命名','body','keyboard');await set('input[aria-label="版本标题"]',title);await native('确认重命名','body','keyboard');await until('title restored',async()=>await versionTitle()===title);await safe();
+ row.controls.push(await check('删除合成待回收版本','body','icon',i));await confirm([false]);await native('删除合成待回收版本','body','keyboard');assert.equal((await calls()).length,1);assert.deepEqual(fs.readFileSync(victim),victimOriginal);row.actions.cancelDelete=true;
+ await confirm([true]);await native('删除合成待回收版本','body','keyboard');await until('victim moved',()=>!fs.existsSync(victim));await openBin();await until('restore control',()=>js(s=>[...document.querySelectorAll(s+' button')].some(e=>e.innerText.trim()==='恢复原版本'&&!e.disabled),bin));row.controls.push(await check('恢复原版本',bin,'button',b),await check('永久删除归档',bin,'button',b));await js(s=>document.querySelector(s).scrollIntoView({block:'center'}),bin);await shot(b+'-trash');
+ await confirm([true,false]);await native('永久删除归档',bin,'keyboard');assert.equal((await calls()).length,2);assert(!fs.existsSync(victim));row.actions.secondPurgeConfirmationCancels=true;
+ await confirm([false]);await native('恢复原版本',bin,'keyboard');assert.equal((await calls()).length,1);assert(!fs.existsSync(victim));row.actions.cancelRestore=true;
+ await confirm([true]);await native('恢复原版本',bin,'keyboard');await until('restored',()=>fs.existsSync(victim));await until('restore completed',()=>js(s=>document.querySelector(s)?.innerText.includes('已恢复原版本。'),bin));assert.deepEqual(canonical(JSON.parse(fs.readFileSync(victim))),canonical(JSON.parse(victimOriginal)));row.actions.restore=true;await safe();write();
+ }
+ report.checks={allPairs:true,nativeKeyboard:true,renameRole:true,realTrashAndRestore:true,doubleConfirmation:true,isolatedSource:true};write();
+}
+app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{report.error=String(e.stack||e);write();console.error(e);clearTimeout(timer);app.exit(1)});

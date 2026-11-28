@@ -1,0 +1,83 @@
+name: Resume Studio T16 version and backup confirmation gates
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-version-actions']
+permissions:
+  contents: read
+jobs:
+  active:
+    strategy:
+      fail-fast: false
+      max-parallel: 15
+      matrix:
+        suite: [backup]
+        pair: [0, 1, 2, 3, 4, 5]
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build native app
+        timeout-minutes: 3
+        run: |
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native active skin protection gate
+        timeout-minutes: 8
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $suite = '${{ matrix.suite }}'
+          $env:T16_PAIR = '${{ matrix.pair }}'
+          $env:RESUME_STUDIO_LIST_MODE = $suite
+          $env:STUDIO_THEME_PHASE = 'candidate'
+          $prefix = switch ($suite) {
+            'ai' { 'synthetic-ai-receipts-' }
+            'workflow' { 'synthetic-queue-workflow-' }
+            'review' { 'synthetic-review-' }
+            'version-comparison' { 'synthetic-theme-t06-' }
+            'all-corrupt' { 'synthetic-list-' }
+            'backup' { 'synthetic-t46-queue-backup-' }
+          }
+          $entry = ".\validation-theme-t16-active-$suite.cjs"
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ($prefix + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t16-extra'
+          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          Copy-Item validation-theme-t12-provenance.json $env:RESUME_STUDIO_EVIDENCE_OUT
+          if (!(Test-Path -LiteralPath $entry -PathType Leaf)) { throw 'Missing exact T16 entry' }
+          node .\validation-theme-t11-preflight.cjs $entry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            if ($suite -eq 'workflow') { $env:QUEUE_PHASE = 'main' }
+            & .\node_modules\.bin\electron.cmd $entry
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($suite -eq 'workflow') {
+              $env:QUEUE_PHASE = 'restart'
+              & .\node_modules\.bin\electron.cmd $entry
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Preserve native evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t16-extra-${{ matrix.suite }}-${{ matrix.pair }}
+          path: theme-t16-extra/
+          if-no-files-found: error
+          retention-days: 3
