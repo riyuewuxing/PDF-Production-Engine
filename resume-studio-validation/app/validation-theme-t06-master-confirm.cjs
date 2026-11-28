@@ -1,0 +1,42 @@
+const {app}=require('electron'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;
+if(!root||!out||!path.basename(root).startsWith('synthetic-t06-merge-'))throw Error('isolated fixture required');
+fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
+const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
+const report={runnerSha:process.env.GITHUB_SHA,checks:{}};
+const write=()=>fs.writeFileSync(path.join(out,'master-confirm.json'),JSON.stringify(report,null,2));
+const timer=setTimeout(()=>{report.error='application watchdog';write();process.exit(2)},95000);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(label,fn,ms=15000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label)}
+async function run(){
+ const master=await main.store.saveResume('master',{...fixture,id:'synthetic-t06-master',title:'合成母库',skillContent:'T06_MASTER_ONLY_SKILL'});
+ await main.store.saveResume('runner-fixture',{...fixture,skillContent:'T06_CURRENT_SKILL'});
+ await main.registerAssetProtocol();main.registerIpcHandlers();
+ const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,920);win.focus();
+ const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(x=>JSON.stringify(x)).join(',')+')');
+ const click=async(label,sel='body')=>assert(await js((label,sel)=>{const b=[...document.querySelector(sel)?.querySelectorAll('button')||[]].find(e=>e.innerText.trim()===label&&!e.disabled);if(!b)return false;b.click();return true},label,sel),'button missing '+label);
+ const cap=async n=>{await js(()=>document.fonts.ready.then(()=>true));await sleep(250);const im=await win.webContents.capturePage();assert(!im.isEmpty());fs.writeFileSync(path.join(out,n+'.png'),im.toPNG());};
+ const sel='[data-studio-region="master-merge-dialog"]';
+ await until('editor',()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人'));
+ await until('saved',()=>js(()=>document.body.innerText.includes('已保存至本地硬盘')));
+ const before=await main.store.getResume('runner-fixture'),snapshots=await main.store.listSnapshots('runner-fixture'),masterFile=main.store.resolveResumePath('master').filePath,masterBytes=fs.readFileSync(masterFile);
+ await js(()=>{const e=document.querySelector('select[aria-label="切换工作台主题"]');e.value='warm';e.dispatchEvent(new Event('change',{bubbles:true}));return true});
+ await click('版本母库');await click('从母库 (master.json) 挑选经历合并到当前版本');await until('master ready',()=>js(sel=>document.querySelector(sel)?.innerText.includes('专业技能文案'),sel));
+ assert(await js(sel=>[...document.querySelector(sel).querySelectorAll('button')].find(e=>e.innerText.trim()==='合并选中条目到当前简历')?.disabled,sel));report.checks.emptySelectionBlocked=true;
+ const selectReplace=()=>js(sel=>{const card=[...document.querySelector(sel).querySelectorAll('div')].find(e=>e.firstElementChild?.innerText==='专业技能文案'&&e.querySelectorAll('button').length===2);const b=[...card?.querySelectorAll('button')||[]].find(e=>e.innerText.trim()==='覆盖当前');if(!b)return false;b.click();return true},sel);
+ assert(await selectReplace());await until('selected one',()=>js(sel=>document.querySelector(sel)?.innerText.includes('已选择 1 项'),sel));
+ await cap('warm-master-before-confirm');
+ assert.deepEqual(await main.store.getResume('runner-fixture'),before);assert.deepEqual(await main.store.listSnapshots('runner-fixture'),snapshots);report.checks.selectionNoWrite=true;
+ await click('取消',sel);await until('cancel closes',()=>js(sel=>!document.querySelector(sel),sel));assert.deepEqual(await main.store.getResume('runner-fixture'),before);report.checks.cancelNoWrite=true;
+ await click('从母库 (master.json) 挑选经历合并到当前版本');await until('master reopened',()=>js(sel=>document.querySelector(sel)?.innerText.includes('专业技能文案'),sel));
+ assert(await js(sel=>document.querySelector(sel)?.innerText.includes('已选择 0 项'),sel));report.checks.reopenClearsSelection=true;
+ assert(await selectReplace());await click('合并选中条目到当前简历',sel);
+ await until('confirmed exact write',async()=>(await main.store.getResume('runner-fixture')).skillContent===master.skillContent,25000);
+ const after=await main.store.getResume('runner-fixture'),expected={...before,updatedAt:after.updatedAt,skillContent:master.skillContent};
+ assert.deepEqual(after,expected);report.checks.onlySelectedSkillChanged=true;
+ const saved=await main.store.listSnapshots('runner-fixture');assert.equal(saved.length,snapshots.length+1);const s=saved.find(x=>x.reason==='母库合并前自动快照');assert(s);
+ const record=JSON.parse(fs.readFileSync(path.join(main.store.backupsDir,'runner-fixture',s.id+'.json'),'utf8'));assert.deepEqual(record.document,before);report.checks.prewriteSnapshotExact=true;
+ assert(fs.readFileSync(masterFile).equals(masterBytes));report.checks.masterSourceBytesUnchanged=true;
+ await cap('warm-master-confirmed');write();
+}
+app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e.stack||e.message);write();process.exit(1)});
