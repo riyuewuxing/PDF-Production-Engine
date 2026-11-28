@@ -25,11 +25,12 @@ async function run(){
  await click('求职面试');await until('six status records',()=>js(()=>document.querySelectorAll('select[data-studio-career-status]').length===6));
  for(const id of ['classic','dark','light','warm']){
   await set('select[aria-label="切换工作台主题"]',id);await until('theme',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
+  await sleep(400); // allow CSS color transitions to settle before contrast sampling
   const rows=await js(()=>[...document.querySelectorAll('select[data-studio-career-status]')].map(e=>({value:e.value,marker:e.dataset.studioCareerStatus,bg:getComputedStyle(e).backgroundColor,fg:getComputedStyle(e).color,selected:e.selectedOptions[0].textContent})));
   assert.equal(rows.length,6);assert.deepEqual(rows.map(r=>r.value).sort(),states.slice().sort());assert(rows.every(r=>r.marker===r.value&&r.selected));
   if(id!=='classic'){const bg=rows.map(r=>r.bg);assert(new Set(bg).size>=5,'semantic status backgrounds collapsed '+JSON.stringify(rows));}
-  const contrast=await audit(win,'[data-studio-region="career-main"]','statuses-'+id);if(id!=='classic')assert.equal(contrast.failures.length,0,JSON.stringify(contrast.failures.slice(0,5)));
-  report.states[id]={rows,contrast};write();await js(()=>document.querySelector('select[data-studio-career-status]').scrollIntoView({block:'center'}));await capture('statuses-'+id);
+  const contrast=await audit(win,'[data-studio-region="career-main"]','statuses-'+id);report.states[id]={rows,contrast};write();if(id!=='classic')assert.equal(contrast.failures.length,0,JSON.stringify(contrast.failures.slice(0,5)));
+  await js(()=>document.querySelector('select[data-studio-career-status]').scrollIntoView({block:'center'}));await capture('statuses-'+id);
   assert.deepEqual(await main.store.getApplications(),seeded);assert(fs.readFileSync(source).equals(bytes));
  }
  report.checks.allSixStatusesAcrossThemes=true;
