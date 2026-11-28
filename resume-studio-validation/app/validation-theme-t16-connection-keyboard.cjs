@@ -55,7 +55,8 @@ const click=async(label)=>{
  win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...p});
  win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...p});
 };
-const sendKey=async code=>{win.webContents.sendInputEvent({type:'keyDown',keyCode:code});win.webContents.sendInputEvent({type:'keyUp',keyCode:code});await sleep(55)};
+// Same proven native key sequence as T13/T14/T15; Enter needs the char event.
+const sendKey=async code=>{win.webContents.sendInputEvent({type:'keyDown',keyCode:code});if(code==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'Enter'});await sleep(40);win.webContents.sendInputEvent({type:'keyUp',keyCode:code});await sleep(90)};
 const focused=()=>js(()=>{const e=document.activeElement,s=getComputedStyle(e),r=e.getBoundingClientRect();return {label:e.innerText?.trim()||e.getAttribute('aria-label')||e.tagName,disabled:!!e.disabled,tag:e.tagName,focusVisible:e.matches(':focus-visible'),outline:s.outlineStyle,outlineWidth:s.outlineWidth,shadow:s.boxShadow,rect:[r.width,r.height],theme:e.closest('[data-studio-theme]')?.dataset.studioTheme||null}});
 const keyboard=async(label,activation)=>{
  await until('keyboard target '+label,()=>visible(label));await t16.probe(label);
@@ -64,6 +65,7 @@ const keyboard=async(label,activation)=>{
  assert(hit,'Tab could not reach '+label);assert(hit.focusVisible,'keyboard focus not visible '+label);
  assert((hit.outline!=='none'&&parseFloat(hit.outlineWidth)>0)||hit.shadow!=='none','no computed focus indicator '+label);
  assert.equal(hit.theme,palette);report.keyboard.push({label,activation,steps,focus:hit});write();
+ await capture('focus-'+report.keyboard.length,label);
  await sendKey(activation);
 };
 const receipt=state=>js(s=>document.querySelector('[aria-label="连接测试调用回执"]')?.dataset.attemptState===s,state);
