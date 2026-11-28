@@ -1,0 +1,80 @@
+name: Resume Studio T10 new palettes interview final exact adapter gate
+on:
+  push:
+    branches: ['resume-studio/theme-p2-t10-interview-final']
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [candidate]
+    runs-on: windows-latest
+    timeout-minutes: 14
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Restore T07 source for classic baseline
+        if: matrix.suite == 'baseline'
+        working-directory: .
+        timeout-minutes: 2
+        run: |
+          git fetch --no-tags --depth=1 origin 103eb9192a540fda7d921ac4ee721dd1201cb882
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git restore --source=103eb9192a540fda7d921ac4ee721dd1201cb882 --worktree --staged -- resume-studio-validation/app/src
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck and actual desktop build
+        timeout-minutes: 3
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual native operation and five-theme matrix
+        timeout-minutes: 6
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $suite = '${{ matrix.suite }}'
+          $env:STUDIO_THEME_PHASE = $suite
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-interview-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t10-interview-final'
+          pnpm exec esbuild validation-interview-adapters.ts --bundle --platform=node --format=cjs --outfile=validation-interview-adapters.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $entry = '.\validation-theme-t08-interview-gate.cjs'
+          foreach ($file in @($entry, '.\validation-interview-adapters.cjs', '.\validation-theme-t08-matrix.cjs', '.\validation-theme-t08-baseline-matrix.cjs', '.\validation-theme-t05-contrast.cjs')) {
+            if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing $file" }
+            node --check $file
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          node -e "const x=require('./validation-interview-adapters.cjs');if(typeof x.parsePracticeKey!=='function'||typeof x.jobReviewBasisHash!=='function'||typeof x.splitJobRequirements!=='function')process.exit(1)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            & .\node_modules\.bin\electron.cmd $entry
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Upload raw evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t10-interview-final-${{ matrix.suite }}
+          path: theme-t10-interview-final/
+          if-no-files-found: error
+          retention-days: 3
