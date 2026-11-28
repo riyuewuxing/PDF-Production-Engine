@@ -307,7 +307,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
             <div className="grid grid-cols-3 gap-2 text-xs">
               <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>宽 (px)</span>
-                <input data-studio-control="true"
+                <input {...fieldSkin(skins,'number')} data-studio-control="true"
                   type="number"
                   min={50}
                   max={180}
@@ -326,7 +326,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               </label>
               <label className="flex flex-col gap-0.5 text-slate-500 studio-ui-muted">
                 <span>高 (px)</span>
-                <input data-studio-control="true"
+                <input {...fieldSkin(skins,'number')} data-studio-control="true"
                   type="number"
                   min={50}
                   max={220}
