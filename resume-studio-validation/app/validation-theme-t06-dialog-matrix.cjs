@@ -1,6 +1,6 @@
 const audit=require('./validation-theme-t05-contrast.cjs');
 const fs=require('node:fs'),path=require('node:path');
-const themes=['classic','dark','light','warm'],bg={dark:'rgb(17, 24, 39)',light:'rgb(255, 255, 255)',warm:'rgb(251, 247, 238)'};
+const themes=['classic','aurora','forest','lavender','highContrast'],bg={aurora:'rgb(34, 42, 71)',forest:'rgb(29, 56, 45)',lavender:'rgb(250, 248, 255)',highContrast:'rgb(17, 17, 17)'};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 module.exports=async function matrix(win,out,region,label){
  const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(x=>JSON.stringify(x)).join(',')+')');

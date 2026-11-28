@@ -1,0 +1,60 @@
+{
+  "productBase": "e8984e935f44b4f579abb301cdbbc99c37fe2c37",
+  "sourceScripts": [
+    {
+      "path": "validation-theme-t09-preview.cjs",
+      "sourceCommit": "87466be021ebab65a8d50566a37cec23247e8ea5",
+      "sourceBlob": "12d6bf8f44381977e4f8f7b9cbefccf8c3a61d5e",
+      "adapted": true
+    },
+    {
+      "path": "validation-theme-t08-interview-gate.cjs",
+      "sourceCommit": "2b3c0664764a50e884b48e64738a65255f14796c",
+      "sourceBlob": "2363afbf7633d5c8eb38091bcfca0a455e341733",
+      "adapted": false
+    },
+    {
+      "path": "validation-interview-adapters.ts",
+      "sourceCommit": "2b3c0664764a50e884b48e64738a65255f14796c",
+      "sourceBlob": "54c6c41cbb61c3e2fbdc6e5aa0c50fd1030f472a",
+      "adapted": false
+    },
+    {
+      "path": "validation-theme-t08-baseline-matrix.cjs",
+      "sourceCommit": "2b3c0664764a50e884b48e64738a65255f14796c",
+      "sourceBlob": "7b1a3890acd66313b8f595db4578ce6c8fa816fe",
+      "adapted": false
+    },
+    {
+      "path": "validation-theme-t07-command.cjs",
+      "sourceCommit": "c9eac9ba269c691d36045032629ae5c495237377",
+      "sourceBlob": "643787dc9199a6f9c3986afc07d68a4af265e852",
+      "adapted": true
+    },
+    {
+      "path": "validation-theme-t07-recovery.cjs",
+      "sourceCommit": "c9eac9ba269c691d36045032629ae5c495237377",
+      "sourceBlob": "0747a94a38464db4225573e83b59f71fd409b44f",
+      "adapted": true
+    },
+    {
+      "path": "validation-theme-t06-dialog-matrix.cjs",
+      "sourceCommit": "c9eac9ba269c691d36045032629ae5c495237377",
+      "sourceBlob": "40245503e1f4bbbb85ea2ba29ad6cb0ff5898279",
+      "adapted": true
+    },
+    {
+      "path": "validation-theme-t09-crop.cjs",
+      "sourceCommit": "f4202e211975165af3c91e257c27d816591143a8",
+      "sourceBlob": "54172859aa47a229aae0f1d9aaae395631c632f3",
+      "adapted": true
+    },
+    {
+      "path": "validation-theme-t08-matrix.cjs",
+      "sourceCommit": "f4202e211975165af3c91e257c27d816591143a8",
+      "sourceBlob": "9aa46b6b5f693652ab8ef418cffa8d7a7aa9fbc3",
+      "adapted": true
+    }
+  ],
+  "scope": "candidate palettes; no material or motion implementation"
+}

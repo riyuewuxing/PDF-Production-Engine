@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),audit=require('./validation-theme-t05-contrast.cjs');
-const themes=['classic','dark','light','warm'];
+const themes=['classic','aurora','forest','lavender','highContrast'];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 module.exports=async function matrix(win,out,region,label,source){
  const selector='[data-studio-region="'+region+'"]',res={};
