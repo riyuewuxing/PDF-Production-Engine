@@ -83,6 +83,21 @@ export function ComponentSkinWorkshop() {
           <textarea aria-label="只读多行文本样例" {...fieldSkin(draft,'multiline')} readOnly rows={2} value="只读样例" className="w-full rounded border p-2 studio-ui-border studio-ui-surface studio-ui-primary" />
         </div>
       </section>
+      <section aria-label="密钥与数字真实样例" className="mt-3 rounded-lg border p-3 studio-ui-border">
+        <h3 className="font-semibold text-sm">密钥与数字 · 独立原生控件</h3>
+        <p className="text-xs studio-ui-muted">仅使用合成样例；密钥保持遮蔽，数字保留原生步进和校验。</p>
+        <div className="grid gap-3 sm:grid-cols-2 mt-2">
+          {(['password','number'] as const).map(family=><label key={family} className="grid gap-1 text-sm">{family==='password'?'密钥输入':'数字输入'}
+            <select aria-label={family==='password'?'密钥输入皮肤':'数字输入皮肤'} value={draft[family]??'inherit'} onChange={e=>setDraft(prev=>({...prev,[family]:e.target.value as ComponentSkins[typeof family]}))}>
+              <option value="inherit">保留当前主题原样</option>{FIELD_VARIANTS.map(v=><option key={v} value={v}>{FIELD_LABELS[v]}</option>)}
+            </select>
+          </label>)}
+          <input type="password" aria-label="密钥输入样例" autoComplete="off" {...fieldSkin(draft,'password')} defaultValue="synthetic-only" />
+          <input type="number" aria-label="数字输入样例" min={1} max={120} step={1} {...fieldSkin(draft,'number')} defaultValue={60} />
+          <input type="password" aria-label="不可用密钥样例" autoComplete="off" {...fieldSkin(draft,'password')} disabled defaultValue="synthetic-only" />
+          <input type="number" aria-label="只读数字样例" min={1} max={120} step={1} {...fieldSkin(draft,'number')} readOnly value={60} />
+        </div>
+      </section>
       {pending&&<section aria-label="样例危险操作确认" className="mt-3 rounded border p-3 text-sm studio-ui-error-border studio-ui-error-surface">
         <p>仅样例确认，绝不删除真实数据。</p>
         <div className="flex flex-wrap gap-2 mt-2">
