@@ -1,13 +1,13 @@
-name: T17 public native text field coverage
+name: T17 public native search completion
 on:
   pull_request:
-    branches: ['resume-studio/theme-p3-t17-text-pilot']
+    branches: ['resume-studio/theme-p3-t17-text-coverage']
     types: [opened, synchronize, reopened]
 permissions:
   contents: read
 jobs:
   native:
-    if: github.event.pull_request.head.ref == 'resume-studio/theme-p3-t17-text-coverage' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.ref == 'resume-studio/theme-p3-t17-text-search' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-latest
     timeout-minutes: 18
     strategy:
