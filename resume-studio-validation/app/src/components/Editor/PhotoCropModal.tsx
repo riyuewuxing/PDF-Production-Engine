@@ -149,7 +149,7 @@ export function PhotoCropModal({
       if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(!savingRef.current)closeRef.current();return;}
       if(e.key!=='Tab')return;
       const xs=items(),index=xs.indexOf(document.activeElement as HTMLElement);
-      if(!xs.length||index<0||(e.shiftKey?index===0:index===xs.length-1)){e.preventDefault();e.stopPropagation();(xs.length?(e.shiftKey?xs[xs.length-1]:xs[0]):panel).focus();}
+      if(!xs.length||index<0||(e.shiftKey?index===0:index===xs.length-1)){e.preventDefault();e.stopPropagation();((e.shiftKey?xs.at(-1):xs[0])??panel).focus();}
     };
     const focus=(e:FocusEvent)=>{if(e.target instanceof Node&&!panel.contains(e.target))first();};
     document.addEventListener('keydown',key,true);document.addEventListener('focusin',focus);
