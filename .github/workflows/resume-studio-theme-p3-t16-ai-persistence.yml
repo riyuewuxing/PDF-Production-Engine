@@ -1,0 +1,60 @@
+name: Resume Studio T16 public settings persistence cold restart gate
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-ai-persistence']
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        pair: [0, 1, 2, 3, 4, 5]
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Save and cold restart with synthetic credentials
+        timeout-minutes: 7
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:T16_PAIR = '${{ matrix.pair }}'
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-ai-persistence-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't16-ai-persistence'
+          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          try {
+            foreach ($phase in @('seed','reopen')) {
+              $env:QUEUE_PHASE=$phase
+              & .\node_modules\.bin\electron.cmd .\validation-theme-t16-ai-persistence.cjs
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: t16-ai-persistence-${{ matrix.pair }}
+          path: t16-ai-persistence/
+          retention-days: 3
+          if-no-files-found: error
