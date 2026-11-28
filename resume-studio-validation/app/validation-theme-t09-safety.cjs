@@ -32,7 +32,7 @@ async function run(){
  const focus=()=>js(sel=>{const e=document.activeElement;return {inside:!!e.closest(sel),label:e.getAttribute('aria-label')||e.innerText.trim(),tag:e.tagName}},dlg);
  await until('editor',()=>js(()=>!!document.querySelector('#basic-field-name')));
  await until('source image',()=>js(()=>document.querySelector('img[alt="证件照预览"]')?.naturalWidth>0));
- for(const id of ['classic','aurora','forest','lavender','highContrast']){
+ for(const id of ['classic','nordic','blueprint','terracotta','ink']){
   await theme(id);await open();const initial=await canvas(),first=await focus();assert(first.inside&&first.label==='关闭证件照裁剪弹窗');
   const n=await js(sel=>[...document.querySelectorAll(sel+' button:not(:disabled),'+sel+' input:not(:disabled),'+sel+' [tabindex="0"]')].filter(e=>e.tabIndex>=0&&e.getClientRects().length).length,dlg);
   const index=()=>js(sel=>[...document.querySelectorAll(sel+' button:not(:disabled),'+sel+' input:not(:disabled),'+sel+' [tabindex="0"]')].filter(e=>e.tabIndex>=0&&e.getClientRects().length).indexOf(document.activeElement),dlg);
@@ -56,7 +56,7 @@ async function run(){
  report.checks.keyboardMouseCancelAndBadImage=true;
  // Narrow native renderer: all controls reachable via scroll, no horizontal overflow.
  win.setSize(980,720);
- for(const id of ['classic','aurora','forest','lavender','highContrast']){win.webContents.setZoomFactor(1);await theme(id);for(const z of [1,1.25,1.5]){win.webContents.setZoomFactor(z);await sleep(160);await open();
+ for(const id of ['classic','nordic','blueprint','terracotta','ink']){win.webContents.setZoomFactor(1);await theme(id);for(const z of [1,1.25,1.5]){win.webContents.setZoomFactor(z);await sleep(160);await open();
   const geom=()=>js(sel=>{const f=document.querySelector(sel+' > div'),r=f.getBoundingClientRect(),e=document.activeElement,b=e.getBoundingClientRect();return {view:[innerWidth,innerHeight],rect:[r.left,r.top,r.right,r.bottom],scroll:[f.clientWidth,f.scrollWidth,f.clientHeight,f.scrollHeight],focus:e.getAttribute('aria-label')||e.innerText.trim(),visible:b.left>=r.left-1&&b.right<=r.right+1&&b.top>=r.top-1&&b.bottom<=r.bottom+1}},dlg);
   const first=await geom();await press('Tab',['shift']);const last=await geom();report.zoom[id+'-'+z]={first,last};write();assert(first.rect[0]>=0&&first.rect[1]>=0&&first.rect[2]<=first.view[0]+1&&first.rect[3]<=first.view[1]+1);assert(first.scroll[1]<=first.scroll[0]+1,'horizontal overflow');assert(first.visible&&last.visible,'focused control outside visible dialog');await shot('zoom-'+id+'-'+z);await press('Escape');await close();}}
  win.webContents.setZoomFactor(1);win.setSize(1440,1000);await readOnly();report.checks.zoomReachable=true;

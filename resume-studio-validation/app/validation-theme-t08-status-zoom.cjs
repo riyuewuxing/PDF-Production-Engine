@@ -23,7 +23,7 @@ async function run(){
  const capture=async n=>{await js(()=>document.fonts.ready.then(()=>true));await sleep(180);const s=await win.webContents.capturePage();assert(!s.isEmpty());fs.writeFileSync(path.join(out,n+'.png'),s.toPNG())};
  await until('editor',()=>js(()=>!!document.querySelector('#basic-field-name')));
  await click('求职面试');await until('six status records',()=>js(()=>document.querySelectorAll('select[data-studio-career-status]').length===6));
- for(const id of ['classic','aurora','forest','lavender','highContrast']){
+ for(const id of ['classic','nordic','blueprint','terracotta','ink']){
   await set('select[aria-label="切换工作台主题"]',id);await until('theme',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
   await sleep(400); // allow CSS color transitions to settle before contrast sampling
   const rows=await js(()=>[...document.querySelectorAll('select[data-studio-career-status]')].map(e=>({value:e.value,marker:e.dataset.studioCareerStatus,bg:getComputedStyle(e).backgroundColor,fg:getComputedStyle(e).color,selected:e.selectedOptions[0].textContent})));
@@ -40,7 +40,7 @@ async function run(){
  await click('内容编辑');await click('导出 PDF');await until('export ready',()=>js(()=>[...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='记入投递并锁定快照'&&!b.disabled)),30000);
  const ledger=await main.store.getApplications();const sel='[data-studio-region="quick-log-dialog"]';
  win.setSize(1080,720);
- for(const id of ['classic','aurora','forest','lavender','highContrast']){
+ for(const id of ['classic','nordic','blueprint','terracotta','ink']){
   win.webContents.setZoomFactor(1);await set('select[aria-label="切换工作台主题"]',id);await until('theme',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
   for(const z of [1,1.25,1.5]){
    win.webContents.setZoomFactor(z);await sleep(150);await click('记入投递并锁定快照');await until('modal',()=>js(sel=>!!document.querySelector(sel),sel));

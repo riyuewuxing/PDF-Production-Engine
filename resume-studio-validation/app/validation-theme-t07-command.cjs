@@ -23,7 +23,7 @@ async function run(){
  const close=async()=>{await press('Escape');await until('command closed',()=>js(sel=>!document.querySelector(sel),sel))};
  await until('editor',()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人'));
  const before=await main.store.getResume('runner-fixture'),snaps=await main.store.listSnapshots('runner-fixture'),ledger=await main.store.getApplications();
- const themes=['classic','aurora','forest','lavender','highContrast'],colors={aurora:'rgb(34, 42, 71)',forest:'rgb(29, 56, 45)',lavender:'rgb(250, 248, 255)',highContrast:'rgb(17, 17, 17)'};
+ const themes=['classic','nordic','blueprint','terracotta','ink'],colors={nordic:'rgb(248, 249, 250)',blueprint:'rgb(27, 49, 80)',terracotta:'rgb(255, 247, 240)',ink:'rgb(255, 255, 255)'};
  let baseline=null;
  for(const id of themes){
   await js(id=>{const e=document.querySelector('select[aria-label="切换工作台主题"]');e.value=id;e.dispatchEvent(new Event('change',{bubbles:true}));return true},id);
@@ -70,7 +70,7 @@ async function run(){
   report.themes[id].keyboard={initial:true,down:true,up:true,filter:true,emptyEnter:true,escape:true,noWrite:true};write();
  }
  // Exercise real keyboard selection of theme command, not just change event.
- await open();await query('工作台主题 forest');assert.equal((await state()).options.length,1);await press('Enter');await until('theme command ran',()=>js(()=>document.querySelector('.studio-shell')?.dataset.studioTheme==='forest'&&!document.querySelector('[aria-label="全局命令面板"]')));
+ await open();await query('工作台主题 blueprint');assert.equal((await state()).options.length,1);await press('Enter');await until('theme command ran',()=>js(()=>document.querySelector('.studio-shell')?.dataset.studioTheme==='blueprint'&&!document.querySelector('[aria-label="全局命令面板"]')));
  assert.deepEqual(await main.store.getResume('runner-fixture'),before);report.checks.themeCommandNoWrite=true;
  await open();await query('版本母库');await press('Enter');await until('navigation command executed',()=>js(()=>document.body.innerText.includes('版本与母库管理')&&!document.querySelector('[aria-label="全局命令面板"]')));
  assert.deepEqual(await main.store.getResume('runner-fixture'),before);report.checks.navigationCommandNoWrite=true;write();

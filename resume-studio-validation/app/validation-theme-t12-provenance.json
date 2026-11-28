@@ -1,0 +1,57 @@
+{
+  "source": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+  "sourceRuns": [
+    46115744492,
+    46116023098,
+    46116302278
+  ],
+  "adaptations": [
+    {
+      "path": "validation-theme-t09-preview.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "bb5d0c6a9b4d1a58fa2e1cb5099ec83195bc1263"
+    },
+    {
+      "path": "validation-theme-t07-command.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "1ae77e2134ca481e87494da060da6d4c5f0e03e6"
+    },
+    {
+      "path": "validation-theme-t07-recovery.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "a88423261693b2b5f58513042877eee34c256717"
+    },
+    {
+      "path": "validation-theme-t06-dialog-matrix.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "8632cb10bf307a5f635f995f7f782d920064a951"
+    },
+    {
+      "path": "validation-theme-t09-crop.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "2903db832c8fe669730dbbdecd1408d71ca04dea"
+    },
+    {
+      "path": "validation-theme-t08-matrix.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "39863dc994aa1c5f03219614224f0431a0ce3f2e"
+    },
+    {
+      "path": "validation-theme-t09-safety.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "1db8404039a851f659382af86c54504b7f45271f"
+    },
+    {
+      "path": "validation-theme-t08-status-zoom.cjs",
+      "sourceCommit": "f81403a205ac26f68a64db7581a2530fe48ac0b1",
+      "sourceBlob": "659a912b02c6a8bccaa09a2174236b082272071b"
+    }
+  ],
+  "unmodifiedDependencies": [
+    "validation-theme-t11-preflight.cjs",
+    "validation-interview-adapters.ts",
+    "validation-theme-t08-interview-gate.cjs",
+    "validation-theme-t08-baseline-matrix.cjs"
+  ],
+  "scope": "palette candidates only"
+}

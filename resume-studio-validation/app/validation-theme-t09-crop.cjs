@@ -11,7 +11,7 @@ async function until(label,fn,ms=18000){const end=Date.now()+ms;while(Date.now()
 const configs=[{preset:'一寸 3:4',frame:'无额外边框',sw:'透明',color:'',zoom:.8,w:240,h:320,outH:480,radius:'sm',aspect:'3:4',width:88,height:116},{preset:'方照 1:1',frame:'白环投影',sw:'证件蓝',color:'#2563eb',zoom:1.35,w:260,h:260,outH:360,radius:'md',aspect:'1:1',width:96,height:96},{preset:'圆形头像',frame:'精装相框',sw:'证件红',color:'#dc2626',zoom:1.75,w:260,h:260,outH:360,radius:'full',aspect:'1:1',width:96,height:96}];
 const frames=['none','white-ring','card-border'];
 async function run(){
- const themes=phase==='baseline'?['classic']:['classic','aurora','forest','lavender','highContrast'];
+ const themes=phase==='baseline'?['classic']:['classic','nordic','blueprint','terracotta','ink'];
  const rgba=Buffer.alloc(137*193*4);
  for(let y=0;y<193;y++)for(let x=0;x<137;x++){const i=(y*137+x)*4;rgba[i]=(x*3+y)%256;rgba[i+1]=(y*5+x)%256;rgba[i+2]=(x*7+y*2)%256;rgba[i+3]=x<21||y<17?0:255;if(!rgba[i+3])rgba.fill(0,i,i+3);}
  const original=nativeImage.createFromBitmap(rgba,{width:137,height:193}).toPNG(),dataUrl='data:image/png;base64,'+original.toString('base64');

@@ -45,13 +45,13 @@ async function run(){
   const openIssues=async()=>{expect(await js('(()=>{const e=document.querySelector('+JSON.stringify(warning)+');if(!e)return false;e.open=true;return true})()'),'issue details absent');};
 
   const audit=require('./validation-theme-t05-contrast.cjs');
-  const themes=['classic','aurora','forest','lavender','highContrast'];
+  const themes=['classic','nordic','blueprint','terracotta','ink'];
   const verify=async(region,id,label)=>{
     const sel='[data-studio-region="'+region+'"]';
     await until('scope '+region+' '+id,()=>js('document.querySelector('+JSON.stringify(sel)+')?.dataset.studioTheme==='+JSON.stringify(id)));
     const state=await js('('+function(sel){const e=document.querySelector(sel),s=getComputedStyle(e);return {theme:e.dataset.studioTheme,bg:s.backgroundColor,fg:s.color,status:e.dataset.studioStatus||null,text:e.innerText,buttons:[...e.querySelectorAll('button')].map(b=>[b.innerText,b.disabled])}}.toString()+')('+JSON.stringify(sel)+')');
-    const statusColors={aurora:'rgb(66, 44, 21)',forest:'rgb(66, 44, 21)',lavender:'rgb(254, 243, 199)',highContrast:'rgb(66, 44, 21)'};
-    const panelColors={aurora:'rgb(34, 42, 71)',forest:'rgb(29, 56, 45)',lavender:'rgb(250, 248, 255)',highContrast:'rgb(17, 17, 17)'};
+    const statusColors={nordic:'rgb(254, 243, 199)',blueprint:'rgb(66, 44, 21)',terracotta:'rgb(254, 243, 199)',ink:'rgb(254, 243, 199)'};
+    const panelColors={nordic:'rgb(248, 249, 250)',blueprint:'rgb(27, 49, 80)',terracotta:'rgb(255, 247, 240)',ink:'rgb(255, 255, 255)'};
     if(id!=='classic')expect(state.bg===(state.status==='warning'?statusColors[id]:panelColors[id]),'wrong scope color '+JSON.stringify(state));
     const contrast=await audit(win,sel,label+'-'+id);observations.themeMatrix??={};observations.themeMatrix[label+'-'+id]={state,contrast};report();
     if(id!=='classic')expect(!contrast.failures.length,'contrast '+label+' '+id+' '+JSON.stringify(contrast.failures.slice(0,5)));
