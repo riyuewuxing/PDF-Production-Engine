@@ -1,0 +1,105 @@
+name: Resume Studio T16 queue closeout deterministic regression
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-queue-closeout']
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: windows-latest
+    timeout-minutes: 14
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck
+        timeout-minutes: 3
+        run: pnpm typecheck
+      - name: Repeat targeted queue regression
+        timeout-minutes: 4
+        run: |
+          1..10 | ForEach-Object {
+            Write-Host "QUEUE CLOSEOUT ITERATION $_"
+            pnpm exec vitest run src/server/jobQueueExecution.test.ts -t "records worker failure once"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Full regression
+        timeout-minutes: 5
+        run: pnpm test
+  native:
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - pair: 0
+            palette: classic
+          - pair: 1
+            palette: highContrast
+          - pair: 2
+            palette: classic
+          - pair: 3
+            palette: highContrast
+          - pair: 4
+            palette: classic
+          - pair: 5
+            palette: highContrast
+    runs-on: windows-latest
+    timeout-minutes: 14
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Native controlled closeout window
+        timeout-minutes: 5
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:T16_PAIR = '${{ matrix.pair }}'
+          $env:T16_PALETTE = '${{ matrix.palette }}'
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-queue-closeout-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't16-queue-closeout'
+          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          try {
+            & .\node_modules\.bin\electron.cmd .\validation-theme-t16-queue-closeout.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: t16-queue-closeout-${{ matrix.pair }}-${{ matrix.palette }}
+          path: t16-queue-closeout/
+          retention-days: 3
+          if-no-files-found: error
