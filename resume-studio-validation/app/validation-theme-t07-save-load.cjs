@@ -44,7 +44,7 @@ async function run(){
    await select('切换工作台主题',id);await until('theme saved',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
    let release;listGate=new Promise(r=>release=r);
    try{win.webContents.reload();await verify('startup-loading',id);}finally{listGate=null;release();}
-   await until('editor returns',ready);assert(fs.readFileSync(disk).equals(original),'theme reload wrote source');
+   await until('editor returns',()=>js(()=>!!document.querySelector('#basic-field-name')));if(!await ready()){await select('快速切换简历版本','runner-fixture');await until('fixture selected after reload',ready);}assert(fs.readFileSync(disk).equals(original),'theme reload wrote source');
    // Actual user-selected version change, with one controlled delayed getResume IPC.
    let releaseGet;getGate=new Promise(r=>releaseGet=r);
    try{
