@@ -73,4 +73,4 @@ async function run(){
  await until('checkpoint cleared after confirmation',()=>!records().some(x=>x.input.kind==='resume'));
  assert(fs.readFileSync(disk).equals(original));assert.deepEqual(await getResume('runner-fixture'),before);report.checks.confirmedReloadNoOriginalWrite=true;write();
 }
-app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e.stack||e);write();process.exit(1)});
+app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e.stack||e);console.error(report.error);write();process.exit(1)});
