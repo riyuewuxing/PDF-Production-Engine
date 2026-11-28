@@ -1,0 +1,114 @@
+{
+  "files": {
+    "App.tsx": {
+      "490": "主导航"
+    },
+    "components/Common/StudioHeader.tsx": {
+      "210": "隐私开关",
+      "224": "脱敏popover触发",
+      "297": "导出菜单触发",
+      "314": "导出菜单项",
+      "322": "导出菜单项",
+      "330": "导出菜单项",
+      "338": "导出菜单项",
+      "346": "导出菜单项",
+      "354": "导出菜单项"
+    },
+    "components/Common/CommandPaletteModal.tsx": {
+      "436": "命令选择项"
+    },
+    "components/Editor/BasicInfoEditor.tsx": {
+      "239": "照片可见开关"
+    },
+    "components/Editor/PhotoCropModal.tsx": {
+      "337": "裁剪比例选择",
+      "357": "照片边框选择",
+      "380": "照片背景色选择"
+    },
+    "components/Editor/ResumeEditorPane.tsx": {
+      "260": "图标选择器触发",
+      "278": "模块折叠",
+      "328": "手工分页开关",
+      "355": "模块可见开关",
+      "418": "图标选择项"
+    },
+    "components/Preview/A4PreviewPane.tsx": {
+      "262": "预览布局模式切换"
+    },
+    "components/Style/StyleAndColorPane.tsx": {
+      "233": "语言选择",
+      "267": "颜色选择",
+      "305": "纸张背景色选择",
+      "342": "材质选择",
+      "363": "标题样式选择",
+      "398": "字体选择",
+      "506": "标题字重选择"
+    },
+    "components/Templates/TemplateGallery.tsx": {
+      "232": "收藏切换",
+      "402": "收藏切换",
+      "418": "颜色选择",
+      "519": "分类标签",
+      "550": "预览来源选项",
+      "561": "预览来源选项"
+    },
+    "components/Career/JobCareerPane.tsx": {
+      "421": "业务标签",
+      "430": "业务标签",
+      "439": "业务标签",
+      "448": "业务标签",
+      "592": "状态筛选",
+      "604": "状态筛选",
+      "791": "JD折叠"
+    },
+    "components/Career/JobQueueWorkflowPane.tsx": {
+      "125": "流程标签"
+    },
+    "components/Diagnose/DiagnoseAndMatchPane.tsx": {
+      "560": "诊断标签",
+      "569": "诊断标签",
+      "578": "诊断标签",
+      "587": "诊断标签",
+      "848": "ATS原文折叠",
+      "890": "AI配置折叠",
+      "928": "模型预设选项",
+      "1018": "AI模式标签",
+      "1028": "AI模式标签",
+      "1038": "AI模式标签",
+      "1039": "AI模式标签",
+      "1317": "润色模式选项"
+    },
+    "components/Diagnose/JobRequirementsPane.tsx": {
+      "254": "历史核对列表选择"
+    },
+    "components/Diagnose/ResumeAiAssistantPane.tsx": {
+      "212": "任务模式选项"
+    },
+    "components/Versions/MasterMergeModal.tsx": {
+      "144": "经历多选",
+      "174": "经历多选",
+      "204": "经历多选",
+      "238": "自定义项多选",
+      "270": "技能合并选项",
+      "279": "技能合并选项",
+      "296": "自评合并选项",
+      "305": "自评合并选项"
+    },
+    "components/Versions/RecoveryDraftPanel.tsx": {
+      "51": "恢复草稿折叠"
+    },
+    "components/Versions/RecycleBinPanel.tsx": {
+      "45": "回收站折叠"
+    },
+    "components/Versions/VersionAndMasterPane.tsx": {
+      "377": "版本列表选择",
+      "410": "母库列表选择",
+      "432": "历史快照折叠",
+      "505": "复制来源选择",
+      "517": "复制来源选择"
+    },
+    "components/Versions/VersionCompareModal.tsx": {
+      "149": "差异类别选择"
+    }
+  }
+}

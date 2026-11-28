@@ -304,7 +304,7 @@ export function VersionAndMasterPane({
                 }}
                 className="min-w-0 flex-1 rounded border border-slate-400 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-xs text-slate-900 studio-ui-primary"
               />
-              <button {...iconSkin(skins)} data-studio-control="true"
+              <button {...iconSkin(skins,'primary')} data-studio-control="true"
                 type="button"
                 aria-label="确认重命名"
                 onClick={() => {
@@ -328,7 +328,7 @@ export function VersionAndMasterPane({
           ) : (
             <div className="mt-1 flex items-center justify-between gap-2">
               <span className="truncate text-sm font-bold text-slate-900 studio-ui-primary">{activeDoc.title}</span>
-              <button {...iconSkin(skins)} data-studio-control="true"
+              <button {...buttonSkin(skins)} data-studio-control="true"
                 type="button"
                 onClick={() => {
                   setRenameDraft(activeDoc.title);

@@ -83,6 +83,11 @@
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="ghost"] {border-radius: 5px; border-color:transparent; --skin-bg:var(--studio-surface);}
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="floating"] {border-radius:9px; box-shadow:0 2px 4px rgb(0 0 0 / .22);}
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="fine-outline"] {border-radius: 2px; --skin-bg:var(--studio-surface); outline:1px solid var(--skin-border); outline-offset:-3px;}
+  /* Primary icons retain the primary foreground on neutral ghost/outline material. */
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin-role="primary"]:is([data-studio-skin="ghost"],[data-studio-skin="fine-outline"]) {
+    --skin-bg:var(--studio-surface);--skin-fg:var(--studio-accent-text);--skin-hover-fg:var(--studio-accent-text);--skin-hover:var(--studio-hover);
+    border-color:var(--studio-focus);
+  }
   /* Danger retains a readable error foreground on neutral icon backgrounds. */
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin-role="danger"]:is([data-studio-skin="ghost"],[data-studio-skin="fine-outline"]) {
     --skin-bg:var(--studio-surface);--skin-fg:var(--studio-error);--skin-hover-fg:var(--studio-error);--skin-hover:var(--studio-hover);

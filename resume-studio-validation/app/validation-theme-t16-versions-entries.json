@@ -146,7 +146,7 @@
         {
           "line": 304,
           "ordinal": 1,
-          "role": "normal",
+          "role": "primary",
           "family": "icon"
         },
         {
@@ -159,7 +159,7 @@
           "line": 328,
           "ordinal": 1,
           "role": "normal",
-          "family": "icon"
+          "family": "button"
         },
         {
           "line": 343,
