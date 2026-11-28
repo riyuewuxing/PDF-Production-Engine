@@ -8,7 +8,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ResumeSummary, TemplateId } from '../../schema/resumeSchema';
 import { TEMPLATE_REGISTRY } from '../../templates/registry';
 import { STUDIO_THEME_IDS, STUDIO_THEMES, type StudioThemeId } from '../../studio-theme/presets';
@@ -74,6 +74,48 @@ export function CommandPaletteModal({
   const [query, setQuery] = useState('');
   const [highlightedIdx, setHighlightedIdx] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef=useRef<HTMLDivElement>(null);
+  const searchRef=useRef<HTMLInputElement>(null);
+  const onCloseRef=useRef(onClose);
+  onCloseRef.current=onClose;
+  useLayoutEffect(()=>{
+    const dialog=dialogRef.current;
+    if(!isOpen||!dialog)return;
+    // Capture the opener before focusing search. No focus theft after an action navigates away.
+    const opener=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    const focusSearch=()=> (searchRef.current??dialog).focus({preventScroll:true});
+    focusSearch();
+    const onKey=(e:KeyboardEvent)=>{
+      if(e.isComposing||e.keyCode===229)return;
+      if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey){
+        const key=e.key.toLowerCase();
+        if(key==='k'||key==='s'){
+          e.preventDefault();e.stopPropagation();
+          if(key==='k')onCloseRef.current();
+          return;
+        }
+      }
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();onCloseRef.current();return;}
+      if(e.key!=='Tab')return;
+      const items=Array.from(dialog.querySelectorAll<HTMLElement>('input:not(:disabled),button:not(:disabled)')).filter(el=>el.tabIndex>=0&&el.getClientRects().length>0);
+      const index=items.indexOf(document.activeElement as HTMLElement);
+      if(!items.length){e.preventDefault();dialog.focus({preventScroll:true});return;}
+      // Native traversal inside the list preserves scroll-to-focused-option.
+      if(index<0||(e.shiftKey?index===0:index===items.length-1)){
+        e.preventDefault();e.stopPropagation();
+        (e.shiftKey?items[items.length-1]:items[0])?.focus();
+      }
+    };
+    const onFocus=(e:FocusEvent)=>{if(e.target instanceof Node&&!dialog.contains(e.target))focusSearch();};
+    document.addEventListener('keydown',onKey,true);
+    document.addEventListener('focusin',onFocus);
+    return()=>{
+      document.removeEventListener('keydown',onKey,true);
+      document.removeEventListener('focusin',onFocus);
+      const active=document.activeElement;
+      if(opener?.isConnected&&!opener.closest('[inert]')&&(!active||active===document.body||dialog.contains(active)))opener.focus({preventScroll:true});
+    };
+  },[isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -304,6 +346,7 @@ export function CommandPaletteModal({
       }}
     >
       <div
+        ref={dialogRef} tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="全局命令面板"
@@ -314,11 +357,12 @@ export function CommandPaletteModal({
           <Search size={16} className="shrink-0 text-teal-400 studio-ui-info" />
           <input data-studio-control="true"
             type="text"
-            autoFocus
+            ref={searchRef}
             data-native-undo="true"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
+              if(e.nativeEvent.isComposing||e.nativeEvent.keyCode===229)return;
               if (e.key === 'Escape') {
                 e.preventDefault();
                 onClose();

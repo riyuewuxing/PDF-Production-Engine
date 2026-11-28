@@ -42,6 +42,30 @@ async function run(){
   const emptyContrast=await audit(win,sel,id+'-empty');report.themes[id].emptyContrast=emptyContrast;if(id!=='classic')assert.equal(emptyContrast.failures.length,0);
   await press('Enter');assert(await js(sel=>!!document.querySelector(sel),sel),'empty Enter closed');
   await close();
+  // Focused text editor opens the modal. Actual Tab cycles must stay inside it, including the last result.
+  await js(()=>{document.querySelector('#basic-field-name').focus();return true});await open();
+  const focused=()=>js(sel=>{const e=document.activeElement;return {inside:!!e.closest(sel),label:e.getAttribute('aria-label')||e.id||e.innerText?.trim()||'',option:e.dataset.cmdIndex||null}},sel);
+  assert.equal((await focused()).label,'搜索命令、模板与版本');
+  const n=await js(sel=>document.querySelector(sel).querySelectorAll('button[role=option]').length,sel);
+  await press('Tab',['shift']);let f=await focused();assert(f.inside&&Number(f.option)===n-1,'reverse wrap escaped '+JSON.stringify(f));
+  await press('Tab');assert.equal((await focused()).label,'搜索命令、模板与版本');
+  await press('Tab');assert.equal((await focused()).label,'关闭命令面板');
+  await press('Tab');assert.equal((await focused()).option,'0');
+  await press('Tab',['shift']);assert.equal((await focused()).label,'关闭命令面板');
+  await press('Tab',['shift']);assert.equal((await focused()).label,'搜索命令、模板与版本');
+  await js(()=>{document.querySelector('#basic-field-name').focus();return true});assert.equal((await focused()).label,'搜索命令、模板与版本');
+  // Native command-save must not reach window-level global actions.
+  await js(()=>{window.__t07Keys=[];window.__t07Listener=e=>{if(e.ctrlKey&&['k','s'].includes(e.key.toLowerCase()))window.__t07Keys.push({key:e.key.toLowerCase(),trusted:e.isTrusted,prevented:e.defaultPrevented})};document.addEventListener('keydown',window.__t07Listener,true);return true});
+  await press('S',['control']);assert(await js(sel=>!!document.querySelector(sel),sel));
+  await press('K',['control']);await until('toggle closes',()=>js(sel=>!document.querySelector(sel),sel));
+  const keys=await js(()=>{document.removeEventListener('keydown',window.__t07Listener,true);return window.__t07Keys});
+  assert.deepEqual(keys,[{key:'s',trusted:true,prevented:true},{key:'k',trusted:true,prevented:true}]);
+  assert.equal((await focused()).label,'basic-field-name','Ctrl+K did not restore editor focus');
+  await open();await close();assert.equal((await focused()).label,'basic-field-name','Escape did not restore editor focus');
+  await open();await query('T07_NO_MATCH_ABC_012');
+  await press('Tab',['shift']);assert.equal((await focused()).label,'关闭命令面板');await press('Tab');assert.equal((await focused()).label,'搜索命令、模板与版本');
+  await press('Tab');await press('Enter');await until('keyboard close button',()=>js(sel=>!document.querySelector(sel),sel));assert.equal((await focused()).label,'basic-field-name');
+  report.themes[id].focusGate={reverseWrap:true,forwardWrap:true,firstOption:true,reverseTraversal:true,outsideRedirect:true,ctrlSBlocked:true,ctrlKCloseReturn:true,escReturn:true,emptyWrap:true,closeButtonReturn:true,keys};
   assert.deepEqual(await main.store.getResume('runner-fixture'),before);assert.deepEqual(await main.store.listSnapshots('runner-fixture'),snaps);assert.deepEqual(await main.store.getApplications(),ledger);
   report.themes[id].keyboard={initial:true,down:true,up:true,filter:true,emptyEnter:true,escape:true,noWrite:true};write();
  }
