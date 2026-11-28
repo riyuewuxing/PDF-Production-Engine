@@ -1,4 +1,4 @@
-import { useRef,useState } from 'react';
+import { useLayoutEffect,useRef,useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useStudioTheme } from './StudioThemeProvider';
 import { surfaceStyle } from './surfaces';
@@ -10,14 +10,16 @@ export function ComponentSkinWorkshop() {
   const {themeId,skins,skinNotice,selectSkins}=useStudioTheme();
   const dialog=useRef<HTMLDialogElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
+  const [opened,setOpened]=useState(false);
   const [draft,setDraft]=useState<ComponentSkins>(()=>({...skins}));
   const [basis,setBasis]=useState<ComponentSkins>(()=>({...skins}));
   const [count,setCount]=useState(0);
   const [pending,setPending]=useState(false);
   const open=()=>{
     setDraft({...skins});setBasis({...skins});setCount(0);setPending(false);
-    dialog.current?.showModal();
+    setOpened(true);
   };
+  useLayoutEffect(()=>{if(opened&&dialog.current&&!dialog.current.open)dialog.current.showModal();},[opened]);
   const close=()=>dialog.current?.close();
   const conflict=!equalSkins(basis,skins);
   const sampleClass='inline-flex items-center justify-center gap-1 rounded border px-3 py-2 text-sm font-medium studio-ui-border studio-ui-primary studio-ui-surface';
@@ -26,10 +28,10 @@ export function ComponentSkinWorkshop() {
     <button ref={trigger} type="button" onClick={open} aria-haspopup="dialog"
       className="rounded border border-slate-700 studio-chrome-border bg-slate-900 studio-chrome-field px-2 py-1 text-[11px] studio-chrome-primary text-slate-100 hover:bg-slate-800 studio-chrome-hover">组件外观</button>
     {skinNotice&&<span role="status" className="studio-theme-notice max-w-[180px] whitespace-normal text-[11px]">{skinNotice}</span>}
-    <dialog ref={dialog} role="dialog" aria-label="组件外观工坊" data-studio-region="component-skin-workshop"
+    {opened&&<dialog ref={dialog} role="dialog" aria-label="组件外观工坊" data-studio-region="component-skin-workshop"
       data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')}
       className="studio-component-dialog no-print"
-      onClose={()=>{trigger.current?.focus();setPending(false);}}
+      onClose={()=>{setOpened(false);trigger.current?.focus();setPending(false);}}
       onKeyDown={e=>{if(e.ctrlKey||e.metaKey)e.stopPropagation();}}>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-lg font-semibold">组件外观工坊 · 首批试点</h2><p className="text-xs mt-1 studio-ui-muted">仅改变已接入的工作台按钮。预览中的操作使用合成样例，不会写入简历。</p></div>
@@ -81,6 +83,6 @@ export function ComponentSkinWorkshop() {
         <button type="button" className="studio-skin-neutral" onClick={close}>取消</button>
         <button type="button" className="studio-skin-apply disabled:opacity-50" disabled={conflict||equalSkins(draft,basis)} onClick={()=>{selectSkins(draft);close();}}>应用组件外观</button>
       </div>
-    </dialog>
+    </dialog>}
   </>;
 }
