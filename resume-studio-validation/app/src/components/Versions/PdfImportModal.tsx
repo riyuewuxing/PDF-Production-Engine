@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { Check, FileText, X } from 'lucide-react';
@@ -113,7 +113,7 @@ export function PdfImportModal({
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700 studio-ui-primary">新版本标题</span>
-                <input data-studio-control="true"
+                <input {...fieldSkin(skins,'text')} data-studio-control="true"
                   type="text"
                   data-native-undo="true"
                   value={form.title}
@@ -123,7 +123,7 @@ export function PdfImportModal({
               </label>
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700 studio-ui-primary">姓名</span>
-                <input data-studio-control="true"
+                <input {...fieldSkin(skins,'text')} data-studio-control="true"
                   type="text"
                   data-native-undo="true"
                   value={form.name}
@@ -133,7 +133,7 @@ export function PdfImportModal({
               </label>
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700 studio-ui-primary">意向岗位</span>
-                <input data-studio-control="true"
+                <input {...fieldSkin(skins,'text')} data-studio-control="true"
                   type="text"
                   data-native-undo="true"
                   value={form.jobTitle}
@@ -143,7 +143,7 @@ export function PdfImportModal({
               </label>
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700 studio-ui-primary">电话</span>
-                <input data-studio-control="true"
+                <input {...fieldSkin(skins,'text')} data-studio-control="true"
                   type="text"
                   data-native-undo="true"
                   value={form.phone}
@@ -156,14 +156,14 @@ export function PdfImportModal({
               ] as const).map(([key,label]) => (
                 <label key={key} className="flex flex-col gap-1">
                   <span className="font-semibold text-slate-700 studio-ui-primary">{label}</span>
-                  <input data-studio-control="true" type="text" data-native-undo="true" value={form[key] ?? ''} onChange={e=>updateField(key,e.target.value)} className="rounded border border-slate-200 px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-primary" />
+                  <input {...(key==='birthDate'?{}:fieldSkin(skins,'text'))} data-studio-control="true" type="text" data-native-undo="true" value={form[key] ?? ''} onChange={e=>updateField(key,e.target.value)} className="rounded border border-slate-200 px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-primary" />
                 </label>
               ))}
             </div>
 
             <label className="flex flex-col gap-1">
               <span className="font-semibold text-slate-700 studio-ui-primary">教育经历（{form.markdownHeadings ? '### 标题分条，其余作正文' : '首行作学校抬头，其余作列表'}）</span>
-              <textarea data-studio-control="true"
+              <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                 rows={3}
                 data-native-undo="true"
                 value={form.educationText}
@@ -174,7 +174,7 @@ export function PdfImportModal({
 
             <label className="flex flex-col gap-1">
               <span className="font-semibold text-slate-700 studio-ui-primary">工作 / 实习经历</span>
-              <textarea data-studio-control="true"
+              <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                 rows={3}
                 data-native-undo="true"
                 value={form.experienceText}
@@ -185,7 +185,7 @@ export function PdfImportModal({
 
             <label className="flex flex-col gap-1">
               <span className="font-semibold text-slate-700 studio-ui-primary">项目经历</span>
-              <textarea data-studio-control="true"
+              <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                 rows={3}
                 data-native-undo="true"
                 value={form.projectsText}
@@ -197,7 +197,7 @@ export function PdfImportModal({
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700 studio-ui-primary">专业技能</span>
-                <textarea data-studio-control="true"
+                <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                   rows={3}
                   data-native-undo="true"
                   value={form.skillsText}
@@ -207,7 +207,7 @@ export function PdfImportModal({
               </label>
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-slate-700 studio-ui-primary">自我评价</span>
-                <textarea data-studio-control="true"
+                <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                   rows={3}
                   data-native-undo="true"
                   value={form.selfEvaluationText}
@@ -218,13 +218,13 @@ export function PdfImportModal({
             </div>
             <label className="flex flex-col gap-1">
               <span className="font-semibold text-slate-700 studio-ui-primary">荣誉奖项（逐行）</span>
-              <textarea data-studio-control="true" rows={3} data-native-undo="true" value={form.honorsText} onChange={e=>updateField('honorsText',e.target.value)} className="rounded border border-slate-200 p-2 text-slate-900 studio-ui-border studio-ui-primary" />
+              <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" rows={3} data-native-undo="true" value={form.honorsText} onChange={e=>updateField('honorsText',e.target.value)} className="rounded border border-slate-200 p-2 text-slate-900 studio-ui-border studio-ui-primary" />
             </label>
             {Boolean(form.unclassifiedText?.trim()) && <div ref={unknownRef} tabIndex={-1} data-import-review-unclassified="true" className="space-y-1 rounded border border-amber-200 bg-amber-50 p-2 studio-ui-warning-border studio-ui-warning-surface">
               <p className="font-semibold text-amber-900 studio-ui-warning">未分类或重复原文（必须明确选择处理方式）</p>
               <label className="flex items-start gap-2"><input data-studio-control="true" type="radio" name="import-unclassified" checked={form.keepUnclassified===true} onChange={()=>updateField('keepUnclassified',true)} />保留为禁用栏目（可能含个人信息或重复字段；原生备份包含该栏目）</label>
               <label className="flex items-start gap-2"><input data-studio-control="true" type="radio" name="import-unclassified" checked={form.keepUnclassified===false} onChange={()=>updateField('keepUnclassified',false)} />不保留未分类原文</label>
-              <textarea data-studio-control="true" aria-label="未分类原文" rows={3} data-native-undo="true" value={form.unclassifiedText ?? ''} onChange={e=>updateField('unclassifiedText',e.target.value)} className="w-full rounded border border-slate-200 p-2 studio-ui-border" />
+              <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="未分类原文" rows={3} data-native-undo="true" value={form.unclassifiedText ?? ''} onChange={e=>updateField('unclassifiedText',e.target.value)} className="w-full rounded border border-slate-200 p-2 studio-ui-border" />
               <p>选择不保留时，此栏不会写入新版本，原文件不变。可将需要的内容手动放到上方栏目。</p>
             </div>}
           </fieldset>
