@@ -12,7 +12,7 @@ async function run(){
  const file=s=>main.store.resolveResumePath(s).filePath,hashes=()=>[sha(fs.readFileSync(file(slug))),sha(fs.readFileSync(file(long)))],before=hashes(),ledger=await main.store.getApplications();
  await main.registerAssetProtocol();main.registerIpcHandlers();const win=await main.createMainWindow();win.unmaximize();win.setSize(1440,1000);win.focus();
  const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(x=>JSON.stringify(x)).join(',')+')');
- const themes=['classic','dark','light','warm'];
+ const themes=['classic','graphite','obsidian','ocean','porcelain'];
  const click=async(label,scope='body')=>{await until('button '+label,()=>js((label,scope)=>[...document.querySelectorAll(scope+' button')].some(e=>(e.innerText.trim()===label||e.getAttribute('aria-label')===label)&&!e.disabled&&e.getClientRects().length),label,scope));assert(await js((label,scope)=>{const b=[...document.querySelectorAll(scope+' button')].find(e=>(e.innerText.trim()===label||e.getAttribute('aria-label')===label)&&!e.disabled&&e.getClientRects().length);if(!b)return false;b.scrollIntoView({block:'nearest'});b.click();return true},label,scope));};
  const set=async(sel,value)=>assert(await js((sel,value)=>{const e=document.querySelector(sel);if(!e||e.disabled)return false;const proto=e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,value);e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));return true},sel,value));
  const theme=async id=>{await set('select[aria-label="切换工作台主题"]',id);await until('theme',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));await sleep(350);};
@@ -38,7 +38,7 @@ async function run(){
   await js(sel=>{document.querySelector(sel+' button:last-child').focus();return true},action);await key('Enter');await until('lightbox',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label^="模板大图对比"]')));await shot('gallery-lightbox-'+id);await key('Escape');await until('lightbox close',()=>js(()=>!document.querySelector('[role="dialog"][aria-label^="模板大图对比"]')));await noWrite();
   report.gallery[id]={paper:clean,contrast,favoriteToggle:true,inspectAndEscape:true,noWrite:true};write();
  }
- report.checks.galleryFourThemes=true;
+ report.checks.galleryFiveThemes=true;
  // Explicitly apply one template; all other fields except recommended color are unchanged.
  await click('一键应用',action);await until('applied template',async()=> (await main.store.getResume(slug)).templateId==='vip-cyber-dark',20000);
  const applied=await main.store.getResume(slug);assert.deepEqual({...applied,templateId:original.templateId,globalSettings:original.globalSettings,updatedAt:original.updatedAt},original);assert.deepEqual({...applied.globalSettings,themeColor:original.globalSettings.themeColor},original.globalSettings);assert.equal(hashes()[1],before[1]);report.checks.explicitApplyOnlyTemplateAndColor=true;
@@ -49,6 +49,6 @@ async function run(){
   const contrast=await audit(win,warning,'spread-'+id);if(id!=='classic')assert.equal(contrast.failures.length,0,JSON.stringify(contrast.failures.slice(0,5)));await shot('spread-warning-'+id);
   assert.equal(hashes()[1],before[1]);assert.deepEqual(await main.store.getApplications(),ledger);report.spread[id]={...state,contrast};write();
  }
- report.checks.overflowWarningFourThemes=true;report.checks.paperAndLedgerPreserved=true;write();
+ report.checks.overflowWarningFiveThemes=true;report.checks.paperAndLedgerPreserved=true;write();
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e.stack||e);console.error(report.error);write();app.exit(1)});
