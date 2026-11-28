@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {
   AlertCircle,
   AlertTriangle,
@@ -673,7 +673,7 @@ export function DiagnoseAndMatchPane({
           <div className="space-y-4">
             <label className="flex flex-col gap-1.5">
               <span className="font-semibold text-slate-800 studio-ui-primary">粘贴目标岗位招聘 JD / 考编公告条件</span>
-              <textarea data-studio-control="true"
+              <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                 rows={6}
                 data-native-undo="true"
                 value={jdText}
@@ -914,7 +914,7 @@ export function DiagnoseAndMatchPane({
                     <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700 studio-ui-error">删除档案</button></div>)}</div>
                     <p className="text-[10px] text-slate-500 studio-ui-muted">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
                    </div>}
-                   <input data-studio-control="true" aria-label="模型档案名称" disabled={profileBusy} value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5 studio-ui-border" placeholder="档案名称"/>
+                   <input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="模型档案名称" disabled={profileBusy} value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5 studio-ui-border" placeholder="档案名称"/>
                    <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800 studio-ui-primary">
                     <input data-studio-control="true"
                       type="checkbox"
@@ -952,7 +952,7 @@ export function DiagnoseAndMatchPane({
                     ))}
                   </div>
 
-                  <input data-studio-control="true"
+                  <input {...fieldSkin(skins,'text')} data-studio-control="true"
                     type="text"
                     data-native-undo="true"
                     disabled={profileBusy}
@@ -971,7 +971,7 @@ export function DiagnoseAndMatchPane({
                       placeholder={aiSettings.hasApiKey && !aiSettings.clearApiKey ? '已保存密钥，留空保留' : 'API Key（Ollama 可留空）'}
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       disabled={profileBusy}
@@ -1075,7 +1075,7 @@ export function DiagnoseAndMatchPane({
               <div className="space-y-3">
                 <label className="flex flex-col gap-1">
                   <span className="font-semibold text-slate-800 studio-ui-primary">目标岗位招聘 JD（与「JD 雷达」同步）</span>
-                  <textarea data-studio-control="true"
+                  <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                     rows={4}
                     data-native-undo="true"
                     value={jdText}
@@ -1247,7 +1247,7 @@ export function DiagnoseAndMatchPane({
                           )}
 
                           {isEditing ? (
-                            <textarea data-studio-control="true"
+                            <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                               rows={4}
                               data-native-undo="true"
                               value={proposal.suggestedText}
