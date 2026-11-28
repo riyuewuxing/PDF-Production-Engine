@@ -1,5 +1,5 @@
 /** P2 candidate presets. Registration is not full-theme acceptance; real scene coverage is tracked separately. */
-export const STUDIO_THEME_IDS = ['classic', 'dark', 'light', 'warm', 'graphite', 'obsidian', 'ocean', 'porcelain', 'aurora', 'forest', 'lavender', 'highContrast'] as const;
+export const STUDIO_THEME_IDS = ['classic', 'dark', 'light', 'warm', 'graphite', 'obsidian', 'ocean', 'porcelain', 'aurora', 'forest', 'lavender', 'highContrast', 'nordic', 'blueprint', 'terracotta', 'ink'] as const;
 export type StudioThemeId = typeof STUDIO_THEME_IDS[number];
 export const DEFAULT_STUDIO_THEME: StudioThemeId = 'classic';
 export function isStudioThemeId(value: unknown): value is StudioThemeId {
@@ -146,6 +146,35 @@ const highContrast: ChromeTokens = {
   accentFill: '#6b5100', accentHover: '#4b3900', selected: '#332900',
   selectedText: '#fef3c7', selectedBorder: '#fde047', focus: '#fde047',
 };
+// P2 final color batch, with explicit per-zone palette choices.
+const nordic: ChromeTokens = {
+  ...light, surface: '#e9ecef', field: '#f8f9fa', raised: '#e6eaee',
+  overlay: '#f8f9fa', hover: '#dde2e7', text: '#26323d', muted: '#455563',
+  border: '#687a87', divider: '#b7c4cd', accentText: '#285762',
+  accentFill: '#386b79', accentHover: '#2b5360', selected: '#cddfe5',
+  selectedText: '#24434c', selectedBorder: '#386b79', focus: '#386b79',
+};
+const blueprint: ChromeTokens = {
+  ...dark, surface: '#102039', field: '#152942', raised: '#1b3150',
+  overlay: '#203953', hover: '#29425e', text: '#e5effc', muted: '#c6d9ee',
+  border: '#849db6', divider: '#425e7b', accentText: '#a5defb',
+  accentFill: '#24597c', accentHover: '#194461', selected: '#244760',
+  selectedText: '#e0f2fe', selectedBorder: '#7dd3fc', focus: '#7dd3fc',
+};
+const terracotta: ChromeTokens = {
+  ...light, surface: '#ede0d7', field: '#fff7f0', raised: '#f2e5dc',
+  overlay: '#fff7f0', hover: '#dcc8b9', text: '#432c26', muted: '#65483e',
+  border: '#84675b', divider: '#c4ad9f', accentText: '#793321',
+  accentFill: '#9a402d', accentHover: '#783121', selected: '#e7c7b6',
+  selectedText: '#632f23', selectedBorder: '#9a402d', focus: '#9a402d',
+};
+const ink: ChromeTokens = {
+  ...light, surface: '#f3f3f3', field: '#ffffff', raised: '#eeeeee',
+  overlay: '#ffffff', hover: '#e5e5e5', text: '#161616', muted: '#444444',
+  border: '#666666', divider: '#b4b4b4', accentText: '#333333',
+  accentFill: '#333333', accentHover: '#222222', selected: '#dddddd',
+  selectedText: '#161616', selectedBorder: '#333333', focus: '#333333',
+};
 const withSurface = (palette: ChromeTokens, surface: string): ChromeTokens => ({ ...palette, surface });
 export const STUDIO_THEMES: Readonly<Record<StudioThemeId, StudioThemePreset>> = {
   classic: { id: 'classic', label: '经典双拼', header: classic, nav: withSurface(classic, '#0d1118'),
@@ -184,6 +213,18 @@ export const STUDIO_THEMES: Readonly<Record<StudioThemeId, StudioThemePreset>> =
   highContrast: { id: 'highContrast', label: '清晰高对比', header: highContrast, nav: highContrast,
     panel: withSurface(highContrast, '#111111'), preview: withSurface(highContrast, '#111111'), gallery: highContrast,
     stage: { scheme: 'dark', background: '#000000', label: '#ffffff' } },
+  nordic: { id: 'nordic', label: '北欧雾灰', header: nordic, nav: withSurface(nordic, '#dde2e7'),
+    panel: withSurface(nordic, '#f8f9fa'), preview: withSurface(nordic, '#e6eaee'), gallery: nordic,
+    stage: { scheme: 'light', background: '#dde2e7', label: '#455563' } },
+  blueprint: { id: 'blueprint', label: '工程蓝图', header: blueprint, nav: withSurface(blueprint, '#0c192c'),
+    panel: withSurface(blueprint, '#1b3150'), preview: withSurface(blueprint, '#152942'), gallery: blueprint,
+    stage: { scheme: 'dark', background: '#0c192c', label: '#c6d9ee' } },
+  terracotta: { id: 'terracotta', label: '赤陶暖棕', header: terracotta, nav: withSurface(terracotta, '#dcc8b9'),
+    panel: withSurface(terracotta, '#fff7f0'), preview: withSurface(terracotta, '#f2e5dc'), gallery: terracotta,
+    stage: { scheme: 'light', background: '#dcc8b9', label: '#65483e' } },
+  ink: { id: 'ink', label: '墨迹黑白', header: ink, nav: withSurface(ink, '#e5e5e5'),
+    panel: withSurface(ink, '#ffffff'), preview: withSurface(ink, '#eeeeee'), gallery: ink,
+    stage: { scheme: 'light', background: '#e5e5e5', label: '#444444' } },
 };
 
 export function resolveChromeTokens(id: unknown, zone: 'header' | 'nav'): ChromeTokens {

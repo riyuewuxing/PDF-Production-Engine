@@ -103,6 +103,10 @@ describe('P2 explicit zone registry — candidate, not completed visual presets'
     ['forest', '#1d382d', '#193128', '#142820', '#0f2019', 'dark'],
     ['lavender', '#faf8ff', '#eae4f4', '#eeeaf7', '#e1dbf0', 'light'],
     ['highContrast', '#111111', '#111111', '#000000', '#000000', 'dark'],
+    ['nordic', '#f8f9fa', '#e6eaee', '#e9ecef', '#dde2e7', 'light'],
+    ['blueprint', '#1b3150', '#152942', '#102039', '#0c192c', 'dark'],
+    ['terracotta', '#fff7f0', '#f2e5dc', '#ede0d7', '#dcc8b9', 'light'],
+    ['ink', '#ffffff', '#eeeeee', '#f3f3f3', '#e5e5e5', 'light'],
   ] as const)('does not fall back for %s', (id, panel, preview, gallery, stage, scheme) => {
     expect(resolveSurfaceTokens(id, 'panel').surface).toBe(panel);
     expect(resolveSurfaceTokens(id, 'preview').surface).toBe(preview);
@@ -141,6 +145,20 @@ describe('High contrast candidate colors, not a whole-application accessibility 
   });
   it('never mixes preview override with the persisted workbench theme', () => {
     for(const id of ['aurora','forest','lavender','highContrast'] as const) {
+      expect(resolvePreviewBacking(id,'dark')).toEqual(resolvePreviewBacking('classic','dark'));
+      expect(resolvePreviewBacking(id,'light')).toEqual(resolvePreviewBacking('classic','light'));
+    }
+  });
+});
+
+describe('P2 sixteen palette registry completeness, not complete visual themes', () => {
+  it('has exactly the approved sixteen distinct IDs and complete independent region records', () => {
+    expect(STUDIO_THEME_IDS).toEqual(['classic','dark','light','warm','graphite','obsidian','ocean','porcelain','aurora','forest','lavender','highContrast','nordic','blueprint','terracotta','ink']);
+    expect(Object.keys(STUDIO_THEMES).sort()).toEqual([...STUDIO_THEME_IDS].sort());
+    expect(new Set(STUDIO_THEME_IDS.map(id=>STUDIO_THEMES[id].label)).size).toBe(16);
+    expect(new Set(STUDIO_THEME_IDS.map(id=>JSON.stringify(STUDIO_THEMES[id].header))).size).toBe(16);
+    for(const id of STUDIO_THEME_IDS) {
+      expect(STUDIO_THEMES[id].id).toBe(id);
       expect(resolvePreviewBacking(id,'dark')).toEqual(resolvePreviewBacking('classic','dark'));
       expect(resolvePreviewBacking(id,'light')).toEqual(resolvePreviewBacking('classic','light'));
     }
