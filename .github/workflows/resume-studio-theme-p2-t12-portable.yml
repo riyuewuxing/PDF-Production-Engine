@@ -1,0 +1,75 @@
+name: Resume Studio T12 actual portable theme choice and configuration preservation
+on:
+  push:
+    branches: ['resume-studio/theme-p2-t12-portable']
+permissions:
+  contents: read
+jobs:
+  portable:
+    runs-on: windows-latest
+    timeout-minutes: 24
+    defaults:
+      run:
+        working-directory: resume-studio-validation/app
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Generate original multiresolution icon from existing public SVG
+        timeout-minutes: 2
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          & .\node_modules\.bin\electron.cmd .\scripts\generate-icon.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual portable via exact package script
+        timeout-minutes: 7
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm desktop:pack
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Inspect ASAR and verify actual release file
+        timeout-minutes: 2
+        run: |
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 't12-portable-evidence'
+          node validation-asar.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = Get-Item -LiteralPath 'Resume Studio.exe'
+          $sig = Get-AuthenticodeSignature -FilePath $exe.FullName
+          $icon = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'build/icon.ico'))
+          $sizes = @(); for($i=0;$i -lt [BitConverter]::ToUInt16($icon,4);$i++){ $n=$icon[6+16*$i]; $sizes+= $(if($n -eq 0){256}else{[int]$n}) }
+          if (($sizes -join ',') -ne '256,128,64,48,32,16') { throw 'wrong icon resolutions' }
+          [ordered]@{runnerSha=$env:GITHUB_SHA;name=$exe.Name;bytes=$exe.Length;sha256=(Get-FileHash -LiteralPath $exe.FullName -Algorithm SHA256).Hash.ToLower();authenticode=$sig.Status.ToString();iconSizes=$sizes;releaseArtifactConsumed=!(Test-Path -LiteralPath 'release/Resume Studio.exe')} | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $env:RESUME_STUDIO_PORTABLE_EVIDENCE 'release-file.json')
+          Copy-Item -LiteralPath 'build/icon.png' -Destination $env:RESUME_STUDIO_PORTABLE_EVIDENCE
+          Add-Type -AssemblyName System.Drawing
+          $embedded = [System.Drawing.Icon]::ExtractAssociatedIcon($exe.FullName)
+          if ($null -eq $embedded) { throw 'portable wrapper has no associated icon' }
+          $bmp = $embedded.ToBitmap()
+          try { $bmp.Save((Join-Path $env:RESUME_STUDIO_PORTABLE_EVIDENCE 'actual-wrapper-icon.png'),[System.Drawing.Imaging.ImageFormat]::Png) } finally { $bmp.Dispose(); $embedded.Dispose() }
+      - name: Actual portable sixteen themes, separate cold starts, future and legacy preference protection
+        timeout-minutes: 8
+        run: |
+          $env:RESUME_STUDIO_PORTABLE_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 't12-portable-evidence'
+          node --check validation-theme-t12-portable.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node validation-theme-t12-portable.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish evidence only (not a public product release)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t12-portable-evidence
+          path: t12-portable-evidence/
+          if-no-files-found: warn
+          retention-days: 3
