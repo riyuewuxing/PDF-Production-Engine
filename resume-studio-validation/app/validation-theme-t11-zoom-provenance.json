@@ -1,0 +1,14 @@
+[
+  {
+    "path": "validation-theme-t09-safety.cjs",
+    "sourceCommit": "ed9af8b25c13eaea3c8c50e4bcc792759c4c4f76",
+    "sourceBlob": "9a1e914bc7c8f9b58417a8825dd2d7154c181e98",
+    "change": "theme IDs only"
+  },
+  {
+    "path": "validation-theme-t08-status-zoom.cjs",
+    "sourceCommit": "e67e5d50cb81e8f2473257703a59a3e4c5cb9a1c",
+    "sourceBlob": "f7ce0a967e13565eb16e6fe59b7c48f0460bbdbc",
+    "change": "theme IDs only"
+  }
+]
