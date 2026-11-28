@@ -962,7 +962,7 @@ export function DiagnoseAndMatchPane({
                     className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                   />
                   <div className="grid grid-cols-2 gap-2">
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'password')} data-studio-control="true"
                       type="password"
                       data-native-undo="true"
                       disabled={profileBusy}
@@ -995,9 +995,9 @@ export function DiagnoseAndMatchPane({
                     </label>
                   )}
                   <div className="grid grid-cols-3 gap-1">
-                    <label className="text-[10px]">输入字符预算<input data-studio-control="true" aria-label="输入字符预算" disabled={profileBusy} type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
-                    <label className="text-[10px]">输出 tokens<input data-studio-control="true" aria-label="输出 tokens" disabled={profileBusy} type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
-                    <label className="text-[10px]">超时（秒）<input data-studio-control="true" aria-label="超时（秒）" disabled={profileBusy} type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">输入字符预算<input {...fieldSkin(skins,'number')} data-studio-control="true" aria-label="输入字符预算" disabled={profileBusy} type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">输出 tokens<input {...fieldSkin(skins,'number')} data-studio-control="true" aria-label="输出 tokens" disabled={profileBusy} type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">超时（秒）<input {...fieldSkin(skins,'number')} data-studio-control="true" aria-label="超时（秒）" disabled={profileBusy} type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1 studio-ui-border"/></label>
                   </div>
                   <p className="text-[10px] text-slate-500 studio-ui-muted">预算为本地上限，不代表该模型真实上下文能力；不自动重试其他接口。</p>
                   <div className="flex items-center justify-between gap-2">
