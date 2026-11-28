@@ -27,6 +27,7 @@ async function run(){
  const click=async(label,scope='body')=>assert(await js((label,scope)=>{const b=[...document.querySelector(scope)?.querySelectorAll('button')||[]].find(e=>e.innerText.trim()===label&&!e.disabled);if(!b)return false;b.click();return true},label,scope),'button missing '+label);
  const sel=r=>'[data-studio-region="'+r+'"]';
  const verify=async(r,id)=>{
+   report.stage=r+'-'+id;write();console.log('T07_STAGE '+report.stage);
    await until(r+' '+id,()=>js((s,id)=>document.querySelector(s)?.dataset.studioTheme===id,sel(r),id));
    const x=await js(s=>{const e=document.querySelector(s),c=getComputedStyle(e);return {bg:c.backgroundColor,fg:c.color,text:e.innerText,theme:e.dataset.studioTheme,status:e.dataset.studioStatus||null}},sel(r));
    const bg=x.status==='error'?{dark:'rgb(59, 29, 37)',light:'rgb(254, 226, 226)',warm:'rgb(254, 226, 226)'}:{dark:'rgb(17, 24, 39)',light:'rgb(255, 255, 255)',warm:'rgb(251, 247, 238)'};
@@ -37,7 +38,8 @@ async function run(){
  };
  const themes=['classic','dark','light','warm'];
  const ready=()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人');
- await until('initial editor',ready);
+ await until('initial editor',()=>js(()=>!!document.querySelector('#basic-field-name')));
+ if(!await ready()){await select('快速切换简历版本','runner-fixture');await until('select fixture',ready);}
  for(const id of themes){
    await select('切换工作台主题',id);await until('theme saved',()=>js(id=>document.querySelector('.studio-shell')?.dataset.studioTheme===id,id));
    let release;listGate=new Promise(r=>release=r);
