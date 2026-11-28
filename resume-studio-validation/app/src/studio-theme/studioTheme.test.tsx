@@ -27,6 +27,12 @@ describe('Studio theme preferences — independent and bounded', () => {
     expect(selectStudioTheme(storage, 'constructor')).toBeNull();
     expect(storage.setItem).not.toHaveBeenCalled();
   });
+  it.each(STUDIO_THEME_IDS)('persists and reads registered candidate %s without touching business data', id => {
+    const storage=memoryStorage({unrelated:'keep'});
+    expect(selectStudioTheme(storage,id)).toEqual({themeId:id,saved:true,notice:null});
+    expect(readStudioTheme(storage)).toEqual({themeId:id,state:'saved'});
+    expect(storage.data.get('unrelated')).toBe('keep');
+  });
   it('reads legacy choice without destroying it; explicit selection saves v1', () => {
     const storage = memoryStorage({ [LEGACY_STUDIO_THEME_KEY]: 'warm', unrelated: 'untouched' });
     expect(readStudioTheme(storage)).toEqual({ themeId: 'warm', state: 'legacy' });

@@ -1,5 +1,5 @@
 /** P2 candidate presets. Registration is not full-theme acceptance; real scene coverage is tracked separately. */
-export const STUDIO_THEME_IDS = ['classic', 'dark', 'light', 'warm', 'graphite', 'obsidian', 'ocean', 'porcelain'] as const;
+export const STUDIO_THEME_IDS = ['classic', 'dark', 'light', 'warm', 'graphite', 'obsidian', 'ocean', 'porcelain', 'aurora', 'forest', 'lavender', 'highContrast'] as const;
 export type StudioThemeId = typeof STUDIO_THEME_IDS[number];
 export const DEFAULT_STUDIO_THEME: StudioThemeId = 'classic';
 export function isStudioThemeId(value: unknown): value is StudioThemeId {
@@ -116,6 +116,36 @@ const porcelain: ChromeTokens = {
   accentFill: '#20518b', accentHover: '#193f6e', selected: '#d3e4f5',
   selectedText: '#183b62', selectedBorder: '#2563a6', focus: '#2563a6',
 };
+// P2 second batch: opaque scoped color candidates. Material and motion
+// variants are separate gates; never apply them to document renderers.
+const aurora: ChromeTokens = {
+  ...dark, surface: '#161c36', field: '#1c2440', raised: '#222a47',
+  overlay: '#272e4b', hover: '#303952', text: '#f5f7ff', muted: '#d5ddfa',
+  border: '#8996bd', divider: '#4b5679', accentText: '#c4ccff',
+  accentFill: '#51429e', accentHover: '#403580', selected: '#383666',
+  selectedText: '#eef0ff', selectedBorder: '#a5b4fc', focus: '#a5b4fc',
+};
+const forest: ChromeTokens = {
+  ...dark, surface: '#142820', field: '#193128', raised: '#1d382d',
+  overlay: '#223c30', hover: '#2b4438', text: '#eaf6ee', muted: '#d1e8d8',
+  border: '#8ba899', divider: '#496656', accentText: '#9ce8b9',
+  accentFill: '#256345', accentHover: '#1d5037', selected: '#2b503b',
+  selectedText: '#dcfce7', selectedBorder: '#7ddaa3', focus: '#7ddaa3',
+};
+const lavender: ChromeTokens = {
+  ...light, surface: '#eeeaf7', field: '#faf8ff', raised: '#eae4f4',
+  overlay: '#faf8ff', hover: '#e0d9f0', text: '#332a47', muted: '#524465',
+  border: '#78648d', divider: '#c5b8d8', accentText: '#5b3695',
+  accentFill: '#7048ac', accentHover: '#59388d', selected: '#ded1f2',
+  selectedText: '#43256a', selectedBorder: '#7048ac', focus: '#7048ac',
+};
+const highContrast: ChromeTokens = {
+  ...dark, surface: '#000000', field: '#111111', raised: '#1a1a1a',
+  overlay: '#111111', hover: '#282828', text: '#ffffff', muted: '#e5e5e5',
+  border: '#e5e5e5', divider: '#b3b3b3', accentText: '#fde047',
+  accentFill: '#6b5100', accentHover: '#4b3900', selected: '#332900',
+  selectedText: '#fef3c7', selectedBorder: '#fde047', focus: '#fde047',
+};
 const withSurface = (palette: ChromeTokens, surface: string): ChromeTokens => ({ ...palette, surface });
 export const STUDIO_THEMES: Readonly<Record<StudioThemeId, StudioThemePreset>> = {
   classic: { id: 'classic', label: '经典双拼', header: classic, nav: withSurface(classic, '#0d1118'),
@@ -142,6 +172,18 @@ export const STUDIO_THEMES: Readonly<Record<StudioThemeId, StudioThemePreset>> =
   porcelain: { id: 'porcelain', label: '雾蓝瓷白', header: porcelain, nav: withSurface(porcelain, '#e0e8f0'),
     panel: withSurface(porcelain, '#f6f9fc'), preview: withSurface(porcelain, '#e2eaf2'), gallery: porcelain,
     stage: { scheme: 'light', background: '#d5dfe9', label: '#40566c' } },
+  aurora: { id: 'aurora', label: '极光玻璃', header: aurora, nav: withSurface(aurora, '#12172b'),
+    panel: withSurface(aurora, '#222a47'), preview: withSurface(aurora, '#1c2440'), gallery: aurora,
+    stage: { scheme: 'dark', background: '#12172b', label: '#d5ddfa' } },
+  forest: { id: 'forest', label: '森林墨绿', header: forest, nav: withSurface(forest, '#0f2019'),
+    panel: withSurface(forest, '#1d382d'), preview: withSurface(forest, '#193128'), gallery: forest,
+    stage: { scheme: 'dark', background: '#0f2019', label: '#d1e8d8' } },
+  lavender: { id: 'lavender', label: '薰衣草', header: lavender, nav: withSurface(lavender, '#e1dbf0'),
+    panel: withSurface(lavender, '#faf8ff'), preview: withSurface(lavender, '#eae4f4'), gallery: lavender,
+    stage: { scheme: 'light', background: '#e1dbf0', label: '#524465' } },
+  highContrast: { id: 'highContrast', label: '清晰高对比', header: highContrast, nav: highContrast,
+    panel: withSurface(highContrast, '#111111'), preview: withSurface(highContrast, '#111111'), gallery: highContrast,
+    stage: { scheme: 'dark', background: '#000000', label: '#ffffff' } },
 };
 
 export function resolveChromeTokens(id: unknown, zone: 'header' | 'nav'): ChromeTokens {

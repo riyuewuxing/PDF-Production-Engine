@@ -99,6 +99,10 @@ describe('P2 explicit zone registry — candidate, not completed visual presets'
     ['obsidian', '#1c1917', '#211d18', '#11100f', '#0c0a09', 'dark'],
     ['ocean', '#17354b', '#102b40', '#0d2436', '#0a1c2a', 'dark'],
     ['porcelain', '#f6f9fc', '#e2eaf2', '#e6edf4', '#d5dfe9', 'light'],
+    ['aurora', '#222a47', '#1c2440', '#161c36', '#12172b', 'dark'],
+    ['forest', '#1d382d', '#193128', '#142820', '#0f2019', 'dark'],
+    ['lavender', '#faf8ff', '#eae4f4', '#eeeaf7', '#e1dbf0', 'light'],
+    ['highContrast', '#111111', '#111111', '#000000', '#000000', 'dark'],
   ] as const)('does not fall back for %s', (id, panel, preview, gallery, stage, scheme) => {
     expect(resolveSurfaceTokens(id, 'panel').surface).toBe(panel);
     expect(resolveSurfaceTokens(id, 'preview').surface).toBe(preview);
@@ -120,6 +124,25 @@ describe('P2 explicit zone registry — candidate, not completed visual presets'
       expect(resolveSurfaceTokens(id,'preview').surface).toBe(preview);
       expect(resolveSurfaceTokens(id,'gallery').surface).toBe(gallery);
       expect(resolvePreviewBacking(id,'follow').background).toBe(stage);
+    }
+  });
+});
+
+describe('High contrast candidate colors, not a whole-application accessibility claim', () => {
+  it('has prominent foreground and focus in every scoped zone', () => {
+    for (const zone of ['header','nav','panel','preview','gallery'] as const) {
+      const t=STUDIO_THEMES.highContrast[zone];
+      for(const bg of [t.surface,t.field,t.raised,t.hover,t.overlay]) {
+        expect(contrast(t.text,bg)).toBeGreaterThanOrEqual(7);
+        expect(contrast(t.focus,bg)).toBeGreaterThanOrEqual(7);
+        expect(contrast(t.border,bg)).toBeGreaterThanOrEqual(7);
+      }
+    }
+  });
+  it('never mixes preview override with the persisted workbench theme', () => {
+    for(const id of ['aurora','forest','lavender','highContrast'] as const) {
+      expect(resolvePreviewBacking(id,'dark')).toEqual(resolvePreviewBacking('classic','dark'));
+      expect(resolvePreviewBacking(id,'light')).toEqual(resolvePreviewBacking('classic','light'));
     }
   });
 });
