@@ -5,7 +5,7 @@ fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPa
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json'),audit=require('./validation-theme-t05-contrast.cjs');
 const report={runnerSha:process.env.GITHUB_SHA,checks:{},themes:{}};
 const write=()=>fs.writeFileSync(path.join(out,'command-native.json'),JSON.stringify(report,null,2));
-const timer=setTimeout(()=>{report.error='application watchdog';write();process.exit(2)},105000);
+const timer=setTimeout(()=>{report.error='application watchdog';write();process.exit(2)},180000);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(label,fn,ms=12000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label)}
 async function run(){
@@ -23,7 +23,7 @@ async function run(){
  const close=async()=>{await press('Escape');await until('command closed',()=>js(sel=>!document.querySelector(sel),sel))};
  await until('editor',()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人'));
  const before=await main.store.getResume('runner-fixture'),snaps=await main.store.listSnapshots('runner-fixture'),ledger=await main.store.getApplications();
- const themes=['classic','dark','light','warm'],colors={dark:'rgb(17, 24, 39)',light:'rgb(255, 255, 255)',warm:'rgb(251, 247, 238)'};
+ const themes=['classic','graphite','obsidian','ocean','porcelain'],colors={graphite:'rgb(35, 35, 38)',obsidian:'rgb(28, 25, 23)',ocean:'rgb(23, 53, 75)',porcelain:'rgb(246, 249, 252)'};
  let baseline=null;
  for(const id of themes){
   await js(id=>{const e=document.querySelector('select[aria-label="切换工作台主题"]');e.value=id;e.dispatchEvent(new Event('change',{bubbles:true}));return true},id);
@@ -70,7 +70,7 @@ async function run(){
   report.themes[id].keyboard={initial:true,down:true,up:true,filter:true,emptyEnter:true,escape:true,noWrite:true};write();
  }
  // Exercise real keyboard selection of theme command, not just change event.
- await open();await query('工作台主题 dark');assert.equal((await state()).options.length,1);await press('Enter');await until('theme command ran',()=>js(()=>document.querySelector('.studio-shell')?.dataset.studioTheme==='dark'&&!document.querySelector('[aria-label="全局命令面板"]')));
+ await open();await query('工作台主题 ocean');assert.equal((await state()).options.length,1);await press('Enter');await until('theme command ran',()=>js(()=>document.querySelector('.studio-shell')?.dataset.studioTheme==='ocean'&&!document.querySelector('[aria-label="全局命令面板"]')));
  assert.deepEqual(await main.store.getResume('runner-fixture'),before);report.checks.themeCommandNoWrite=true;
  await open();await query('版本母库');await press('Enter');await until('navigation command executed',()=>js(()=>document.body.innerText.includes('版本与母库管理')&&!document.querySelector('[aria-label="全局命令面板"]')));
  assert.deepEqual(await main.store.getResume('runner-fixture'),before);report.checks.navigationCommandNoWrite=true;write();

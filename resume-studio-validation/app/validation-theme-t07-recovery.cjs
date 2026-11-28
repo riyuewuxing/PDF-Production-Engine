@@ -8,7 +8,7 @@ if(!root||!out||!['mixed','all-corrupt'].includes(mode)||!path.basename(root).st
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json');
 const checks={},observations={};const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const deadline=setTimeout(()=>{console.error('list recovery watchdog expired '+mode);app.exit(2);},105000);
+const deadline=setTimeout(()=>{console.error('list recovery watchdog expired '+mode);app.exit(2);},180000);
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const expect=(v,msg)=>{if(!v)throw Error(msg)};
 async function until(label,fn,limit=15000){const end=Date.now()+limit;while(Date.now()<end){if(await fn())return;await sleep(150);}throw Error('timeout '+label);}
@@ -45,13 +45,13 @@ async function run(){
   const openIssues=async()=>{expect(await js('(()=>{const e=document.querySelector('+JSON.stringify(warning)+');if(!e)return false;e.open=true;return true})()'),'issue details absent');};
 
   const audit=require('./validation-theme-t05-contrast.cjs');
-  const themes=['classic','dark','light','warm'];
+  const themes=['classic','graphite','obsidian','ocean','porcelain'];
   const verify=async(region,id,label)=>{
     const sel='[data-studio-region="'+region+'"]';
     await until('scope '+region+' '+id,()=>js('document.querySelector('+JSON.stringify(sel)+')?.dataset.studioTheme==='+JSON.stringify(id)));
     const state=await js('('+function(sel){const e=document.querySelector(sel),s=getComputedStyle(e);return {theme:e.dataset.studioTheme,bg:s.backgroundColor,fg:s.color,status:e.dataset.studioStatus||null,text:e.innerText,buttons:[...e.querySelectorAll('button')].map(b=>[b.innerText,b.disabled])}}.toString()+')('+JSON.stringify(sel)+')');
-    const statusColors={dark:'rgb(66, 44, 21)',light:'rgb(254, 243, 199)',warm:'rgb(254, 243, 199)'};
-    const panelColors={dark:'rgb(17, 24, 39)',light:'rgb(255, 255, 255)',warm:'rgb(251, 247, 238)'};
+    const statusColors={graphite:'rgb(66, 44, 21)',obsidian:'rgb(66, 44, 21)',ocean:'rgb(66, 44, 21)',porcelain:'rgb(254, 243, 199)'};
+    const panelColors={graphite:'rgb(35, 35, 38)',obsidian:'rgb(28, 25, 23)',ocean:'rgb(23, 53, 75)',porcelain:'rgb(246, 249, 252)'};
     if(id!=='classic')expect(state.bg===(state.status==='warning'?statusColors[id]:panelColors[id]),'wrong scope color '+JSON.stringify(state));
     const contrast=await audit(win,sel,label+'-'+id);observations.themeMatrix??={};observations.themeMatrix[label+'-'+id]={state,contrast};report();
     if(id!=='classic')expect(!contrast.failures.length,'contrast '+label+' '+id+' '+JSON.stringify(contrast.failures.slice(0,5)));
