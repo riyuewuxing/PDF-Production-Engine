@@ -121,7 +121,7 @@ export function DiagnoseAndMatchPane({
   const [aiSubMode, setAiSubMode] = useState<AiSubMode>('single');
   const [aiSettings, setAiSettings] = useState<ByokAiSettings>(DEFAULT_BYOK_SETTINGS);
   const [catalog,setCatalog]=useState<AiProfileCatalog|null>(null);
-  const [profileBusy,setProfileBusy]=useState(false);
+  const [profileBusy,setProfileBusy]=useState(true);
   const [testingConnection,setTestingConnection]=useState(false);
   const [connectionTip,setConnectionTip]=useState<string|null>(null);
   const [connectionAttempt,setConnectionAttempt]=useState<{settings:ByokAiSettings;value:AiTaskReceipt}|null>(null);
@@ -167,16 +167,18 @@ export function DiagnoseAndMatchPane({
 
   useEffect(() => {
     mountedRef.current = true;
+    let active=true;
     void (window.resumeDesktop?apiClient.listAiProfiles().then(c=>{
-      if(mountedRef.current)setCatalog(c);
+      if(active)setCatalog(c);
       const selected=c.profiles.find(p=>p.profileId===c.activeProfileId);
       if(!selected)throw new Error('当前模型档案不存在。');return selected;
     }):apiClient.getAiSettings()).then((settings) => {
-      if (mountedRef.current) setAiSettings(settings);
+      if (active) setAiSettings(settings);
     }).catch((err: unknown) => {
-      if (mountedRef.current) setSettingsError(err instanceof Error ? err.message : '无法读取 AI 配置。');
-    });
+      if (active) setSettingsError(err instanceof Error ? err.message : '无法读取 AI 配置。');
+    }).finally(()=>{if(active)setProfileBusy(false);});
     return () => {
+      active=false;
       mountedRef.current = false;
       polishAbortRef.current?.abort();
       tailorAbortRef.current?.abort();
@@ -881,7 +883,7 @@ export function DiagnoseAndMatchPane({
 
         {subTab === 'ai' && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 studio-ui-border studio-ui-raised">
+            <div role="group" aria-label="AI 模型中心" aria-busy={profileBusy} className="rounded-lg border border-slate-200 bg-slate-50 p-3 studio-ui-border studio-ui-raised">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 font-semibold text-slate-800 studio-ui-primary">
                   <ShieldCheck size={14} className="text-teal-600 studio-ui-info" />
@@ -899,6 +901,7 @@ export function DiagnoseAndMatchPane({
                 默认关闭。桌面端密钥由系统加密保护，已保存密钥不再回传界面；模型请求由主进程发送。浏览器模式不持久化密钥。技能版本：{AI_SKILL_VERSION}。
               </p>
 
+              {profileBusy && <p role="status" className="mt-2 text-[11px] studio-ui-muted">正在读取或保存模型档案，请稍候。</p>}
               {settingsError && <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700 studio-ui-error-border studio-ui-error-surface studio-ui-error">{settingsError}</div>}
               {showAiConfig && (
                 <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 studio-ui-border">
@@ -911,10 +914,11 @@ export function DiagnoseAndMatchPane({
                     <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700 studio-ui-error">删除档案</button></div>)}</div>
                     <p className="text-[10px] text-slate-500 studio-ui-muted">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
                    </div>}
-                   <input data-studio-control="true" aria-label="模型档案名称" value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5 studio-ui-border" placeholder="档案名称"/>
+                   <input data-studio-control="true" aria-label="模型档案名称" disabled={profileBusy} value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5 studio-ui-border" placeholder="档案名称"/>
                    <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800 studio-ui-primary">
                     <input data-studio-control="true"
                       type="checkbox"
+                      disabled={profileBusy}
                       checked={aiSettings.enabled}
                       onChange={(e) =>
                         setAiSettings((prev) => ({ ...prev, enabled: e.target.checked }))
@@ -928,6 +932,7 @@ export function DiagnoseAndMatchPane({
                       <button data-studio-control="true"
                         key={p.label}
                         type="button"
+                        disabled={profileBusy}
                         onClick={() =>
                           setAiSettings((prev) => ({
                             ...prev,
@@ -950,6 +955,7 @@ export function DiagnoseAndMatchPane({
                   <input data-studio-control="true"
                     type="text"
                     data-native-undo="true"
+                    disabled={profileBusy}
                     value={aiSettings.baseUrl}
                     onChange={(e) => setAiSettings((prev) => ({ ...prev, baseUrl: e.target.value, deepseekThinking:undefined, apiKey: '', hasApiKey: false, clearApiKey: false }))}
                     placeholder="OpenAI 兼容 Base URL"
@@ -959,6 +965,7 @@ export function DiagnoseAndMatchPane({
                     <input data-studio-control="true"
                       type="password"
                       data-native-undo="true"
+                      disabled={profileBusy}
                       value={aiSettings.apiKey}
                       onChange={(e) => setAiSettings((prev) => ({ ...prev, apiKey: e.target.value, clearApiKey: false }))}
                       placeholder={aiSettings.hasApiKey && !aiSettings.clearApiKey ? '已保存密钥，留空保留' : 'API Key（Ollama 可留空）'}
@@ -967,6 +974,7 @@ export function DiagnoseAndMatchPane({
                     <input data-studio-control="true"
                       type="text"
                       data-native-undo="true"
+                      disabled={profileBusy}
                       value={aiSettings.model}
                       onChange={(e) => setAiSettings((prev) => ({ ...prev, model: e.target.value, deepseekThinking:supportsDeepSeekThinking(prev.baseUrl,e.target.value)?prev.deepseekThinking:undefined }))}
                       aria-label="模型名"
@@ -975,21 +983,21 @@ export function DiagnoseAndMatchPane({
                     />
                   </div>
                   {supportsDeepSeekThinking(aiSettings.baseUrl,aiSettings.model)&&<div className="space-y-1 rounded border border-slate-200 bg-white p-2 studio-ui-border studio-ui-surface">
-                    <label className="block text-[11px] font-semibold">DeepSeek 思考模式<select data-studio-control="true" aria-label="DeepSeek 思考模式" value={aiSettings.deepseekThinking??'provider-default'} onChange={e=>setAiSettings(p=>({...p,deepseekThinking:e.target.value as ByokAiSettings['deepseekThinking']}))} className="mt-1 w-full rounded border p-1 studio-ui-border"><option value="disabled">关闭思考 · 短任务优先</option><option value="enabled">开启思考 · 可能更慢</option><option value="provider-default">服务商默认 · 不额外发送参数</option></select></label>
+                    <label className="block text-[11px] font-semibold">DeepSeek 思考模式<select data-studio-control="true" aria-label="DeepSeek 思考模式" disabled={profileBusy} value={aiSettings.deepseekThinking??'provider-default'} onChange={e=>setAiSettings(p=>({...p,deepseekThinking:e.target.value as ByokAiSettings['deepseekThinking']}))} className="mt-1 w-full rounded border p-1 studio-ui-border"><option value="disabled">关闭思考 · 短任务优先</option><option value="enabled">开启思考 · 可能更慢</option><option value="provider-default">服务商默认 · 不额外发送参数</option></select></label>
                     <p className="text-[10px] text-slate-500 studio-ui-muted">思考与正文共用输出预算；连接测试只发送固定合成文本（显式关闭时64 tokens，其余最多1024且不超过档案上限）。已有档案不会自动换模型。</p>
                   </div>}
                   {/^deepseek-(chat|reasoner)$/.test(aiSettings.model.trim())&&/^(https:\/\/api\.deepseek\.com)(\/v1)?\/?$/.test(aiSettings.baseUrl.trim())&&<p className="rounded bg-amber-50 p-2 text-[11px] text-amber-900 studio-ui-warning-surface studio-ui-warning">旧模型名称已不在当前官方推荐列表。可按需手动改为 deepseek-flash 或 deepseek-v4-pro 后保存；不会自动修改现有档案。</p>}
                   {aiSettings.hasApiKey && (
                     <label className="flex items-center gap-2 text-[11px] text-slate-600 studio-ui-muted">
-                      <input data-studio-control="true" type="checkbox" checked={Boolean(aiSettings.clearApiKey)}
+                      <input data-studio-control="true" type="checkbox" disabled={profileBusy} checked={Boolean(aiSettings.clearApiKey)}
                         onChange={(e) => setAiSettings(prev => ({ ...prev, clearApiKey: e.target.checked, apiKey: '' }))} />
                       保存时清除已有密钥
                     </label>
                   )}
                   <div className="grid grid-cols-3 gap-1">
-                    <label className="text-[10px]">输入字符预算<input data-studio-control="true" aria-label="输入字符预算" type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
-                    <label className="text-[10px]">输出 tokens<input data-studio-control="true" aria-label="输出 tokens" type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
-                    <label className="text-[10px]">超时（秒）<input data-studio-control="true" aria-label="超时（秒）" type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">输入字符预算<input data-studio-control="true" aria-label="输入字符预算" disabled={profileBusy} type="number" min={1000} max={100000} value={aiSettings.contextBudgetChars??60000} onChange={e=>setAiSettings(p=>({...p,contextBudgetChars:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">输出 tokens<input data-studio-control="true" aria-label="输出 tokens" disabled={profileBusy} type="number" min={64} max={8192} value={aiSettings.maxOutputTokens??4096} onChange={e=>setAiSettings(p=>({...p,maxOutputTokens:Number(e.target.value)}))} className="w-full rounded border p-1 studio-ui-border"/></label>
+                    <label className="text-[10px]">超时（秒）<input data-studio-control="true" aria-label="超时（秒）" disabled={profileBusy} type="number" min={1} max={120} value={(aiSettings.timeoutMs??60000)/1000} onChange={e=>setAiSettings(p=>({...p,timeoutMs:Number(e.target.value)*1000}))} className="w-full rounded border p-1 studio-ui-border"/></label>
                   </div>
                   <p className="text-[10px] text-slate-500 studio-ui-muted">预算为本地上限，不代表该模型真实上下文能力；不自动重试其他接口。</p>
                   <div className="flex items-center justify-between gap-2">

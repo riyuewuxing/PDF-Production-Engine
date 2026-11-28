@@ -1,0 +1,64 @@
+name: T16 public native profile transaction lock
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-profile-lock']
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 14
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - {pair: 0, palette: classic}
+          - {pair: 1, palette: light}
+          - {pair: 2, palette: dark}
+          - {pair: 3, palette: highContrast}
+          - {pair: 4, palette: dark}
+          - {pair: 5, palette: highContrast}
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install public locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck public candidate
+        if: matrix.pair == 0
+        timeout-minutes: 3
+        run: pnpm typecheck
+      - name: Build
+        timeout-minutes: 3
+        run: pnpm desktop:build
+      - name: Native real-click delayed read and save gate
+        timeout-minutes: 4
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:T16_PAIR = '${{ matrix.pair }}'
+          $env:T16_PALETTE = '${{ matrix.palette }}'
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-profile-lock-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't16-profile-lock'
+          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          & .\node_modules\.bin\electron.cmd .\validation-theme-t16-profile-lock.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: t16-profile-lock-${{ matrix.pair }}-${{ matrix.palette }}
+          path: t16-profile-lock/
+          if-no-files-found: error
+          retention-days: 3
