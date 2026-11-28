@@ -57,7 +57,7 @@ async function run(){
     if(id!=='classic')expect(!contrast.failures.length,'contrast '+label+' '+id+' '+JSON.stringify(contrast.failures.slice(0,5)));
   };
   const chooseTheme=async id=>{
-    expect(await js('(()=>{const e=document.querySelector(\\'select[aria-label="切换工作台主题"]\\');if(!e)return false;e.value='+JSON.stringify(id)+';e.dispatchEvent(new Event("change",{bubbles:true}));return true})()'),'theme selector missing');
+    expect(await js('('+function(id){const e=document.querySelector('select[aria-label="切换工作台主题"]');if(!e)return false;e.value=id;e.dispatchEvent(new Event('change',{bubbles:true}));return true}.toString()+')('+JSON.stringify(id)+')'),'theme selector missing');
     await until('theme selected',()=>js('document.querySelector(".studio-shell")?.dataset.studioTheme==='+JSON.stringify(id)));
   };
   if(mode==='mixed'){
