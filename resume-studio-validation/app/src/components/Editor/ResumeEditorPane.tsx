@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
 import {
   ArrowDown,
   ArrowUp,
@@ -41,6 +43,7 @@ export function ResumeEditorPane({
   onImmediateChange,
   focusSectionRequest,
 }: ResumeEditorPaneProps) {
+  const skins=useStudioComponentSkins();
   const [openSectionIds, setOpenSectionIds] = useState<Record<string, boolean>>({
     basic: true,
     education: true,
@@ -313,6 +316,7 @@ export function ResumeEditorPane({
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button data-studio-control="true"
                     type="button"
+                    {...iconSkin(skins)}
                     onClick={() => startRename(section)}
                     aria-label={`重命名${section.title}`}
                     title="重命名模块"
@@ -371,6 +375,7 @@ export function ResumeEditorPane({
                   <button data-studio-control="true"
                     type="button"
                     disabled={index === 0 || (index === 1 && orderedSections[0]?.id === 'basic')}
+                    {...iconSkin(skins)}
                     onClick={() => moveSection(index, -1)}
                     aria-label={`上移${section.title}`}
                     className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary disabled:opacity-25"
@@ -380,6 +385,7 @@ export function ResumeEditorPane({
                   <button data-studio-control="true"
                     type="button"
                     disabled={index === orderedSections.length - 1 || isBasic}
+                    {...iconSkin(skins)}
                     onClick={() => moveSection(index, 1)}
                     aria-label={`下移${section.title}`}
                     className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-700 studio-ui-hover-primary disabled:opacity-25"
@@ -389,7 +395,8 @@ export function ResumeEditorPane({
                   {!isBasic && (
                     <button data-studio-control="true"
                       type="button"
-                      onClick={() => deleteSection(section.id)}
+                      {...iconSkin(skins,'danger')}
+                    onClick={() => deleteSection(section.id)}
                       aria-label={`删除模块${section.title}`}
                       title="删除模块"
                       className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
@@ -484,7 +491,8 @@ export function ResumeEditorPane({
             />
             <button data-studio-control="true"
               type="button"
-              onClick={addCustomSection}
+              {...buttonSkin(skins,'primary')}
+                    onClick={addCustomSection}
               className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 studio-ui-fill px-2.5 py-1.5 text-xs font-medium text-white studio-ui-on-fill hover:bg-slate-800 studio-ui-fill-hover"
             >
               <Plus size={13} /> 添加模块
@@ -493,7 +501,8 @@ export function ResumeEditorPane({
           {!hasExperienceModule && (
             <button data-studio-control="true"
               type="button"
-              onClick={addExperienceSection}
+              {...buttonSkin(skins)}
+                    onClick={addExperienceSection}
               className="inline-flex w-full items-center justify-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 text-xs font-medium text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
             >
               <Plus size={13} /> 启用标准“工作经历”模块

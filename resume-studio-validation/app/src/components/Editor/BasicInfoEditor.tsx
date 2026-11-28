@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
 import { Crop, Eye, EyeOff, Plus, Trash2, Upload } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 import { apiClient, resolveAssetUrl } from '../../lib/apiClient';
@@ -21,6 +23,7 @@ const CORE_FIELD_KEYS = new Set([
 ]);
 
 export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInfoEditorProps) {
+  const skins=useStudioComponentSkins();
   const emitDiscrete = onImmediateChange ?? onChange;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -162,7 +165,8 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
             />
             <button data-studio-control="true"
               type="button"
-              onClick={() => toggleFieldVisible(field.id)}
+              {...iconSkin(skins)}
+                onClick={() => toggleFieldVisible(field.id)}
               aria-label={field.visible ? `隐藏${field.label}` : `显示${field.label}`}
               title={field.visible ? '当前显示' : '当前已隐藏'}
               className="rounded p-1.5 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover hover:text-slate-800 studio-ui-hover-primary"
@@ -179,7 +183,8 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
           <span className="text-xs font-semibold text-slate-700 studio-ui-primary">自定义标签字段</span>
           <button data-studio-control="true"
             type="button"
-            onClick={addCustomField}
+            {...buttonSkin(skins)}
+                onClick={addCustomField}
             className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border px-2 py-1 text-xs font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover"
           >
             <Plus size={12} /> 添加标签
@@ -206,6 +211,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               />
               <button data-studio-control="true"
                 type="button"
+                {...iconSkin(skins)}
                 onClick={() => updateCustomField(cf.id, { visible: !cf.visible })}
                 aria-label={cf.visible ? `隐藏${cf.label}` : `显示${cf.label}`}
                 className="rounded p-1 text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover"
@@ -214,6 +220,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               </button>
               <button data-studio-control="true"
                 type="button"
+                {...iconSkin(skins,'danger')}
                 onClick={() => removeCustomField(cf.id)}
                 aria-label={`删除${cf.label}`}
                 className="rounded p-1 text-slate-400 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
@@ -268,6 +275,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               />
               <button data-studio-control="true"
                 type="button"
+                {...buttonSkin(skins,'primary')}
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex items-center gap-1.5 rounded bg-slate-900 studio-ui-fill px-2.5 py-1.5 text-xs font-medium text-white studio-ui-on-fill hover:bg-slate-800 studio-ui-fill-hover"
               >
@@ -277,7 +285,8 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               {basic.photo && (
                 <button data-studio-control="true"
                   type="button"
-                  onClick={() => setCropSrc(resolveAssetUrl(basic.photo))}
+                  {...buttonSkin(skins)}
+                onClick={() => setCropSrc(resolveAssetUrl(basic.photo))}
                   className="inline-flex items-center gap-1 rounded border border-teal-300 studio-ui-selected-border bg-teal-50 studio-ui-selected px-2 py-1.5 text-xs font-medium text-teal-800 studio-ui-selected-text hover:bg-teal-100 studio-ui-selected-hover"
                 >
                   <Crop size={12} /> 裁剪/换底
@@ -286,7 +295,8 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
               {basic.photo && (
                 <button data-studio-control="true"
                   type="button"
-                  onClick={() => emitDiscrete({ ...basic, photo: '' })}
+                  {...buttonSkin(skins,'danger')}
+                onClick={() => emitDiscrete({ ...basic, photo: '' })}
                   className="rounded border border-slate-200 studio-ui-border px-2 py-1.5 text-xs text-slate-600 studio-ui-muted hover:bg-red-50 studio-ui-error-hover hover:text-red-600 studio-ui-error-hover-text"
                 >
                   清除

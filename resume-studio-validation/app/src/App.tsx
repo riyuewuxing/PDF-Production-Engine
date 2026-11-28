@@ -39,10 +39,12 @@ import type {JobPdfOrigin} from './schema/jobPdfSourceSchema';
 import { TEMPLATE_REGISTRY } from './templates/registry';
 import { StudioThemeProvider, useStudioTheme } from './studio-theme/StudioThemeProvider';
 import { StudioThemePicker } from './studio-theme/StudioThemePicker';
+import { ComponentSkinWorkshop } from './studio-theme/ComponentSkinWorkshop';
 import { chromeStyle } from './studio-theme/resolve';
 import { surfaceStyle } from './studio-theme/surfaces';
 import './studio-theme/styles/chrome.css';
 import './studio-theme/styles/surfaces.css';
+import './studio-theme/styles/componentSkins.css';
 
 function buildDefaultGlobalSettings(doc: ResumeDocument): GlobalSettings {
   const meta = TEMPLATE_REGISTRY.find((t) => t.id === doc.templateId);
@@ -425,7 +427,7 @@ function StudioApp() {
       {(versionTransitioning||isFitting)&&<div className="no-print absolute inset-0 z-[100] flex items-center justify-center bg-slate-900/35"><div data-studio-region="busy-overlay" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} className="rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg">{versionTransitioning?'正在安全处理版本，请稍候…':'正在测量页面排版…'}</div></div>}
       <StudioHeader
         studioThemeId={themeId}
-        themeControl={<StudioThemePicker value={themeId} notice={themeNotice} onChange={selectTheme} />}
+        themeControl={<><StudioThemePicker value={themeId} notice={themeNotice} onChange={selectTheme} /><ComponentSkinWorkshop /></>}
         activeSlug={activeSlug}
         activeTab={activeTab}
         summaries={summaries}

@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
 import {
   AlertCircle,
   CheckCircle2,
@@ -96,6 +98,7 @@ export function StudioHeader({
   onExportFormat,
   onOpenCommandPalette,
 }: StudioHeaderProps) {
+  const skins=useStudioComponentSkins();
   return (
     <header aria-label="工作台顶栏" data-studio-surface="header" data-studio-theme={studioThemeId}
       style={chromeStyle(studioThemeId, 'header')} className="no-print flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-800 studio-chrome-border bg-[#11161f] px-3 py-1.5 text-slate-100 studio-chrome-primary 2xl:flex-nowrap">
@@ -124,6 +127,7 @@ export function StudioHeader({
           <button
             type="button"
             disabled={!canUndo}
+            {...iconSkin(skins)}
             onClick={onUndo}
             aria-label="撤销"
             title={`撤销 (Ctrl+Z)${undoCount > 0 ? ` · 可撤 ${undoCount} 步` : ''}`}
@@ -135,6 +139,7 @@ export function StudioHeader({
           <button
             type="button"
             disabled={!canRedo}
+            {...iconSkin(skins)}
             onClick={onRedo}
             aria-label="重做"
             title={`重做 (Ctrl+Y)${redoCount > 0 ? ` · 可恢复 ${redoCount} 步` : ''}`}
@@ -175,7 +180,8 @@ export function StudioHeader({
       <div aria-label="工作台操作" className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 whitespace-nowrap 2xl:shrink-0 2xl:flex-nowrap">
         <button
           type="button"
-          onClick={onOpenCommandPalette}
+          {...buttonSkin(skins)}
+            onClick={onOpenCommandPalette}
           aria-label="打开命令面板"
           title="全局命令面板 (Ctrl+K)"
           className="inline-flex items-center gap-1.5 rounded border border-slate-700/80 studio-chrome-border bg-slate-900/90 studio-chrome-field px-2 py-1 text-[11px] text-slate-300 studio-chrome-muted hover:border-teal-500/50 studio-chrome-hover-border hover:text-white studio-chrome-hover-text"
@@ -190,6 +196,7 @@ export function StudioHeader({
         {activeTab === 'templates' && (
           <button
             type="button"
+            {...buttonSkin(skins)}
             onClick={onBackToEdit}
             className="rounded border border-slate-700 studio-chrome-border bg-slate-800 studio-chrome-raised px-2.5 py-1 text-xs text-slate-200 studio-chrome-primary hover:bg-slate-700 studio-chrome-hover"
           >
@@ -266,7 +273,8 @@ export function StudioHeader({
             <button
               type="button"
               disabled={isFitting}
-              onClick={onFitOnePage}
+              {...buttonSkin(skins)}
+            onClick={onFitOnePage}
               className="inline-flex items-center gap-1 rounded border border-slate-700 studio-chrome-border bg-slate-800 studio-chrome-raised px-2.5 py-1 text-xs font-medium text-slate-200 studio-chrome-primary hover:bg-slate-700 studio-chrome-hover disabled:opacity-50"
             >
               <Shrink size={13} />
@@ -279,6 +287,7 @@ export function StudioHeader({
           <button
             type="button"
             disabled={isExporting}
+            {...buttonSkin(skins,'primary')}
             onClick={() => onExportFormat('pdf', false)}
             className="inline-flex items-center gap-1.5 rounded-l bg-teal-600 studio-chrome-accent-fill px-3 py-1 text-xs font-semibold text-white studio-chrome-primary shadow-xs hover:bg-teal-500 disabled:opacity-50"
           >
@@ -359,14 +368,16 @@ export function StudioHeader({
             <button
               type="button"
               disabled={isExporting}
-              onClick={() => onExportFormat('pdf', true)}
+              {...buttonSkin(skins)}
+            onClick={() => onExportFormat('pdf', true)}
               className="rounded border border-slate-700 studio-chrome-border bg-slate-800 studio-chrome-raised px-2.5 py-1 text-xs text-slate-200 studio-chrome-primary hover:bg-slate-700 studio-chrome-hover disabled:opacity-50"
             >
               另存为...
             </button>
             <button
               type="button"
-              onClick={() => void apiClient.openExportsDir()}
+              {...buttonSkin(skins)}
+            onClick={() => void apiClient.openExportsDir()}
               className="inline-flex items-center gap-1 rounded border border-slate-700 studio-chrome-border bg-slate-800 studio-chrome-raised px-2.5 py-1 text-xs text-slate-200 studio-chrome-primary hover:bg-slate-700 studio-chrome-hover"
             >
               <FolderOpen size={12} /> 打开导出目录
