@@ -26,7 +26,7 @@ async function run(){
    await press('K',['control']);await until('command open',()=>js(sel=>!!document.querySelector(sel),sel));await sleep(200);
    const row=await inspect();report.rows[id+'-'+factor]=row;write();await capture('zoom-'+id+'-'+factor);
    await press('Tab',['shift']);const last=await js(sel=>{const d=document.querySelector(sel),e=document.activeElement,r=e.getBoundingClientRect(),l=d.querySelector('[role=listbox]').parentElement.getBoundingClientRect();return {inside:d.contains(e),index:e.dataset.cmdIndex||null,visible:r.top>=l.top-1&&r.bottom<=Math.min(l.bottom,innerHeight)+1}},sel);
-   row.last=last;write();await press('Escape');await until('closed',()=>js(sel=>!document.querySelector(sel),sel)); 
+   row.last=last;write();assert(row.fullyVisible&&row.footerVisible&&last.inside&&last.visible,'command geometry or last option clipped '+id+' '+factor+' '+JSON.stringify(row));await capture('zoom-last-'+id+'-'+factor);await press('Escape');await until('closed',()=>js(sel=>!document.querySelector(sel),sel)); 
   }
   win.webContents.setZoomFactor(1);
  }
