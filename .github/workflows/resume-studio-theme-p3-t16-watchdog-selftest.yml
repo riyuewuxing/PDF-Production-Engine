@@ -1,0 +1,28 @@
+name: Resume Studio T16 Windows watchdog selftest
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-watchdog-selftest']
+permissions:
+  contents: read
+jobs:
+  process:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Actual process watchdog selftest
+        timeout-minutes: 2
+        shell: pwsh
+        run: ./resume-studio-validation/app/qa-watchdog-selftest.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: t16-watchdog-selftest
+          path: t16-watchdog-evidence/
+          retention-days: 3
+          if-no-files-found: error
