@@ -1,7 +1,7 @@
 name: Resume Studio T16 version action native keyboard gates
 on:
   push:
-    branches: ['resume-studio/theme-p3-t16-version-actions-retry']
+    branches: ['resume-studio/theme-p3-t16-version-actions-confirm']
 permissions:
   contents: read
 jobs:
@@ -45,7 +45,7 @@ jobs:
           $entry = '.\validation-theme-t16-version-actions.cjs'
           $prefix = 'synthetic-t16-versions-'
           $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ($prefix + [guid]::NewGuid().ToString())
-          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t16-version-actions-retry'
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t16-version-actions-confirm'
           New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
           Copy-Item validation-theme-t12-provenance.json $env:RESUME_STUDIO_EVIDENCE_OUT
           if (!(Test-Path -LiteralPath $entry -PathType Leaf)) { throw 'Missing exact T16 entry' }
@@ -67,7 +67,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: theme-t16-version-actions-retry-${{ matrix.theme }}
-          path: theme-t16-version-actions-retry/
+          name: theme-t16-version-actions-confirm-${{ matrix.theme }}
+          path: theme-t16-version-actions-confirm/
           if-no-files-found: error
           retention-days: 3
