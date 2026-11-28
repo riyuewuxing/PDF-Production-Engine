@@ -167,6 +167,8 @@ const terracotta: ChromeTokens = {
   border: '#84675b', divider: '#c4ad9f', accentText: '#793321',
   accentFill: '#9a402d', accentHover: '#783121', selected: '#e7c7b6',
   selectedText: '#632f23', selectedBorder: '#9a402d', focus: '#9a402d',
+  // Warm hover/nav surfaces require darker semantic text than the light base.
+  success: '#14532d', warning: '#78350f', info: '#1e40af',
 };
 const ink: ChromeTokens = {
   ...light, surface: '#f3f3f3', field: '#ffffff', raised: '#eeeeee',

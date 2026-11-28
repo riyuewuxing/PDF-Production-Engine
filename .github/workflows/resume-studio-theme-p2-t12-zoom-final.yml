@@ -1,0 +1,64 @@
+name: Resume Studio T12 corrected final palettes crop and tracker zoom safety
+on:
+  push:
+    branches: ['resume-studio/theme-p2-t12-final']
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [crop-safety, tracker-status]
+    runs-on: windows-latest
+    timeout-minutes: 14
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: |
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native keyboard and renderer zoom gate
+        timeout-minutes: 6
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $suite = '${{ matrix.suite }}'
+          $prefix = if ($suite -eq 'crop-safety') { 'synthetic-crop-safety-' } else { 'synthetic-review-' }
+          $entry = if ($suite -eq 'crop-safety') { '.\validation-theme-t09-safety.cjs' } else { '.\validation-theme-t08-status-zoom.cjs' }
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ($prefix + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t12-final-zoom'
+          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          Copy-Item validation-theme-t12-provenance.json $env:RESUME_STUDIO_EVIDENCE_OUT
+          node .\validation-theme-t11-preflight.cjs $entry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            & .\node_modules\.bin\electron.cmd $entry
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Preserve raw evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t12-final-zoom-${{ matrix.suite }}
+          path: theme-t12-final-zoom/
+          if-no-files-found: error
+          retention-days: 3

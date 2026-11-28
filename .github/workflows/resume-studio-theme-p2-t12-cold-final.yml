@@ -1,0 +1,73 @@
+name: Resume Studio T12 corrected all sixteen native cold starts and window sizes
+on:
+  push:
+    branches: ['resume-studio/theme-p2-t12-final']
+permissions:
+  contents: read
+jobs:
+  cold:
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [batch3]
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: |
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual separate-process preference verification and viewport screenshots
+        timeout-minutes: 9
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $ids = switch ('${{ matrix.batch }}') {
+            'pilot' { @('classic','dark','light','warm') }
+            'batch1' { @('graphite','obsidian','ocean','porcelain') }
+            'batch2' { @('aurora','forest','lavender','highContrast') }
+            'batch3' { @('nordic','blueprint','terracotta','ink') }
+          }
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t12-final-cold'
+          $entry = '.\validation-theme-t12-cold.cjs'
+          node .\validation-theme-t11-preflight.cjs $entry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($id in $ids) {
+            $env:STUDIO_COLD_ID = $id
+            $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t12-cold-' + [guid]::NewGuid().ToString())
+            try {
+              $env:STUDIO_COLD_PHASE = 'select'
+              & .\node_modules\.bin\electron.cmd $entry
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              $env:STUDIO_COLD_PHASE = 'restart'
+              & .\node_modules\.bin\electron.cmd $entry
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            } finally {
+              Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+      - name: Preserve raw screenshots and results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t12-final-cold-${{ matrix.batch }}
+          path: theme-t12-final-cold/
+          if-no-files-found: error
+          retention-days: 3

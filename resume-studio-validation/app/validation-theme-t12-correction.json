@@ -1,0 +1,12 @@
+{
+  "original": "d01dc2ae5781a44ea02bd25878ffe381c580da0a",
+  "firstFailedRun": 46117318808,
+  "failedJob": 140893927529,
+  "assertion": "terracotta/header and panel: #166534 on #dcc8b9 = 4.415833591236164 < 4.5",
+  "correctedTokens": {
+    "success": "#14532d",
+    "warning": "#78350f",
+    "info": "#1e40af"
+  },
+  "reason": "Three inherited semantic foregrounds lacked contrast against terracotta nav/hover; no gate relaxed; affected suites rerun; other palette values unchanged"
+}
