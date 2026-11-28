@@ -2,7 +2,7 @@ const {app}=require('electron'),fs=require('node:fs'),path=require('node:path'),
 const root=process.env.RESUME_STUDIO_DATA_DIR,out=process.env.RESUME_STUDIO_EVIDENCE_OUT;if(!root||!out||!path.basename(root).startsWith('synthetic-preview-'))throw Error('isolated preview fixture required');
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out,{recursive:true});app.setPath('userData',path.join(root,'profile'));app.disableHardwareAcceleration();
 const report={runnerSha:process.env.GITHUB_SHA,checks:{},gallery:{},spread:{}};const write=()=>fs.writeFileSync(path.join(out,'preview-chrome.json'),JSON.stringify(report,null,2));
-const timer=setTimeout(()=>{report.error='preview chrome watchdog';write();app.exit(2)},230000);
+const timer=setTimeout(()=>{report.error='preview chrome watchdog';write();app.exit(2)},260000);
 const main=require('./dist-electron/main.cjs'),fixture=require('./runner-fixture.json'),audit=require('./validation-theme-t05-contrast.cjs');const sleep=ms=>new Promise(r=>setTimeout(r,ms)),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 async function until(label,fn,ms=15000){const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await sleep(100)}throw Error('timeout '+label)}
 async function run(){
@@ -45,10 +45,24 @@ async function run(){
   let isolated;
   try{await sleep(250);isolated=await capture(r.rect,label+'-paper-isolated');}
   finally{await js((sel,old)=>{const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]');const es=[...p.parentElement.children].filter(e=>e!==p);if(es.length!==old.length)throw Error('chrome identity changed');es.forEach((e,i)=>old[i]===null?e.removeAttribute('style'):e.setAttribute('style',old[i]));return true},card,originalStyle);await sleep(250)}
-  return {raw,inner,isolated,styleHash:sha(Buffer.from(JSON.stringify(r.signature))),chrome:r.chrome};
+  const experiments={};
+  for(const mode of ['isolation','contain','neutralAncestors']){
+    const original=await js((sel,mode)=>{
+      const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]'),host=p.parentElement,card=host.parentElement,g=card.closest('[data-studio-surface="gallery"]');
+      const nodes=mode==='neutralAncestors'?[host,card,g]:[host];
+      const before=nodes.map(e=>e.getAttribute('style'));
+      if(mode==='isolation')host.style.setProperty('isolation','isolate','important');
+      if(mode==='contain')host.style.setProperty('contain','paint','important');
+      if(mode==='neutralAncestors'){host.style.setProperty('background-color','#fff','important');card.style.setProperty('background-color','#1b222e','important');g.style.setProperty('background-color','#141922','important')}
+      return before;
+    },card,mode);
+    try{await sleep(250);experiments[mode]=await capture(r.rect,label+'-paper-'+mode)}
+    finally{await js((sel,mode,before)=>{const p=document.querySelector(sel+' [data-studio-paper="thumbnail"]'),host=p.parentElement,card=host.parentElement,g=card.closest('[data-studio-surface="gallery"]');const nodes=mode==='neutralAncestors'?[host,card,g]:[host];nodes.forEach((e,i)=>before[i]===null?e.removeAttribute('style'):e.setAttribute('style',before[i]));return true},card,mode,original);await sleep(250)}
+  }
+  return {raw,inner,isolated,experiments,styleHash:sha(Buffer.from(JSON.stringify(r.signature))),chrome:r.chrome};
  };
  for(const id of themes){await theme(id);await js(sel=>{document.querySelector(sel).scrollIntoView({block:'center'});return true},card);await sleep(200);
-  const clean=await paper(id);report.gallery[id]={paper:clean};write();if(id!=='classic'){const baseline=report.gallery.classic.paper;assert.equal(clean.styleHash,baseline.styleHash,'theme changed paper computed DOM');assert.deepEqual(clean.isolated,baseline.isolated,'theme changed isolated paper pixels');assert.deepEqual(clean.inner,baseline.inner,'theme changed live paper interior pixels');}
+  const clean=await paper(id);report.gallery[id]={paper:clean};write();if(id!=='classic'){const baseline=report.gallery.classic.paper;assert.equal(clean.styleHash,baseline.styleHash,'theme changed paper computed DOM');assert.deepEqual(clean.inner,baseline.inner,'theme changed live paper interior pixels');}
   const point=await js(sel=>{const r=document.querySelector(sel).getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+Math.min(100,r.height/2))}},card);
   win.webContents.sendInputEvent({type:'mouseMove',...point});await until('hover action visible',()=>js(sel=>Number(getComputedStyle(document.querySelector(sel)).opacity)>.99,action));
   const contrast=await audit(win,action,'gallery-'+id);if(id!=='classic')assert.equal(contrast.failures.length,0,JSON.stringify(contrast.failures.slice(0,5)));await shot('gallery-hover-'+id);
@@ -58,7 +72,7 @@ async function run(){
   await js(sel=>{document.querySelector(sel+' button:last-child').focus();return true},action);await key('Enter');await until('lightbox',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label^="模板大图对比"]')));await shot('gallery-lightbox-'+id);await key('Escape');await until('lightbox close',()=>js(()=>!document.querySelector('[role="dialog"][aria-label^="模板大图对比"]')));await noWrite();
   report.gallery[id]={paper:clean,contrast,favoriteToggle:true,inspectAndEscape:true,noWrite:true};write();
  }
- report.checks.galleryFiveThemes=true;
+ report.checks.galleryFiveThemes=true;report.checks.originalExactPixelGate=Object.values(report.gallery).every(r=>r.paper.raw.pixels===report.gallery.classic.paper.raw.pixels);
  // Explicitly apply one template; all other fields except recommended color are unchanged.
  await click('一键应用',action);await until('applied template',async()=> (await main.store.getResume(slug)).templateId==='vip-cyber-dark',20000);
  const applied=await main.store.getResume(slug);assert.deepEqual({...applied,templateId:original.templateId,globalSettings:original.globalSettings,updatedAt:original.updatedAt},original);assert.deepEqual({...applied.globalSettings,themeColor:original.globalSettings.themeColor},original.globalSettings);assert.equal(hashes()[1],before[1]);report.checks.explicitApplyOnlyTemplateAndColor=true;
@@ -69,6 +83,6 @@ async function run(){
   const contrast=await audit(win,warning,'spread-'+id);if(id!=='classic')assert.equal(contrast.failures.length,0,JSON.stringify(contrast.failures.slice(0,5)));await shot('spread-warning-'+id);
   assert.equal(hashes()[1],before[1]);assert.deepEqual(await main.store.getApplications(),ledger);report.spread[id]={...state,contrast};write();
  }
- report.checks.overflowWarningFiveThemes=true;report.checks.paperAndLedgerPreserved=true;write();
+ report.checks.overflowWarningFiveThemes=true;report.checks.paperAndLedgerPreserved=true;write();assert.equal(report.checks.originalExactPixelGate,true,'raw pixel gate still failed; composition diagnostics retained');
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=String(e.stack||e);console.error(report.error);write();app.exit(1)});
