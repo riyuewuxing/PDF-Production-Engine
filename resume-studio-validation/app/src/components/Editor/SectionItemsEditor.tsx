@@ -1,3 +1,5 @@
+import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
 import {
   ArrowDown,
   ArrowUp,
@@ -54,6 +56,7 @@ function MarkdownTextarea({
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const skins=useStudioComponentSkins();
 
   const insertBullet = () => {
     const el = ref.current;
@@ -96,14 +99,14 @@ function MarkdownTextarea({
     <div className={className}>
       <div className="mb-1 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={insertBullet}
             className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1.5 py-0.5 text-[11px] text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
           >
             <List size={11} /> 添加列表项
           </button>
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={wrapBold}
             className="inline-flex items-center gap-1 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 studio-ui-primary hover:bg-slate-100 studio-ui-hover"
@@ -148,6 +151,7 @@ function ItemToolbar({
   onMoveDown: () => void;
   onDelete: () => void;
 }) {
+  const skins=useStudioComponentSkins();
   return (
     <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 studio-ui-divider pb-1.5">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -166,7 +170,7 @@ function ItemToolbar({
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
-        <button data-studio-control="true"
+        <button {...iconSkin(skins)} data-studio-control="true"
           type="button"
           onClick={onDuplicate}
           aria-label="复制一份该条经历"
@@ -175,7 +179,7 @@ function ItemToolbar({
         >
           <Copy size={13} />
         </button>
-        <button data-studio-control="true"
+        <button {...iconSkin(skins)} data-studio-control="true"
           type="button"
           onClick={onToggleVisible}
           aria-label={visible ? '隐藏该条经历' : '显示该条经历'}
@@ -184,7 +188,7 @@ function ItemToolbar({
         >
           {visible ? <Eye size={14} /> : <EyeOff size={14} className="text-amber-600 studio-ui-warning" />}
         </button>
-        <button data-studio-control="true"
+        <button {...iconSkin(skins)} data-studio-control="true"
           type="button"
           disabled={index === 0}
           onClick={onMoveUp}
@@ -193,7 +197,7 @@ function ItemToolbar({
         >
           <ArrowUp size={13} />
         </button>
-        <button data-studio-control="true"
+        <button {...iconSkin(skins)} data-studio-control="true"
           type="button"
           disabled={index === total - 1}
           onClick={onMoveDown}
@@ -202,7 +206,7 @@ function ItemToolbar({
         >
           <ArrowDown size={13} />
         </button>
-        <button data-studio-control="true"
+        <button {...iconSkin(skins,'danger')} data-studio-control="true"
           type="button"
           onClick={onDelete}
           aria-label="删除条目"
@@ -222,6 +226,7 @@ export function SectionItemsEditor({
   onImmediateChange,
 }: SectionItemsEditorProps) {
   const emitDiscrete = onImmediateChange ?? onChange;
+  const skins=useStudioComponentSkins();
   const eduDnd = useHandleDragReorder(document.education, (next) =>
     emitDiscrete({ ...document, education: next }),
   );
@@ -382,7 +387,7 @@ export function SectionItemsEditor({
             />
           </div>
         ))}
-        <button data-studio-control="true"
+        <button {...buttonSkin(skins)} data-studio-control="true"
           type="button"
           onClick={addItem}
           className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
@@ -499,7 +504,7 @@ export function SectionItemsEditor({
             />
           </div>
         ))}
-        <button data-studio-control="true"
+        <button {...buttonSkin(skins)} data-studio-control="true"
           type="button"
           onClick={addItem}
           className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
@@ -622,7 +627,7 @@ export function SectionItemsEditor({
             />
           </div>
         ))}
-        <button data-studio-control="true"
+        <button {...buttonSkin(skins)} data-studio-control="true"
           type="button"
           onClick={addItem}
           className="inline-flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-300 studio-ui-border py-1.5 text-xs font-medium text-slate-600 studio-ui-muted hover:border-slate-400 studio-ui-hover-border hover:bg-slate-50 studio-ui-hover"
@@ -734,7 +739,7 @@ export function SectionItemsEditor({
           />
         </div>
       ))}
-      <button data-studio-control="true"
+      <button {...buttonSkin(skins)} data-studio-control="true"
         type="button"
         onClick={() =>
           updateCustomList(

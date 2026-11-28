@@ -165,7 +165,7 @@ export function StudioHeader({
           {saveState === 'error' && (
             <span className="inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap text-red-400 studio-chrome-error" title={saveError ?? undefined}>
               <AlertCircle size={12} /> 保存失败
-              <button
+              <button {...buttonSkin(skins)}
                 type="button"
                 onClick={onManualSave}
                 className="shrink-0 whitespace-nowrap rounded border border-red-400/40 studio-chrome-error-border bg-red-950/60 studio-chrome-error-fill px-1.5 py-0.5 text-[10px] font-medium text-red-200 studio-chrome-error hover:bg-red-900"
@@ -258,7 +258,7 @@ export function StudioHeader({
                       />
                       <span>立即启用脱敏预览</span>
                     </label>
-                    <button
+                    <button {...buttonSkin(skins)}
                       type="button"
                       onClick={onCloseRedactionPopover}
                       className="rounded bg-slate-700 studio-chrome-raised px-2.5 py-1 text-[11px] hover:bg-slate-600 studio-chrome-hover"

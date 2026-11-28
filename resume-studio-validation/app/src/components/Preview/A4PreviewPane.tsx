@@ -1,3 +1,5 @@
+import { buttonSkin } from '../../studio-theme/componentSkins';
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
 import {
   BookmarkCheck,
   CheckCircle2,
@@ -56,6 +58,7 @@ export function A4PreviewPane({
   isRedacted = false,
   onDisableRedaction,
 }: A4PreviewPaneProps) {
+  const skins=useStudioComponentSkins();
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
@@ -273,7 +276,7 @@ export function A4PreviewPane({
             {isSpread ? '单列滚动' : '双页总览'}
           </button>
 
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={() => setCanvasTheme(isDark ? 'light' : 'dark')}
             aria-label={isDark ? '切换浅色画布' : '切换暗色画布'}
@@ -288,7 +291,7 @@ export function A4PreviewPane({
             {isDark ? '浅色底' : '暗调底'}
           </button>
           {canvasTheme !== 'follow' && (
-            <button data-studio-control="true" type="button" aria-label="画布底衬跟随工作台"
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" aria-label="画布底衬跟随工作台"
               onClick={() => setCanvasTheme('follow')}
               className="rounded border border-slate-300 studio-ui-border px-2 py-0.5 text-[11px] text-slate-500 studio-ui-muted hover:bg-slate-100 studio-ui-hover">
               跟随工作台
@@ -310,7 +313,7 @@ export function A4PreviewPane({
                 当前处于隐私脱敏预览与导出模式（已掩码姓名/手机/邮箱/敏感词并隐藏照片，不改动磁盘原档）
               </span>
               {onDisableRedaction && (
-                <button data-studio-control="true"
+                <button {...buttonSkin(skins)} data-studio-control="true"
                   type="button"
                   onClick={onDisableRedaction}
                   className="rounded border border-purple-300/40 studio-ui-privacy-border bg-purple-950/60 studio-ui-privacy-surface px-2 py-0.5 text-[11px] font-medium text-purple-100 studio-ui-privacy hover:bg-purple-900 studio-ui-privacy-hover"
@@ -352,7 +355,7 @@ export function A4PreviewPane({
               {exportStatus.type !== 'error' && (canLogApplication || (exportStatus.filePath && desktop)) && (
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                   {canLogApplication && onOpenQuickLog && (
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                       type="button"
                       onClick={onOpenQuickLog}
                       className="inline-flex items-center gap-1 rounded border border-teal-300/60 studio-ui-selected-border bg-teal-600 studio-ui-fill px-2.5 py-0.5 font-semibold text-white studio-ui-on-fill hover:bg-teal-500 studio-ui-fill-hover"
@@ -362,14 +365,14 @@ export function A4PreviewPane({
                   )}
                   {exportStatus.filePath && desktop && (
                     <>
-                      <button data-studio-control="true"
+                      <button {...buttonSkin(skins)} data-studio-control="true"
                         type="button"
                         onClick={() => void apiClient.openFile(exportStatus.filePath!)}
                         className="inline-flex items-center gap-1 rounded border border-emerald-400/40 studio-ui-success-border bg-emerald-950/60 studio-ui-success-surface px-2 py-0.5 font-medium text-emerald-200 studio-ui-success hover:bg-emerald-900 studio-ui-success-hover"
                       >
                         <FileText size={12} /> 打开文件
                       </button>
-                      <button data-studio-control="true"
+                      <button {...buttonSkin(skins)} data-studio-control="true"
                         type="button"
                         onClick={() => void apiClient.showInFolder(exportStatus.filePath!)}
                         className="inline-flex items-center gap-1 rounded border border-emerald-400/40 studio-ui-success-border bg-emerald-950/60 studio-ui-success-surface px-2 py-0.5 font-medium text-emerald-200 studio-ui-success hover:bg-emerald-900 studio-ui-success-hover"

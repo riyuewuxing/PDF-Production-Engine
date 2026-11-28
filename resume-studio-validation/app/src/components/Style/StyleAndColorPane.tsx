@@ -1,3 +1,5 @@
+import { buttonSkin } from '../../studio-theme/componentSkins';
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
 import { Check, RefreshCw, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/apiClient';
@@ -110,6 +112,7 @@ export function StyleAndColorPane({
   onResetToDefault,
   onSwitchLocale,
 }: StyleAndColorPaneProps) {
+  const skins=useStudioComponentSkins();
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
   const [fontSourceNote, setFontSourceNote] = useState<string>('');
   const [loadingFonts, setLoadingFonts] = useState(false);
@@ -201,7 +204,7 @@ export function StyleAndColorPane({
           <div className="text-xs font-bold text-slate-900 studio-ui-primary">样式与排印引擎</div>
           <div className="text-[11px] text-slate-500 studio-ui-muted">配色、纸张、中文排印与本机字体覆盖</div>
         </div>
-        <button data-studio-control="true"
+        <button {...buttonSkin(skins)} data-studio-control="true"
           type="button"
           onClick={handleReset}
           title="将配色、纸张、字体与字号间距恢复到当前模板默认设定（支持 Ctrl+Z 撤回）"
@@ -377,7 +380,7 @@ export function StyleAndColorPane({
         <section className="space-y-2.5 border-t border-slate-100 studio-ui-divider pt-3">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-slate-800 studio-ui-primary">精选中文排印字体（8 套）</span>
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins)} data-studio-control="true"
               type="button"
               onClick={loadFonts}
               disabled={loadingFonts}

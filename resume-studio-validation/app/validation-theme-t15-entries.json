@@ -1,0 +1,276 @@
+{
+  "base": "1f2bcecaa065f8a1beb0c2af6f3ec9b0d519d7ef",
+  "scope": "reviewed native button actions, not selection controls; no CSS edits",
+  "files": [
+    {
+      "path": "App.tsx",
+      "baseBlob": "7c6c0c6825b4b37cbaeeb373acf3df4a46d72c40",
+      "entries": [
+        {
+          "line": 396,
+          "family": "button",
+          "role": "primary"
+        },
+        {
+          "line": 471,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 472,
+          "family": "button",
+          "role": "danger"
+        }
+      ]
+    },
+    {
+      "path": "components/Common/StudioHeader.tsx",
+      "baseBlob": "c20d1b334f36dddcc08a750f44d0fb00292168fc",
+      "entries": [
+        {
+          "line": 168,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 261,
+          "family": "button",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "components/Common/CommandPaletteModal.tsx",
+      "baseBlob": "3ae279ba432ccdf155ddeb5456e44ca63995ba64",
+      "entries": [
+        {
+          "line": 403,
+          "family": "icon",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "components/Editor/ResumeEditorPane.tsx",
+      "baseBlob": "223cbd496b1b241486536bfcfe1c8c23d45413fe",
+      "entries": [
+        {
+          "line": 194,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 208,
+          "family": "button",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "components/Editor/SectionItemsEditor.tsx",
+      "baseBlob": "4ad8707075047c68c1a6d0adda649152ec32197e",
+      "entries": [
+        {
+          "line": 99,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 106,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 169,
+          "family": "icon",
+          "role": "normal"
+        },
+        {
+          "line": 178,
+          "family": "icon",
+          "role": "normal"
+        },
+        {
+          "line": 187,
+          "family": "icon",
+          "role": "normal"
+        },
+        {
+          "line": 196,
+          "family": "icon",
+          "role": "normal"
+        },
+        {
+          "line": 205,
+          "family": "icon",
+          "role": "danger"
+        },
+        {
+          "line": 385,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 502,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 625,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 737,
+          "family": "button",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "components/Editor/PhotoCropModal.tsx",
+      "baseBlob": "a21c2d302dc7dab5f4d963089797529cd3878ea4",
+      "entries": [
+        {
+          "line": 242,
+          "family": "icon",
+          "role": "normal"
+        },
+        {
+          "line": 309,
+          "family": "icon",
+          "role": "normal"
+        },
+        {
+          "line": 415,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 425,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 432,
+          "family": "button",
+          "role": "primary"
+        }
+      ]
+    },
+    {
+      "path": "components/Preview/A4PreviewPane.tsx",
+      "baseBlob": "280300b62614ae42b069019c629438c536a65412",
+      "entries": [
+        {
+          "line": 276,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 291,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 313,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 355,
+          "family": "button",
+          "role": "primary"
+        },
+        {
+          "line": 365,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 372,
+          "family": "button",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "components/Style/StyleAndColorPane.tsx",
+      "baseBlob": "a137b33943d50f451b0dea9040bf689bb57a6e64",
+      "entries": [
+        {
+          "line": 204,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 380,
+          "family": "button",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "components/Templates/TemplateGallery.tsx",
+      "baseBlob": "40743b2ab10a751fa0a6fa46c023e94b52c4df37",
+      "entries": [
+        {
+          "line": 248,
+          "family": "button",
+          "role": "primary"
+        },
+        {
+          "line": 256,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 429,
+          "family": "button",
+          "role": "primary"
+        },
+        {
+          "line": 437,
+          "family": "icon",
+          "role": "normal"
+        }
+      ]
+    },
+    {
+      "path": "studio-theme/ComponentSkinWorkshop.tsx",
+      "baseBlob": "6f699e21e59ac4e16fa2ccca20e75437c824b9a4",
+      "entries": [
+        {
+          "line": 28,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 38,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 76,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 82,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 83,
+          "family": "button",
+          "role": "normal"
+        },
+        {
+          "line": 84,
+          "family": "button",
+          "role": "primary"
+        }
+      ]
+    }
+  ]
+}

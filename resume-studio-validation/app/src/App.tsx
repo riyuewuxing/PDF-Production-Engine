@@ -1,3 +1,4 @@
+import { buttonSkin } from './studio-theme/componentSkins';
 import {
   AlertCircle,
   BookOpen,
@@ -80,7 +81,7 @@ export default function App() {
 }
 
 function StudioApp() {
-  const { themeId, notice: themeNotice, selectTheme } = useStudioTheme();
+  const { themeId, notice: themeNotice, selectTheme, skins } = useStudioTheme();
   const [activeTab, setActiveTab] = useState<StudioNavTab>('edit');
   const [workspaceContext,setWorkspaceContext]=useState<{folder:string;restored:boolean}|null>(null);
   useEffect(()=>{let alive=true;void window.resumeDesktop?.workspaceBackup?.context?.().then(v=>{if(alive)setWorkspaceContext(v);}).catch(()=>{});return()=>{alive=false;};},[]);
@@ -393,7 +394,7 @@ function StudioApp() {
           <AlertCircle size={28} className="mx-auto text-red-400 studio-ui-error" />
           <h1 className="mt-3 text-base font-semibold">无法加载本地简历</h1>
           <p className="mt-1 text-sm text-slate-400 studio-ui-muted">{loadError ?? 'data/ 目录中暂无可用简历'}</p>
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true"
             type="button"
             disabled={versionTransitioning}
             onClick={() => void refreshListAndLoad()}
@@ -468,8 +469,8 @@ function StudioApp() {
         <div data-studio-region="save-error" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} data-studio-status="error" role="alert" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-300 bg-red-50 px-4 py-2 text-xs text-red-900">
           <div className="min-w-0 flex-1 break-words">{saveError || '保存失败。'} 当前编辑仍在内存中；可以先另存草稿，不会覆盖原简历。</div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <button data-studio-control="true" type="button" onClick={()=>void handleBackupDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 font-semibold studio-ui-surface studio-ui-primary studio-ui-error-border">另存未保存草稿</button>
-            <button data-studio-control="true" type="button" onClick={()=>void handleReloadDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 studio-ui-surface studio-ui-primary studio-ui-error-border">重载磁盘版本</button>
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>void handleBackupDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 font-semibold studio-ui-surface studio-ui-primary studio-ui-error-border">另存未保存草稿</button>
+            <button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" onClick={()=>void handleReloadDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 studio-ui-surface studio-ui-primary studio-ui-error-border">重载磁盘版本</button>
           </div>
         </div>
       )}

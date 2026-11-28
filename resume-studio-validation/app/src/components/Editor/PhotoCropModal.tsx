@@ -1,6 +1,7 @@
+import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import { Check, RotateCcw, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
+import {useStudioThemeId, useStudioComponentSkins} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import type { PhotoConfig } from '../../schema/resumeSchema';
 
@@ -65,6 +66,7 @@ export function PhotoCropModal({
   onConfirm: (result: CropOutputPayload) => Promise<void>;
 }) {
   const themeId=useStudioThemeId();
+  const skins=useStudioComponentSkins();
   const [srcUrl, setSrcUrl] = useState(initialSrc);
   const [preset, setPreset] = useState<CropPresetId>(() => {
     if (initialPhotoConfig.borderRadius === 'full') return 'circle';
@@ -239,7 +241,7 @@ export function PhotoCropModal({
             <h2 className="text-sm font-bold text-slate-900 studio-ui-primary">证件照裁剪与底色工作台</h2>
             <p className="text-[11px] text-slate-500 studio-ui-muted">画布内可按住拖动位置，滚轮或滑块缩放</p>
           </div>
-          <button data-studio-control="true"
+          <button {...iconSkin(skins)} data-studio-control="true"
             type="button"
             onClick={cancel}
             disabled={saving} aria-label="关闭证件照裁剪弹窗"
@@ -306,7 +308,7 @@ export function PhotoCropModal({
                 className="flex-1 accent-teal-600 studio-ui-accent"
               />
               <ZoomIn size={14} className="text-slate-500" />
-              <button data-studio-control="true"
+              <button {...iconSkin(skins)} data-studio-control="true"
                 type="button"
                 onClick={() => {
                   setZoom(1);
@@ -412,7 +414,7 @@ export function PhotoCropModal({
               onChange={handlePickFile}
               className="hidden"
             />
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins)} data-studio-control="true"
               type="button"
               onClick={() => filePickRef.current?.click()} disabled={saving}
               className="inline-flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-medium text-slate-700 hover:bg-slate-100 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
@@ -422,14 +424,14 @@ export function PhotoCropModal({
           </div>
 
           <div className="flex items-center gap-2">
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins)} data-studio-control="true"
               type="button"
               onClick={cancel} disabled={saving}
               className="rounded border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-100 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
             >
               取消
             </button>
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins,'primary')} data-studio-control="true"
               type="button"
               disabled={saving||!ready}
               onClick={() => void handleConfirm()}

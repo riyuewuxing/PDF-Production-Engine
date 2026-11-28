@@ -1,3 +1,5 @@
+import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
 import {
   Check,
   Maximize2,
@@ -123,6 +125,7 @@ function LiveThumbnailCard({
   onToggleFavorite: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const skins=useStudioComponentSkins();
   const [mounted, setMounted] = useState(
     () => typeof IntersectionObserver === 'undefined',
   );
@@ -245,7 +248,7 @@ function LiveThumbnailCard({
 
         {/* Glassmorphic hover/focus action overlay */}
         <div data-studio-region="gallery-card-actions" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-slate-950/60 opacity-0 backdrop-blur-[1.5px] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true"
             type="button"
             onClick={onSelect}
             className="inline-flex items-center gap-1.5 rounded-full bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-teal-400 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
@@ -253,7 +256,7 @@ function LiveThumbnailCard({
             <Check size={13} />
             一键应用
           </button>
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={onInspect}
             className="inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-slate-900/80 px-3.5 py-1.5 text-xs font-medium text-white shadow hover:bg-slate-800 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
@@ -299,6 +302,7 @@ function TemplateLightboxModal({
   onApply: (color: string) => void;
 }) {
   const [trialColor, setTrialColor] = useState(initialColor);
+  const skins=useStudioComponentSkins();
   const dialogRef = useRef<HTMLDivElement>(null);
   const TemplateComponent = meta.component;
 
@@ -426,7 +430,7 @@ function TemplateLightboxModal({
               ))}
             </div>
 
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins,'primary')} data-studio-control="true"
               type="button"
               onClick={() => onApply(trialColor)}
               className="inline-flex items-center gap-1.5 rounded-md bg-teal-600 studio-ui-fill px-3.5 py-1.5 text-xs font-semibold text-white studio-ui-on-fill hover:bg-teal-500 studio-ui-fill-hover"
@@ -434,7 +438,7 @@ function TemplateLightboxModal({
               <Check size={13} /> 应用此模板并开始编辑
             </button>
 
-            <button data-studio-control="true"
+            <button {...iconSkin(skins)} data-studio-control="true"
               type="button"
               onClick={onClose}
               aria-label="关闭大图对比"

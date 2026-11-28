@@ -191,7 +191,7 @@ export function ResumeEditorPane({
           <div className="text-xs font-bold text-slate-900 studio-ui-primary">内容编辑</div>
           <div className="text-[11px] text-slate-500 studio-ui-muted">拖动抓手排模块 · 点击右侧可跳转定位</div>
         </div>
-        <button data-studio-control="true"
+        <button {...buttonSkin(skins)} data-studio-control="true"
           type="button"
           onClick={() => emitDiscrete(applyCjkSpacingToDocument(document))}
           title="在中英文与数字间自动补充半角空格（跳过邮箱、URL、日期及不等式），支持 Ctrl+Z 撤销"
@@ -205,7 +205,7 @@ export function ResumeEditorPane({
         {!orderedSections.some(s => s.id === 'basic') && (
           <div className="rounded-lg border border-amber-200 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface p-3 text-xs text-slate-700 studio-ui-primary">
             <p className="mb-2">导入文档未包含基本信息模块，原有字段仍保留。恢复后只显示已启用的字段。</p>
-            <button data-studio-control="true" type="button" className="rounded border border-amber-300 studio-ui-warning-border bg-white studio-ui-surface px-2 py-1 font-medium hover:bg-amber-100 studio-ui-warning-hover"
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" className="rounded border border-amber-300 studio-ui-warning-border bg-white studio-ui-surface px-2 py-1 font-medium hover:bg-amber-100 studio-ui-warning-hover"
               onClick={() => {
                 updateSections([{id:'basic',title:'基本信息',icon:'User',enabled:true,order:0,pageBreakBefore:false},
                   ...orderedSections.map((s,index)=>({...s,order:index+1}))]);

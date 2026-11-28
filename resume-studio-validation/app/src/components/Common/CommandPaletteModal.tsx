@@ -1,3 +1,4 @@
+import { iconSkin } from '../../studio-theme/componentSkins';
 import {
   Command,
   FileDown,
@@ -12,7 +13,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ResumeSummary, TemplateId } from '../../schema/resumeSchema';
 import { TEMPLATE_REGISTRY } from '../../templates/registry';
 import { STUDIO_THEME_IDS, STUDIO_THEMES, type StudioThemeId } from '../../studio-theme/presets';
-import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
+import {useStudioThemeId, useStudioComponentSkins} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 
 export type StudioNavTab = 'edit' | 'templates' | 'style' | 'versions' | 'diagnose' | 'career';
@@ -70,6 +71,7 @@ export function CommandPaletteModal({
   onToggleLocale,
 }: CommandPaletteModalProps) {
   const contextThemeId=useStudioThemeId();
+  const skins=useStudioComponentSkins();
   const themeId=activeStudioTheme??contextThemeId;
   const [query, setQuery] = useState('');
   const [highlightedIdx, setHighlightedIdx] = useState(0);
@@ -400,7 +402,7 @@ export function CommandPaletteModal({
             aria-label="搜索命令、模板与版本"
             className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none studio-ui-primary"
           />
-          <button data-studio-control="true"
+          <button {...iconSkin(skins)} data-studio-control="true"
             type="button"
             onClick={onClose}
             aria-label="关闭命令面板"
