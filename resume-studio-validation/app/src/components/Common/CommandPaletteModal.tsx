@@ -1,4 +1,4 @@
-import { iconSkin } from '../../studio-theme/componentSkins';
+import { iconSkin, fieldSkin } from '../../studio-theme/componentSkins';
 import {
   Command,
   FileDown,
@@ -357,7 +357,7 @@ export function CommandPaletteModal({
       >
         <div className="flex shrink-0 items-center gap-2.5 border-b border-slate-800 px-4 py-3 studio-ui-border">
           <Search size={16} className="shrink-0 text-teal-400 studio-ui-info" />
-          <input data-studio-control="true"
+          <input {...fieldSkin(skins,'text')} data-studio-control="true"
             type="text"
             ref={searchRef}
             data-native-undo="true"

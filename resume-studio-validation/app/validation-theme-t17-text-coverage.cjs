@@ -51,6 +51,19 @@ async function run(){
  for(const [index,v] of variants.entries()){
   const m=variants[(index+1)%variants.length],row={text:v,multiline:m,fields:[],checks:{}};
   await choose(v,m);row.fields.push(await readField(field,'text',v));
+  const cmd='[aria-label="搜索命令、模板与版本"]',search='[aria-label="搜索模板"]';
+  await hit(await point('button[aria-label="打开命令面板"]'));
+  row.fields.push(await readField(cmd,'text',v));
+  await hit(await point(cmd));win.webContents.insertText('zzqsyntheticnomatch');
+  await until('command typed',()=>js(s=>document.querySelector(s)?.value==='zzqsyntheticnomatch',cmd));
+  await until('command filters',()=>js(()=>!document.querySelector('[aria-label="匹配命令列表"] [role="option"]')));
+  await capture(v+'-command-search',cmd);await press('Escape');await until('command closes',()=>js(s=>!document.querySelector(s),cmd));
+  const gallery=await js(()=>{const b=[...document.querySelectorAll('nav[aria-label="主导航"] button')].find(e=>e.innerText.trim().startsWith('模板库'));return b?.innerText.trim()});
+  assert(gallery);await nav(gallery);row.fields.push(await readField(search,'text',v));
+  await hit(await point(search));win.webContents.insertText('zzqsyntheticnomatch');
+  await until('gallery filters',()=>js(s=>document.querySelector(s)?.value==='zzqsyntheticnomatch'&&document.body.innerText.includes('未找到匹配'),search));
+  await capture(v+'-gallery-search',search);
+  await nav('内容编辑');row.checks.nativeSearch=true;
   await nav('版本母库');await click('重命名');const rename='[aria-label="版本标题"]';
   row.fields.push(await readField(rename,'text',v));await capture(v+'-version-rename',rename);await press('Escape');
   await until('rename canceled',()=>js(s=>!document.querySelector(s),rename));
@@ -97,6 +110,6 @@ async function run(){
  await nav('求职面试');await hit(await point('button[aria-label="岗位队列"]'));
  assert.equal((await state(queueCompany)).variant,null);assert.equal((await state(queueJD)).variant,'inset');
  assert.equal(await source(),before);assert.equal(report.external,0);
- report.checks={distinctPairings:true,independentRestore:true,nativeQueueText:true,documentIsolation:true,secretExcluded:true,importCancel:true,compactNative:true,noExternalNetwork:true};report.complete=true;write();
+ report.checks={distinctPairings:true,nativeSearch:true,independentRestore:true,nativeQueueText:true,documentIsolation:true,secretExcluded:true,importCancel:true,compactNative:true,noExternalNetwork:true};report.complete=true;write();
 }
 app.whenReady().then(run).then(()=>{clearTimeout(watchdog);app.exit(0)}).catch(e=>{clearTimeout(watchdog);report.error=String(e.message||e);write();console.error(report.error);app.exit(1)});

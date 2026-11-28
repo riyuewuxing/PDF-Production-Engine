@@ -1,4 +1,4 @@
-import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { buttonSkin, iconSkin, fieldSkin } from '../../studio-theme/componentSkins';
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
 import {
   Check,
@@ -467,6 +467,7 @@ export function TemplateGallery({
   activeDocument,
   onSelectTemplate,
 }: TemplateGalleryProps) {
+  const skins=useStudioComponentSkins();
   const [category, setCategory] = useState<GalleryTabId>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewMode, setPreviewMode] = useState<'mine' | 'sample'>('mine');
@@ -535,7 +536,7 @@ export function TemplateGallery({
         <div className="flex flex-wrap items-center gap-2.5 text-[11px]">
           <label className="relative flex items-center">
             <Search size={12} className="pointer-events-none absolute left-2.5 text-slate-400 studio-ui-muted" />
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="search"
               data-native-undo="true"
               aria-label="搜索模板"
