@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useEffect,useRef,useState} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
@@ -77,7 +77,7 @@ export function AiLayoutPane(props:Props){
   return <section aria-label="AI 版式优化" className="space-y-3 rounded-lg border border-teal-200 bg-white p-3 text-[11px] text-slate-800 studio-ui-info-border studio-ui-surface studio-ui-primary">
     <div className="font-bold text-teal-900 studio-ui-info">AI 版式优化 · {LAYOUT_SKILL_VERSION}</div>
     <p>只发送目标、当前七项排版参数、模板 ID 与画布测量。默认禁止切换模板，不发送正文、照片、联系方式或本地 PDF。</p>
-    <label className="block">版式目标<textarea data-studio-control="true" aria-label="AI 版式目标" disabled={locked} value={goal} onChange={e=>{setGoal(e.target.value);clear();}} rows={3} placeholder="例如：在不缩小正文到难以阅读的情况下，尽量压到一页。" className="mt-1 w-full rounded border p-2 studio-ui-border"/></label>
+    <label className="block">版式目标<textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="AI 版式目标" disabled={locked} value={goal} onChange={e=>{setGoal(e.target.value);clear();}} rows={3} placeholder="例如：在不缩小正文到难以阅读的情况下，尽量压到一页。" className="mt-1 w-full rounded border p-2 studio-ui-border"/></label>
     <label className="flex gap-2"><input data-studio-control="true" type="checkbox" disabled={locked} checked={allowTemplate} onChange={e=>{setAllowTemplate(e.target.checked);clear();}}/>允许从现有模板中选择其他模板（默认关闭）</label>
     <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked||!goal.trim()} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">预览版式请求</button>
     {busy&&<div className="flex items-center justify-between"><span>{busy==='model'?'模型处理中…':busy==='render'?'正在本地渲染两份 PDF…':'正在创建快照并应用…'}</span>{busy!=='apply'&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>ctrl.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消版式任务</button>}</div>}
