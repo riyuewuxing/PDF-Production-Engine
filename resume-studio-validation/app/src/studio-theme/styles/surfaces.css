@@ -18,6 +18,7 @@
     & .studio-ui-muted { color: var(--studio-muted); }
     & .studio-ui-border { border-color: var(--studio-border); }
     & .studio-ui-divider { border-color: var(--studio-divider); }
+    & .studio-ui-divide > :not(:last-child) { border-color: var(--studio-divider); }
     & .studio-ui-hover:hover:not(:disabled) { background-color: var(--studio-hover); }
     & .studio-ui-hover-primary:hover:not(:disabled) { color: var(--studio-text); }
     & .studio-ui-hover-border:hover:not(:disabled) { border-color: var(--studio-focus); }
@@ -75,7 +76,7 @@
   /* These are business chrome and raster-image review surfaces, not a live A4.
      Native scrollbar colors inherit within each explicit region; geometry is untouched.
      The classic palette and OS forced-colors remain authoritative. */
-  :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+  :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"], [data-studio-region="version-compare-dialog"], [data-studio-region="master-merge-dialog"], [data-studio-region="resume-import-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) {
     scrollbar-color: var(--studio-border) var(--studio-surface);
   }
 
@@ -85,7 +86,7 @@
   [data-studio-stage="themed"] [data-studio-stage-label="true"] { color: var(--studio-stage-label); }
 
   @media (forced-colors: active) {
-    :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+    :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"], [data-studio-region="version-compare-dialog"], [data-studio-region="master-merge-dialog"], [data-studio-region="resume-import-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) {
       scrollbar-color: auto;
     }
     :is([data-studio-surface="panel"], [data-studio-surface="preview"], [data-studio-surface="gallery"]) [data-studio-control]:focus-visible {
