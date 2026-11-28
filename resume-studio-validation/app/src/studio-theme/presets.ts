@@ -1,8 +1,5 @@
-/**
- * P1 pilot: only these four presets are selectable until their real surfaces
- * are migrated. A preset in this registry is not a full-theme acceptance claim.
- */
-export const STUDIO_THEME_IDS = ['classic', 'dark', 'light', 'warm'] as const;
+/** P2 candidate presets. Registration is not full-theme acceptance; real scene coverage is tracked separately. */
+export const STUDIO_THEME_IDS = ['classic', 'dark', 'light', 'warm', 'graphite', 'obsidian', 'ocean', 'porcelain'] as const;
 export type StudioThemeId = typeof STUDIO_THEME_IDS[number];
 export const DEFAULT_STUDIO_THEME: StudioThemeId = 'classic';
 export function isStudioThemeId(value: unknown): value is StudioThemeId {
@@ -39,11 +36,20 @@ export interface ChromeTokens {
   privacyBorder: string;
   info: string;
 }
+export interface PreviewStageTokens {
+  scheme: 'light' | 'dark';
+  background: string;
+  label: string;
+}
 export interface StudioThemePreset {
   id: StudioThemeId;
   label: string;
   header: ChromeTokens;
   nav: ChromeTokens;
+  panel: ChromeTokens;
+  preview: ChromeTokens;
+  gallery: ChromeTokens;
+  stage: PreviewStageTokens;
 }
 
 const classic: ChromeTokens = {
@@ -80,11 +86,62 @@ const warm: ChromeTokens = {
   errorFill: '#fee2e2', onError: '#991b1b', privacyFill: '#6b21a8',
   privacyHover: '#581c87', onPrivacy: '#ffffff', privacyBorder: '#6b21a8', info: '#1e40af',
 };
+// Each preset owns every workbench zone; new dark IDs must never fall
+// through a conditional to a white panel. Document colors are not tokens here.
+const graphite: ChromeTokens = {
+  ...dark, surface: '#18181b', field: '#202024', raised: '#29292e',
+  overlay: '#232326', hover: '#36363c', text: '#fafafa', muted: '#d4d4d8',
+  border: '#85858e', divider: '#44444c', accentText: '#d4d4d8',
+  accentFill: '#52525b', accentHover: '#3f3f46', selected: '#35353b',
+  selectedText: '#fafafa', selectedBorder: '#a1a1aa', focus: '#d4d4d8',
+};
+const obsidian: ChromeTokens = {
+  ...dark, surface: '#11100f', field: '#191714', raised: '#28231d',
+  overlay: '#211d18', hover: '#352d23', text: '#f5f1e9', muted: '#ded4c3',
+  border: '#93846d', divider: '#4c4132', accentText: '#e7c27b',
+  accentFill: '#785416', accentHover: '#604115', selected: '#3d2c15',
+  selectedText: '#ffe4ad', selectedBorder: '#d4a853', focus: '#e7c27b',
+};
+const ocean: ChromeTokens = {
+  ...dark, surface: '#0d2436', field: '#102b40', raised: '#17354b',
+  overlay: '#1a3b54', hover: '#24465c', text: '#eaf6fc', muted: '#c5deed',
+  border: '#8098ac', divider: '#39576b', accentText: '#a4d2ff',
+  accentFill: '#1e40af', accentHover: '#1e3a8a', selected: '#193c60',
+  selectedText: '#d1e8ff', selectedBorder: '#7db8ff', focus: '#a4d2ff',
+};
+const porcelain: ChromeTokens = {
+  ...light, surface: '#e6edf4', field: '#f6f9fc', raised: '#e2eaf2',
+  overlay: '#f6f9fc', hover: '#d5dfeb', text: '#183248', muted: '#40566c',
+  border: '#667b90', divider: '#b8c7d7', accentText: '#1c4c80',
+  accentFill: '#20518b', accentHover: '#193f6e', selected: '#d3e4f5',
+  selectedText: '#183b62', selectedBorder: '#2563a6', focus: '#2563a6',
+};
+const withSurface = (palette: ChromeTokens, surface: string): ChromeTokens => ({ ...palette, surface });
 export const STUDIO_THEMES: Readonly<Record<StudioThemeId, StudioThemePreset>> = {
-  classic: { id: 'classic', label: '经典双拼', header: classic, nav: {...classic, surface: '#0d1118'} },
-  dark: { id: 'dark', label: '沉浸暗夜', header: dark, nav: {...dark, surface: '#080d1a'} },
-  light: { id: 'light', label: '极简晴白', header: light, nav: {...light, surface: '#f8fafc'} },
-  warm: { id: 'warm', label: '温润羊皮', header: warm, nav: {...warm, surface: '#efe8d8'} },
+  classic: { id: 'classic', label: '经典双拼', header: classic, nav: withSurface(classic, '#0d1118'),
+    panel: withSurface(light, '#ffffff'), preview: classic, gallery: withSurface(classic, '#141922'),
+    stage: { scheme: 'dark', background: '#181d27', label: '#cbd5e1' } },
+  dark: { id: 'dark', label: '沉浸暗夜', header: dark, nav: withSurface(dark, '#080d1a'),
+    panel: withSurface(dark, '#111827'), preview: withSurface(dark, '#182234'), gallery: dark,
+    stage: { scheme: 'dark', background: '#0b0f17', label: '#cbd5e1' } },
+  light: { id: 'light', label: '极简晴白', header: light, nav: withSurface(light, '#f8fafc'),
+    panel: light, preview: light, gallery: withSurface(light, '#f8fafc'),
+    stage: { scheme: 'light', background: '#e2e8f0', label: '#475569' } },
+  warm: { id: 'warm', label: '温润羊皮', header: warm, nav: withSurface(warm, '#efe8d8'),
+    panel: withSurface(warm, '#fbf7ee'), preview: warm, gallery: warm,
+    stage: { scheme: 'light', background: '#e6dfd0', label: '#57534e' } },
+  graphite: { id: 'graphite', label: '石墨专业', header: graphite, nav: withSurface(graphite, '#141417'),
+    panel: withSurface(graphite, '#232326'), preview: withSurface(graphite, '#202024'), gallery: graphite,
+    stage: { scheme: 'dark', background: '#101012', label: '#d4d4d8' } },
+  obsidian: { id: 'obsidian', label: '黑金', header: obsidian, nav: withSurface(obsidian, '#0c0a09'),
+    panel: withSurface(obsidian, '#1c1917'), preview: withSurface(obsidian, '#211d18'), gallery: obsidian,
+    stage: { scheme: 'dark', background: '#0c0a09', label: '#ded4c3' } },
+  ocean: { id: 'ocean', label: '深海蓝', header: ocean, nav: withSurface(ocean, '#0a1c2a'),
+    panel: withSurface(ocean, '#17354b'), preview: withSurface(ocean, '#102b40'), gallery: ocean,
+    stage: { scheme: 'dark', background: '#0a1c2a', label: '#c5deed' } },
+  porcelain: { id: 'porcelain', label: '雾蓝瓷白', header: porcelain, nav: withSurface(porcelain, '#e0e8f0'),
+    panel: withSurface(porcelain, '#f6f9fc'), preview: withSurface(porcelain, '#e2eaf2'), gallery: porcelain,
+    stage: { scheme: 'light', background: '#d5dfe9', label: '#40566c' } },
 };
 
 export function resolveChromeTokens(id: unknown, zone: 'header' | 'nav'): ChromeTokens {

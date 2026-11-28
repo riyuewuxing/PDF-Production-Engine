@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { DEFAULT_STUDIO_THEME, isStudioThemeId, resolveChromeTokens, type ChromeTokens, type StudioThemeId } from './presets';
+import { DEFAULT_STUDIO_THEME, isStudioThemeId, STUDIO_THEMES, type ChromeTokens, type StudioThemeId, type PreviewStageTokens } from './presets';
 
 export type StudioSurfaceZone = 'panel' | 'preview' | 'gallery';
 export type PreviewBacking = 'follow' | 'dark' | 'light';
@@ -26,14 +26,11 @@ const lightStatus = {
 
 export function resolveSurfaceTokens(value: unknown, zone: StudioSurfaceZone): StudioSurfaceTokens {
   const id: StudioThemeId = isStudioThemeId(value) ? value : DEFAULT_STUDIO_THEME;
-  // Classic's old utility classes remain authoritative. Explicit panel tokens
-  // describe the intended light region, not a dark header inherited by a field.
-  const palette = resolveChromeTokens(id === 'classic' && zone === 'panel' ? 'light' : id, 'header');
+  // Every accepted ID has explicit per-zone tokens. Classic retains its
+  // existing split palette, and status colors remain semantic, not decorative.
+  const palette = STUDIO_THEMES[id][zone];
   const status = palette.scheme === 'dark' ? darkStatus : lightStatus;
-  const panelSurface = id === 'dark' ? '#111827' : id === 'warm' ? '#fbf7ee' : '#ffffff';
-  const previewSurface = id === 'dark' ? '#182234' : id === 'warm' ? '#f4eee1' : palette.surface;
-  const gallerySurface = id === 'classic' ? '#141922' : id === 'dark' ? '#0b1120' : id === 'warm' ? '#f4eee1' : '#f8fafc';
-  return { ...palette, ...status, surface: zone === 'panel' ? panelSurface : zone === 'gallery' ? gallerySurface : previewSurface };
+  return { ...palette, ...status };
 }
 
 export function surfaceStyle(id: unknown, zone: StudioSurfaceZone): CSSProperties {
@@ -44,24 +41,14 @@ export function surfaceStyle(id: unknown, zone: StudioSurfaceZone): CSSPropertie
   return result as CSSProperties;
 }
 
-export interface ResolvedPreviewBacking {
-  scheme: 'light' | 'dark';
-  background: string;
-  label: string;
-}
+export type ResolvedPreviewBacking = PreviewStageTokens;
 const defaultDark: ResolvedPreviewBacking = { scheme: 'dark', background: '#181d27', label: '#cbd5e1' };
 const defaultLight: ResolvedPreviewBacking = { scheme: 'light', background: '#e2e8f0', label: '#475569' };
-const backingByTheme: Readonly<Record<StudioThemeId, ResolvedPreviewBacking>> = {
-  classic: defaultDark,
-  dark: { scheme: 'dark', background: '#0b0f17', label: '#cbd5e1' },
-  light: defaultLight,
-  warm: { scheme: 'light', background: '#e6dfd0', label: '#57534e' },
-};
 
 export function resolvePreviewBacking(id: unknown, override: PreviewBacking): ResolvedPreviewBacking {
   if (override === 'dark') return defaultDark;
   if (override === 'light') return defaultLight;
-  return backingByTheme[isStudioThemeId(id) ? id : DEFAULT_STUDIO_THEME];
+  return STUDIO_THEMES[isStudioThemeId(id) ? id : DEFAULT_STUDIO_THEME].stage;
 }
 
 /** Only these two custom properties may cross the stage ancestor.

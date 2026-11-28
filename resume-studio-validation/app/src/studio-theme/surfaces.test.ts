@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STUDIO_THEME_IDS } from './presets';
+import { STUDIO_THEME_IDS, STUDIO_THEMES } from './presets';
 import { resolveSurfaceTokens, resolvePreviewBacking, surfaceStyle, stageStyle, type PreviewBacking } from './surfaces';
 
 function luminance(hex: string) {
@@ -90,5 +90,36 @@ describe('Gallery chrome is independent of paper', () => {
     const css = surfaceStyle(id, 'gallery');
     expect(Object.keys(css).every(k => k.startsWith('--studio-'))).toBe(true);
     for (const key of ['color','colorScheme','fontFamily','filter','transform','opacity','zoom']) expect(css).not.toHaveProperty(key);
+  });
+});
+
+describe('P2 explicit zone registry — candidate, not completed visual presets', () => {
+  it.each([
+    ['graphite', '#232326', '#202024', '#18181b', '#101012', 'dark'],
+    ['obsidian', '#1c1917', '#211d18', '#11100f', '#0c0a09', 'dark'],
+    ['ocean', '#17354b', '#102b40', '#0d2436', '#0a1c2a', 'dark'],
+    ['porcelain', '#f6f9fc', '#e2eaf2', '#e6edf4', '#d5dfe9', 'light'],
+  ] as const)('does not fall back for %s', (id, panel, preview, gallery, stage, scheme) => {
+    expect(resolveSurfaceTokens(id, 'panel').surface).toBe(panel);
+    expect(resolveSurfaceTokens(id, 'preview').surface).toBe(preview);
+    expect(resolveSurfaceTokens(id, 'gallery').surface).toBe(gallery);
+    expect(resolvePreviewBacking(id, 'follow').background).toBe(stage);
+    for (const zone of ['header','nav','panel','preview','gallery'] as const) {
+      expect(STUDIO_THEMES[id][zone].scheme).toBe(scheme);
+      expect(contrast(STUDIO_THEMES[id][zone].text, STUDIO_THEMES[id][zone].surface)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+  it('retains exact pilot region surface/backing choices', () => {
+    for (const [id, panel, preview, gallery, stage] of [
+      ['classic','#ffffff','#11161f','#141922','#181d27'],
+      ['dark','#111827','#182234','#0b1120','#0b0f17'],
+      ['light','#ffffff','#ffffff','#f8fafc','#e2e8f0'],
+      ['warm','#fbf7ee','#f4eee1','#f4eee1','#e6dfd0'],
+    ] as const) {
+      expect(resolveSurfaceTokens(id,'panel').surface).toBe(panel);
+      expect(resolveSurfaceTokens(id,'preview').surface).toBe(preview);
+      expect(resolveSurfaceTokens(id,'gallery').surface).toBe(gallery);
+      expect(resolvePreviewBacking(id,'follow').background).toBe(stage);
+    }
   });
 });
