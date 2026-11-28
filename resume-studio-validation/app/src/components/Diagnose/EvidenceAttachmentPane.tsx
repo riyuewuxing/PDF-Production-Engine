@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useEffect,useRef,useState} from 'react';
 import type {FactRecord} from '../../schema/factBankSchema';
 import type {EvidenceEntry,EvidenceIndex,EvidenceIntegrity,EvidenceVaultAudit} from '../../schema/evidenceSchema';
@@ -93,7 +93,7 @@ export function EvidenceAttachmentPane(props:Props){
     {notice&&<div role="status" className="text-teal-800 studio-ui-info">{notice}</div>}
     {index&&<>
       <div className="text-slate-600 studio-ui-muted">有效关联 {rows.filter(e=>e.status==='attached').length} · 历史 {rows.filter(e=>e.status!=='attached').length} · 本地索引 {index.entries.length}/{MAX_EVIDENCE_RECORDS}</div>
-      <label className="block">搜索附件<input data-studio-control="true" aria-label="搜索证据附件" value={query} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded border p-1.5 studio-ui-border" placeholder="名称、来源说明、格式、SHA-256"/></label>
+      <label className="block">搜索附件<input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="搜索证据附件" value={query} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded border p-1.5 studio-ui-border" placeholder="名称、来源说明、格式、SHA-256"/></label>
       <div aria-label="本地附件列表" className="max-h-64 space-y-2 overflow-auto">
         {!shown.length&&<p>没有匹配的附件记录。</p>}
         {shown.map(e=><div key={e.id} className="space-y-1 rounded border bg-white p-2 studio-ui-surface studio-ui-border">
@@ -114,7 +114,7 @@ export function EvidenceAttachmentPane(props:Props){
       {canAttach?<div className="space-y-2 rounded border bg-white p-2 studio-ui-surface studio-ui-border">
         <div className="font-semibold">关联新的本地文件</div>
         <p>支持 PDF、PNG、JPG、UTF-8 TXT；单文件 {MAX_EVIDENCE_FILE_BYTES/1048576} MB，目录最多 {MAX_EVIDENCE_VAULT_BYTES/1048576} MB。只复制明确选择的文件，不扫描目录、不自动打开附件。</p>
-        <label className="block">来源说明（可选）<textarea data-studio-control="true" aria-label="附件来源说明" disabled={locked} rows={2} maxLength={500} value={note} onChange={e=>{setNote(e.target.value);setConsent(false);}} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
+        <label className="block">来源说明（可选）<textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="附件来源说明" disabled={locked} rows={2} maxLength={500} value={note} onChange={e=>{setNote(e.target.value);setConsent(false);}} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={locked} checked={consent} onChange={e=>setConsent(e.target.checked)}/>我确认将选择的附件复制到本地并关联该事实，不允许自动外发</label>
         <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked||!consent||audit?.indexMissingWithFiles===true||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">选择文件并关联证据</button>
       </div>:<p className="text-slate-600 studio-ui-muted">只有当前版本的有效原始事实可新增附件；历史或其他版本记录仍可本地追溯。</p>}
