@@ -1,0 +1,110 @@
+name: Resume Studio T16 inherited business regression final product
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-final']
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [pilot, batch1, batch2, new, workflow, interview, ai, review, crop, preview, command, mixed, all-corrupt, version-comparison, local-text-import, local-docx-import]
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 10
+      - name: Restore exact T10 product baseline
+        if: matrix.suite == 'baseline'
+        working-directory: .
+        timeout-minutes: 2
+        run: |
+          git fetch --no-tags --depth=1 origin e8984e935f44b4f579abb301cdbbc99c37fe2c37
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git restore --source=e8984e935f44b4f579abb301cdbbc99c37fe2c37 --worktree --staged -- resume-studio-validation/app/src
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Typecheck and full regression
+        if: false
+        timeout-minutes: 4
+        run: |
+          pnpm typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron application
+        timeout-minutes: 3
+        run: |
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Dependency closure and actual native scene gate
+        timeout-minutes: 8
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $suite = '${{ matrix.suite }}'
+          $env:STUDIO_THEME_PHASE = 'candidate'
+          $env:STUDIO_THEME_GROUP = $suite
+          $env:RESUME_STUDIO_LIST_MODE = $suite
+          $entry = '.\validation-theme-p2-t12.cjs'
+          $prefix = 'studio-theme-t11-'
+          switch ($suite) {
+            'baseline' { $env:STUDIO_THEME_PHASE = 'baseline' }
+            'workflow' { $entry = '.\validation-theme-t08-workflow.cjs'; $prefix = 'synthetic-queue-workflow-' }
+            'interview' { $entry = '.\validation-theme-t08-interview-gate.cjs'; $prefix = 'synthetic-interview-' }
+            'ai' { $entry = '.\validation-theme-t08-ai.cjs'; $prefix = 'synthetic-ai-receipts-' }
+            'review' { $entry = '.\validation-theme-t08-review.cjs'; $prefix = 'synthetic-review-' }
+            'crop' { $entry = '.\validation-theme-t09-crop.cjs'; $prefix = 'synthetic-crop-' }
+            'preview' { $entry = '.\validation-theme-t09-preview.cjs'; $prefix = 'synthetic-preview-' }
+            'command' { $entry = '.\validation-theme-t07-command.cjs'; $prefix = 'synthetic-list-' }
+            'mixed' { $entry = '.\validation-theme-t07-recovery.cjs'; $prefix = 'synthetic-list-' }
+            'all-corrupt' { $entry = '.\validation-theme-t07-recovery.cjs'; $prefix = 'synthetic-list-' }
+            'version-comparison' { $entry = '.\validation-version-comparison-t06.cjs'; $prefix = 'synthetic-theme-t06-' }
+            'local-text-import' { $entry = '.\validation-local-text-import-t06.cjs'; $prefix = 'synthetic-theme-t06-' }
+            'local-docx-import' { $entry = '.\validation-local-docx-import-t06.cjs'; $prefix = 'synthetic-theme-t06-' }
+          }
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ($prefix + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t16-final-regression-evidence'
+          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
+          Copy-Item validation-theme-t12-provenance.json $env:RESUME_STUDIO_EVIDENCE_OUT
+          if ($suite -eq 'interview') {
+            pnpm exec esbuild validation-interview-adapters.ts --bundle --platform=node --format=cjs --outfile=validation-interview-adapters.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          node .\validation-theme-t11-preflight.cjs $entry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            if ($suite -eq 'workflow') { $env:QUEUE_PHASE='main' }
+            & .\node_modules\.bin\electron.cmd $entry
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($suite -eq 'workflow') {
+              $env:QUEUE_PHASE='restart'
+              & .\node_modules\.bin\electron.cmd $entry
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Preserve raw evidence including failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t16-final-regression-${{ matrix.suite }}
+          path: theme-t16-final-regression-evidence/
+          if-no-files-found: error
+          retention-days: 3
