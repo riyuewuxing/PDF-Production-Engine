@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
@@ -180,10 +180,10 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
       <h4 className="font-semibold">登记新岗位</h4>
       <p className="break-words text-[11px] text-slate-600 studio-ui-muted">当前简历：{activeDoc.title} · {activeSlug}。未确认表单离开此页不保存。</p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <label className="space-y-1">单位<input data-studio-control="true" aria-label="队列单位" className={field} value={company} disabled={locked||!!candidate} onChange={e=>setCompany(e.target.value)}/></label>
-        <label className="space-y-1">岗位<input data-studio-control="true" aria-label="队列岗位" className={field} value={role} disabled={locked||!!candidate} onChange={e=>setRole(e.target.value)}/></label>
+        <label className="space-y-1">单位<input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="队列单位" className={field} value={company} disabled={locked||!!candidate} onChange={e=>setCompany(e.target.value)}/></label>
+        <label className="space-y-1">岗位<input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="队列岗位" className={field} value={role} disabled={locked||!!candidate} onChange={e=>setRole(e.target.value)}/></label>
       </div>
-      <label className="block space-y-1">岗位原文（保留输入原样）<textarea data-studio-control="true" aria-label="队列岗位原文" className={field+' min-h-28 resize-y'} value={jd} disabled={locked||!!candidate} onChange={e=>setJd(e.target.value)}/></label>
+      <label className="block space-y-1">岗位原文（保留输入原样）<textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="队列岗位原文" className={field+' min-h-28 resize-y'} value={jd} disabled={locked||!!candidate} onChange={e=>setJd(e.target.value)}/></label>
       <p className="text-[10px] text-slate-500 studio-ui-muted">{jd.length}/{MAX_JOB_QUEUE_JD_CHARS} 字</p>
       {!candidate&&<button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={button} disabled={locked||tasks.length>=MAX_JOB_QUEUE_TASKS} onClick={()=>void prepare()}>核对任务绑定</button>}
       {candidate&&<div role="region" aria-label="确认岗位任务绑定" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">
