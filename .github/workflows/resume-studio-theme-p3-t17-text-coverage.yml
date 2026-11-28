@@ -1,15 +1,15 @@
-name: T18 secret and numeric native verification
+name: T18 integrated native range and export verification
 on:
   pull_request:
-    branches: ['resume-studio/theme-p3-t17-text-search']
+    branches: ['resume-studio/theme-p3-t18-secret-number']
     types: [opened, synchronize, reopened]
 permissions:
   contents: read
 jobs:
   native:
-    if: github.event.pull_request.head.ref == 'resume-studio/theme-p3-t18-secret-number' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.ref == 'resume-studio/theme-p3-t18-field-integration' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -45,34 +45,18 @@ jobs:
       - name: Build
         timeout-minutes: 3
         run: pnpm desktop:build
-      - name: T17 native regression and screenshot gate
-        timeout-minutes: 7
-        run: |
-          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
-          $env:T17_THEME = '${{ matrix.theme }}'
-          $env:T17_EXPECTED_SHA = '${{ github.event.pull_request.head.sha }}'
-          if ((git rev-parse HEAD).Trim() -ne $env:T17_EXPECTED_SHA) { throw 'Candidate checkout mismatch' }
-          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t17-text-' + [guid]::NewGuid().ToString())
-          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't17-text-coverage'
-          New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
-          try {
-            & .\node_modules\.bin\electron.cmd .\validation-theme-t17-text-coverage.cjs
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          } finally {
-            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
-          }
-      - name: T18 native masked and numeric input gate
+      - name: T18 native range, mixed preference, and real export gate
         timeout-minutes: 7
         run: |
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $env:T18_THEME = '${{ matrix.theme }}'
           $env:T18_EXPECTED_SHA = '${{ github.event.pull_request.head.sha }}'
           if ((git rev-parse HEAD).Trim() -ne $env:T18_EXPECTED_SHA) { throw 'Candidate checkout mismatch' }
-          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t18-fields-' + [guid]::NewGuid().ToString())
-          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't18-secret-number'
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t18-integration-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 't18-field-integration'
           New-Item -ItemType Directory -Force -Path $env:RESUME_STUDIO_EVIDENCE_OUT | Out-Null
           try {
-            & .\node_modules\.bin\electron.cmd .\validation-theme-t18-secret-number.cjs
+            & .\node_modules\.bin\electron.cmd .\validation-theme-t18-field-integration.cjs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           } finally {
             Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
@@ -80,9 +64,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: t18-fields-${{ matrix.theme }}
-          path: |
-            t17-text-coverage/
-            t18-secret-number/
+          name: t18-integration-${{ matrix.theme }}
+          path: t18-field-integration/
           if-no-files-found: warn
           retention-days: 3
