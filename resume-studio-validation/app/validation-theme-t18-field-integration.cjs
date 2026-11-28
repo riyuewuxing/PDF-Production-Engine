@@ -49,6 +49,34 @@ async function nativeNumber(selector,typed,expected){
  await until('native number '+selector,async()=>(await state(selector))?.value===String(expected));
 }
 const validity=s=>js(s=>{const e=document.querySelector(s);return {type:e.type,value:e.value,valid:e.validity.valid,under:e.validity.rangeUnderflow,over:e.validity.rangeOverflow,step:e.validity.stepMismatch}},s);
+const invalidAppearance=s=>js(s=>{
+ const e=document.querySelector(s),c=getComputedStyle(e),probe=document.createElement('span');
+ probe.style.cssText='display:none;color:var(--studio-error)';e.parentElement.appendChild(probe);
+ const errorColor=getComputedStyle(probe).color;probe.remove();
+ return {type:e.type,valid:e.validity.valid,disabled:e.disabled,readOnly:e.readOnly,borderStyle:c.borderTopStyle,borderColor:c.borderTopColor,errorColor,image:c.backgroundImage,shadow:c.boxShadow,outline:c.outlineStyle,forced:matchMedia('(forced-colors: active)').matches,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height};
+},s);
+async function requireInvalid(s,forced=false){
+ const a=await invalidAppearance(s);assert.equal(a.type,'number');assert.equal(a.valid,false);assert.equal(a.disabled,false);assert.equal(a.readOnly,false);
+ assert.equal(a.forced,forced);assert.equal(a.borderStyle,'dashed');assert.equal(a.image,'none');
+ if(forced)assert.equal(a.shadow,'none');else assert.equal(a.borderColor,a.errorColor);
+ return a;
+}
+async function checkAllInvalidVariants(){
+ const original=await prefs(),observations=[];
+ await open();const num=sample('数字输入样例');
+ for(const v of variants){
+  await select(sample('数字输入皮肤'),v);await nativeNumber(num,60,60);
+  const valid=await invalidAppearance(num);assert(valid.valid);assert.notEqual(valid.borderStyle,'dashed');
+  await nativeNumber(num,121,121);const invalid=await requireInvalid(num);
+  assert.equal(invalid.width,valid.width);assert.equal(invalid.height,valid.height);
+  await capture('invalid-sample-'+v,num);await nativeNumber(num,60,60);
+  const recovered=await invalidAppearance(num);assert(recovered.valid);assert.equal(recovered.borderStyle,valid.borderStyle);
+  observations.push({variant:v,valid,invalid,recovered});
+ }
+ assert.equal(await prefs(),original);await click('取消',dialog);await close();
+ assert.equal(await prefs(),original);report.invalidVariants=observations;write();
+}
+
 async function renderPair(name,doc){
  const pdf=await main.renderDocumentToPdf(doc),png=await main.renderDocumentToPng(doc);
  assert(pdf.subarray(0,5).toString()==='%PDF-'&&pdf.length>5000);
@@ -100,6 +128,7 @@ async function run(){
  assert.equal((await state(field)).variant,'gradient');assert.equal((await state(photoWidth)).variant,'raised');
  assert.equal(sha(await paper()),paperHash);assert.deepEqual(JSON.parse(await source()),before);
  await renderPair('mixed',await doc());await capture('01-mixed-editor',photoWidth);
+ await checkAllInvalidVariants();
  await reloadRenderer();assert.deepEqual(JSON.parse(await prefs()),{schemaVersion:3,skins:config});
  assert.equal((await state(field)).variant,'gradient');assert.equal((await state(photoHeight)).variant,'raised');
  assert.equal((await state(field)).scope,theme);assert.equal(sha(await paper()),paperHash);
@@ -109,9 +138,23 @@ async function run(){
  await hit(await point(secret));win.webContents.insertText('synthetic-reload-only');
  await until('masked dirty draft',()=>js(s=>document.querySelector(s)?.type==='password'&&document.querySelector(s).value==='synthetic-reload-only',secret));
  for(const [sel,v,expect] of [[budget,999,'under'],[tokens,8193,'over'],[timeout,121,'over']]){
-  await nativeNumber(sel,v,v);const actual=await validity(sel);assert(actual[expect]&&!actual.valid&&actual.type==='number');report.rows.push({phase:'invalid-profile',selector:sel,observation:actual});
+  await nativeNumber(sel,v,v);const actual=await validity(sel);assert(actual[expect]&&!actual.valid&&actual.type==='number');report.rows.push({phase:'invalid-profile',selector:sel,observation:actual,appearance:await requireInvalid(sel)});
  }
  await capture('03-native-invalid-budgets',timeout);
+ const dbg=win.webContents.debugger;
+ try{
+  dbg.attach('1.3');await dbg.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'forced-colors',value:'active'}]});
+  await until('forced colors active',()=>js(()=>matchMedia('(forced-colors: active)').matches));
+  report.forcedInvalid=await requireInvalid(timeout,true);
+  assert(await js(s=>document.querySelector(s)?.type==='password',secret));
+  await capture('03b-emulated-forced-colors-invalid',timeout);
+ }finally{
+  if(dbg.isAttached()){await dbg.sendCommand('Emulation.setEmulatedMedia',{features:[]});dbg.detach();}
+ }
+ await until('forced colors restored',()=>js(()=>!matchMedia('(forced-colors: active)').matches));
+ await nativeNumber(timeout,25,25);assert((await invalidAppearance(timeout)).valid);assert.notEqual((await invalidAppearance(timeout)).borderStyle,'dashed');
+ report.checks.invalidVisualAndEmulatedForcedColors=true;write();
+
  assert.equal(settingsHash(),initialSettings);assert.equal(report.profileWrites,0);
  await reloadRenderer();await openProfile();
  assert(await js(s=>document.querySelector(s)?.type==='password'&&document.querySelector(s).value==='',secret));

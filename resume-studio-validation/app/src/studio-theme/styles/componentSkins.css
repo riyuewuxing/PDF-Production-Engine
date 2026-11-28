@@ -149,3 +149,24 @@
     [data-studio-surface][data-studio-theme] :is(input[data-studio-skin-family="text"]:is([type="text"],[type="search"],[type="email"],[type="tel"],[type="url"],:not([type])),textarea[data-studio-skin-family="multiline"],input[type="password"][data-studio-skin-family="password"],input[type="number"][data-studio-skin-family="number"])[data-studio-skin]:disabled {color:GrayText;}
   }
 }
+
+/* Native numeric validation remains authoritative. Only opt-in number fields
+ * receive an error border; dashed edges provide a non-color cue in every theme.
+ * Do not change value, handlers, validity, focus outline, or box dimensions. */
+@media screen {
+  [data-studio-surface][data-studio-theme] input[type="number"][data-studio-skin-family="number"][data-studio-skin]:invalid:not(:disabled):not([readonly]) {
+    border-color: var(--studio-error);
+    border-style: dashed;
+    background-image: none;
+    box-shadow: inset 0 0 0 1px var(--studio-error);
+  }
+  @media (forced-colors: active) {
+    [data-studio-surface][data-studio-theme] input[type="number"][data-studio-skin-family="number"][data-studio-skin]:invalid:not(:disabled):not([readonly]) {
+      border-color: FieldText;
+      border-style: dashed;
+      background-image: none;
+      box-shadow: none !important;
+      forced-color-adjust: auto;
+    }
+  }
+}
