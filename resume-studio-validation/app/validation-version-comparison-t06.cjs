@@ -143,12 +143,12 @@ async function run(){
  assert(await active()==='runner-fixture','active version changed');assert(fs.readFileSync(snapFile).length>0,'snapshot removed');
  checks.allDocumentAndSnapshotHashesUnchanged=true;
  await click('脱敏模式中');await click('从母库 (master.json) 挑选经历合并到当前版本');
- await until('master merge loaded',()=>js(()=>!!document.querySelector('[data-studio-region="master-merge-dialog"] button.w-full')));
- assert(await js(()=>{const root=document.querySelector('[data-studio-region="master-merge-dialog"]'),b=root.querySelector('button.w-full');if(!b||b.disabled)return false;b.click();return true}),'master selection absent');
- await until('selected one',()=>js(()=>document.querySelector('[data-studio-region="master-merge-dialog"]').innerText.includes('已选择 1 项')));
+ await until('master merge loaded',()=>js(()=>!!document.querySelector('[role="dialog"][aria-label="从母库挑选经历"] button.w-full')));
+ assert(await js(()=>{const root=document.querySelector('[role="dialog"][aria-label="从母库挑选经历"]'),b=root.querySelector('button.w-full');if(!b||b.disabled)return false;b.click();return true}),'master selection absent');
+ await until('selected one',()=>js(()=>document.querySelector('[role="dialog"][aria-label="从母库挑选经历"]').innerText.includes('已选择 1 项')));
  await matrix(win,out,'master-merge-dialog','master-selected');unchanged();
  assert(await js(()=>{const e=document.querySelector('button[aria-label="关闭母库挑选弹窗"]');if(!e)return false;e.click();return true}),'merge close absent');
- await until('merge closed',()=>js(()=>!document.querySelector('[data-studio-region="master-merge-dialog"]')));
+ await until('merge closed',()=>js(()=>!document.querySelector('[role="dialog"][aria-label="从母库挑选经历"]')));
  unchanged();checks.themeMasterSelectionCancelNoWrite=true;
  fs.writeFileSync(path.join(out,'version-compare-native.json'),JSON.stringify({runnerSha:process.env.GITHUB_SHA,sourceSha:manifest.sourceSha,platform:process.platform,checks,verifiedHashes:state,synthetic:{currentId:current.id,targetId:target.id,masterId:master.id}},null,2));
 }

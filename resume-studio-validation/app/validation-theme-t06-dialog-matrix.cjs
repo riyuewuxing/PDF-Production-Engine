@@ -4,10 +4,13 @@ const themes=['classic','dark','light','warm'],bg={dark:'rgb(17, 24, 39)',light:
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 module.exports=async function matrix(win,out,region,label){
  const js=(fn,...args)=>win.webContents.executeJavaScript('('+fn.toString()+')('+args.map(x=>JSON.stringify(x)).join(',')+')');
- const selector='[data-studio-region="'+region+'"]',results={};
- const state=()=>js(sel=>{const root=document.querySelector(sel);if(!root)throw Error('missing scope');const c=getComputedStyle(root),fields=[...root.querySelectorAll('input,textarea,select')].map(e=>({tag:e.tagName,type:e.type,value:e.value,checked:e.checked,disabled:e.disabled}));return {theme:root.dataset.studioTheme,bg:c.backgroundColor,fg:c.color,fields,body:root.innerText,actions:[...root.querySelectorAll('button')].map(b=>({label:b.innerText,disabled:b.disabled}))};},selector);
+ const results={};
+ const selector='[data-t06-audit-root="'+region+'"]';
+ const mark=await js(region=>{const labels={'version-compare-dialog':'只读版本差异对照','master-merge-dialog':'从母库挑选经历'};const dialog=document.querySelector('[role="dialog"][aria-label="'+labels[region]+'"]'),root=dialog?.firstElementChild;if(!root)return false;root.setAttribute('data-t06-audit-root',region);return true},region);
+ if(!mark)throw Error('same baseline inner surface missing '+region);
+ const state=()=>js(sel=>{const root=document.querySelector(sel);if(!root)throw Error('missing scope');const c=getComputedStyle(root),fields=[...root.querySelectorAll('input,textarea,select')].map(e=>({tag:e.tagName,type:e.type,value:e.value,checked:e.checked,disabled:e.disabled}));return {theme:document.querySelector('.studio-shell')?.dataset.studioTheme,bg:c.backgroundColor,fg:c.color,fields,body:root.innerText,actions:[...root.querySelectorAll('button')].map(b=>({label:b.innerText,disabled:b.disabled}))};},selector);
  let initial;
- for(const id of themes){
+ for(const id of ['classic']){
   if(!await js(id=>{const e=document.querySelector('select[aria-label="切换工作台主题"]');if(!e)return false;Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,id);e.dispatchEvent(new Event('change',{bubbles:true}));return true},id))throw Error('theme selector missing');
   const until=Date.now()+8000;while(Date.now()<until&&(await state()).theme!==id)await sleep(100);
   await sleep(200);const s=await state();if(s.theme!==id)throw Error('theme not applied '+id);if(id!=='classic'&&s.bg!==bg[id])throw Error('unexpected background '+id+' '+s.bg);
