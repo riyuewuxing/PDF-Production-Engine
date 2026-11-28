@@ -110,16 +110,17 @@ async function run(){
   report.cases[label]={slug,documentHash:sha(fs.readFileSync(path.join(main.store.resumesDir,slug+'.json'))),rows:{}};
   const id=group;await switchTheme(id);
   for(const [b,i] of skinRows){
-   await chooseSkin(b,i);const s=await sheetState();assert(s.rect.width>100&&s.rect.height>100,'A4 crop too small');
+   await chooseSkin(b,i);const prePointer=await sheetState();win.webContents.sendInputEvent({type:'mouseMove',x:10,y:10});await sleep(250);const s=await sheetState();assert(s.rect.width>100&&s.rect.height>100,'A4 crop too small');
    const key=label+'-'+b+'-'+i;
-   const row={domHash:sha(JSON.stringify(s.signature)),crop:await shot(key+'-a4',s.rect),rect:s.rect,boundary:s.boundary,pages:s.pages,export:await nativeExport(doc,key)};
+   fs.writeFileSync(path.join(out,key+'-signature.json'),JSON.stringify({beforePointer:prePointer.signature,settled:s.signature},null,2));
+   const row={domHash:sha(JSON.stringify(s.signature)),beforePointerHash:sha(JSON.stringify(prePointer.signature)),crop:await shot(key+'-a4',s.rect),rect:s.rect,boundary:s.boundary,pages:s.pages,export:await nativeExport(doc,key)};
    await shot(key+'-screen');report.cases[label].rows[b+'-'+i]=row;write();
-   if(b!=='inherit'){const baseline=report.cases[label].rows['inherit-inherit'];assert.equal(row.domHash,baseline.domHash,'paper DOM '+key);if(JSON.stringify(row.crop.size)===JSON.stringify(baseline.crop.size))assert.equal(row.crop.pixels,baseline.crop.pixels,'same-size paper crop '+key);else row.cropComparison='different visible clip; compare document DOM and native output';assert.equal(row.export.pngPixels,baseline.export.pngPixels,'native PNG '+key);assert.equal(row.boundary,baseline.boundary,'page boundary '+key);assert.equal(row.pages,baseline.pages,'page count '+key)}
+   if(b!=='inherit'){const baseline=report.cases[label].rows['inherit-inherit'];if(row.domHash!==baseline.domHash){(report.domMismatches??=[]).push(key);write();}if(JSON.stringify(row.crop.size)===JSON.stringify(baseline.crop.size))assert.equal(row.crop.pixels,baseline.crop.pixels,'same-size paper crop '+key);else row.cropComparison='different visible clip; compare document DOM and native output';assert.equal(row.export.pngPixels,baseline.export.pngPixels,'native PNG '+key);assert.equal(row.boundary,baseline.boundary,'page boundary '+key);assert.equal(row.pages,baseline.pages,'page count '+key)}
    assert.deepEqual(storeHashes(),original,'theme or export modified source file');
   }
  }
- report.checks.twoAdditionalFixturesAllThemeRows=true;report.checks.paperDomAndNativePngExact=true;report.checks.sourceBytesUnchanged=true;
+ report.checks.twoAdditionalFixturesAllThemeRows=true;report.checks.paperDomAndNativePngExact=!(report.domMismatches?.length);report.checks.sourceBytesUnchanged=true;
  const lastTheme=group;assert.deepEqual(await readPref(),{schemaVersion:1,activePreset:lastTheme});
- fs.writeFileSync(stateFile,JSON.stringify({theme:lastTheme,hashes:original}));report.checks.restartFixturePersisted=true;write();await sleep(400);
+ fs.writeFileSync(stateFile,JSON.stringify({theme:lastTheme,hashes:original}));report.checks.restartFixturePersisted=true;write();await sleep(400);assert.equal(report.domMismatches?.length??0,0,'paper DOM mismatches '+JSON.stringify(report.domMismatches));
 }
 app.whenReady().then(run).then(()=>{clearTimeout(timer);app.exit(0)}).catch(e=>{clearTimeout(timer);report.error=e.stack||String(e);write();console.error(report.error);app.exit(1)});

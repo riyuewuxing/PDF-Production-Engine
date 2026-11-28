@@ -116,7 +116,7 @@
   .studio-component-dialog .studio-skin-notice {color:var(--studio-warning);}
   @media (forced-colors:active) {
     [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role] {
-      background:ButtonFace;color:ButtonText;border:1px solid ButtonText;box-shadow:none;forced-color-adjust:auto;
+      background:ButtonFace;color:ButtonText;border:1px solid ButtonText;background-image:none!important;box-shadow:none!important;forced-color-adjust:auto;
     }
     [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:focus-visible {outline:2px solid Highlight;}
     [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:disabled {color:GrayText;}
