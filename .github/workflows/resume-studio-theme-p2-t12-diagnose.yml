@@ -1,0 +1,61 @@
+name: Resume Studio T12 actual offline diagnosis and PDF original matrix
+on:
+  push:
+    branches: ['resume-studio/theme-p2-t12-diagnose']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [pilot, batch1, batch2, batch3]
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron app
+        timeout-minutes: 3
+        run: |
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual local diagnosis configuration facts and original PDF
+        timeout-minutes: 6
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t12-diagnose-' + [guid]::NewGuid().ToString())
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t12-diagnose'
+          $env:STUDIO_THEME_GROUP = '${{ matrix.group }}'
+          $entry = '.\validation-theme-t12-diagnose.cjs'
+          node .\validation-theme-t11-preflight.cjs $entry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            & .\node_modules\.bin\electron.cmd $entry
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Preserve actual evidence even if a gate fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t12-diagnose-${{ matrix.group }}
+          path: theme-t12-diagnose/
+          if-no-files-found: error
+          retention-days: 3
