@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {JobAiReviewPane} from './JobAiReviewPane';
 import type {AiTextReviewActions,JobReviewApplyGuard} from './ResumeAiAssistantPane';
@@ -16,6 +18,7 @@ function historicalClauses(a:JobReviewArchive){try{return new Map(splitJobRequir
 type Props={document:ResumeDocument;slug:string;jdText:string;pdfOrigin?:JobPdfOrigin;onJdTextChange:(next:string,origin?:JobPdfOrigin)=>void;onFlush:()=>Promise<void>;getRevision:()=>string;rewriteActions?:AiTextReviewActions;queueTask?:JobQueueTask;queueReadBasis?:()=>Promise<ResumeDocument>};
 type Session={source:string;pdfOrigin?:JobPdfOrigin;doc:ResumeDocument;slug:string;clauses:RequirementClause[]};
 export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChange,onFlush,getRevision,rewriteActions,queueTask,queueReadBasis}:Props){
+  const skins=useStudioComponentSkins();
   const desktop=isDesktopMode();
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const [applicationId,setApplicationId]=useState('');
@@ -186,14 +189,14 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
     <div className="font-bold text-indigo-900 studio-ui-info">岗位原文与证据核对（离线）</div>
     <p>按原文行、分号和句号列出候选条款，保留原文位置。关键词只是检索线索，不是资格判定；复合条件、例外、专业目录与公告上下文须人工核对。</p>
     <p>只读当前可见简历自述和明确加载的有效原始事实（含仅本地记录），不读附件正文、不联网、不修改简历。跨版本关联事实暂不参与此项核对。</p>
-    <button data-studio-control="true" type="button" disabled={busy||!jdText.trim()} onClick={analyze} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">分析岗位原文</button>
+    <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={busy||!jdText.trim()} onClick={analyze} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">分析岗位原文</button>
     {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-800 studio-ui-error-surface studio-ui-error">{error}</div>}
     {notice&&<div role="status" className="text-teal-800 studio-ui-info">{notice}</div>}
     {desktop&&<div className="space-y-2 rounded border border-indigo-200 bg-white p-2 studio-ui-info-border studio-ui-surface" aria-label="本地岗位核对档案">
       <div className="font-semibold">本地核对档案 · 当前简历 {archives.length} 份 / 全部 {(ledger.data.jobReviews??[]).length}/{MAX_JOB_REVIEW_ARCHIVES}</div>
       <p>历史档案不会自动成为当前结论；恢复时重新校验原文、版本、事实和内容。仅本地保存，不进入模型请求。</p>
       {!canUseLedger&&<p className="text-amber-800 studio-ui-warning">{ledger.error||'台账尚未就绪或存在未保存草稿。'} 请在投递台账处理保存、重试或重载。</p>}
-      <button data-studio-control="true" type="button" disabled={busy||ledger.loading||ledger.saving||ledger.dirty} onClick={()=>void task(async()=>{await careerLedger.load();setNotice('已读取本地核对档案。');})} className="rounded border px-2 py-1 studio-ui-border">刷新本地核对档案</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||ledger.loading||ledger.saving||ledger.dirty} onClick={()=>void task(async()=>{await careerLedger.load();setNotice('已读取本地核对档案。');})} className="rounded border px-2 py-1 studio-ui-border">刷新本地核对档案</button>
       {!queueTask&&<label className="flex items-center gap-1"><input data-studio-control="true" type="checkbox" checked={showAllArchives} disabled={busy} onChange={e=>setShowAllArchives(e.target.checked)}/>显示全部简历版本的历史档案</label>}
       {queueTask&&<p>仅显示当前岗位任务的核对档案，不会载入其他岗位的原文或记录。</p>}
       {visibleArchives.map(a=>{const clauses=historicalClauses(a);return <div key={a.id} className="space-y-1 rounded border p-2 studio-ui-border">
@@ -209,16 +212,16 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
           </div>
         </details>
         <div className="flex flex-wrap gap-1">
-          {!queueTask&&<button data-studio-control="true" type="button" disabled={busy||!canUseLedger||a.slug!==slug||a.docId!==document.id} onClick={()=>onJdTextChange(a.source,a.pdfOrigin)} className="rounded border px-2 py-1 studio-ui-border">载入档案原文</button>}
-          <button data-studio-control="true" type="button" disabled={busy||!canUseLedger||a.source!==jdText||!sameJobPdfOrigin(a.pdfOrigin,pdfOrigin)||a.slug!==slug||a.docId!==document.id} onClick={()=>restoreArchive(a)} className="rounded border px-2 py-1 studio-ui-border">恢复档案核对</button>
-          <button data-studio-control="true" type="button" disabled={busy||!canUseLedger} onClick={()=>deleteArchive(a)} className="rounded border px-2 py-1 text-red-700 studio-ui-error studio-ui-border">删除核对档案</button>
+          {!queueTask&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||!canUseLedger||a.slug!==slug||a.docId!==document.id} onClick={()=>onJdTextChange(a.source,a.pdfOrigin)} className="rounded border px-2 py-1 studio-ui-border">载入档案原文</button>}
+          <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||!canUseLedger||a.source!==jdText||!sameJobPdfOrigin(a.pdfOrigin,pdfOrigin)||a.slug!==slug||a.docId!==document.id} onClick={()=>restoreArchive(a)} className="rounded border px-2 py-1 studio-ui-border">恢复档案核对</button>
+          <button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={busy||!canUseLedger} onClick={()=>deleteArchive(a)} className="rounded border px-2 py-1 text-red-700 studio-ui-error studio-ui-border">删除核对档案</button>
         </div>
       </div>})}
     </div>}
     {current&&<>
       {!queueTask&&rewriteActions&&<JobAiReviewPane document={document} slug={slug} source={session.source} clauses={session.clauses} disabled={busy} rewriteActions={rewriteActions} jobApplyGuard={jobApplyGuard} onReview={id=>{select(id);requestAnimationFrame(()=>window.document.querySelector('[aria-label="岗位条款原文"]')?.scrollIntoView({block:'center'}));}}/>}
       <div className="flex flex-wrap gap-2 text-slate-700 studio-ui-primary"><span>候选 {session.clauses.length} 条</span><span>已记录 {totals.length} 条</span><span>本人标记硬条件 {totals.filter(r=>r.priority==='mandatory').length}</span><span>自述支持 {totals.filter(r=>r.outcome==='supported').length}</span><span>缺口 {totals.filter(r=>r.outcome==='gap').length}</span></div>
-      <button data-studio-control="true" type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">加载 / 刷新岗位事实依据</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||!window.resumeDesktop?.facts} onClick={load} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">加载 / 刷新岗位事实依据</button>
       <div className="text-slate-600 studio-ui-muted">{bank?'本地事实版本已读取：'+checkedAt:'尚未加载独立事实库，仅显示简历自述。'} 事实库变化后请刷新；保存核对结果时再次校验已加载的版本。</div>
       <label className="block">选择候选条款<select data-studio-control="true" aria-label="岗位候选条款" disabled={busy} value={active} onChange={e=>select(e.target.value)} className="mt-1 w-full rounded border bg-white p-1.5 studio-ui-surface studio-ui-border">
         {session.clauses.map((c,i)=>{const page=jobPdfPageForRange(pdfOrigin,c.start,c.end);return <option key={c.id} value={c.id}>{i+1}. {page!==undefined?'PDF 第 '+page+' 页 · 提取文本':''}第 {c.line} 行 · {c.quote.slice(0,68)}{reviews[c.id]?' · 已记录':''}</option>})}
@@ -245,7 +248,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
           </div>
         </>}
         <label className="block">核对说明（选填）<textarea data-studio-control="true" aria-label="岗位核对说明" rows={2} maxLength={500} disabled={busy} value={draft.note} onChange={e=>setDraft(d=>({...d,note:e.target.value}))} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
-        <button data-studio-control="true" type="button" disabled={busy||(draft.outcome==='supported'&&!draft.evidenceIds.length)} onClick={save} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">记录本条人工核对</button>
+        <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={busy||(draft.outcome==='supported'&&!draft.evidenceIds.length)} onClick={save} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">记录本条人工核对</button>
       </div>}
       <div className="space-y-1" aria-label="岗位核对记录">
         {session.clauses.filter(c=>reviews[c.id]).map(c=>{const review=reviews[c.id]!;return <button data-studio-control="true" type="button" key={c.id} disabled={busy} onClick={()=>select(c.id)} className="block w-full rounded border bg-white p-2 text-left studio-ui-surface studio-ui-border">
@@ -258,7 +261,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
           {eligibleApplications.map(a=><option key={a.id} value={a.id}>{a.company} · {a.role} · {a.appliedDate}</option>)}
         </select></label>
         <p className="text-slate-600 studio-ui-muted">只列出同一简历、原文完全一致且已有永久快照的投递；保存时还会核对快照内容。不会创建或发送投递。</p>
-        <button data-studio-control="true" type="button" disabled={busy||!canUseLedger||!totals.length} onClick={commitArchive} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">保存本次核对到本地</button>
+        <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={busy||!canUseLedger||!totals.length} onClick={commitArchive} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">保存本次核对到本地</button>
       </div>}
       <p className="text-slate-600 studio-ui-muted">逐条记录先保存在本次会话；修改 JD、切换简历、离页或重新分析会清空会话结果。明确保存的历史档案保留，非招聘资格结论。</p>
     </>}

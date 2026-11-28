@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
@@ -25,6 +27,7 @@ const stateLabels:Record<JobQueueTask['status'],string>={pending:'待处理',run
 const failureLabels={ 'local-error':'本地解析或写入前核验失败','source-changed':'绑定简历发生变化或超出读取上限','invalid-source':'岗位原文无可核对条款或超过80条，请分批登记新任务。','timeout':'执行超时','interrupted':'中断后已显式恢复为失败' };
 /** The renderer requests explicit commands only; no worker or AI request here. */
 export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;activeDoc:ResumeDocument;redacted:boolean}){
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const tasks=ledger.data.jobQueue??[];
@@ -182,32 +185,32 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
       </div>
       <label className="block space-y-1">岗位原文（保留输入原样）<textarea data-studio-control="true" aria-label="队列岗位原文" className={field+' min-h-28 resize-y'} value={jd} disabled={locked||!!candidate} onChange={e=>setJd(e.target.value)}/></label>
       <p className="text-[10px] text-slate-500 studio-ui-muted">{jd.length}/{MAX_JOB_QUEUE_JD_CHARS} 字</p>
-      {!candidate&&<button data-studio-control="true" type="button" className={button} disabled={locked||tasks.length>=MAX_JOB_QUEUE_TASKS} onClick={()=>void prepare()}>核对任务绑定</button>}
+      {!candidate&&<button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={button} disabled={locked||tasks.length>=MAX_JOB_QUEUE_TASKS} onClick={()=>void prepare()}>核对任务绑定</button>}
       {candidate&&<div role="region" aria-label="确认岗位任务绑定" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">
         <p className="font-semibold break-words">确认登记：{candidate.task.company} · {candidate.task.role}</p>
         <p className="break-words">磁盘简历：{candidate.title} · {candidate.task.slug}</p>
         <p className="break-all text-[10px]">版本：{candidate.task.documentRevision}</p>
         <p className="break-all text-[10px]">文档 SHA-256：{candidate.task.documentSha256}</p>
         <p className="text-[10px]">原文 {candidate.task.jdText.length} 字；确认后固定绑定，不会自动替换为其他版本。</p>
-        <div className="flex flex-wrap gap-2"><button data-studio-control="true" type="button" disabled={locked} onClick={()=>void confirm()} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">确认登记岗位任务</button><button data-studio-control="true" type="button" className={button} onClick={()=>setCandidate(null)}>取消本次登记</button></div>
+        <div className="flex flex-wrap gap-2"><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked} onClick={()=>void confirm()} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">确认登记岗位任务</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={button} onClick={()=>setCandidate(null)}>取消本次登记</button></div>
       </div>}
-      {busy&&<p role="status">{busy==='prepare'?'读取磁盘绑定…':busy==='check'?'核验绑定…':busy==='execute'?'等待任务台账确认…':'保存台账…'}{(busy==='prepare'||busy==='check')&&<button data-studio-control="true" type="button" className={button+' ml-2'} onClick={()=>readRef.current?.cancel()}>取消读取</button>}</p>}
+      {busy&&<p role="status">{busy==='prepare'?'读取磁盘绑定…':busy==='check'?'核验绑定…':busy==='execute'?'等待任务台账确认…':'保存台账…'}{(busy==='prepare'||busy==='check')&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" className={button+' ml-2'} onClick={()=>readRef.current?.cancel()}>取消读取</button>}</p>}
       {workflowCandidate&&<div role="region" aria-label="确认固定岗位流程" className="rounded border border-teal-300 bg-teal-50 p-2 space-y-2 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">
         <p className="font-semibold break-words">确认进入：{workflowCandidate.task.company} · {workflowCandidate.task.role}</p><p>绑定简历：{workflowCandidate.document.title} · {workflowCandidate.task.slug}</p>
         <p>本地准备回执 {workflowCandidate.task.execution?.result?.clauseCount} 条。仅加载此岗位材料流程，不修改当前简历，不发送材料。</p>
-        <button data-studio-control="true" type="button" className={button} disabled={!ready||busy!==null} onClick={()=>void openWorkflow(workflowCandidate.task,true)}>确认进入该岗位流程</button> <button data-studio-control="true" type="button" className={button} onClick={()=>setWorkflowCandidate(null)}>取消进入流程</button>
+        <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={button} disabled={!ready||busy!==null} onClick={()=>void openWorkflow(workflowCandidate.task,true)}>确认进入该岗位流程</button> <button {...buttonSkin(skins)} data-studio-control="true" type="button" className={button} onClick={()=>setWorkflowCandidate(null)}>取消进入流程</button>
       </div>}
       {message&&<p role={message.error?'alert':'status'} className={'break-words '+(message.error?'text-red-700 studio-ui-error':'text-teal-800 studio-ui-selected-text')}>{message.text}</p>}
     </div>
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">已登记任务</h4><button data-studio-control="true" type="button" className={button} disabled={ledger.dirty||ledger.saving||ledger.loading||busy!==null||!!candidate} onClick={()=>void careerLedger.load().catch(()=>{})}>刷新岗位队列</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">已登记任务</h4><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={button} disabled={ledger.dirty||ledger.saving||ledger.loading||busy!==null||!!candidate} onClick={()=>void careerLedger.load().catch(()=>{})}>刷新岗位队列</button></div>
       {!tasks.length&&<p className="text-slate-500 studio-ui-muted">暂无待处理岗位。</p>}
       {tasks.map(task=>{
         const status=check?.id===task.id&&check.revision===ledger.data.revision?check:null;
         return <article key={task.id} aria-label={'岗位任务 '+task.company+' '+task.role} className="rounded-lg border border-slate-200 p-3 space-y-2 studio-ui-border">
           <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h5 className="font-semibold break-words">{task.company} · {task.role}</h5><p className="text-[10px] break-all text-slate-600 studio-ui-muted">{task.slug} · {task.documentRevision}</p></div><span className="rounded bg-slate-100 px-2 py-1 studio-ui-raised">{ledger.dirty?'待保存草稿':stateLabels[task.status]}</span></div>
           <details><summary data-studio-control="true" className="cursor-pointer text-slate-700 studio-ui-primary">查看岗位原文（{task.jdText.length} 字）与绑定详情</summary><pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-50 p-2 font-sans text-[11px] studio-ui-raised">{task.jdText}</pre><p className="mt-1 break-all text-[10px]">任务 ID：{task.id}</p><p className="break-all text-[10px]">SHA-256：{task.documentSha256}</p></details>
-          <div className="flex flex-wrap items-center gap-2"><button data-studio-control="true" type="button" aria-label={'核验岗位绑定 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void verify(task)}>核验绑定</button><span className={status?.status==='same'?'text-teal-700 studio-ui-selected-text':status?'text-amber-800 studio-ui-warning':'text-slate-500 studio-ui-muted'}>{status?.status==='same'?'绑定一致（核验时）':status?.status==='stale'?'版本已变化，原任务不得沿用':status?.status==='unavailable'?'绑定不可核验，不得沿用':'未核验当前版本'}</span></div>
+          <div className="flex flex-wrap items-center gap-2"><button {...buttonSkin(skins)} data-studio-control="true" type="button" aria-label={'核验岗位绑定 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void verify(task)}>核验绑定</button><span className={status?.status==='same'?'text-teal-700 studio-ui-selected-text':status?'text-amber-800 studio-ui-warning':'text-slate-500 studio-ui-muted'}>{status?.status==='same'?'绑定一致（核验时）':status?.status==='stale'?'版本已变化，原任务不得沿用':status?.status==='unavailable'?'绑定不可核验，不得沿用':'未核验当前版本'}</span></div>
           {status&&<p className="text-[10px] text-slate-500 studio-ui-muted">核验时间 {status.at}；不会自动更新任务或启动操作。</p>}
           {task.execution&&<div className="rounded bg-slate-50 p-2 text-[11px] break-words studio-ui-raised">
             <p>执行尝试 {task.execution.attempts}/{MAX_JOB_QUEUE_ATTEMPTS} · {task.execution.updatedAt}</p>
@@ -220,7 +223,7 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
             {task.execution.result&&<p className="text-teal-800 studio-ui-selected-text">本地候选条款 {task.execution.result.clauseCount} 条；尚未人工核对，不代表符合招聘条件。后续使用前仍需核验绑定版本。</p>}
           </div>}
           {task.status==='prepared'&&<div className="space-y-1 rounded bg-teal-50 p-2 studio-ui-selected studio-ui-selected-text">
-            <button data-studio-control="true" type="button" aria-label={'核对岗位流程 '+task.company+' '+task.role} className={button} disabled={!supportsWorkflow||locked||!!candidate||task.slug!==activeSlug||task.docId!==activeDoc.id} onClick={()=>void openWorkflow(task)}>核对并进入岗位流程</button>
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" aria-label={'核对岗位流程 '+task.company+' '+task.role} className={button} disabled={!supportsWorkflow||locked||!!candidate||task.slug!==activeSlug||task.docId!==activeDoc.id} onClick={()=>void openWorkflow(task)}>核对并进入岗位流程</button>
             {(task.slug!==activeSlug||task.docId!==activeDoc.id)&&<p>请先在顶部切换到绑定简历；不自动切换或保存其他版本。</p>}
             {!supportsWorkflow&&<p>需要升级桌面桥接才可进入流程。</p>}
             <details><summary data-studio-control="true">该岗位已保存历史（只读，不代表当前依据）</summary>
@@ -231,11 +234,11 @@ export function JobQueuePane({activeSlug,activeDoc,redacted}:{activeSlug:string;
             </details>
           </div>}
           {supportsExecution&&<div className="flex flex-wrap gap-2">
-            {task.status==='pending'&&<button data-studio-control="true" type="button" aria-label={'开始岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning} onClick={()=>void execute(task,'start')}>开始本地准备</button>}
-            {(task.status==='paused'||task.status==='failed')&&<button data-studio-control="true" type="button" aria-label={'重试岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning||task.execution?.failure==='invalid-source'||(task.execution?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS} onClick={()=>void execute(task,'retry')}>{task.status==='paused'?'继续准备（新尝试）':'重试准备'}</button>}
-            {task.status==='running'&&<><button data-studio-control="true" type="button" aria-label={'暂停岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void execute(task,'pause')}>暂停</button>
-              <button data-studio-control="true" type="button" aria-label={'恢复中断岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||!task.execution?.deadlineAt||clock<Date.parse(task.execution.deadlineAt)} onClick={()=>void execute(task,'recover')}>恢复中断为失败</button></>}
-            {task.status!=='canceled'&&task.status!=='prepared'&&<button data-studio-control="true" type="button" aria-label={'取消岗位 '+task.company+' '+task.role} className={button+' text-red-700 studio-ui-error'} disabled={locked||!!candidate} onClick={()=>void execute(task,'cancel')}>取消任务（保留记录）</button>}
+            {task.status==='pending'&&<button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" aria-label={'开始岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning} onClick={()=>void execute(task,'start')}>开始本地准备</button>}
+            {(task.status==='paused'||task.status==='failed')&&<button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" aria-label={'重试岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||hasRunning||task.execution?.failure==='invalid-source'||(task.execution?.attempts??0)>=MAX_JOB_QUEUE_ATTEMPTS} onClick={()=>void execute(task,'retry')}>{task.status==='paused'?'继续准备（新尝试）':'重试准备'}</button>}
+            {task.status==='running'&&<><button {...buttonSkin(skins)} data-studio-control="true" type="button" aria-label={'暂停岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate} onClick={()=>void execute(task,'pause')}>暂停</button>
+              <button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" aria-label={'恢复中断岗位 '+task.company+' '+task.role} className={button} disabled={locked||!!candidate||!task.execution?.deadlineAt||clock<Date.parse(task.execution.deadlineAt)} onClick={()=>void execute(task,'recover')}>恢复中断为失败</button></>}
+            {task.status!=='canceled'&&task.status!=='prepared'&&<button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" aria-label={'取消岗位 '+task.company+' '+task.role} className={button+' text-red-700 studio-ui-error'} disabled={locked||!!candidate} onClick={()=>void execute(task,'cancel')}>取消任务（保留记录）</button>}
           </div>}
         </article>;
       })}

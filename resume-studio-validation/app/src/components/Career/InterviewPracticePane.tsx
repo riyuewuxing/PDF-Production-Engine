@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
@@ -9,6 +11,7 @@ import {interviewRole,preparePracticeQuestions,practiceHistory,buildPracticeText
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
 
 export function InterviewPracticePane({document,slug,queueTask,beforeQueueExport}:{document:ResumeDocument;slug:string;queueTask?:JobQueueTask;beforeQueueExport?:()=>Promise<unknown>}){
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
   const [role,setRole]=useState(queueTask?.role??'');
@@ -64,7 +67,7 @@ export function InterviewPracticePane({document,slug,queueTask,beforeQueueExport
         {archives.map(a=><option key={a.id} value={a.id}>历史岗位核对 · {a.createdAt.slice(0,10)} · {a.rows.length}条 · {a.source.slice(0,45)}</option>)}
       </select></label>
       {!!archiveId&&<p className="rounded bg-amber-50 p-2 text-amber-900 studio-ui-warning-surface studio-ui-warning">使用历史档案原文和当时人工标记，不重新认定当前资格，不读取旧事实 ID 对应的当前事实；请回到岗位核对重新校验最新依据。当前输入岗位名仅用于区分练习草稿。</p>}
-      <button data-studio-control="true" type="button" disabled={!editable||!rows.length||exporting} onClick={()=>void exportText()} className="rounded border border-teal-400 bg-white px-2 py-1 text-teal-800 disabled:opacity-40 studio-ui-selected-border studio-ui-surface studio-ui-selected-text">{exporting?'正在导出练习…':'导出当前练习 TXT'}</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!editable||!rows.length||exporting} onClick={()=>void exportText()} className="rounded border border-teal-400 bg-white px-2 py-1 text-teal-800 disabled:opacity-40 studio-ui-selected-border studio-ui-surface studio-ui-selected-text">{exporting?'正在导出练习…':'导出当前练习 TXT'}</button>
       <p className="text-slate-600 studio-ui-muted">仅导出当前选择的题目、显示依据与本人回答草稿；不含其他历史草稿。不自动发送。</p>
       {exportNotice&&<p role="status" className="break-all">{exportNotice}</p>}
       {!!foreignCount&&<p className="text-amber-900 studio-ui-warning">同名文件另有 {foreignCount} 条其他简历身份的草稿，未在此展示或套用；恢复原文档身份或备份台账后可核查。</p>}

@@ -1,0 +1,611 @@
+{
+  "base": "70b15042072d00bdcc162a1d9e23ca1308e4360f",
+  "files": [
+    {
+      "path": "components/Diagnose/AiLayoutPane.tsx",
+      "baseBlob": "ceb3fe8b1007b491585a5cf18cd3939791d394d6",
+      "entries": [
+        {
+          "line": 79,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 80,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 84,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 84,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 87,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 89,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/AiPdfComparisonView.tsx",
+      "baseBlob": "703c3e134ecb7b011f89a6e144139b12fd1804b7",
+      "entries": [
+        {
+          "line": 63,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 63,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 67,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 69,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 69,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 69,
+          "ordinal": 3,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 73,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 73,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/DiagnoseAndMatchPane.tsx",
+      "baseBlob": "29ad67d94ba388a57e8123d2a53de29881d81d62",
+      "entries": [
+        {
+          "line": 651,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 749,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 907,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 908,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 994,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 1005,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1005,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1057,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 1058,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1088,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 1098,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1124,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 1136,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1148,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 1191,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1329,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 1338,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1353,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1360,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/EvidenceAttachmentPane.tsx",
+      "baseBlob": "dd20e1fa4427229a6ed647bb1d813fbf0ce74114",
+      "entries": [
+        {
+          "line": 69,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 74,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 76,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 77,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 104,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 105,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 106,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 107,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 116,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/FactBankPane.tsx",
+      "baseBlob": "7c7d7f89bb6bcef50718bc18b94bdd755ee5c8f7",
+      "entries": [
+        {
+          "line": 81,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 100,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 101,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 102,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 103,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 114,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 114,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 118,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 126,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/JobAiReviewPane.tsx",
+      "baseBlob": "0700092b686895789a22e0776d9e04020b5247e9",
+      "entries": [
+        {
+          "line": 89,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 91,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 91,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 94,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 94,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 97,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 97,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 105,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 105,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 118,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 127,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 128,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 133,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/JobNoticePdfPane.tsx",
+      "baseBlob": "754be1adf7295d53a7c259e1368332219478a208",
+      "entries": [
+        {
+          "line": 65,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 69,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 81,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 93,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 94,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/JobRequirementsPane.tsx",
+      "baseBlob": "88d6d94c7537f6dcc22382472ab370cee6bbfa38",
+      "entries": [
+        {
+          "line": 189,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 196,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 212,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 213,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 214,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 221,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 248,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 261,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/ResumeAiAssistantPane.tsx",
+      "baseBlob": "9038918be314f881296eb415c506816b58b58528",
+      "entries": [
+        {
+          "line": 212,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 212,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 226,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 227,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 229,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 234,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 235,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 244,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 244,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 249,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 250,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 252,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Diagnose/TextPdfReviewGate.tsx",
+      "baseBlob": "ca0f96385fd269455a957b4f501b4ca89b747be3",
+      "entries": [
+        {
+          "line": 6,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 7,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    }
+  ]
+}

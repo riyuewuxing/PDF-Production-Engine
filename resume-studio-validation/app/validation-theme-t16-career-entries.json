@@ -1,0 +1,389 @@
+{
+  "base": "70b15042072d00bdcc162a1d9e23ca1308e4360f",
+  "files": [
+    {
+      "path": "components/Career/CareerAiPanel.tsx",
+      "baseBlob": "505672de4de54a06e992faf432592c52548d6851",
+      "entries": [
+        {
+          "line": 107,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 110,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 113,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 123,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 123,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 132,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 132,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Career/InterviewPracticePane.tsx",
+      "baseBlob": "99950277a0547c3c35fa35410a4350a3f2ebb8c0",
+      "entries": [
+        {
+          "line": 67,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Career/JobCareerPane.tsx",
+      "baseBlob": "04e05858e1f6ffae33c248b9a8a9e4b9907c5161",
+      "entries": [
+        {
+          "line": 461,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 461,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 462,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 467,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 499,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 577,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 651,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "icon"
+        },
+        {
+          "line": 680,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 682,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 692,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 694,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 695,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 696,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 697,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 700,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 711,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 771,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 894,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 902,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 930,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 951,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 959,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "icon"
+        },
+        {
+          "line": 980,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 1012,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Career/JobQueuePane.tsx",
+      "baseBlob": "f4a0097ce84f7432288859a7e56ad6493414d59a",
+      "entries": [
+        {
+          "line": 185,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 192,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 192,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 194,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 198,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 198,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 203,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 210,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 223,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 234,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 235,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 236,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 237,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        },
+        {
+          "line": 238,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Career/JobQueueWorkflowPane.tsx",
+      "baseBlob": "be8d2d1ed11798f053742ba9d11b1eeed89c09bc",
+      "entries": [
+        {
+          "line": 109,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 118,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 129,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 129,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 130,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 137,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 138,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 139,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Career/QuickLogApplicationModal.tsx",
+      "baseBlob": "f500e1bd0fc0475254237b4ac5cd41eaacac90b3",
+      "entries": [
+        {
+          "line": 202,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 228,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 318,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 325,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    }
+  ]
+}

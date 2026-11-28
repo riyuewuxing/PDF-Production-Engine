@@ -1,9 +1,12 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import { useCallback,useEffect,useRef,useState } from 'react';
 import { RotateCcw,Trash2 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import type { ResumeTrashList,ResumeTrashMeta } from '../../server/localFsApi';
 
 export function RecycleBinPanel({onRestore,refreshKey=0}:{onRestore:(id:string,revision:string,asCopy:boolean)=>Promise<void>;refreshKey?:number}){
+  const skins=useStudioComponentSkins();
   const [data,setData]=useState<ResumeTrashList|null>(null);
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
@@ -44,7 +47,7 @@ export function RecycleBinPanel({onRestore,refreshKey=0}:{onRestore:(id:string,r
     </button>
     {open&&<>
       <p className="text-[11px] text-slate-500 studio-ui-muted">移入回收站的版本不会自动清理。恢复原版本保留原标识；另存副本不覆盖任何文件。母库及投递历史独立保护。</p>
-      <button data-studio-control="true" type="button" onClick={()=>void refresh()} disabled={busy||loading} className="rounded border border-slate-300 studio-ui-border px-2 py-1">刷新回收站</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>void refresh()} disabled={busy||loading} className="rounded border border-slate-300 studio-ui-border px-2 py-1">刷新回收站</button>
       {loading&&<p>正在读取本地归档…</p>}
       {error&&<div role="alert" className="rounded bg-red-50 studio-ui-error-surface p-2 text-red-700 studio-ui-error">{error}</div>}
       {notice&&<div role="status" className="rounded bg-emerald-50 studio-ui-success-surface p-2 text-emerald-800 studio-ui-success">{notice}</div>}
@@ -54,9 +57,9 @@ export function RecycleBinPanel({onRestore,refreshKey=0}:{onRestore:(id:string,r
         <div className="break-words font-semibold">{item.title}</div>
         <div className="break-all text-[10px] text-slate-500 studio-ui-muted">{item.slug} · {new Date(item.deletedAt).toLocaleString()}</div>
         <div className="flex flex-wrap gap-1.5">
-          <button data-studio-control="true" type="button" disabled={busy} onClick={()=>void restore(item,false)} className="inline-flex items-center gap-1 rounded border border-teal-300 studio-ui-selected-border px-2 py-1 text-teal-800 studio-ui-selected-text disabled:opacity-50"><RotateCcw size={11}/>恢复原版本</button>
-          <button data-studio-control="true" type="button" disabled={busy} onClick={()=>void restore(item,true)} className="rounded border border-slate-300 studio-ui-border px-2 py-1 disabled:opacity-50">另存恢复副本</button>
-          <button data-studio-control="true" type="button" disabled={busy} onClick={()=>void purge(item)} className="rounded border border-red-200 studio-ui-error-border px-2 py-1 text-red-700 studio-ui-error disabled:opacity-50">永久删除归档</button>
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={busy} onClick={()=>void restore(item,false)} className="inline-flex items-center gap-1 rounded border border-teal-300 studio-ui-selected-border px-2 py-1 text-teal-800 studio-ui-selected-text disabled:opacity-50"><RotateCcw size={11}/>恢复原版本</button>
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={busy} onClick={()=>void restore(item,true)} className="rounded border border-slate-300 studio-ui-border px-2 py-1 disabled:opacity-50">另存恢复副本</button>
+          <button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={busy} onClick={()=>void purge(item)} className="rounded border border-red-200 studio-ui-error-border px-2 py-1 text-red-700 studio-ui-error disabled:opacity-50">永久删除归档</button>
         </div>
       </div>)}
     </>}

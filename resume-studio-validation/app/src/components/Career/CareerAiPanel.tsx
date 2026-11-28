@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useEffect,useRef,useState} from 'react';
@@ -16,6 +18,7 @@ type Basis={document:ResumeDocument;slug:string;company:string;role:string;jdTex
 type Prepared={basis:Basis;request:CareerRefinePrepared};
 type Proposal=Prepared&ReturnType<typeof restoreCareerRefine>;
 export function CareerAiPanel(props:Props){
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const [catalog,setCatalog]=useState<AiProfileCatalog|null>(null);
   const [profileId,setProfileId]=useState('');
@@ -104,13 +107,13 @@ export function CareerAiPanel(props:Props){
       <details className="rounded border border-slate-200 bg-white p-2 space-y-2 studio-ui-border studio-ui-surface studio-ui-primary">
         <summary data-studio-control="true" className="cursor-pointer font-semibold">本地事实资料库 · 文案选择（{factIds.length} 条）</summary>
         <p>仅当前版本关联的本人确认、允许外发的事实可逐次选择。默认不发送；证据位置仅本地展示。新增、更正或撤销请前往诊断优化。</p>
-        <button data-studio-control="true" type="button" disabled={locked||!window.resumeDesktop?.facts} onClick={()=>void refreshFacts()} className="rounded border px-2 py-1 studio-ui-border">加载 / 刷新文案事实</button>
+        <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked||!window.resumeDesktop?.facts} onClick={()=>void refreshFacts()} className="rounded border px-2 py-1 studio-ui-border">加载 / 刷新文案事实</button>
         {bank&&<div aria-label="文案事实选择" className="max-h-48 overflow-auto space-y-1">{!eligible.length&&<p>当前版本没有可选择外发的事实。</p>}{eligible.map(r=><label key={r.id} className="block rounded border p-2 break-words studio-ui-border"><span className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" aria-label={'文案选择事实 '+r.assertion} disabled={locked||(!factIds.includes(r.id)&&factIds.length>=20)} checked={factIds.includes(r.id)} onChange={e=>{setFactIds(ids=>e.target.checked?[...ids,r.id]:ids.filter(id=>id!==r.id));clearApprovals();}}/>{r.assertion}</span><span className="block text-slate-600 studio-ui-muted">{blocks.find(b=>b.key===r.blockKey)?.label} · {r.evidenceRef}</span></label>)}</div>}
       </details>
-      <button data-studio-control="true" type="button" disabled={locked||!selected?.enabled} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">预览文案精修请求</button>
+      <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked||!selected?.enabled} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">预览文案精修请求</button>
       {!selected?.enabled&&<p className="text-slate-500 studio-ui-muted">请先在「诊断优化 → AI 润色 Diff」启用模型档案。</p>}
     </>:<p>桌面端模型档案尚未加载。离线文案仍可编辑。</p>}
-    {busy&&<div className="flex items-center justify-between"><span>模型正在处理…</span><button data-studio-control="true" type="button" onClick={()=>controller.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消文案请求</button></div>}
+    {busy&&<div className="flex items-center justify-between"><span>模型正在处理…</span><button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>controller.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消文案请求</button></div>}
     {attempt&&isCurrent(attempt.basis)&&<AiTaskReceiptView label="文案调用回执" attempt={attempt.value}/>}
     {error&&<div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800 studio-ui-error-border studio-ui-error-surface studio-ui-error">{error}</div>}
     {preview&&isCurrent(preview.basis)&&<section aria-label="文案 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-white p-2 studio-ui-warning-border studio-ui-surface studio-ui-primary">
@@ -120,7 +123,7 @@ export function CareerAiPanel(props:Props){
       <p>{preview.request.replacements.length} 类身份字段在本地替换，不发送真实映射。</p>
       {preview.request.providedFacts.length>0&&<div aria-label="文案外发事实清单" className="max-h-40 overflow-auto rounded border border-amber-200 p-2 studio-ui-warning-border"><p className="font-semibold">本次外发 {preview.request.providedFacts.length} 条本人确认事实</p>{preview.request.providedFacts.map(r=><div key={r.id} className="border-t py-1 whitespace-pre-wrap break-words">{r.id} · {r.label}<div>{r.facts}</div></div>)}</div>}
       <div className="max-h-64 space-y-1 overflow-auto rounded bg-slate-100 p-2 studio-ui-raised"><p className="font-semibold">系统指令</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.systemPrompt}</pre><p className="font-semibold">发送内容</p><pre className="whitespace-pre-wrap break-words">{preview.request.options.userPrompt}</pre></div>
-      <div className="flex flex-wrap gap-2"><button data-studio-control="true" type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white studio-ui-fill studio-ui-on-fill">确认发送文案给模型</button><button data-studio-control="true" type="button" onClick={()=>setPreview(null)} className="rounded border px-2 py-1 studio-ui-border">取消文案发送</button></div>
+      <div className="flex flex-wrap gap-2"><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked} onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white studio-ui-fill studio-ui-on-fill">确认发送文案给模型</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>setPreview(null)} className="rounded border px-2 py-1 studio-ui-border">取消文案发送</button></div>
     </section>}
     {proposal&&isCurrent(proposal.basis)&&<section aria-label="文案 AI 审核" className="space-y-2 rounded border border-slate-300 bg-white p-2 studio-ui-border studio-ui-surface studio-ui-primary">
       <div className="flex items-center gap-1 font-bold"><ShieldCheck size={13}/>原文与候选文案</div>
@@ -129,7 +132,7 @@ export function CareerAiPanel(props:Props){
       {proposal.warnings.map((w,i)=><p key={i} className="text-amber-800 studio-ui-warning">{w.message}</p>)}
       <p>机械检测不能证明语义事实，所有改写均需人工核对。</p>
       <label className="flex items-start gap-2"><input data-studio-control="true" type="checkbox" disabled={locked} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>我已核对候选文案的身份、经历、数字及其他事实，确认仅替换当前文案草稿。</label>
-      <div className="flex flex-wrap gap-2"><button data-studio-control="true" type="button" disabled={!confirmed||locked} onClick={()=>void apply()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">采纳文案草稿</button><button data-studio-control="true" type="button" onClick={()=>{setProposal(null);setConfirmed(false);}} className="rounded border px-2 py-1 studio-ui-border">放弃候选文案</button></div>
+      <div className="flex flex-wrap gap-2"><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={!confirmed||locked} onClick={()=>void apply()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">采纳文案草稿</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>{setProposal(null);setConfirmed(false);}} className="rounded border px-2 py-1 studio-ui-border">放弃候选文案</button></div>
     </section>}
   </section>;
 }

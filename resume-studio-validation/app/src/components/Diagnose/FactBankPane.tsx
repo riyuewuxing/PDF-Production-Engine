@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useRef,useState} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {FactBank,FactInput,FactRecord} from '../../schema/factBankSchema';
@@ -10,6 +12,7 @@ import type {EditableBlockOption} from '../../lib/resumeBlocks';
 const blank:FactInput={kind:'other',assertion:'',value:'',unit:'',timeframe:'',evidenceRef:'',sensitivity:'local-only'};
 type Props={document:ResumeDocument;slug:string;blocks:readonly EditableBlockOption[];keys:readonly string[];bank:FactBank|null;selected:readonly string[];locked:boolean;onBank:(bank:FactBank)=>void;onSelected:(ids:string[])=>void;onBusy:(busy:boolean)=>void;onFlush:()=>Promise<void>;getRevision:()=>string};
 export function FactBankPane(props:Props){
+  const skins=useStudioComponentSkins();
   const [target,setTarget]=useState('');
   const [correction,setCorrection]=useState<string|null>(null);
   const [linking,setLinking]=useState<FactRecord|null>(null);
@@ -78,7 +81,7 @@ export function FactBankPane(props:Props){
     <summary data-studio-control="true" className="cursor-pointer font-semibold">本地事实资料库（{records.filter(r=>r.verifiedStatus==='user-confirmed').length} 条）</summary>
     <p className="text-slate-600 studio-ui-muted">与简历正文、母库分开保存。人工确认仅表示本人核对，不是独立证据验证。证据位置只保存在本机，默认不外发；每次任务还需单独勾选可外发事实。</p>
     {!bridge&&<p>本地事实库仅支持当前桌面桥接版本。</p>}
-    <button data-studio-control="true" type="button" disabled={props.locked||!bridge} onClick={()=>bridge&&void task(()=>bridge.get(),'已读取本地事实资料库。')} className="rounded border px-2 py-1 studio-ui-border">加载 / 刷新事实库</button>
+    <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked||!bridge} onClick={()=>bridge&&void task(()=>bridge.get(),'已读取本地事实资料库。')} className="rounded border px-2 py-1 studio-ui-border">加载 / 刷新事实库</button>
     {error&&<div role="alert" className="rounded bg-red-50 p-2 text-red-800 studio-ui-error-surface studio-ui-error">{error}</div>}
     {notice&&<div role="status" className="text-teal-800 studio-ui-info">{notice}</div>}
     {props.bank&&<>
@@ -97,10 +100,10 @@ export function FactBankPane(props:Props){
           {r.supersedesId&&<div className="text-slate-600 studio-ui-muted">修订自：{props.bank?.records.find(s=>s.id===r.supersedesId)?.assertion||'旧记录'}</div>}
           <div className="text-slate-600 studio-ui-muted">{r.verifiedStatus==='revoked'?'已撤销':matches?'本人确认 · 非独立验证':r.docId!==props.document.id?'其他版本的本地记录':'关联主体已变更 / 隐藏'} · {r.sensitivity==='shareable'?'可按次选择外发':'仅本地'}</div>
           <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" aria-label={'选择事实 '+r.assertion} disabled={props.locked||!eligible} checked={eligible&&props.selected.includes(r.id)} onChange={e=>props.onSelected(e.target.checked?[...props.selected,r.id]:props.selected.filter(id=>id!==r.id))}/>加入本次 AI 任务</label>
-          {canLinkFactToDocument(props.document,r)&&!props.bank?.records.some(s=>s.linkedFrom?.recordId===r.id&&s.docId===props.document.id&&s.verifiedStatus==='user-confirmed')&&<button data-studio-control="true" type="button" disabled={props.locked||!bridge?.link} className="mr-3 text-teal-800 studio-ui-info" onClick={()=>{setLinking(r);setLinkShareable(false);setLinkConfirmed(false);}}>关联到当前同源段落</button>}
-          {r.sourceScope==='manual'&&r.verifiedStatus==='user-confirmed'&&matches&&<button data-studio-control="true" type="button" disabled={props.locked} className="mr-3 text-teal-800 studio-ui-info" onClick={()=>beginCorrection(r)}>更正事实</button>}
-          <button data-studio-control="true" type="button" disabled={props.locked||!window.resumeDesktop?.evidence} className="mr-3 text-indigo-800 studio-ui-info" onClick={()=>setEvidenceId(r.id)}>证据附件索引</button>
-          {r.verifiedStatus!=='revoked'&&<button data-studio-control="true" type="button" disabled={props.locked} className="text-red-700 studio-ui-error" onClick={()=>revoke(r.id)}>撤销事实授权</button>}
+          {canLinkFactToDocument(props.document,r)&&!props.bank?.records.some(s=>s.linkedFrom?.recordId===r.id&&s.docId===props.document.id&&s.verifiedStatus==='user-confirmed')&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked||!bridge?.link} className="mr-3 text-teal-800 studio-ui-info" onClick={()=>{setLinking(r);setLinkShareable(false);setLinkConfirmed(false);}}>关联到当前同源段落</button>}
+          {r.sourceScope==='manual'&&r.verifiedStatus==='user-confirmed'&&matches&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked} className="mr-3 text-teal-800 studio-ui-info" onClick={()=>beginCorrection(r)}>更正事实</button>}
+          <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked||!window.resumeDesktop?.evidence} className="mr-3 text-indigo-800 studio-ui-info" onClick={()=>setEvidenceId(r.id)}>证据附件索引</button>
+          {r.verifiedStatus!=='revoked'&&<button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={props.locked} className="text-red-700 studio-ui-error" onClick={()=>revoke(r.id)}>撤销事实授权</button>}
         </article>;
       })}</div>
       {evidenceRecord&&<EvidenceAttachmentPane key={props.slug+':'+evidenceRecord.id} document={props.document} slug={props.slug} fact={evidenceRecord} bankRevision={props.bank.revision} locked={props.locked} onBusy={props.onBusy} onFlush={props.onFlush} getRevision={props.getRevision} onClose={()=>setEvidenceId(null)}/>}
@@ -111,11 +114,11 @@ export function FactBankPane(props:Props){
         <p>仅复制已确认事实的本地关联记录；不自动继承外发权限。原始事实撤销或更正会同步撤销关联记录。外发前还将核对原始版本。</p>
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={props.locked||linking.sensitivity!=='shareable'} checked={linkShareable} onChange={e=>{setLinkShareable(e.target.checked);setLinkConfirmed(false);}}/>允许今后逐次选择该关联事实外发（默认关闭）</label>
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={props.locked} checked={linkConfirmed} onChange={e=>setLinkConfirmed(e.target.checked)}/>我已核对原事实与当前段落的主体、时间及来源一致</label>
-        <div className="flex gap-2"><button data-studio-control="true" type="button" disabled={props.locked||!linkConfirmed||!canLinkFactToDocument(props.document,linking)} onClick={link} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">确认跨版本关联</button><button data-studio-control="true" type="button" disabled={props.locked} onClick={()=>setLinking(null)} className="rounded border px-2 py-1 studio-ui-border">取消关联</button></div>
+        <div className="flex gap-2"><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={props.locked||!linkConfirmed||!canLinkFactToDocument(props.document,linking)} onClick={link} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">确认跨版本关联</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked} onClick={()=>setLinking(null)} className="rounded border px-2 py-1 studio-ui-border">取消关联</button></div>
       </section>}
       <div className="rounded bg-slate-50 p-2 space-y-2 studio-ui-raised">
         <div className="font-semibold">{correction?'更正事实（保留旧记录）':'新增本人核对的事实'}</div>
-        {correction&&<button data-studio-control="true" type="button" disabled={props.locked} className="text-teal-800 studio-ui-info" onClick={()=>{setCorrection(null);setDraft(blank);setConfirmedEntity(null);}}>取消更正</button>}
+        {correction&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked} className="text-teal-800 studio-ui-info" onClick={()=>{setCorrection(null);setDraft(blank);setConfirmedEntity(null);}}>取消更正</button>}
         <label className="block">关联段落<select data-studio-control="true" aria-label="事实关联段落" disabled={props.locked||!!correction} value={target} onChange={e=>{setTarget(e.target.value);setConfirmedEntity(null);}} className="mt-1 w-full rounded border p-1.5 studio-ui-border"><option value="">选择可见段落</option>{props.blocks.map(b=><option key={b.key} value={b.key}>{b.label}</option>)}</select></label>
         <label className="block">类型<select data-studio-control="true" aria-label="事实类型" disabled={props.locked} value={draft.kind} onChange={e=>edit('kind',e.target.value as FactInput['kind'])} className="mt-1 w-full rounded border p-1.5 studio-ui-border">{Object.entries({experience:'经历',achievement:'成果',credential:'资质',skill:'技能',other:'其他'}).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label>
         <label className="block">事实陈述<textarea data-studio-control="true" aria-label="事实陈述" disabled={props.locked} rows={3} maxLength={2000} value={draft.assertion} onChange={e=>edit('assertion',e.target.value)} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
@@ -123,7 +126,7 @@ export function FactBankPane(props:Props){
         {field('时间范围（可选）','timeframe',200)}{field('本地证据位置 / 来源说明','evidenceRef',1000)}
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={props.locked} checked={draft.sensitivity==='shareable'} onChange={e=>edit('sensitivity',e.target.checked?'shareable':'local-only')}/>允许今后逐次选择此外发事实（默认关闭）</label>
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={props.locked} checked={confirmed} onChange={e=>setConfirmedEntity(e.target.checked?factEntityId(props.document,target):null)}/>我已核对该陈述、主体和来源；确认新增本人自述事实</label>
-        <button data-studio-control="true" type="button" disabled={props.locked||!target||!draft.assertion.trim()||!draft.evidenceRef.trim()||!confirmed} onClick={create} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">{correction?'确认更正事实':'确认保存事实'}</button>
+        <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={props.locked||!target||!draft.assertion.trim()||!draft.evidenceRef.trim()||!confirmed} onClick={create} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">{correction?'确认更正事实':'确认保存事实'}</button>
       </div>
     </>}
   </details>;

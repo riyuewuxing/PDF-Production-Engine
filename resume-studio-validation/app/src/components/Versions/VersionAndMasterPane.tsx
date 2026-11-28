@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {
   BookMarked,
   Check,
@@ -97,6 +99,7 @@ export function VersionAndMasterPane({
   onFlushBeforeMutation,
   getCurrentRevision,
 }: VersionAndMasterPaneProps) {
+  const skins=useStudioComponentSkins();
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
@@ -301,7 +304,7 @@ export function VersionAndMasterPane({
                 }}
                 className="min-w-0 flex-1 rounded border border-slate-400 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-xs text-slate-900 studio-ui-primary"
               />
-              <button data-studio-control="true"
+              <button {...iconSkin(skins)} data-studio-control="true"
                 type="button"
                 aria-label="确认重命名"
                 onClick={() => {
@@ -313,7 +316,7 @@ export function VersionAndMasterPane({
               >
                 <Check size={12} />
               </button>
-              <button data-studio-control="true"
+              <button {...iconSkin(skins)} data-studio-control="true"
                 type="button"
                 aria-label="取消重命名"
                 onClick={() => setIsRenaming(false)}
@@ -325,7 +328,7 @@ export function VersionAndMasterPane({
           ) : (
             <div className="mt-1 flex items-center justify-between gap-2">
               <span className="truncate text-sm font-bold text-slate-900 studio-ui-primary">{activeDoc.title}</span>
-              <button data-studio-control="true"
+              <button {...iconSkin(skins)} data-studio-control="true"
                 type="button"
                 onClick={() => {
                   setRenameDraft(activeDoc.title);
@@ -340,14 +343,14 @@ export function VersionAndMasterPane({
         </section>
 
         <section className="space-y-1">
-          <button data-studio-control="true" type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug})} className="w-full rounded-lg border border-teal-600 studio-ui-selected-border bg-teal-50 studio-ui-selected py-2 font-semibold text-teal-800 studio-ui-selected-text disabled:opacity-50">对比版本 / 历史快照</button>
+          <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug})} className="w-full rounded-lg border border-teal-600 studio-ui-selected-border bg-teal-50 studio-ui-selected py-2 font-semibold text-teal-800 studio-ui-selected-text disabled:opacity-50">对比版本 / 历史快照</button>
           {comparisonDisabled&&<p className="text-[11px] text-slate-600 studio-ui-muted">脱敏预览开启时禁止查看原始版本差异。</p>}
         </section>
 
         {/* Master Bank Actions */}
         {activeSlug !== 'master' && (
           <section>
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins,'primary')} data-studio-control="true"
               type="button"
               disabled={busy}
               onClick={onOpenMasterMerge}
@@ -382,7 +385,7 @@ export function VersionAndMasterPane({
                     </div>
                   </button>
                   {(summaries.length > 1 || masterSummary) && (
-                    <button data-studio-control="true"
+                    <button {...iconSkin(skins,'danger')} data-studio-control="true"
                       type="button"
                       disabled={busy}
                       onClick={() => void handleDelete(item.slug, item.title)}
@@ -435,7 +438,7 @@ export function VersionAndMasterPane({
               <History size={13} className="text-teal-700 studio-ui-selected-text" />
               <span>历史快照回滚 {snapshotView?.error?'（检查失败）':!snapshotView?'（检查中）':`(${snapshots.length}/15)`}</span>
             </button>
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins,'primary')} data-studio-control="true"
               type="button"
               disabled={busy}
               onClick={() => void handleCreateManualSnapshot()}
@@ -479,8 +482,8 @@ export function VersionAndMasterPane({
                         模板：{snap.templateId} · 约 {snap.charCount} 字
                       </div>
                     </div>
-                    <button data-studio-control="true" type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug,snapshotId:snap.id})} aria-label={'对比历史快照 '+formatSnapshotTime(snap.createdAt)} className="shrink-0 rounded border border-slate-300 studio-ui-border px-2 py-1 text-[10px] font-semibold text-slate-700 studio-ui-primary disabled:opacity-50">对比</button>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||comparisonDisabled||Boolean(pdfDraft)} onClick={()=>setComparison({slug:activeSlug,snapshotId:snap.id})} aria-label={'对比历史快照 '+formatSnapshotTime(snap.createdAt)} className="shrink-0 rounded border border-slate-300 studio-ui-border px-2 py-1 text-[10px] font-semibold text-slate-700 studio-ui-primary disabled:opacity-50">对比</button>
+                    <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                       type="button"
                       disabled={busy}
                       onClick={() => void handleRestoreSnapshot(snap)}
@@ -533,7 +536,7 @@ export function VersionAndMasterPane({
               placeholder="输入新岗位名称，如：物理教研员"
               className="min-w-0 flex-1 rounded border border-slate-200 studio-ui-border px-2.5 py-1.5 text-xs text-slate-900 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
             />
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins,'primary')} data-studio-control="true"
               type="button"
               disabled={busy}
               onClick={() => void handleCreate()}
@@ -566,7 +569,7 @@ export function VersionAndMasterPane({
           <input data-studio-control="true" ref={textInputRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={e=>void handleTextualImport(e,'text')} className="hidden" />
           <input data-studio-control="true" ref={docxInputRef} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e=>void handleTextualImport(e,'docx')} className="hidden" />
           <div className="grid grid-cols-2 gap-2">
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins)} data-studio-control="true"
               type="button"
               disabled={busy || Boolean(pdfDraft)}
               onClick={() => importInputRef.current?.click()}
@@ -574,7 +577,7 @@ export function VersionAndMasterPane({
             >
               <Upload size={13} /> 导入 JSON
             </button>
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins)} data-studio-control="true"
               type="button"
               disabled={busy || Boolean(pdfDraft)}
               onClick={() => pdfInputRef.current?.click()}
@@ -582,11 +585,11 @@ export function VersionAndMasterPane({
             >
               <FileText size={13} /> 从旧 PDF 导入
             </button>
-            <button data-studio-control="true" type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover disabled:opacity-40">从 TXT / Markdown 导入</button>
-            <button data-studio-control="true" type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>docxInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover disabled:opacity-40">从 DOCX 导入</button>
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>textInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover disabled:opacity-40">从 TXT / Markdown 导入</button>
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy || Boolean(pdfDraft)} onClick={()=>docxInputRef.current?.click()} className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover disabled:opacity-40">从 DOCX 导入</button>
           </div>
-          {parsingTextualImport && <button data-studio-control="true" type="button" onClick={()=>parsingImport.current?.abort()} className="w-full rounded border border-amber-300 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface py-1.5 text-amber-900 studio-ui-warning">取消本地解析</button>}
-          <button data-studio-control="true"
+          {parsingTextualImport && <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>parsingImport.current?.abort()} className="w-full rounded border border-amber-300 studio-ui-warning-border bg-amber-50 studio-ui-warning-surface py-1.5 text-amber-900 studio-ui-warning">取消本地解析</button>}
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={handleExportJson}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface py-1.5 font-medium text-slate-700 studio-ui-primary hover:bg-slate-50 studio-ui-hover"

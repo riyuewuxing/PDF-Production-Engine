@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {
@@ -77,6 +79,7 @@ export function JobCareerPane({
   onCloneSnapshot,
   onExportStatus,
 }: JobCareerPaneProps) {
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const [subTab, setSubTab] = useState<CareerSubTab>('tracker');
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
@@ -458,13 +461,13 @@ export function JobCareerPane({
         {(ledger.error||ledger.dirty)&&<div role="alert" className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-2 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">
           <div className="font-semibold">{ledger.error||'台账草稿等待保存'}</div>
           <div className="flex flex-wrap gap-2">
-            {ledger.dirty&&<><button data-studio-control="true" type="button" disabled={ledger.saving} onClick={()=>void careerLedger.flush().catch(()=>{})} className="rounded border px-2 py-1 studio-ui-border">重试保存台账</button><button data-studio-control="true" type="button" onClick={()=>void backupLedger()} className="rounded border px-2 py-1 studio-ui-border">另存台账草稿</button></>}
-            <button data-studio-control="true" type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1 studio-ui-border">重载磁盘台账</button>
+            {ledger.dirty&&<><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={ledger.saving} onClick={()=>void careerLedger.flush().catch(()=>{})} className="rounded border px-2 py-1 studio-ui-border">重试保存台账</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>void backupLedger()} className="rounded border px-2 py-1 studio-ui-border">另存台账草稿</button></>}
+            <button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={ledger.saving||ledger.loading} onClick={()=>void reloadLedger()} className="rounded border px-2 py-1 studio-ui-border">重载磁盘台账</button>
           </div>
         </div>}
         {comparisonDisabled&&<p className="rounded border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700 studio-ui-border studio-ui-raised studio-ui-primary">脱敏预览开启时隐藏队列关联投递，禁止复盘、克隆原始永久快照或打开关联 PDF。</p>}
         {!loading&&!ledgerReviewReady&&<p className="text-[11px] text-slate-600 studio-ui-muted">永久快照复盘及克隆需要已确认的磁盘台账，请先处理未保存草稿或重新加载。</p>}
-        {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 studio-ui-border studio-ui-raised"><span className="text-[10px] text-slate-600 studio-ui-muted">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button data-studio-control="true" type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40 studio-ui-border studio-ui-surface studio-ui-primary">刷新磁盘台账</button></div>}
+        {!loading&&!ledger.dirty&&!ledger.error&&subTab==='tracker'&&<div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 studio-ui-border studio-ui-raised"><span className="text-[10px] text-slate-600 studio-ui-muted">复盘基于已确认磁盘台账；外部变动后请刷新。</span><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={ledger.saving||ledger.loading||Boolean(cloningId)} onClick={()=>void reloadLedger()} className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 disabled:opacity-40 studio-ui-border studio-ui-surface studio-ui-primary">刷新磁盘台账</button></div>}
         {/* Preserve a previously loaded queue session while refreshing the ledger.
             Its own guards block new reads/writes; other tabs retain the old loading behavior. */}
         {loading&&!(ledger.ready&&subTab==='queue') ? (
@@ -496,7 +499,7 @@ export function JobCareerPane({
                     <span className="text-[11px] font-semibold text-slate-700 studio-ui-primary">
                       5 阶段漏斗（面邀 {funnel.interviewRate}% · Offer {funnel.offerRate}%）
                     </span>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins)} data-studio-control="true"
                       type="button"
                       disabled={visibleApplications.length === 0}
                       onClick={() => void handleExportCsv()}
@@ -574,7 +577,7 @@ export function JobCareerPane({
                         </option>
                       ))}
                     </select>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                       type="button"
                       onClick={handleAddApplication}
                       className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-900 px-3 py-1.5 font-medium text-white hover:bg-slate-800 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
@@ -648,7 +651,7 @@ export function JobCareerPane({
                                 {item.appliedDate && <span>{item.appliedDate}</span>}
                               </div>
                             </div>
-                            <button data-studio-control="true"
+                            <button {...iconSkin(skins,'danger')} data-studio-control="true"
                               type="button"
                               onClick={() => void deleteApplication(item)}
                               aria-label={`删除投递 ${item.company}`}
@@ -677,9 +680,9 @@ export function JobCareerPane({
                             </select>
 
                             <div className="flex flex-wrap items-center gap-1">
-                              {item.snapshotId&&<button data-studio-control="true" type="button" disabled={!canReview||Boolean(cloningId)} onClick={()=>openApplicationReview(item)} aria-label={'只读复盘 '+item.company} className="inline-flex items-center gap-0.5 rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-info-surface studio-ui-info"><History size={10}/> 只读复盘</button>}
+                              {item.snapshotId&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!canReview||Boolean(cloningId)} onClick={()=>openApplicationReview(item)} aria-label={'只读复盘 '+item.company} className="inline-flex items-center gap-0.5 rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-info-surface studio-ui-info"><History size={10}/> 只读复盘</button>}
                               {item.snapshotId && onCloneSnapshot && (
-                                <button data-studio-control="true"
+                                <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                                   type="button"
                                   disabled={!canReview||Boolean(cloningId)}
                                   onClick={() => void handleCloneSnapshotToWorkspace(item)}
@@ -689,15 +692,15 @@ export function JobCareerPane({
                                   {cloningId===item.id?(clonePhase==='reading'?'读取核验中…':'创建复盘版…'):'克隆回工作台'}
                                 </button>
                               )}
-                              {cloningId===item.id&&clonePhase==='reading'&&<button data-studio-control="true" type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">取消读取快照</button>}
+                              {cloningId===item.id&&clonePhase==='reading'&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>{if(cloneRead.current?.phase==='reading')cloneRead.current.cancel();}} className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-900 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">取消读取快照</button>}
                               {item.pdfReceipt&&item.snapshotId&&item.exportedFilePath&&desktop&&<>
-                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-info-surface studio-ui-info">核验 PDF</button>
-                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">核验并打开</button>
-                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40 studio-ui-border studio-ui-primary">选择文件核验</button>
-                                <button data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>void handleSubmissionPackage(item)} aria-label={'制作投递包 '+item.company} className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-surface studio-ui-info">制作投递包 ZIP</button>
+                                <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'check')} aria-label={'核验 PDF '+item.company} className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-info-surface studio-ui-info">核验 PDF</button>
+                                <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'open')} aria-label={'核验并打开 PDF '+item.company} title="每次打开前重新核验记录路径的实际字节；核验不是对随后文件变化的锁定" className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800 disabled:opacity-40 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">核验并打开</button>
+                                <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)} onClick={()=>void handlePdfCheck(item,'choose')} aria-label={'选择 PDF 核验 '+item.company} title="显式选择已移动或另存的文件，仅比较字节，不改台账路径" className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 disabled:opacity-40 studio-ui-border studio-ui-primary">选择文件核验</button>
+                                <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={!canReview||packageBusy||Boolean(pdfCheck&&!pdfCheck.result&&!pdfCheck.error)||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>void handleSubmissionPackage(item)} aria-label={'制作投递包 '+item.company} className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-800 disabled:opacity-40 studio-ui-info-border studio-ui-surface studio-ui-info">制作投递包 ZIP</button>
                               </>}
                               {item.exportedFilePath && !item.pdfReceipt && desktop && (
-                                <button data-studio-control="true"
+                                <button {...buttonSkin(skins)} data-studio-control="true"
                                   type="button"
                                   disabled={comparisonDisabled}
                                   title="台账记录的路径，未核验文件内容与封存时一致；打开前请自行核对。"
@@ -708,7 +711,7 @@ export function JobCareerPane({
                                 </button>
                               )}
                               {item.resumeSlug && (
-                                <button data-studio-control="true"
+                                <button {...buttonSkin(skins)} data-studio-control="true"
                                   type="button"
                                   onClick={() => onSwitchToResumeForEdit(item.resumeSlug)}
                                   className="inline-flex items-center gap-0.5 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 studio-ui-selected-border studio-ui-selected studio-ui-selected-text studio-ui-selected-hover"
@@ -768,7 +771,7 @@ export function JobCareerPane({
                               aria-label={`${item.company} 面试地点`}
                               className="col-span-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-800 studio-ui-border studio-ui-raised studio-ui-primary"
                             />
-                            <button data-studio-control="true"
+                            <button {...buttonSkin(skins)} data-studio-control="true"
                               type="button"
                               onClick={() => void handleExportIcs(item)}
                               title="导出 RFC 5545 标准日历日程（含提前 30 分钟提醒）"
@@ -891,7 +894,7 @@ export function JobCareerPane({
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-slate-900 studio-ui-primary">1. 正式自荐信 / 求职信</span>
                     <div className="flex items-center gap-1.5">
-                      <button data-studio-control="true"
+                      <button {...buttonSkin(skins)} data-studio-control="true"
                         type="button"
                         onClick={() => void copyText('cover', effectiveCoverLetter)}
                         className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-primary studio-ui-hover"
@@ -899,7 +902,7 @@ export function JobCareerPane({
                         {copiedKey === 'cover' ? <Check size={11} /> : <Copy size={11} />}
                         {copiedKey === 'cover' ? '已复制' : '复制'}
                       </button>
-                      <button data-studio-control="true"
+                      <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                         type="button"
                         disabled={exportingLetter}
                         onClick={() => void handleExportCoverLetter()}
@@ -927,7 +930,7 @@ export function JobCareerPane({
                       placeholder="版本标题（留空则按单位-岗位-日期自动命名）"
                       className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                       type="button"
                       onClick={handleSaveCoverLetterVersion}
                       className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-800 hover:bg-slate-100 studio-ui-border studio-ui-raised studio-ui-primary studio-ui-hover"
@@ -948,7 +951,7 @@ export function JobCareerPane({
                             key={saved.id}
                             className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] studio-ui-border studio-ui-raised"
                           >
-                            <button data-studio-control="true"
+                            <button {...buttonSkin(skins)} data-studio-control="true"
                               type="button"
                               onClick={() => handleLoadCoverLetterVersion(saved)}
                               className="min-w-0 flex-1 truncate text-left font-medium text-slate-800 hover:text-teal-700 studio-ui-primary studio-ui-hover-primary"
@@ -956,7 +959,7 @@ export function JobCareerPane({
                             >
                               {saved.title}（{saved.headerVariant}）
                             </button>
-                            <button data-studio-control="true"
+                            <button {...iconSkin(skins,'danger')} data-studio-control="true"
                               type="button"
                               aria-label={`删除自荐信版本 ${saved.title}`}
                               onClick={() => handleDeleteCoverLetterVersion(saved.id)}
@@ -977,7 +980,7 @@ export function JobCareerPane({
                     <span className="inline-flex items-center gap-1 font-bold text-slate-900 studio-ui-primary">
                       <Mail size={13} className="text-sky-600 studio-ui-info" /> 2. 规范投递邮件主题与正文
                     </span>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins)} data-studio-control="true"
                       type="button"
                       onClick={() =>
                         void copyText(
@@ -1009,7 +1012,7 @@ export function JobCareerPane({
                     <span className="inline-flex items-center gap-1 font-bold text-slate-900 studio-ui-primary">
                       <MessageSquareText size={13} className="text-emerald-600 studio-ui-success" /> 3. BOSS直聘 / 招聘平台 3 句话开场白
                     </span>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins)} data-studio-control="true"
                       type="button"
                       onClick={() => void copyText('boss', effectiveBossText)}
                       className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-primary studio-ui-hover"

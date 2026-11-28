@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {
   AlertCircle,
   AlertTriangle,
@@ -100,6 +102,7 @@ export function DiagnoseAndMatchPane({
   onFlushBeforeApply: () => Promise<void>;
   getCurrentRevision: () => string;
 }) {
+  const skins=useStudioComponentSkins();
   const [subTab, setSubTab] = useState<DiagnoseSubTab>('hr');
   const [jobRewriteApplied,setJobRewriteApplied]=useState<{slug:string;document:ResumeDocument;source:string}|null>(null);
   const [internalJobSource,setInternalJobSource]=useState<{text:string;pdfOrigin?:JobPdfOrigin}>({text:''});
@@ -648,7 +651,7 @@ export function DiagnoseAndMatchPane({
                         </div>
                       </div>
                       {finding.sectionId && (
-                        <button data-studio-control="true"
+                        <button {...buttonSkin(skins)} data-studio-control="true"
                           type="button"
                           onClick={() => onJumpToSection(finding.sectionId!)}
                           className="inline-flex shrink-0 items-center gap-0.5 rounded border border-current/25 bg-white studio-ui-surface px-2 py-1 text-[11px] font-semibold hover:bg-slate-50 studio-ui-hover"
@@ -746,7 +749,7 @@ export function DiagnoseAndMatchPane({
                 在内存中把当前简历渲染成与正式导出完全一致的矢量 A4 PDF，再解析出招聘系统真正读到的文本流。
                 全程不落盘、不产生快照、不改动原稿。
               </p>
-              <button data-studio-control="true"
+              <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                 type="button"
                 disabled={atsRunning}
                 onClick={() => void handleRunAtsInspection()}
@@ -904,8 +907,8 @@ export function DiagnoseAndMatchPane({
                     <select data-studio-control="true" aria-label="当前模型档案" value={aiSettings.profileId} disabled={profileBusy||testingConnection||polishing||tailoring} onChange={e=>{const id=e.target.value;void changeProfile(()=>apiClient.activateAiProfile(id));}} className="w-full rounded border border-slate-300 p-1.5 studio-ui-border">
                       {catalog.profiles.map(p=><option key={p.profileId} value={p.profileId}>{p.providerLabel} · {p.model}{p.enabled?'':'（未启用）'}</option>)}
                     </select>
-                    <button data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1 studio-ui-info-border">新建模型档案</button>
-                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700 studio-ui-error">删除档案</button></div>)}</div>
+                    <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>void changeProfile(()=>apiClient.createAiProfile({...DEFAULT_BYOK_SETTINGS,providerLabel:'新模型档案'}))} className="rounded border border-teal-300 px-2 py-1 studio-ui-info-border">新建模型档案</button>
+                    <div className="space-y-1">{catalog.profiles.filter(p=>p.profileId!==catalog.activeProfileId).map(p=><div key={p.profileId} className="flex items-center justify-between gap-1 text-[10px]"><span className="min-w-0 truncate">{p.providerLabel} · {p.model} · {p.hasApiKey?'已存密钥':'无密钥'}</span><button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring} onClick={()=>{if(window.confirm('删除该模型档案及其本地加密密钥？'))void changeProfile(()=>apiClient.removeAiProfile(p.profileId!,p.revision!));}} className="text-red-700 studio-ui-error">删除档案</button></div>)}</div>
                     <p className="text-[10px] text-slate-500 studio-ui-muted">档案独立保存，不自动跨模型切换或复用其他档案密钥。</p>
                    </div>}
                    <input data-studio-control="true" aria-label="模型档案名称" value={aiSettings.providerLabel} onChange={e=>setAiSettings(p=>({...p,providerLabel:e.target.value}))} className="w-full rounded border border-slate-200 p-1.5 studio-ui-border" placeholder="档案名称"/>
@@ -991,7 +994,7 @@ export function DiagnoseAndMatchPane({
                   <p className="text-[10px] text-slate-500 studio-ui-muted">预算为本地上限，不代表该模型真实上下文能力；不自动重试其他接口。</p>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-emerald-700 studio-ui-success">{settingsSavedMsg}</span>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                       type="button"
                       onClick={() => void handleSaveAiSettings()}
                        disabled={profileBusy||testingConnection||polishing||tailoring}
@@ -1002,7 +1005,7 @@ export function DiagnoseAndMatchPane({
                   </div>
                   <div className="rounded border border-teal-200 bg-white p-2 space-y-1 studio-ui-info-border studio-ui-surface">
                     <p className="text-[10px] text-slate-500 studio-ui-muted">连接测试仅发送固定英文合成探针（无简历、JD 或个人资料），输出上限为64或1024 tokens，并受档案上限约束。</p>
-                    <div className="flex items-center gap-2"><button data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50 studio-ui-info-border studio-ui-info">测试模型连接</button>{testingConnection&&<button data-studio-control="true" type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消连接测试</button>}</div>
+                    <div className="flex items-center gap-2"><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={profileBusy||testingConnection||polishing||tailoring||!aiSettings.enabled} onClick={()=>void testConnection()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50 studio-ui-info-border studio-ui-info">测试模型连接</button>{testingConnection&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>testAbort.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消连接测试</button>}</div>
                     {connectionTip&&<p role="status" className="text-emerald-700 studio-ui-success">{connectionTip}</p>}
                      {connectionAttempt?.settings===aiSettings&&<AiTaskReceiptView label="连接测试调用回执" attempt={connectionAttempt.value}/>}
                   </div>
@@ -1054,8 +1057,8 @@ export function DiagnoseAndMatchPane({
                   <pre className="whitespace-pre-wrap break-words text-[10px]">{(pendingRequest.mode==='single'?pendingRequest.options:pendingRequest.prepared.options).userPrompt}</pre>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button data-studio-control="true" type="button" disabled={factsBusy||polishing||tailoring||applying} onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white studio-ui-fill studio-ui-on-fill">确认发送给模型</button>
-                  <button data-studio-control="true" type="button" onClick={()=>setPendingRequest(null)} className="rounded border border-slate-300 bg-white px-3 py-1.5 studio-ui-border studio-ui-surface">取消发送</button>
+                  <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={factsBusy||polishing||tailoring||applying} onClick={confirmPendingRequest} className="rounded bg-teal-700 px-3 py-1.5 font-semibold text-white studio-ui-fill studio-ui-on-fill">确认发送给模型</button>
+                  <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>setPendingRequest(null)} className="rounded border border-slate-300 bg-white px-3 py-1.5 studio-ui-border studio-ui-surface">取消发送</button>
                 </div>
               </section>
             )}
@@ -1085,7 +1088,7 @@ export function DiagnoseAndMatchPane({
                 </label>
 
                 <div className="flex items-center gap-2">
-                  <button data-studio-control="true"
+                  <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                     type="button"
                     disabled={tailoring || applying || factsBusy}
                     onClick={() => void handlePrepareTailor()}
@@ -1095,7 +1098,7 @@ export function DiagnoseAndMatchPane({
                     {tailoring ? '正在分析整卷匹配与防编造检查...' : '生成整卷 JD 定向提案'}
                   </button>
                   {tailoring && (
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins)} data-studio-control="true"
                       type="button"
                       onClick={() => {tailorAbortRef.current?.abort();setWholeAttempt({status:'cancelled'});setTailorError(null);setPendingRequest(null);}}
                       className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-surface studio-ui-primary studio-ui-hover"
@@ -1121,7 +1124,7 @@ export function DiagnoseAndMatchPane({
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 studio-ui-border studio-ui-raised">
                       <div className="flex flex-wrap gap-1.5">
-                        <button data-studio-control="true"
+                        <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                           type="button"
                           disabled={applying}
                           onClick={() => {
@@ -1133,7 +1136,7 @@ export function DiagnoseAndMatchPane({
                         >
                           已核对后全选无机器预警项
                         </button>
-                        <button data-studio-control="true"
+                        <button {...buttonSkin(skins)} data-studio-control="true"
                           type="button"
                           disabled={applying}
                           onClick={() =>
@@ -1145,7 +1148,7 @@ export function DiagnoseAndMatchPane({
                         </button>
                       </div>
 
-                      <button data-studio-control="true"
+                      <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                         type="button"
                         disabled={applying || factsBusy || !tailorProposals.some((p) => p.accepted) || !wholeReview.canApply}
                         onClick={() => void handleApplyTailorProposals()}
@@ -1188,7 +1191,7 @@ export function DiagnoseAndMatchPane({
                               />
                               <span>{proposal.label}</span>
                             </label>
-                            <button data-studio-control="true"
+                            <button {...buttonSkin(skins)} data-studio-control="true"
                               type="button"
                               onClick={() =>
                                 setTailorEditingKey(isEditing ? null : proposal.blockKey)
@@ -1326,7 +1329,7 @@ export function DiagnoseAndMatchPane({
                 ))}
               </div>
 
-              <button data-studio-control="true"
+              <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                 type="button"
                 disabled={polishing || applying || factsBusy || !selectedBlock}
                 onClick={handlePreparePolish}
@@ -1335,7 +1338,7 @@ export function DiagnoseAndMatchPane({
                 <Wand2 size={13} /> {polishing ? '请求模型生成中...' : '生成润色对比 Diff'}
               </button>
 
-              {polishing&&<button data-studio-control="true" type="button" onClick={()=>{polishAbortRef.current?.abort();setSingleAttempt({status:'cancelled'});setPolishError(null);}} className="rounded border px-2 py-1 studio-ui-border">取消单段请求</button>}
+              {polishing&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>{polishAbortRef.current?.abort();setSingleAttempt({status:'cancelled'});setPolishError(null);}} className="rounded border px-2 py-1 studio-ui-border">取消单段请求</button>}
               {singleBasis&&isCurrent(singleBasis)&&<AiTaskReceiptView label="单段调用回执" attempt={singleAttempt}/>}
               {polishError && (
                 <div role="alert" ref={polishErrorElement} className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 studio-ui-error-border studio-ui-error-surface studio-ui-error">
@@ -1350,14 +1353,14 @@ export function DiagnoseAndMatchPane({
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-teal-900 studio-ui-info">原文 vs 建议 Diff 审阅</span>
                   <div className="flex items-center gap-1.5">
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins)} data-studio-control="true"
                       type="button"
                       onClick={() => setSuggestedText(null)}
                       className="rounded border border-slate-300 bg-white px-2.5 py-1 text-[11px] text-slate-600 hover:bg-slate-50 studio-ui-border studio-ui-surface studio-ui-muted studio-ui-hover"
                     >
                       放弃
                     </button>
-                    <button data-studio-control="true"
+                    <button {...buttonSkin(skins,'primary')} data-studio-control="true"
                       type="button"
                       disabled={applying || factsBusy || !polishRiskConfirmed || !singleReview.canApply}
                       onClick={() => void handleAdoptDiff()}

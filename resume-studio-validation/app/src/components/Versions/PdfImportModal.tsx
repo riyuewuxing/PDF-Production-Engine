@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { Check, FileText, X } from 'lucide-react';
@@ -17,6 +19,7 @@ export function PdfImportModal({
   onCancel: () => void;
   onCreateVersion: (doc: ResumeDocument) => Promise<void>;
 }) {
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const [form, setForm] = useState<PdfImportDraft | null>(draft);
   const [busy, setBusy] = useState(false);
@@ -82,7 +85,7 @@ export function PdfImportModal({
               本地启发式提取，所有字段均为待核对候选，并非事实验证。{form.sourceKind==='docx'?'仅提取正文文字及可识别标题，不复刻 Word 版式。':'Markdown 仅识别常见二级章节、三级经历标题。'} 原文件不变。确认后另建独立版本。
             </p>
           </div>
-          <button data-studio-control="true"
+          <button {...iconSkin(skins)} data-studio-control="true"
             type="button"
             onClick={cancel}
             disabled={busy}
@@ -237,10 +240,10 @@ export function PdfImportModal({
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs studio-ui-border studio-ui-raised">
           {(needsUnclassifiedDecision || needsDocxReview) && <p role="status" className="mr-auto text-amber-800 studio-ui-warning">{needsDocxReview?'请先确认 DOCX 提取范围。 ':''}{needsUnclassifiedDecision?'请先选择未分类原文的处理方式。':''}</p>}
-          <button data-studio-control="true" type="button" onClick={()=>jump(fieldsRef.current)} className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 md:hidden studio-ui-border studio-ui-surface studio-ui-primary">定位字段</button>
-          <button data-studio-control="true" type="button" onClick={()=>jump(sourceRef.current)} className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 studio-ui-border studio-ui-surface studio-ui-primary">定位原文</button>
-          {(needsUnclassifiedDecision||needsDocxReview)&&<button data-studio-control="true" type="button" onClick={()=>jump(needsDocxReview?scopeRef.current:unknownRef.current)} className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-900 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">定位待确认</button>}
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>jump(fieldsRef.current)} className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 md:hidden studio-ui-border studio-ui-surface studio-ui-primary">定位字段</button>
+          <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>jump(sourceRef.current)} className="rounded border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 studio-ui-border studio-ui-surface studio-ui-primary">定位原文</button>
+          {(needsUnclassifiedDecision||needsDocxReview)&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>jump(needsDocxReview?scopeRef.current:unknownRef.current)} className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-900 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning">定位待确认</button>}
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={cancel}
             disabled={busy}
@@ -248,7 +251,7 @@ export function PdfImportModal({
           >
             取消
           </button>
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true"
             type="button"
             disabled={busy || needsUnclassifiedDecision || needsDocxReview}
             onClick={() => void handleConfirm()}

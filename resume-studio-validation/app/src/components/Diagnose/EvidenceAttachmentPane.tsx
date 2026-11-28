@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useEffect,useRef,useState} from 'react';
 import type {FactRecord} from '../../schema/factBankSchema';
 import type {EvidenceEntry,EvidenceIndex,EvidenceIntegrity,EvidenceVaultAudit} from '../../schema/evidenceSchema';
@@ -11,6 +13,7 @@ const INTEGRITY:Record<EvidenceIntegrity['state'],string>={intact:'字节校验�
 const sizeLabel=(n:number)=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB';
 
 export function EvidenceAttachmentPane(props:Props){
+  const skins=useStudioComponentSkins();
   const [index,setIndex]=useState<EvidenceIndex|null>(null);
   const [audit,setAudit]=useState<EvidenceVaultAudit|null>(null);
   const [integrity,setIntegrity]=useState<Record<string,EvidenceIntegrity>>({});
@@ -66,15 +69,15 @@ export function EvidenceAttachmentPane(props:Props){
     void task(async()=>{const value=await bridge!.purge({id:e.id,indexRevision:index.revision,confirmation:'DELETE_MANAGED_EVIDENCE_COPY'});if(mounted.current){update(value);setNotice('已删除工作台副本，保留历史索引。');}});
   };
   return <section aria-label="本地证据附件索引" className="space-y-2 rounded border border-indigo-200 bg-indigo-50/50 p-2 break-words studio-ui-info-border studio-ui-info-surface">
-    <div className="flex items-start justify-between gap-2"><div className="font-semibold text-indigo-900 studio-ui-info">本地证据附件索引</div><button data-studio-control="true" type="button" disabled={locked} onClick={props.onClose} className="rounded border px-2 py-0.5 studio-ui-border">关闭附件索引</button></div>
+    <div className="flex items-start justify-between gap-2"><div className="font-semibold text-indigo-900 studio-ui-info">本地证据附件索引</div><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked} onClick={props.onClose} className="rounded border px-2 py-0.5 studio-ui-border">关闭附件索引</button></div>
     <div>事实：{props.fact.assertion}</div>
     {!rootOnly&&<p className="text-indigo-900 studio-ui-info">跨版本关联：只读查看原始事实的附件；增删请管理原始记录。</p>}
     <p>附件、文件名、说明和 SHA-256 仅存本地，不进入 AI 请求或简历导出。字节一致仅表示与导入副本相符，不代表内容真实或已独立鉴证。附件管理不改变既有事实外发授权。</p>
     {!bridge&&<p>当前仅桌面版支持本地附件管理。</p>}
-    <button data-studio-control="true" type="button" disabled={locked||!bridge} onClick={refresh} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">加载 / 刷新附件索引</button>
+    <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked||!bridge} onClick={refresh} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">加载 / 刷新附件索引</button>
     <div className="flex flex-wrap gap-1">
-      <button data-studio-control="true" type="button" disabled={locked||!bridge} onClick={()=>void task(async()=>{const value=await bridge!.audit();if(mounted.current)setAudit(value);})} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">核对本地附件目录</button>
-      <button data-studio-control="true" type="button" disabled={locked||!bridge} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">打开本地证据目录</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked||!bridge} onClick={()=>void task(async()=>{const value=await bridge!.audit();if(mounted.current)setAudit(value);})} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">核对本地附件目录</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked||!bridge} onClick={()=>void task(()=>bridge!.openVault())} className="rounded border bg-white px-2 py-1 studio-ui-surface studio-ui-border">打开本地证据目录</button>
     </div>
     {audit&&<div aria-label="本地附件目录核对结果" className="rounded border border-indigo-200 bg-white p-2 space-y-1 studio-ui-info-border studio-ui-surface">
       <div className="font-semibold">目录核对（全库，非全文哈希）</div>
@@ -101,10 +104,10 @@ export function EvidenceAttachmentPane(props:Props){
           <div className="text-slate-600 studio-ui-muted">导入：{e.createdAt.replace('T',' ').slice(0,19)} UTC</div>
           {integrity[e.id]&&<div role="status" className={integrity[e.id]?.state==='intact'?'text-teal-800 studio-ui-info':'text-red-800 studio-ui-error'}>{INTEGRITY[integrity[e.id]!.state]} · {integrity[e.id]!.checkedAt.replace('T',' ').slice(0,19)} UTC</div>}
           <div className="flex flex-wrap gap-1">
-            <button data-studio-control="true" type="button" disabled={locked||e.status==='purged'} onClick={()=>verify(e)} className="rounded border px-2 py-1 studio-ui-border">校验副本 SHA-256</button>
-            <button data-studio-control="true" type="button" disabled={locked||e.status==='purged'} onClick={()=>reveal(e)} className="rounded border px-2 py-1 studio-ui-border">在文件夹定位副本</button>
-            {rootOnly&&e.status==='attached'&&<button data-studio-control="true" type="button" disabled={locked} onClick={()=>detach(e)} className="rounded border px-2 py-1 text-amber-800 studio-ui-warning studio-ui-border">解除附件关联</button>}
-            {rootOnly&&e.status==='detached'&&<button data-studio-control="true" type="button" disabled={locked} onClick={()=>purge(e)} className="rounded border px-2 py-1 text-red-800 studio-ui-error studio-ui-border">删除本地附件副本</button>}
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked||e.status==='purged'} onClick={()=>verify(e)} className="rounded border px-2 py-1 studio-ui-border">校验副本 SHA-256</button>
+            <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked||e.status==='purged'} onClick={()=>reveal(e)} className="rounded border px-2 py-1 studio-ui-border">在文件夹定位副本</button>
+            {rootOnly&&e.status==='attached'&&<button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={locked} onClick={()=>detach(e)} className="rounded border px-2 py-1 text-amber-800 studio-ui-warning studio-ui-border">解除附件关联</button>}
+            {rootOnly&&e.status==='detached'&&<button {...buttonSkin(skins,'danger')} data-studio-control="true" type="button" disabled={locked} onClick={()=>purge(e)} className="rounded border px-2 py-1 text-red-800 studio-ui-error studio-ui-border">删除本地附件副本</button>}
           </div>
         </div>)}
       </div>
@@ -113,7 +116,7 @@ export function EvidenceAttachmentPane(props:Props){
         <p>支持 PDF、PNG、JPG、UTF-8 TXT；单文件 {MAX_EVIDENCE_FILE_BYTES/1048576} MB，目录最多 {MAX_EVIDENCE_VAULT_BYTES/1048576} MB。只复制明确选择的文件，不扫描目录、不自动打开附件。</p>
         <label className="block">来源说明（可选）<textarea data-studio-control="true" aria-label="附件来源说明" disabled={locked} rows={2} maxLength={500} value={note} onChange={e=>{setNote(e.target.value);setConsent(false);}} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={locked} checked={consent} onChange={e=>setConsent(e.target.checked)}/>我确认将选择的附件复制到本地并关联该事实，不允许自动外发</label>
-        <button data-studio-control="true" type="button" disabled={locked||!consent||audit?.indexMissingWithFiles===true||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">选择文件并关联证据</button>
+        <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked||!consent||audit?.indexMissingWithFiles===true||index.entries.length>=MAX_EVIDENCE_RECORDS} onClick={attach} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">选择文件并关联证据</button>
       </div>:<p className="text-slate-600 studio-ui-muted">只有当前版本的有效原始事实可新增附件；历史或其他版本记录仍可本地追溯。</p>}
     </>}
   </section>;

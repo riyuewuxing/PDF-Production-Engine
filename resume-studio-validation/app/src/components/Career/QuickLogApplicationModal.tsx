@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { BookmarkCheck, Loader2, X } from 'lucide-react';
@@ -44,6 +46,7 @@ export function QuickLogApplicationModal({
   onClose,
   onLogged,
 }: QuickLogApplicationModalProps) {
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
@@ -199,7 +202,7 @@ export function QuickLogApplicationModal({
             <BookmarkCheck size={16} className="text-emerald-400 studio-ui-success" />
             记入投递并锁定永久原稿快照
           </div>
-          <button data-studio-control="true"
+          <button {...iconSkin(skins)} data-studio-control="true"
             type="button"
             onClick={onClose} disabled={saving||refreshing}
             aria-label="关闭记入投递弹窗"
@@ -225,7 +228,7 @@ export function QuickLogApplicationModal({
         {feedback && (
           <div role={feedback.kind==='error'?'alert':'status'} className={`rounded border px-3 py-2 text-[11px] ${feedback.kind==='success'?'border-emerald-500/40 bg-emerald-950/60 text-emerald-200 studio-ui-success-border studio-ui-success-surface studio-ui-success':feedback.kind==='warn'?'border-amber-500/40 bg-amber-950/60 text-amber-200 studio-ui-warning-border studio-ui-warning-surface studio-ui-warning':'border-red-500/40 bg-red-950/60 text-red-200 studio-ui-error-border studio-ui-error-surface studio-ui-error'}`}>
             {feedback.message}
-            {queueTask&&<button data-studio-control="true" type="button" disabled={saving||refreshing} className="ml-2 rounded border px-2 py-1 studio-ui-border" onClick={()=>void refreshQueueLedger()}>{refreshing?'读取台账中…':'刷新岗位归档台账'}</button>}
+            {queueTask&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={saving||refreshing} className="ml-2 rounded border px-2 py-1 studio-ui-border" onClick={()=>void refreshQueueLedger()}>{refreshing?'读取台账中…':'刷新岗位归档台账'}</button>}
           </div>
         )}
 
@@ -315,14 +318,14 @@ export function QuickLogApplicationModal({
         </label>
 
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins)} data-studio-control="true"
             type="button"
             onClick={onClose} disabled={saving||refreshing}
             className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800 studio-ui-border studio-ui-muted studio-ui-hover"
           >
             取消
           </button>
-          <button data-studio-control="true"
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true"
             type="submit"
             disabled={saving||refreshing}
             className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-4 py-1.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"

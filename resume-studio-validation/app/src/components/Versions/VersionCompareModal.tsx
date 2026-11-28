@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { useEffect, useRef, useState } from 'react';
@@ -26,6 +28,7 @@ function Value({value,reveal}:{value:ComparisonValue|null;reveal:boolean}){
 }
 
 export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummary,snapshots,initialSnapshotId,onClose,applicationReview}:Props){
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const [targetKey,setTargetKey]=useState(applicationReview?'memory:'+activeSlug:initialSnapshotId?'snapshot:'+initialSnapshotId:'disk:'+activeSlug);
   const [result,setResult]=useState<Loaded|null>(null);
@@ -113,7 +116,7 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
         <div><h2 className="flex items-center gap-2 text-sm font-bold"><ArrowLeftRight size={16} className="text-teal-700 studio-ui-info"/>{applicationReview?"永久投递快照只读复盘":"只读版本差异对照"}</h2>
           <p className="mt-1 text-[11px] text-slate-600 studio-ui-muted">{applicationReview?'基准为台账关联、身份核验通过的永久原稿；对照为当前内存稿（可能尚未保存）或本地磁盘版本。差异方向：封存原稿 → 对照稿。只读，不恢复、不保存、不调用 AI。':'基准为点击读取时的当前内存稿（可能尚未保存），对照为读取到的本地磁盘版本或快照。不会切换、保存、合并、回滚或调用 AI。'}</p>
         </div>
-        <button data-studio-control="true" ref={closeRef} type="button" onClick={close} aria-label="关闭版本对照" className="rounded p-1 hover:bg-slate-100 studio-ui-hover"><X size={17}/></button>
+        <button {...iconSkin(skins)} data-studio-control="true" ref={closeRef} type="button" onClick={close} aria-label="关闭版本对照" className="rounded p-1 hover:bg-slate-100 studio-ui-hover"><X size={17}/></button>
       </header>
       <div className="space-y-2 border-b border-slate-200 px-4 py-3 text-xs studio-ui-border">
         {applicationReview&&<div className="rounded border border-indigo-200 bg-indigo-50 p-2 text-[11px] text-indigo-950 studio-ui-info-border studio-ui-info-surface studio-ui-info">
@@ -129,8 +132,8 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
               {targets.map(t=><option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
           </label>
-          <button data-studio-control="true" type="button" disabled={!target||busy} onClick={()=>void read()} className="inline-flex items-center gap-1 rounded bg-teal-700 px-3 py-2 font-semibold text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill"><RefreshCw size={13}/>{busy?'读取中…':'读取并对比'}</button>
-          {busy&&<button data-studio-control="true" type="button" onClick={()=>{cancelRead();setError('已取消本次读取，不显示迟到结果。');}} className="rounded border border-slate-300 px-3 py-2 studio-ui-border">取消读取</button>}
+          <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={!target||busy} onClick={()=>void read()} className="inline-flex items-center gap-1 rounded bg-teal-700 px-3 py-2 font-semibold text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill"><RefreshCw size={13}/>{busy?'读取中…':'读取并对比'}</button>
+          {busy&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>{cancelRead();setError('已取消本次读取，不显示迟到结果。');}} className="rounded border border-slate-300 px-3 py-2 studio-ui-border">取消读取</button>}
         </div>
         {error&&<p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-red-800 studio-ui-error-border studio-ui-error-surface studio-ui-error">{error}</p>}
         {shown&&<>
@@ -166,8 +169,8 @@ export function VersionCompareModal({activeSlug,activeDoc,summaries,masterSummar
         </>}
       </div>
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs studio-ui-border studio-ui-raised">
-        {shown?<div className="flex items-center gap-2"><span>当前筛选 {filtered.length} 条 · {actualPage+1}/{pageCount} 页</span><button data-studio-control="true" type="button" disabled={actualPage===0} onClick={()=>changePage(actualPage-1)} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 studio-ui-border">上一页</button><button data-studio-control="true" type="button" disabled={actualPage+1>=pageCount} onClick={()=>changePage(actualPage+1)} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 studio-ui-border">下一页</button></div>:<span>所有比较均为只读。</span>}
-        <button data-studio-control="true" type="button" onClick={close} className="rounded border border-slate-300 bg-white px-3 py-1.5 studio-ui-border studio-ui-surface">关闭对照</button>
+        {shown?<div className="flex items-center gap-2"><span>当前筛选 {filtered.length} 条 · {actualPage+1}/{pageCount} 页</span><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={actualPage===0} onClick={()=>changePage(actualPage-1)} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 studio-ui-border">上一页</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={actualPage+1>=pageCount} onClick={()=>changePage(actualPage+1)} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 studio-ui-border">下一页</button></div>:<span>所有比较均为只读。</span>}
+        <button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={close} className="rounded border border-slate-300 bg-white px-3 py-1.5 studio-ui-border studio-ui-surface">关闭对照</button>
       </footer>
     </div>
   </div>;

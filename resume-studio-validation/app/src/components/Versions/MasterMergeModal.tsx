@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { CheckSquare, Loader2, Square, X } from 'lucide-react';
@@ -19,6 +21,7 @@ export function MasterMergeModal({
   onMerge,
   onClose,
 }: MasterMergeModalProps) {
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const [masterDoc, setMasterDoc] = useState<ResumeDocument | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,7 +108,7 @@ export function MasterMergeModal({
             <h2 className="text-base font-bold text-slate-900 studio-ui-primary">从母库 (master.json) 挑选合并条目</h2>
             <p className="text-xs text-slate-500 studio-ui-muted">勾选需要引入当前岗位的经历条目，合并后可继续针对本岗位微调</p>
           </div>
-          <button data-studio-control="true"
+          <button {...iconSkin(skins)} data-studio-control="true"
             type="button"
             onClick={onClose}
             aria-label="关闭母库挑选弹窗"
@@ -319,14 +322,14 @@ export function MasterMergeModal({
         <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3 studio-ui-border">
           <span className="text-xs text-slate-500 studio-ui-muted">已选择 {totalSelected} 项</span>
           <div className="flex items-center gap-2">
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins)} data-studio-control="true"
               type="button"
               onClick={onClose}
               className="rounded border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 studio-ui-border studio-ui-primary studio-ui-hover"
             >
               取消
             </button>
-            <button data-studio-control="true"
+            <button {...buttonSkin(skins,'primary')} data-studio-control="true"
               type="button"
               disabled={totalSelected === 0}
               onClick={handleConfirmMerge}

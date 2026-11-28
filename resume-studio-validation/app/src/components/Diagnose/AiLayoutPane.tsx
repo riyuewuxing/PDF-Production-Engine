@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useEffect,useRef,useState} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import {apiClient,localErrorMessage} from '../../lib/apiClient';
@@ -11,6 +13,7 @@ type Basis={document:ResumeDocument;slug:string;settings:ByokAiSettings;goal:str
 type Prepared={basis:Basis;options:ByokCompletionOptions};
 type Candidate={basis:Basis;proposal:LayoutProposal;next:ResumeDocument};
 export function AiLayoutPane(props:Props){
+  const skins=useStudioComponentSkins();
   const [goal,setGoal]=useState('');
   const [allowTemplate,setAllowTemplate]=useState(false);
   const [pending,setPending]=useState<Prepared|null>(null);
@@ -76,17 +79,17 @@ export function AiLayoutPane(props:Props){
     <p>只发送目标、当前七项排版参数、模板 ID 与画布测量。默认禁止切换模板，不发送正文、照片、联系方式或本地 PDF。</p>
     <label className="block">版式目标<textarea data-studio-control="true" aria-label="AI 版式目标" disabled={locked} value={goal} onChange={e=>{setGoal(e.target.value);clear();}} rows={3} placeholder="例如：在不缩小正文到难以阅读的情况下，尽量压到一页。" className="mt-1 w-full rounded border p-2 studio-ui-border"/></label>
     <label className="flex gap-2"><input data-studio-control="true" type="checkbox" disabled={locked} checked={allowTemplate} onChange={e=>{setAllowTemplate(e.target.checked);clear();}}/>允许从现有模板中选择其他模板（默认关闭）</label>
-    <button data-studio-control="true" type="button" disabled={locked||!goal.trim()} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">预览版式请求</button>
-    {busy&&<div className="flex items-center justify-between"><span>{busy==='model'?'模型处理中…':busy==='render'?'正在本地渲染两份 PDF…':'正在创建快照并应用…'}</span>{busy!=='apply'&&<button data-studio-control="true" type="button" onClick={()=>ctrl.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消版式任务</button>}</div>}
+    <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked||!goal.trim()} onClick={prepare} className="rounded bg-teal-700 px-3 py-1.5 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">预览版式请求</button>
+    {busy&&<div className="flex items-center justify-between"><span>{busy==='model'?'模型处理中…':busy==='render'?'正在本地渲染两份 PDF…':'正在创建快照并应用…'}</span>{busy!=='apply'&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>ctrl.current?.abort()} className="rounded border px-2 py-1 studio-ui-border">取消版式任务</button>}</div>}
     {attempt&&same(attempt.basis)&&<AiTaskReceiptView label="版式调用回执" attempt={attempt.value}/>}
     {error&&<p role="alert" className="rounded bg-red-50 p-2 text-red-800 studio-ui-error-surface studio-ui-error">{error}</p>}
     {notice&&<p role="status" className="rounded bg-teal-50 p-2 text-teal-800 studio-ui-info-surface studio-ui-info">{notice}</p>}
-    {pending&&same(pending.basis)&&<div aria-label="版式 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-amber-50 p-2 studio-ui-warning-border studio-ui-warning-surface"><strong>版式发送前确认</strong><p className="break-all">{pending.basis.settings.model} · {validateByokBaseUrl(pending.basis.settings.baseUrl).baseUrl}/chat/completions</p><p>{describeAiRequest(pending.basis.settings,pending.options)}</p><div className="max-h-56 overflow-auto bg-white p-2 studio-ui-surface"><pre className="whitespace-pre-wrap break-words">{pending.options.systemPrompt}</pre><pre className="whitespace-pre-wrap break-words">{pending.options.userPrompt}</pre></div><button data-studio-control="true" type="button" onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white studio-ui-fill studio-ui-on-fill">确认发送版式请求</button><button data-studio-control="true" type="button" onClick={()=>setPending(null)} className="ml-2 rounded border px-2 py-1 studio-ui-border">取消发送</button></div>}
+    {pending&&same(pending.basis)&&<div aria-label="版式 AI 数据发送预览" className="space-y-2 rounded border border-amber-300 bg-amber-50 p-2 studio-ui-warning-border studio-ui-warning-surface"><strong>版式发送前确认</strong><p className="break-all">{pending.basis.settings.model} · {validateByokBaseUrl(pending.basis.settings.baseUrl).baseUrl}/chat/completions</p><p>{describeAiRequest(pending.basis.settings,pending.options)}</p><div className="max-h-56 overflow-auto bg-white p-2 studio-ui-surface"><pre className="whitespace-pre-wrap break-words">{pending.options.systemPrompt}</pre><pre className="whitespace-pre-wrap break-words">{pending.options.userPrompt}</pre></div><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" onClick={()=>void send()} className="rounded bg-teal-700 px-2 py-1 text-white studio-ui-fill studio-ui-on-fill">确认发送版式请求</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" onClick={()=>setPending(null)} className="ml-2 rounded border px-2 py-1 studio-ui-border">取消发送</button></div>}
     {candidate&&same(candidate.basis)&&<div className="space-y-2 rounded border border-slate-200 p-2 studio-ui-border"><strong>版式候选（尚未应用）</strong><p>{candidate.proposal.reason}</p>
       <table className="w-full text-left"><thead><tr><th>参数</th><th>原值</th><th>候选</th></tr></thead><tbody>{LAYOUT_KEYS.filter(k=>candidate.basis.document.globalSettings[k]!==candidate.next.globalSettings[k]).map(k=><tr key={k} className="border-t studio-ui-border"><td>{LAYOUT_LIMITS[k].label}</td><td>{layoutSettings(candidate.basis.document)[k]}</td><td>{layoutSettings(candidate.next)[k]}</td></tr>)}{candidate.basis.document.templateId!==candidate.next.templateId&&<tr><td>模板</td><td className="break-all">{candidate.basis.document.templateId}</td><td className="break-all">{candidate.next.templateId}</td></tr>}</tbody></table>
-      <button data-studio-control="true" type="button" disabled={locked} onClick={()=>void render()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50 studio-ui-info-border studio-ui-info">本地试渲染版式对照</button>
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={locked} onClick={()=>void render()} className="rounded border border-teal-300 px-2 py-1 text-teal-800 disabled:opacity-50 studio-ui-info-border studio-ui-info">本地试渲染版式对照</button>
       {comparison&&<><AiPdfComparisonView comparison={comparison}/><label className="flex items-start gap-2"><input data-studio-control="true" type="checkbox" disabled={locked||!!comparison.blockers.length} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>我已检查真实 PDF 前后页面、可读性与机读风险，确认应用当前候选版式。</label></>}
-      <button data-studio-control="true" type="button" disabled={locked||!comparison||!!comparison.blockers.length||!confirmed} onClick={()=>void apply()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">应用已核对版式</button>
+      <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={locked||!comparison||!!comparison.blockers.length||!confirmed} onClick={()=>void apply()} className="rounded bg-teal-700 px-2 py-1 text-white disabled:opacity-50 studio-ui-fill studio-ui-on-fill">应用已核对版式</button>
     </div>}
   </section>;
 }

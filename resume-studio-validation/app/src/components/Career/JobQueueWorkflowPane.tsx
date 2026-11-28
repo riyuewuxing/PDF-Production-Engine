@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
@@ -20,6 +22,7 @@ const primary='rounded bg-teal-700 px-3 py-1.5 font-medium text-white disabled:o
  * draft or switches/edits the user's document. All persistent actions use the
  * existing ledger, export and immutable PDF-snapshot services. */
 export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueOpenResult;activeDoc:ResumeDocument;onExit:()=>void}){
+  const skins=useStudioComponentSkins();
   const themeId=useStudioThemeId();
   const {task,document}=opened;
   const ledger=useSyncExternalStore(careerLedger.subscribe,careerLedger.getSnapshot);
@@ -106,7 +109,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
   const disabled=busy||invalid||!clean||logOpen;
   return <section data-studio-region="job-workflow" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} aria-label="固定岗位材料流程" className="space-y-3 break-words">
     <div className="rounded-lg border border-teal-300 bg-teal-50 p-3 space-y-2 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">
-      <div className="flex flex-wrap justify-between gap-2"><h3 className="font-bold text-teal-900 studio-ui-selected-text">固定岗位材料流程</h3><button data-studio-control="true" type="button" className={btn} disabled={busy||logOpen} onClick={onExit}>返回岗位队列</button></div>
+      <div className="flex flex-wrap justify-between gap-2"><h3 className="font-bold text-teal-900 studio-ui-selected-text">固定岗位材料流程</h3><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={btn} disabled={busy||logOpen} onClick={onExit}>返回岗位队列</button></div>
       <p className="font-semibold">{task.company} · {task.role}</p>
       <p>绑定简历：{document.title} · {task.slug}</p>
       <p className="text-[10px] break-all">任务 ID：{task.id} · 原稿 SHA-256：{task.documentSha256}</p>
@@ -115,7 +118,7 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
       <p className="text-[11px] text-slate-700 studio-ui-primary">已保存核对档案 {archiveCount} · 自荐信 {letters.length} · PDF归档 {applications.length}。这些是记录数量，不是流程通过率。离开或切换模块会丢弃未归档的核对会话；保存的历史保留。</p>
     </div>
     {invalid&&<p role="alert" className="rounded bg-amber-50 p-2 text-amber-900 studio-ui-warning-surface studio-ui-warning">本次流程核验失效。请返回岗位队列重新核验；若磁盘简历已变更，须登记新任务。不会自动换绑。</p>}
-    {!clean&&<div role="status" className="text-amber-800 studio-ui-warning">台账尚未获得保存确认；完成保存或到投递追踪处理草稿后再操作。{!ledger.dirty&&!ledger.saving&&!ledger.loading&&<button data-studio-control="true" type="button" disabled={busy||logOpen} className={btn} onClick={()=>void run(async()=>{await careerLedger.load();if(mounted.current)setNotice('已读取磁盘台账，请重新核验。');})}>刷新岗位流程台账</button>}</div>}
+    {!clean&&<div role="status" className="text-amber-800 studio-ui-warning">台账尚未获得保存确认；完成保存或到投递追踪处理草稿后再操作。{!ledger.dirty&&!ledger.saving&&!ledger.loading&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={busy||logOpen} className={btn} onClick={()=>void run(async()=>{await careerLedger.load();if(mounted.current)setNotice('已读取磁盘台账，请重新核验。');})}>刷新岗位流程台账</button>}</div>}
     {error&&<p role="alert" className="break-words text-red-700 studio-ui-error">{error}</p>}
     {notice&&<p role="status" className="break-words text-teal-800 studio-ui-selected-text">{notice}</p>}
     <div className="grid grid-cols-2 gap-1 rounded bg-slate-100 p-1 studio-ui-raised">
@@ -126,17 +129,17 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
       <h4 className="font-semibold">固定岗位自荐信（本地生成，可人工修改）</h4>
       <textarea data-studio-control="true" aria-label="岗位自荐信正文" value={letter} rows={9} disabled={busy} onChange={e=>setLetter(e.target.value)} className="w-full rounded border p-2 text-slate-900 studio-ui-primary studio-ui-border"/>
       <input data-studio-control="true" aria-label="岗位自荐信版本名" maxLength={200} value={letterTitle} onChange={e=>setLetterTitle(e.target.value)} disabled={busy} placeholder="选填版本名" className="w-full rounded border p-2 studio-ui-border"/>
-      <div className="flex flex-wrap gap-2"><button data-studio-control="true" type="button" className={primary} disabled={disabled} onClick={saveLetter}>保存岗位自荐信</button><button data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={exportLetter}>导出岗位自荐信 PDF</button></div>
-      {letters.map(l=><div key={l.id} className="rounded border p-2 studio-ui-border"><p className="font-semibold break-words">{l.title}</p><p>{l.updatedAt}</p><button data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current){setLetter(l.bodyText);setLetterTitle(l.title);}})}>载入此岗位历史自荐信</button></div>)}
+      <div className="flex flex-wrap gap-2"><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={primary} disabled={disabled} onClick={saveLetter}>保存岗位自荐信</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={exportLetter}>导出岗位自荐信 PDF</button></div>
+      {letters.map(l=><div key={l.id} className="rounded border p-2 studio-ui-border"><p className="font-semibold break-words">{l.title}</p><p>{l.updatedAt}</p><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current){setLetter(l.bodyText);setLetterTitle(l.title);}})}>载入此岗位历史自荐信</button></div>)}
       <details><summary data-studio-control="true">本地邮件及平台话术参考（未发送）</summary><p className="font-semibold mt-2">{bundle.emailSubject}</p><pre className="whitespace-pre-wrap break-words">{bundle.emailBody}</pre><pre className="whitespace-pre-wrap break-words mt-2">{bundle.bossGreeting}</pre></details>
     </div>}
     {!invalid&&tab==='interview'&&<InterviewPracticePane document={document} slug={task.slug} queueTask={task} beforeQueueExport={verify}/>}
     {!invalid&&tab==='materials'&&<div className="rounded border p-3 space-y-2 studio-ui-border">
       <h4 className="font-semibold">原稿 PDF 与本地投递台账</h4>
       <p>先显式导出绑定的原稿 PDF，再确认永久归档。默认待投递；不自动发送或认定送达。ZIP 只包含已核验的原稿 PDF 及本人明确选择的附件。</p>
-      <button data-studio-control="true" type="button" className={primary} disabled={disabled} onClick={exportPdf}>导出岗位原稿 PDF</button>
-      {snapshot&&<div className="rounded bg-teal-50 p-2 space-y-1 studio-ui-selected studio-ui-selected-text"><p className="break-all">{snapshot.filePath}</p><p className="break-all text-[10px]">PDF SHA-256：{snapshot.pdfReceipt.sha256}</p><button data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current)setLogOpen(true);})}>核对并归档岗位 PDF</button></div>}
-      {applications.map(a=><article key={a.id} className="rounded border p-2 space-y-1 studio-ui-border" aria-label={'岗位归档 '+a.id}><p className="font-semibold">{a.company} · {a.role}</p><p>{a.status==='wishlist'?'待投递': '本人台账状态：'+a.status} · 永久快照 {a.snapshotId}</p><p className="text-[10px] break-all">PDF SHA-256：{a.pdfReceipt?.sha256??'缺少凭证'}</p><button data-studio-control="true" type="button" className={btn} disabled={disabled||!a.pdfReceipt||!a.snapshotId||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>packagePdf(a)}>制作本岗位投递包 ZIP</button><p className="text-slate-600 studio-ui-muted">完整只读复盘、状态管理与 PDF 核验仍在投递追踪。</p></article>)}
+      <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={primary} disabled={disabled} onClick={exportPdf}>导出岗位原稿 PDF</button>
+      {snapshot&&<div className="rounded bg-teal-50 p-2 space-y-1 studio-ui-selected studio-ui-selected-text"><p className="break-all">{snapshot.filePath}</p><p className="break-all text-[10px]">PDF SHA-256：{snapshot.pdfReceipt.sha256}</p><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current)setLogOpen(true);})}>核对并归档岗位 PDF</button></div>}
+      {applications.map(a=><article key={a.id} className="rounded border p-2 space-y-1 studio-ui-border" aria-label={'岗位归档 '+a.id}><p className="font-semibold">{a.company} · {a.role}</p><p>{a.status==='wishlist'?'待投递': '本人台账状态：'+a.status} · 永久快照 {a.snapshotId}</p><p className="text-[10px] break-all">PDF SHA-256：{a.pdfReceipt?.sha256??'缺少凭证'}</p><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={btn} disabled={disabled||!a.pdfReceipt||!a.snapshotId||!window.resumeDesktop?.applications?.exportPackage} onClick={()=>packagePdf(a)}>制作本岗位投递包 ZIP</button><p className="text-slate-600 studio-ui-muted">完整只读复盘、状态管理与 PDF 核验仍在投递追踪。</p></article>)}
     </div>}
     {logOpen&&snapshot&&!invalid&&<QuickLogApplicationModal isOpen snapshot={snapshot} queueTask={task} queueRequestId={snapshot.requestId} beforeSubmit={verify} onClose={()=>setLogOpen(false)} onLogged={()=>{if(mounted.current){setSnapshot(null);setNotice('岗位 PDF 已封存至永久台账；未发送。');}}}/>}
   </section>;

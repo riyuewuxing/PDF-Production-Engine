@@ -1,0 +1,347 @@
+{
+  "base": "70b15042072d00bdcc162a1d9e23ca1308e4360f",
+  "files": [
+    {
+      "path": "components/Versions/MasterMergeModal.tsx",
+      "baseBlob": "ef98e67ffef34e8bbf317a3ae3d770dce22d7eef",
+      "entries": [
+        {
+          "line": 108,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 322,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 329,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/PdfImportModal.tsx",
+      "baseBlob": "d0371386e34a1ff51e9a9cb444537d965cdbc550",
+      "entries": [
+        {
+          "line": 85,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 240,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 241,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 242,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 243,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 251,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/RecoveryDraftPanel.tsx",
+      "baseBlob": "a1e9b51de5086d739bbf6421bb328b56a0766c7c",
+      "entries": [
+        {
+          "line": 52,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 56,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 57,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 58,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 59,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 60,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/RecycleBinPanel.tsx",
+      "baseBlob": "e2908b862ca29c0817a83ac09d37541928937430",
+      "entries": [
+        {
+          "line": 47,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 57,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 58,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 59,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/VersionAndMasterPane.tsx",
+      "baseBlob": "b7f3304a75a9e8552cee6cc04885d08bf0c1dfac",
+      "entries": [
+        {
+          "line": 304,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 316,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 328,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 343,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 350,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 385,
+          "ordinal": 1,
+          "role": "danger",
+          "family": "icon"
+        },
+        {
+          "line": 438,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 482,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 483,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 536,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 569,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 577,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 585,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 586,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 588,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 589,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/VersionCompareModal.tsx",
+      "baseBlob": "a319745046e3cf9e913a692c7379c98584f993ef",
+      "entries": [
+        {
+          "line": 116,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "icon"
+        },
+        {
+          "line": 132,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 133,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 169,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 169,
+          "ordinal": 2,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 170,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/WorkspaceBackupPane.tsx",
+      "baseBlob": "de44888be66ec3544e0c2f4e55d9fa790e75de88",
+      "entries": [
+        {
+          "line": 56,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 62,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 66,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 71,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        },
+        {
+          "line": 79,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 85,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    },
+    {
+      "path": "components/Versions/WriteLockPanel.tsx",
+      "baseBlob": "e5c4a47391536ab1ff03362256ccfb015e2fe139",
+      "entries": [
+        {
+          "line": 30,
+          "ordinal": 1,
+          "role": "normal",
+          "family": "button"
+        },
+        {
+          "line": 36,
+          "ordinal": 1,
+          "role": "primary",
+          "family": "button"
+        }
+      ]
+    }
+  ]
+}

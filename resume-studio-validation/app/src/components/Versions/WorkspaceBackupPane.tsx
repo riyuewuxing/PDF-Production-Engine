@@ -1,3 +1,5 @@
+import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
+import { buttonSkin } from '../../studio-theme/componentSkins';
 import {useLayoutEffect,useRef,useState} from 'react';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {localErrorMessage} from '../../lib/apiClient';
@@ -13,6 +15,7 @@ function Summary({value,timeLabel='备份时间'}:{value:BackupSummary;timeLabel
   </div>;
 }
 export function WorkspaceBackupPane({onFlush,recoveryOnly=false}:{onFlush:()=>Promise<void>;recoveryOnly?:boolean}){
+  const skins=useStudioComponentSkins();
   const bridge=window.resumeDesktop?.workspaceBackup;
   const [busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [inspection,setInspection]=useState<BackupInspection|null>(null),[result,setResult]=useState<BackupResult|null>(null),[confirmed,setConfirmed]=useState(false);
@@ -53,22 +56,22 @@ export function WorkspaceBackupPane({onFlush,recoveryOnly=false}:{onFlush:()=>Pr
       {openedWorkspace&&<div aria-label="独立工作区启动结果" className="mt-1 border-t border-teal-100 studio-ui-selected-border pt-1"><p>已收到独立窗口就绪确认（进程 ID：<span aria-label="独立工作区进程 ID">{openedWorkspace.pid}</span>）。</p><p className="break-all">{openedWorkspace.folder}</p></div>}
     </div>}
     <div className="flex flex-wrap gap-1">
-      {!recoveryOnly&&<button data-studio-control="true" type="button" disabled={!!busy} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>void run('正在创建备份',async()=>{
+      {!recoveryOnly&&<button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={!!busy} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>void run('正在创建备份',async()=>{
         setResult(null);setInspection(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
         await onFlush();await careerLedger.flush();
         if(careerLedger.getSnapshot().dirty||careerLedger.getSnapshot().saving)throw new Error('投递台账还有未确认写入，请先保存。');
         const saved=await bridge.create();if(saved){setResultKind('backup');setResult(saved);setNotice('已创建并校验工作区备份。');}else setNotice('已取消创建备份，未发布备份文件夹。');
       })}>创建本地工作区备份</button>}
-      <button data-studio-control="true" type="button" disabled={!!busy} className="rounded border bg-white studio-ui-surface px-2 py-1.5" onClick={()=>void run('正在检查备份',async()=>{
+      <button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!!busy} className="rounded border bg-white studio-ui-surface px-2 py-1.5" onClick={()=>void run('正在检查备份',async()=>{
         setInspection(null);setResult(null);setConfirmed(false);setLaunchInspection(null);setLaunchConfirmed(false);setOpenedWorkspace(null);
         const checked=await bridge.inspect();if(checked){setInspection(checked);setNotice('备份文件清单及内容校验完成，当前工作区未改动。');}else setNotice('已取消检查备份，当前工作区未改动。');
       })}>检查已有备份</button>
-      {bridge.prepareLaunch&&bridge.launch&&<button data-studio-control="true" type="button" disabled={!!busy} className="rounded border bg-white studio-ui-surface px-2 py-1.5" onClick={()=>prepareLaunch('choose')}>检查并打开已有恢复工作区</button>}
+      {bridge.prepareLaunch&&bridge.launch&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!!busy} className="rounded border bg-white studio-ui-surface px-2 py-1.5" onClick={()=>prepareLaunch('choose')}>检查并打开已有恢复工作区</button>}
     </div>
     {inspection&&<div ref={reviewRef} className="space-y-2 scroll-mt-44">
       <p className="break-all">{inspection.folder}</p><Summary value={inspection}/>
       <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" aria-label="确认恢复到独立新工作区" checked={confirmed} disabled={!!busy} onChange={e=>setConfirmed(e.target.checked)}/>我已检查备份范围及异常提示，确认仅恢复到独立新工作区，不切换或覆盖当前工作区。</label>
-      <button data-studio-control="true" type="button" disabled={!!busy||!confirmed} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>void run('正在恢复到新工作区',async()=>{
+      <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={!!busy||!confirmed} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>void run('正在恢复到新工作区',async()=>{
         const basis=inspection;setInspection(null);setConfirmed(false);
         const restored=await bridge.restore(basis.token,'RESTORE_TO_NEW_WORKSPACE');
         if(restored){setResultKind('restore');setResult(restored);setNotice('已恢复并校验独立新工作区，当前工作区未改动。');}else setNotice('已取消恢复，需重新检查备份后才能恢复。');
@@ -76,13 +79,13 @@ export function WorkspaceBackupPane({onFlush,recoveryOnly=false}:{onFlush:()=>Pr
     </div>}
     {result&&<div aria-label="工作区备份结果" className="space-y-1">
       <p className="break-all">{result.folder}</p><Summary value={result}/>
-      {resultKind==='restore'&&<div className="space-y-1 rounded bg-white studio-ui-surface p-2">{bridge.prepareLaunch&&bridge.launch&&<button data-studio-control="true" type="button" disabled={!!busy} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>prepareLaunch('last')}>检查并打开刚恢复的工作区</button>}<p className="text-slate-700 studio-ui-primary">外部导出文件路径可能仍指向旧位置；需要重新配置 AI 密钥。</p><details className="rounded border p-2"><summary className="cursor-pointer font-medium">手动启动（备用方式）</summary><p className="mt-2">请保留原工作区。关闭工作台后，在新开的 PowerShell 中复制并执行下方设置，再从该 PowerShell 启动原来的 Resume Studio.exe（源码开发版在项目目录执行 pnpm desktop:start）。关闭 PowerShell 后，此临时变量不再生效。</p><textarea data-studio-control="true" aria-label="恢复工作区启动设置" readOnly rows={3} onFocus={e=>e.currentTarget.select()} value={"$env:RESUME_STUDIO_DATA_DIR = '"+result.folder.replace(/'/g,"''")+"'"} className="w-full resize-y rounded border p-1 font-mono text-[10px]"/><p>应指向上面的新文件夹，而不是其中的 data。</p></details></div>}
+      {resultKind==='restore'&&<div className="space-y-1 rounded bg-white studio-ui-surface p-2">{bridge.prepareLaunch&&bridge.launch&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!!busy} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>prepareLaunch('last')}>检查并打开刚恢复的工作区</button>}<p className="text-slate-700 studio-ui-primary">外部导出文件路径可能仍指向旧位置；需要重新配置 AI 密钥。</p><details className="rounded border p-2"><summary className="cursor-pointer font-medium">手动启动（备用方式）</summary><p className="mt-2">请保留原工作区。关闭工作台后，在新开的 PowerShell 中复制并执行下方设置，再从该 PowerShell 启动原来的 Resume Studio.exe（源码开发版在项目目录执行 pnpm desktop:start）。关闭 PowerShell 后，此临时变量不再生效。</p><textarea data-studio-control="true" aria-label="恢复工作区启动设置" readOnly rows={3} onFocus={e=>e.currentTarget.select()} value={"$env:RESUME_STUDIO_DATA_DIR = '"+result.folder.replace(/'/g,"''")+"'"} className="w-full resize-y rounded border p-1 font-mono text-[10px]"/><p>应指向上面的新文件夹，而不是其中的 data。</p></details></div>}
     </div>}
     {launchInspection&&<div ref={reviewRef} aria-label="独立工作区打开确认" className="space-y-2 scroll-mt-44 rounded border border-teal-300 studio-ui-selected-border bg-white studio-ui-surface p-2">
       <p className="font-semibold">准备打开独立恢复工作区</p><p className="break-all">{launchInspection.folder}</p><Summary value={launchInspection} timeLabel="检查时间"/>
       <p>这是恢复副本的当前数据检查，不是与原始备份的历史一致性证明。新窗口使用独立数据与浏览器配置，当前窗口及未保存内容不会被关闭或切换。</p>
       <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" aria-label="确认打开独立恢复工作区" checked={launchConfirmed} disabled={!!busy} onChange={e=>setLaunchConfirmed(e.target.checked)}/>我确认在新窗口打开上述工作区，之后的编辑仅属于该工作区。</label>
-      <button data-studio-control="true" type="button" disabled={!!busy||!launchConfirmed} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>void run('正在启动并等待独立窗口就绪',async()=>{
+      <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={!!busy||!launchConfirmed} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>void run('正在启动并等待独立窗口就绪',async()=>{
         const basis=launchInspection;setLaunchInspection(null);setLaunchConfirmed(false);
         const opened=await bridge.launch?.(basis.token,'OPEN_INDEPENDENT_WORKSPACE');
         if(opened?.ready){setOpenedWorkspace({folder:opened.folder,pid:opened.pid});setNotice('独立恢复工作区已实际加载，新窗口就绪；当前窗口继续保留。');}
