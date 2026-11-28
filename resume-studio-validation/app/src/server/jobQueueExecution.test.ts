@@ -242,15 +242,49 @@ describe('local worker cancellation and watchdog',()=>{
   it('records worker failure once, then explicit retry succeeds without executing another pending task',async()=>{
     const f=await fixture(),executor=new JobQueueExecutor(f.store);
     const worker=vi.spyOn(f.store,'prepareJobQueueAttempt').mockRejectedValueOnce(Error('synthetic fault'));
-    await executor.command(command(f.x,f.ledger.revision!,'start'));
-    await until(async()=>row(await f.store.getApplications(),f.x.id).status==='failed');
-    const failed=await f.store.getApplications();
-    expect(row(failed,f.x.id)).toMatchObject({status:'failed',execution:{failure:'local-error',attempts:1}});
-    expect(row(failed,f.y.id)).toEqual(f.y);expect(worker).toHaveBeenCalledTimes(1);
+    // The terminal row can become visible before the asynchronous completion
+    // call returns. Hold exactly that interval instead of racing filesystem I/O.
+    const realFinish=f.store.finishJobQueueAttempt.bind(f.store);
+    let releaseFinish!:()=>void;
+    const held=new Promise<void>(resolve=>{releaseFinish=resolve;});
+    const finish=vi.spyOn(f.store,'finishJobQueueAttempt').mockImplementationOnce(async(...args)=>{
+      const published=await realFinish(...args);
+      await held;
+      return published;
+    });
+    let failed!:Awaited<ReturnType<LocalResumeStore['getApplications']>>;
+    try {
+      await executor.command(command(f.x,f.ledger.revision!,'start'));
+      await until(async()=>row(await f.store.getApplications(),f.x.id).status==='failed');
+      failed=await f.store.getApplications();
+      expect(row(failed,f.x.id)).toMatchObject({status:'failed',execution:{failure:'local-error',attempts:1}});
+      expect(row(failed,f.y.id)).toEqual(f.y);
+      expect(worker).toHaveBeenCalledTimes(1);expect(finish).toHaveBeenCalledTimes(1);
+      const bytes=await readBytes(f.store);
+      await expect(executor.command(command(f.x,failed.revision!,'retry'))).rejects.toThrow(/上一项任务仍在收口/);
+      await expect(executor.command(command(f.y,failed.revision!,'start'))).rejects.toThrow(/上一项任务仍在收口/);
+      expect(await readBytes(f.store)).toEqual(bytes);
+      expect(worker).toHaveBeenCalledTimes(1);
+    } finally {
+      releaseFinish();
+      // The worker is already done. Wait for the actual finish promise, then
+      // let the executor's continuation/finally release its in-process lease.
+      const first=finish.mock.results[0];
+      if(first?.type==='return')await first.value;
+      await new Promise<void>(resolve=>setImmediate(resolve));
+    }
     await executor.command(command(f.x,failed.revision!,'retry'));
     await until(async()=>row(await f.store.getApplications(),f.x.id).status==='prepared');
-    expect(worker).toHaveBeenCalledTimes(2);expect(row(await f.store.getApplications(),f.y.id)).toEqual(f.y);
-  });
+    expect(finish).toHaveBeenCalledTimes(2);
+    await finish.mock.results[1]!.value;
+    await new Promise<void>(resolve=>setImmediate(resolve));
+    const end=await f.store.getApplications();
+    expect(worker).toHaveBeenCalledTimes(2);
+    expect(row(end,f.x.id)).toMatchObject({status:'prepared',execution:{attempts:2,result:result(f.x)}});
+    expect(row(end,f.y.id)).toEqual(f.y);
+    expect(end.applications).toEqual(failed.applications);
+    expect(await Promise.all(['demo-a','demo-b'].map(slug=>fs.readFile(f.store.resolveResumePath(slug).filePath)))).toEqual(f.original);
+  },15000);
   it('times out an uncooperative read, aborts its signal, records failure once, and ignores eventual late reply',async()=>{
     const f=await fixture(),s=await f.store.commandJobQueue(command(f.x,f.ledger.revision!,'start')),task=s.started!;
     vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
