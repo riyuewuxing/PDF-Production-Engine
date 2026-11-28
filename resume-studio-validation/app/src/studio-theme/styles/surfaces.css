@@ -7,6 +7,16 @@
     color: var(--studio-text);
     border-color: var(--studio-border);
   }
+  [data-studio-surface="panel"][data-studio-status="warning"][data-studio-theme]:not([data-studio-theme="classic"]) {
+    background-color: var(--studio-warning-surface);
+    color: var(--studio-warning);
+    border-color: var(--studio-warning);
+  }
+  [data-studio-surface="panel"][data-studio-status="error"][data-studio-theme]:not([data-studio-theme="classic"]) {
+    background-color: var(--studio-danger-surface);
+    color: var(--studio-error);
+    border-color: var(--studio-error);
+  }
   /* Gallery contains document renderers: preserve inherited foreground and color-scheme. */
   [data-studio-surface="gallery"][data-studio-theme]:not([data-studio-theme="classic"]) {
     background-color: var(--studio-surface);
@@ -76,7 +86,7 @@
   /* These are business chrome and raster-image review surfaces, not a live A4.
      Native scrollbar colors inherit within each explicit region; geometry is untouched.
      The classic palette and OS forced-colors remain authoritative. */
-  :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"], [data-studio-region="version-compare-dialog"], [data-studio-region="master-merge-dialog"], [data-studio-region="resume-import-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+  :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"], [data-studio-region="version-compare-dialog"], [data-studio-region="master-merge-dialog"], [data-studio-region="resume-import-dialog"], [data-studio-region="command-palette"], [data-studio-region="startup-error"], [data-studio-region="recovery-drafts"])[data-studio-theme]:not([data-studio-theme="classic"]) {
     scrollbar-color: var(--studio-border) var(--studio-surface);
   }
 
@@ -86,7 +96,7 @@
   [data-studio-stage="themed"] [data-studio-stage-label="true"] { color: var(--studio-stage-label); }
 
   @media (forced-colors: active) {
-    :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"], [data-studio-region="version-compare-dialog"], [data-studio-region="master-merge-dialog"], [data-studio-region="resume-import-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) {
+    :is([data-studio-region="diagnose-jd"], [data-studio-region="diagnose-ai"], [data-studio-region="ai-pdf-portal"], [data-studio-region="version-compare-dialog"], [data-studio-region="master-merge-dialog"], [data-studio-region="resume-import-dialog"], [data-studio-region="command-palette"], [data-studio-region="startup-error"], [data-studio-region="recovery-drafts"])[data-studio-theme]:not([data-studio-theme="classic"]) {
       scrollbar-color: auto;
     }
     :is([data-studio-surface="panel"], [data-studio-surface="preview"], [data-studio-surface="gallery"]) [data-studio-control]:focus-visible {

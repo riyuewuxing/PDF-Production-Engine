@@ -12,6 +12,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ResumeSummary, TemplateId } from '../../schema/resumeSchema';
 import { TEMPLATE_REGISTRY } from '../../templates/registry';
 import { STUDIO_THEME_IDS, STUDIO_THEMES, type StudioThemeId } from '../../studio-theme/presets';
+import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
+import {surfaceStyle} from '../../studio-theme/surfaces';
 
 export type StudioNavTab = 'edit' | 'templates' | 'style' | 'versions' | 'diagnose' | 'career';
 
@@ -67,6 +69,8 @@ export function CommandPaletteModal({
   onToggleRedacted,
   onToggleLocale,
 }: CommandPaletteModalProps) {
+  const contextThemeId=useStudioThemeId();
+  const themeId=activeStudioTheme??contextThemeId;
   const [query, setQuery] = useState('');
   const [highlightedIdx, setHighlightedIdx] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -303,11 +307,12 @@ export function CommandPaletteModal({
         role="dialog"
         aria-modal="true"
         aria-label="全局命令面板"
-        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-[#151c28] text-slate-100 shadow-2xl"
+        data-studio-region="command-palette" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')}
+        className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-700 bg-[#151c28] text-slate-100 shadow-2xl studio-ui-border"
       >
-        <div className="flex items-center gap-2.5 border-b border-slate-800 px-4 py-3">
-          <Search size={16} className="shrink-0 text-teal-400" />
-          <input
+        <div className="flex items-center gap-2.5 border-b border-slate-800 px-4 py-3 studio-ui-border">
+          <Search size={16} className="shrink-0 text-teal-400 studio-ui-info" />
+          <input data-studio-control="true"
             type="text"
             autoFocus
             data-native-undo="true"
@@ -349,13 +354,13 @@ export function CommandPaletteModal({
             }}
             placeholder="输入关键字搜索面板、版本、51 套模板或快捷操作（支持空格分词）..."
             aria-label="搜索命令、模板与版本"
-            className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
+            className="w-full bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none studio-ui-primary"
           />
-          <button
+          <button data-studio-control="true"
             type="button"
             onClick={onClose}
             aria-label="关闭命令面板"
-            className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white studio-ui-muted studio-ui-hover studio-ui-hover-primary"
           >
             <X size={15} />
           </button>
@@ -363,7 +368,7 @@ export function CommandPaletteModal({
 
         <div ref={listRef} className="max-h-[420px] overflow-y-auto p-2">
           {filteredItems.length === 0 ? (
-            <div className="px-4 py-8 text-center text-xs text-slate-400">
+            <div className="px-4 py-8 text-center text-xs text-slate-400 studio-ui-muted">
               未找到匹配「{query}」的命令、模板或版本。
             </div>
           ) : (
@@ -382,7 +387,7 @@ export function CommandPaletteModal({
                           : Sparkles;
                 return (
                   <li key={item.id}>
-                    <button
+                    <button data-studio-control="true"
                       type="button"
                       role="option"
                       aria-selected={isSelected}
@@ -391,21 +396,21 @@ export function CommandPaletteModal({
                       onClick={() => handleRunItem(item)}
                       className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition ${
                         isSelected
-                          ? 'bg-teal-600/25 text-white ring-1 ring-teal-500/50'
-                          : 'text-slate-200 hover:bg-slate-800/70'
+                          ? 'bg-teal-600/25 text-white ring-1 ring-teal-500/50 studio-ui-selected studio-ui-ring studio-ui-selected-text'
+                          : 'text-slate-200 hover:bg-slate-800/70 studio-ui-primary studio-ui-hover'
                       }`}
                     >
                       <div className="flex min-w-0 items-center gap-2.5">
                         <CategoryIcon
                           size={14}
-                          className={isSelected ? 'shrink-0 text-teal-300' : 'shrink-0 text-slate-400'}
+                          className={isSelected ? 'shrink-0 text-teal-300 studio-ui-selected-text' : 'shrink-0 text-slate-400 studio-ui-muted'}
                         />
                         <div className="min-w-0">
                           <div className="truncate text-xs font-medium">{item.title}</div>
-                          <div className="truncate text-[11px] text-slate-400">{item.subtitle}</div>
+                          <div className="truncate text-[11px] text-slate-400 studio-ui-muted">{item.subtitle}</div>
                         </div>
                       </div>
-                      <span className="shrink-0 rounded border border-slate-700 bg-slate-900/80 px-1.5 py-0.5 text-[10px] text-slate-400">
+                      <span className="shrink-0 rounded border border-slate-700 bg-slate-900/80 px-1.5 py-0.5 text-[10px] text-slate-400 studio-ui-border studio-ui-raised studio-ui-muted">
                         {item.category}
                       </span>
                     </button>
@@ -416,9 +421,9 @@ export function CommandPaletteModal({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-800 bg-[#101620] px-4 py-2 text-[11px] text-slate-400">
+        <div className="flex items-center justify-between border-t border-slate-800 bg-[#101620] px-4 py-2 text-[11px] text-slate-400 studio-ui-border studio-ui-raised studio-ui-muted">
           <span className="inline-flex items-center gap-1.5">
-            <Command size={11} className="text-teal-400" />
+            <Command size={11} className="text-teal-400 studio-ui-info" />
             <span>↑↓ 选择 · Enter 执行 · Esc 关闭</span>
           </span>
           <span>共 {filteredItems.length} 项匹配</span>

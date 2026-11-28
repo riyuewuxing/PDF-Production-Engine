@@ -366,8 +366,8 @@ function StudioApp() {
   }, [activeDoc, isRedacted, parsedRedactionTerms]);
 
   const resumeListWarning = listIssues.length > 0 && (
-    <details aria-label="简历文件读取异常" className="no-print shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-2 text-left text-xs text-amber-950">
-      <summary className="cursor-pointer font-semibold">有 {listIssues.length} 份简历文件无法读取，检查未删除或覆盖原文件。</summary>
+    <details data-studio-region="resume-list-warning" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} data-studio-status="warning" aria-label="简历文件读取异常" className="no-print shrink-0 border-b border-amber-300 bg-amber-50 px-3 py-2 text-left text-xs text-amber-950">
+      <summary data-studio-control="true" className="cursor-pointer font-semibold">有 {listIssues.length} 份简历文件无法读取，检查未删除或覆盖原文件。</summary>
       <p className="mt-1">仍可使用正常简历；请先保留异常文件，在本地核对或从备份恢复后重新启动。</p>
       <ul className="mt-1 max-h-24 list-disc overflow-y-auto pl-5">
         {listIssues.map(issue=><li className="break-all" key={issue.slug}>{issue.slug}.json：{{CORRUPTED_JSON:'JSON 损坏',SCHEMA_INVALID:'数据格式不符合规范',UNSAFE_ENTRY:'不是普通文件',UNREADABLE:'无法读取'}[issue.reason]}</li>)}
@@ -377,8 +377,8 @@ function StudioApp() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#11161f] text-sm text-slate-300">
-        <Loader2 size={18} className="mr-2 animate-spin text-teal-400" />
+      <div data-studio-region="startup-loading" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} className="flex h-screen items-center justify-center bg-[#11161f] text-sm text-slate-300">
+        <Loader2 size={18} className="mr-2 animate-spin text-teal-400 studio-ui-info" />
         正在加载本地简历工作台...
       </div>
     );
@@ -386,22 +386,22 @@ function StudioApp() {
 
   if (loadError || !activeDoc) {
     return (
-      <div className="flex h-screen overflow-y-auto bg-[#11161f] p-6">
-        <div className="m-auto w-full max-w-xl shrink-0 rounded-lg border border-red-500/40 bg-slate-900 p-6 text-center text-slate-100 shadow-xl">
-          <AlertCircle size={28} className="mx-auto text-red-400" />
+      <div data-studio-region="startup-error" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} className="flex h-screen overflow-y-auto bg-[#11161f] p-6">
+        <div className="m-auto w-full max-w-xl shrink-0 rounded-lg border border-red-500/40 bg-slate-900 p-6 text-center text-slate-100 shadow-xl studio-ui-raised studio-ui-primary studio-ui-error-border">
+          <AlertCircle size={28} className="mx-auto text-red-400 studio-ui-error" />
           <h1 className="mt-3 text-base font-semibold">无法加载本地简历</h1>
-          <p className="mt-1 text-sm text-slate-400">{loadError ?? 'data/ 目录中暂无可用简历'}</p>
-          <button
+          <p className="mt-1 text-sm text-slate-400 studio-ui-muted">{loadError ?? 'data/ 目录中暂无可用简历'}</p>
+          <button data-studio-control="true"
             type="button"
             disabled={versionTransitioning}
             onClick={() => void refreshListAndLoad()}
-            className="mt-4 rounded bg-teal-600 px-4 py-2 text-xs font-medium text-white hover:bg-teal-500"
+            className="mt-4 rounded bg-teal-600 px-4 py-2 text-xs font-medium text-white hover:bg-teal-500 studio-ui-fill studio-ui-on-fill studio-ui-fill-hover"
           >
             重试加载
           </button>
           <div className="mt-4 space-y-2">{resumeListWarning}<RecoveryDraftPanel onImport={handleImportJson}/><RecycleBinPanel onRestore={handleRestoreTrash}/><WriteLockPanel/>
-            {window.resumeDesktop?.workspaceBackup&&<details aria-label="启动异常时的备份恢复" className="rounded-lg border border-teal-300 bg-white p-3 text-left text-slate-800">
-              <summary className="cursor-pointer text-sm font-semibold text-teal-800">从已有备份恢复或打开独立工作区</summary>
+            {window.resumeDesktop?.workspaceBackup&&<details aria-label="启动异常时的备份恢复" className="rounded-lg border border-teal-300 bg-white p-3 text-left text-slate-800 studio-ui-surface studio-ui-primary studio-ui-info-border">
+              <summary data-studio-control="true" className="cursor-pointer text-sm font-semibold text-teal-800 studio-ui-info">从已有备份恢复或打开独立工作区</summary>
               <div className="mt-2"><WorkspaceBackupPane onFlush={flushPendingSave} recoveryOnly/></div>
             </details>}
           </div>
@@ -422,7 +422,7 @@ function StudioApp() {
 
   return (
     <div className="studio-shell relative flex h-screen flex-col overflow-hidden bg-[#11161f] text-slate-900" data-studio-theme={themeId} inert={versionTransitioning||isFitting} aria-busy={versionTransitioning||isFitting}>
-      {(versionTransitioning||isFitting)&&<div className="no-print absolute inset-0 z-[100] flex items-center justify-center bg-slate-900/35"><div className="rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg">{versionTransitioning?'正在安全处理版本，请稍候…':'正在测量页面排版…'}</div></div>}
+      {(versionTransitioning||isFitting)&&<div className="no-print absolute inset-0 z-[100] flex items-center justify-center bg-slate-900/35"><div data-studio-region="busy-overlay" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} className="rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg">{versionTransitioning?'正在安全处理版本，请稍候…':'正在测量页面排版…'}</div></div>}
       <StudioHeader
         studioThemeId={themeId}
         themeControl={<StudioThemePicker value={themeId} notice={themeNotice} onChange={selectTheme} />}
@@ -458,16 +458,16 @@ function StudioApp() {
         onExportFormat={(format, saveAs) => void handleExportFormat(format, saveAs)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
-      {workspaceContext?.restored&&<div aria-label="独立恢复工作区标识" className="no-print flex shrink-0 flex-wrap items-center gap-x-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"><strong className="shrink-0">独立恢复工作区</strong><span className="min-w-0 break-all">{workspaceContext.folder}</span><span>编辑仅写入此副本；原工作区不受影响。</span></div>}
+      {workspaceContext?.restored&&<div data-studio-region="restored-workspace" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} data-studio-status="warning" aria-label="独立恢复工作区标识" className="no-print flex shrink-0 flex-wrap items-center gap-x-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"><strong className="shrink-0">独立恢复工作区</strong><span className="min-w-0 break-all">{workspaceContext.folder}</span><span>编辑仅写入此副本；原工作区不受影响。</span></div>}
       {resumeListWarning}
       <RecoveryDraftPanel onImport={handleImportJson}/>
-      {recoveryError&&<div role="alert" className="no-print shrink-0 bg-amber-50 px-3 py-1 text-xs text-amber-900">{recoveryError}</div>}
+      {recoveryError&&<div data-studio-region="recovery-error" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} data-studio-status="warning" role="alert" className="no-print shrink-0 bg-amber-50 px-3 py-1 text-xs text-amber-900">{recoveryError}</div>}
       {saveState==='error' && (
-        <div role="alert" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-300 bg-red-50 px-4 py-2 text-xs text-red-900">
+        <div data-studio-region="save-error" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} data-studio-status="error" role="alert" className="no-print flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-red-300 bg-red-50 px-4 py-2 text-xs text-red-900">
           <div className="min-w-0 flex-1 break-words">{saveError || '保存失败。'} 当前编辑仍在内存中；可以先另存草稿，不会覆盖原简历。</div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <button type="button" onClick={()=>void handleBackupDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 font-semibold">另存未保存草稿</button>
-            <button type="button" onClick={()=>void handleReloadDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1">重载磁盘版本</button>
+            <button data-studio-control="true" type="button" onClick={()=>void handleBackupDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 font-semibold studio-ui-surface studio-ui-primary studio-ui-error-border">另存未保存草稿</button>
+            <button data-studio-control="true" type="button" onClick={()=>void handleReloadDraft()} className="rounded border border-red-300 bg-white px-2.5 py-1 studio-ui-surface studio-ui-primary studio-ui-error-border">重载磁盘版本</button>
           </div>
         </div>
       )}
