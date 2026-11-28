@@ -73,7 +73,7 @@
 
     /* Explicit control marker. No broad selectors across the document or
        unconverted photo crop dialog. Native color swatches keep their color. */
-    & :is(input:not([type="color"]):not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, select)[data-studio-control] {
+    & :is(input:not([type="color"]):not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, select)[data-studio-control]:where(:not(.studio-career-status)) {
       color-scheme: var(--studio-scheme);
       background-color: var(--studio-field);
     }
@@ -96,7 +96,7 @@
   /* Career chrome only. Explicit controls and status markers; no document or export styling. */
   :is([data-studio-region="career-main"],[data-studio-region="career-ai"],[data-studio-region="interview-practice"],[data-studio-region="job-queue"],[data-studio-region="job-workflow"],[data-studio-region="quick-log-dialog"])[data-studio-theme]:not([data-studio-theme="classic"]) {
     scrollbar-color: var(--studio-border) var(--studio-surface);
-    & :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),textarea,select)[data-studio-control] { color: var(--studio-text); border-color: var(--studio-border); }
+    & :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),textarea,select)[data-studio-control]:where(:not(.studio-career-status)) { color: var(--studio-text); border-color: var(--studio-border); }
     & :is(input,textarea)[data-studio-control].studio-ui-field-focus:focus { background-color: var(--studio-field); }
     & [data-studio-control]:focus-visible { outline-offset: 1px; }
     & select.studio-career-status[data-studio-career-status="wishlist"] { background-color: var(--studio-raised); color: var(--studio-text); }
