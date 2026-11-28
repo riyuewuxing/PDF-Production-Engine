@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
 import {
   AlertCircle,
   CheckCircle2,
@@ -241,7 +241,7 @@ export function StudioHeader({
                     自动打码姓名/手机/邮箱并隐藏证件照；下方填写需替换为{' '}
                     <code className="font-mono">[某单位]</code> 的学校或公司（逗号/换行分隔）：
                   </p>
-                  <textarea
+                  <textarea {...fieldSkin(skins,'multiline')}
                     rows={3}
                     data-native-undo="true"
                     value={redactionTermsInput}
