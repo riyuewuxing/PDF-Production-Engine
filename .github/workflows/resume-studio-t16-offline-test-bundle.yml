@@ -1,0 +1,60 @@
+name: T16 public offline Linux test dependency bundle
+on:
+  push:
+    branches: ['resume-studio/theme-p3-t16-offline-test-bundle']
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: bash
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install public locked dependencies without download scripts
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          npm install -g pnpm@10.30.0
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify actual test engine before exporting
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run src/lib/byokAiClient.test.ts src/studio-theme/componentSkins.test.tsx
+      - name: Export public source and Linux dependencies only
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/t16-public-bundle"
+          # The checkout contains only the already-published public app.
+          # Archive tracked app files and the generated pnpm node_modules tree;
+          # no environment, credentials, home directories, or git metadata.
+          git ls-files -z -- . > "$RUNNER_TEMP/t16-public-bundle/tracked-files.nul"
+          tar --null -T "$RUNNER_TEMP/t16-public-bundle/tracked-files.nul" -czf "$RUNNER_TEMP/t16-public-bundle/public-source.tar.gz"
+          tar -czf "$RUNNER_TEMP/t16-public-bundle/public-dependencies.tar.gz" node_modules
+          cd "$RUNNER_TEMP/t16-public-bundle"
+          sha256sum public-source.tar.gz public-dependencies.tar.gz > SHA256SUMS
+          printf '%s\n' "$GITHUB_SHA" > source-sha.txt
+          du -h public-*.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t16-public-offline-source
+          path: |
+            ${{ runner.temp }}/t16-public-bundle/public-source.tar.gz
+            ${{ runner.temp }}/t16-public-bundle/SHA256SUMS
+            ${{ runner.temp }}/t16-public-bundle/source-sha.txt
+          retention-days: 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t16-public-offline-dependencies
+          path: ${{ runner.temp }}/t16-public-bundle/public-dependencies.tar.gz
+          retention-days: 1
