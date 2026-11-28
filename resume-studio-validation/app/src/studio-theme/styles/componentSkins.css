@@ -1,7 +1,7 @@
 /* Explicit opt-in controls only. No selectors targeting document renderers.
  * Visual roles remain semantic. Inherit mode has no skin marker. */
 @media screen {
-  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role] {
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin]:where([data-studio-skin-role]) {
     --skin-bg: var(--studio-field);
     --skin-fg: var(--studio-text);
     --skin-border: var(--studio-border);
@@ -58,13 +58,17 @@
   }
   /* Maintain primary/danger semantic distinction for outline/soft/flat. */
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="primary"]:is([data-studio-skin="outline"],[data-studio-skin="soft"],[data-studio-skin="flat"]) {
-    --skin-fg: var(--studio-accent-text); --skin-hover-fg: var(--studio-accent-text);
+    --skin-bg:var(--studio-surface); --skin-fg: var(--studio-accent-text); --skin-hover:var(--studio-hover); --skin-hover-fg: var(--studio-accent-text);
     border-color: var(--studio-focus);
   }
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="danger"]:is([data-studio-skin="outline"],[data-studio-skin="soft"],[data-studio-skin="flat"]) {
-    --skin-fg: var(--studio-error); --skin-hover-fg: var(--studio-error);
+    --skin-bg:var(--studio-surface); --skin-fg: var(--studio-error); --skin-hover:var(--studio-hover); --skin-hover-fg: var(--studio-error);
     border-color: var(--studio-error);
   }
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="primary"][data-studio-skin="soft"],
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="danger"][data-studio-skin="soft"] {--skin-bg:var(--studio-raised);border-color:transparent;}
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="primary"][data-studio-skin="flat"],
+  [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="danger"][data-studio-skin="flat"] {border-color:transparent;border-bottom-color:var(--skin-border);}
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="button"][data-studio-skin-role="danger"][data-studio-skin="gradient"] {
     background-image: linear-gradient(var(--skin-bg),var(--skin-bg)),linear-gradient(135deg,var(--studio-error),var(--studio-border));
   }
@@ -80,17 +84,17 @@
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin="fine-outline"] {border-radius: 2px; --skin-bg:var(--studio-surface); outline:1px solid var(--skin-border); outline-offset:-3px;}
   /* Danger retains a readable error foreground on neutral icon backgrounds. */
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family="icon"][data-studio-skin-role="danger"]:is([data-studio-skin="ghost"],[data-studio-skin="fine-outline"]) {
-    --skin-fg:var(--studio-error);--skin-hover-fg:var(--studio-error);--skin-hover:var(--studio-hover);
+    --skin-bg:var(--studio-surface);--skin-fg:var(--studio-error);--skin-hover-fg:var(--studio-error);--skin-hover:var(--studio-hover);
     border-color:var(--studio-error);
   }
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:hover:not(:disabled) {
     background-color:var(--skin-hover);color:var(--skin-hover-fg);border-color:var(--skin-border);
   }
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin="gradient"][data-studio-skin-role]:hover:not(:disabled) {
-    background-image:linear-gradient(var(--skin-hover),var(--skin-hover)),linear-gradient(135deg,var(--studio-focus),var(--skin-border));
+    border-color:transparent;background-image:linear-gradient(var(--skin-hover),var(--skin-hover)),linear-gradient(135deg,var(--studio-focus),var(--skin-border));
   }
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin="gradient"][data-studio-skin-role="danger"]:hover:not(:disabled) {
-    background-image:linear-gradient(var(--skin-hover),var(--skin-hover)),linear-gradient(135deg,var(--studio-error),var(--studio-border));
+    border-color:transparent;background-image:linear-gradient(var(--skin-hover),var(--skin-hover)),linear-gradient(135deg,var(--studio-error),var(--studio-border));
   }
   [data-studio-surface][data-studio-theme] button[data-studio-skin-family][data-studio-skin][data-studio-skin-role]:active:not(:disabled) {
     box-shadow:inset 0 0 0 2px var(--skin-border);
