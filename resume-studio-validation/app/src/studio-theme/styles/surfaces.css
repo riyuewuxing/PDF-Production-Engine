@@ -17,6 +17,9 @@
     color: var(--studio-error);
     border-color: var(--studio-error);
   }
+  /* A fixed top offset must leave room for the footer at increased renderer zoom.
+     This is dialog geometry only; the list is the flex-shrinkable scroll area. */
+  [data-studio-region="command-palette"] { max-height: calc(100dvh - 5rem); }
   /* Gallery contains document renderers: preserve inherited foreground and color-scheme. */
   [data-studio-surface="gallery"][data-studio-theme]:not([data-studio-theme="classic"]) {
     background-color: var(--studio-surface);
