@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useLayoutEffect,useRef,useState} from 'react';
 import {careerLedger} from '../../lib/careerLedgerSession';
 import {localErrorMessage} from '../../lib/apiClient';
@@ -79,7 +79,7 @@ export function WorkspaceBackupPane({onFlush,recoveryOnly=false}:{onFlush:()=>Pr
     </div>}
     {result&&<div aria-label="工作区备份结果" className="space-y-1">
       <p className="break-all">{result.folder}</p><Summary value={result}/>
-      {resultKind==='restore'&&<div className="space-y-1 rounded bg-white studio-ui-surface p-2">{bridge.prepareLaunch&&bridge.launch&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!!busy} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>prepareLaunch('last')}>检查并打开刚恢复的工作区</button>}<p className="text-slate-700 studio-ui-primary">外部导出文件路径可能仍指向旧位置；需要重新配置 AI 密钥。</p><details className="rounded border p-2"><summary className="cursor-pointer font-medium">手动启动（备用方式）</summary><p className="mt-2">请保留原工作区。关闭工作台后，在新开的 PowerShell 中复制并执行下方设置，再从该 PowerShell 启动原来的 Resume Studio.exe（源码开发版在项目目录执行 pnpm desktop:start）。关闭 PowerShell 后，此临时变量不再生效。</p><textarea data-studio-control="true" aria-label="恢复工作区启动设置" readOnly rows={3} onFocus={e=>e.currentTarget.select()} value={"$env:RESUME_STUDIO_DATA_DIR = '"+result.folder.replace(/'/g,"''")+"'"} className="w-full resize-y rounded border p-1 font-mono text-[10px]"/><p>应指向上面的新文件夹，而不是其中的 data。</p></details></div>}
+      {resultKind==='restore'&&<div className="space-y-1 rounded bg-white studio-ui-surface p-2">{bridge.prepareLaunch&&bridge.launch&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={!!busy} className="rounded bg-teal-700 studio-ui-fill px-2 py-1.5 text-white studio-ui-on-fill disabled:opacity-50" onClick={()=>prepareLaunch('last')}>检查并打开刚恢复的工作区</button>}<p className="text-slate-700 studio-ui-primary">外部导出文件路径可能仍指向旧位置；需要重新配置 AI 密钥。</p><details className="rounded border p-2"><summary className="cursor-pointer font-medium">手动启动（备用方式）</summary><p className="mt-2">请保留原工作区。关闭工作台后，在新开的 PowerShell 中复制并执行下方设置，再从该 PowerShell 启动原来的 Resume Studio.exe（源码开发版在项目目录执行 pnpm desktop:start）。关闭 PowerShell 后，此临时变量不再生效。</p><textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="恢复工作区启动设置" readOnly rows={3} onFocus={e=>e.currentTarget.select()} value={"$env:RESUME_STUDIO_DATA_DIR = '"+result.folder.replace(/'/g,"''")+"'"} className="w-full resize-y rounded border p-1 font-mono text-[10px]"/><p>应指向上面的新文件夹，而不是其中的 data。</p></details></div>}
     </div>}
     {launchInspection&&<div ref={reviewRef} aria-label="独立工作区打开确认" className="space-y-2 scroll-mt-44 rounded border border-teal-300 studio-ui-selected-border bg-white studio-ui-surface p-2">
       <p className="font-semibold">准备打开独立恢复工作区</p><p className="break-all">{launchInspection.folder}</p><Summary value={launchInspection} timeLabel="检查时间"/>

@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, iconSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {
   BookMarked,
   Check,
@@ -287,7 +287,7 @@ export function VersionAndMasterPane({
           <div className="text-[11px] font-medium text-slate-500 studio-ui-muted">当前编辑版本</div>
           {isRenaming ? (
             <div className="mt-1.5 flex items-center gap-1">
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 autoFocus
                 data-native-undo="true"
@@ -528,7 +528,7 @@ export function VersionAndMasterPane({
             )}
           </div>
           <div className="flex gap-2">
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               data-native-undo="true"
               value={newTitleDraft}

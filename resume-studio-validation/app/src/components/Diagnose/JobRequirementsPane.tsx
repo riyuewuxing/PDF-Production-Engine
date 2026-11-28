@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {JobAiReviewPane} from './JobAiReviewPane';
 import type {AiTextReviewActions,JobReviewApplyGuard} from './ResumeAiAssistantPane';
@@ -235,7 +235,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
           <label>本人核对结果<select data-studio-control="true" aria-label="岗位核对结果" disabled={busy||draft.priority==='not-requirement'} value={draft.outcome} onChange={e=>setDraft(d=>({...d,outcome:e.target.value as RequirementOutcome}))} className="mt-1 w-full rounded border p-1.5 studio-ui-border">{Object.entries(outcomeLabel).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label>
         </div>
         {draft.priority!=='not-requirement'&&<>
-          <label className="block">本地依据搜索<input data-studio-control="true" aria-label="搜索岗位依据" disabled={busy} value={query} onChange={e=>setQuery(e.target.value)} placeholder="学校、证书、经历或来源" className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
+          <label className="block">本地依据搜索<input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="搜索岗位依据" disabled={busy} value={query} onChange={e=>setQuery(e.target.value)} placeholder="学校、证书、经历或来源" className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
           <div className="text-slate-600 studio-ui-muted">本次选择 {draft.evidenceIds.length}/5；词语相同也可能是否定或无关陈述。必须阅读原文。</div>
           <div aria-label="岗位本地依据列表" className="max-h-52 space-y-1 overflow-auto">
             {!filtered.length&&<p>无匹配本地依据，仍可标记待核对或缺口。</p>}
@@ -247,7 +247,7 @@ export function JobRequirementsPane({document,slug,jdText,pdfOrigin,onJdTextChan
             </label>)}
           </div>
         </>}
-        <label className="block">核对说明（选填）<textarea data-studio-control="true" aria-label="岗位核对说明" rows={2} maxLength={500} disabled={busy} value={draft.note} onChange={e=>setDraft(d=>({...d,note:e.target.value}))} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
+        <label className="block">核对说明（选填）<textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="岗位核对说明" rows={2} maxLength={500} disabled={busy} value={draft.note} onChange={e=>setDraft(d=>({...d,note:e.target.value}))} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
         <button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" disabled={busy||(draft.outcome==='supported'&&!draft.evidenceIds.length)} onClick={save} className="rounded bg-indigo-700 px-2 py-1 text-white disabled:opacity-40 studio-ui-fill studio-ui-on-fill">记录本条人工核对</button>
       </div>}
       <div className="space-y-1" aria-label="岗位核对记录">

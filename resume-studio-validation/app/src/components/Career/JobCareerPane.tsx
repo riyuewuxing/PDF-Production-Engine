@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {
@@ -530,7 +530,7 @@ export function JobCareerPane({
                 <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2 studio-ui-border studio-ui-raised">
                   <div className="font-semibold text-slate-800 studio-ui-primary">新增投递记录</div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={companyDraft}
@@ -538,7 +538,7 @@ export function JobCareerPane({
                       placeholder="单位/学校名称（必填）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={roleDraft}
@@ -546,7 +546,7 @@ export function JobCareerPane({
                       placeholder="投递岗位名称"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={cityDraft}
@@ -554,7 +554,7 @@ export function JobCareerPane({
                       placeholder="城市（如：示例城市）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={salaryDraft}
@@ -760,7 +760,7 @@ export function JobCareerPane({
                               aria-label={`${item.company} 面试时间`}
                               className="col-span-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-800 studio-ui-border studio-ui-raised studio-ui-primary"
                             />
-                            <input data-studio-control="true"
+                            <input {...fieldSkin(skins,'text')} data-studio-control="true"
                               type="text"
                               data-native-undo="true"
                               value={item.interviewLocation}
@@ -807,7 +807,7 @@ export function JobCareerPane({
                             </div>
                           )}
 
-                          <textarea data-studio-control="true"
+                          <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                             rows={2}
                             data-native-undo="true"
                             value={item.notes}
@@ -828,7 +828,7 @@ export function JobCareerPane({
                 <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2 studio-ui-border studio-ui-raised">
                   <div className="font-semibold text-slate-800 studio-ui-primary">设定目标单位、岗位与页眉风格</div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={letterCompany}
@@ -841,7 +841,7 @@ export function JobCareerPane({
                       placeholder="目标单位（如：示例一中）"
                       className="rounded border border-slate-200 bg-white px-2 py-1.5 text-slate-900 studio-ui-border studio-ui-surface studio-ui-primary"
                     />
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={letterRole}
@@ -876,7 +876,7 @@ export function JobCareerPane({
                       ))}
                     </select>
                   </label>
-                  <textarea data-studio-control="true"
+                  <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                     rows={2}
                     data-native-undo="true"
                     value={jdOptional}
@@ -912,7 +912,7 @@ export function JobCareerPane({
                       </button>
                     </div>
                   </div>
-                  <textarea data-studio-control="true"
+                  <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                     rows={8}
                     data-native-undo="true"
                     value={effectiveCoverLetter}
@@ -922,7 +922,7 @@ export function JobCareerPane({
 
                   {/* Save to coverLetters library */}
                   <div className="flex items-center gap-1.5 pt-1">
-                    <input data-studio-control="true"
+                    <input {...fieldSkin(skins,'text')} data-studio-control="true"
                       type="text"
                       data-native-undo="true"
                       value={letterTitleDraft}
@@ -997,7 +997,7 @@ export function JobCareerPane({
                   <div className="rounded border border-slate-200 bg-slate-100 px-2.5 py-1.5 font-mono text-[11px] text-slate-800 studio-ui-border studio-ui-raised studio-ui-primary">
                     主题：{letterBundle.emailSubject}
                   </div>
-                  <textarea data-studio-control="true"
+                  <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                     rows={5}
                     data-native-undo="true"
                     value={effectiveEmailBody}
@@ -1021,7 +1021,7 @@ export function JobCareerPane({
                       {copiedKey === 'boss' ? '已复制' : '复制话术'}
                     </button>
                   </div>
-                  <textarea data-studio-control="true"
+                  <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
                     rows={3}
                     data-native-undo="true"
                     value={effectiveBossText}

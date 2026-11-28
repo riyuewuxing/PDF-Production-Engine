@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useRef,useState} from 'react';
 import type {ResumeDocument} from '../../schema/resumeSchema';
 import type {FactBank,FactInput,FactRecord} from '../../schema/factBankSchema';
@@ -76,7 +76,7 @@ export function FactBankPane(props:Props){
     const bankRevision=props.bank.revision;
     void task(()=>bridge.revoke({id,bankRevision,confirmation:'REVOKE_FACT'}),'事实已撤销，旧 AI 审批已失效。');
   };
-  const field=(label:string,key:'value'|'unit'|'timeframe'|'evidenceRef',maxLength:number)=><label className="block">{label}<input aria-label={label} disabled={props.locked} value={draft[key]} maxLength={maxLength} onChange={e=>edit(key,e.target.value)} className="mt-1 w-full rounded border p-1.5"/></label>;
+  const field=(label:string,key:'value'|'unit'|'timeframe'|'evidenceRef',maxLength:number)=><label className="block">{label}<input {...(key==='value'||key==='timeframe'?{}:fieldSkin(skins,'text'))} aria-label={label} disabled={props.locked} value={draft[key]} maxLength={maxLength} onChange={e=>edit(key,e.target.value)} className="mt-1 w-full rounded border p-1.5"/></label>;
   return <details className="rounded border border-slate-200 p-2 space-y-2 studio-ui-border">
     <summary data-studio-control="true" className="cursor-pointer font-semibold">本地事实资料库（{records.filter(r=>r.verifiedStatus==='user-confirmed').length} 条）</summary>
     <p className="text-slate-600 studio-ui-muted">与简历正文、母库分开保存。人工确认仅表示本人核对，不是独立证据验证。证据位置只保存在本机，默认不外发；每次任务还需单独勾选可外发事实。</p>
@@ -86,7 +86,7 @@ export function FactBankPane(props:Props){
     {notice&&<div role="status" className="text-teal-800 studio-ui-info">{notice}</div>}
     {props.bank&&<>
       <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={props.locked} checked={showOther} onChange={e=>setShowOther(e.target.checked)}/>显示其他版本及孤立记录（仅本地管理，不可直接外发）</label>
-      <label className="block">本地搜索<input data-studio-control="true" aria-label="搜索本地事实" value={query} onChange={e=>setQuery(e.target.value)} placeholder="陈述、来源、时间或段落" className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
+      <label className="block">本地搜索<input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="搜索本地事实" value={query} onChange={e=>setQuery(e.target.value)} placeholder="陈述、来源、时间或段落" className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
       <div className="text-slate-600 studio-ui-muted">有效 {records.filter(r=>r.verifiedStatus==='user-confirmed').length} 条 · 历史 {records.filter(r=>r.verifiedStatus==='revoked').length} 条 · 显示 {visibleRecords.length} 条</div>
       <div aria-label="本地事实记录列表" className="max-h-56 space-y-2 overflow-auto">{records.length===0&&<p>当前简历没有记录。请从下方手动添加。</p>}{records.length>0&&visibleRecords.length===0&&<p>没有匹配的事实。</p>}{visibleRecords.map(r=>{
         const matches=r.docId===props.document.id&&factEntityId(props.document,r.blockKey)===r.entityId;
@@ -121,7 +121,7 @@ export function FactBankPane(props:Props){
         {correction&&<button {...buttonSkin(skins)} data-studio-control="true" type="button" disabled={props.locked} className="text-teal-800 studio-ui-info" onClick={()=>{setCorrection(null);setDraft(blank);setConfirmedEntity(null);}}>取消更正</button>}
         <label className="block">关联段落<select data-studio-control="true" aria-label="事实关联段落" disabled={props.locked||!!correction} value={target} onChange={e=>{setTarget(e.target.value);setConfirmedEntity(null);}} className="mt-1 w-full rounded border p-1.5 studio-ui-border"><option value="">选择可见段落</option>{props.blocks.map(b=><option key={b.key} value={b.key}>{b.label}</option>)}</select></label>
         <label className="block">类型<select data-studio-control="true" aria-label="事实类型" disabled={props.locked} value={draft.kind} onChange={e=>edit('kind',e.target.value as FactInput['kind'])} className="mt-1 w-full rounded border p-1.5 studio-ui-border">{Object.entries({experience:'经历',achievement:'成果',credential:'资质',skill:'技能',other:'其他'}).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label>
-        <label className="block">事实陈述<textarea data-studio-control="true" aria-label="事实陈述" disabled={props.locked} rows={3} maxLength={2000} value={draft.assertion} onChange={e=>edit('assertion',e.target.value)} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
+        <label className="block">事实陈述<textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="事实陈述" disabled={props.locked} rows={3} maxLength={2000} value={draft.assertion} onChange={e=>edit('assertion',e.target.value)} className="mt-1 w-full rounded border p-1.5 studio-ui-border"/></label>
         <div className="grid grid-cols-2 gap-2">{field('数值（可选）','value',200)}{field('单位（可选）','unit',80)}</div>
         {field('时间范围（可选）','timeframe',200)}{field('本地证据位置 / 来源说明','evidenceRef',1000)}
         <label className="flex items-start gap-1"><input data-studio-control="true" type="checkbox" disabled={props.locked} checked={draft.sensitivity==='shareable'} onChange={e=>edit('sensitivity',e.target.checked?'shareable':'local-only')}/>允许今后逐次选择此外发事实（默认关闭）</label>

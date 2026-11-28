@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
@@ -59,7 +59,7 @@ export function InterviewPracticePane({document,slug,queueTask,beforeQueueExport
   return <section data-studio-region="interview-practice" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')} aria-label="本地面试练习" className="space-y-3">
     <div className="space-y-2 rounded-lg border border-teal-200 bg-teal-50 p-3 studio-ui-selected-border studio-ui-selected studio-ui-selected-text">
       <strong className="text-teal-900 studio-ui-selected-text">面试练习 · 本地生成，不调用 AI</strong>
-      <label className="block">练习目标岗位<input data-studio-control="true" aria-label="面试练习目标岗位" readOnly={!!queueTask} value={queueTask?.role??role} onChange={e=>setRole(e.target.value)} placeholder={visibleBasicValue(document,'title')||'目标岗位'} className="mt-1 w-full rounded border bg-white p-1.5 studio-ui-surface studio-ui-border studio-ui-primary"/></label>
+      <label className="block">练习目标岗位<input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="面试练习目标岗位" readOnly={!!queueTask} value={queueTask?.role??role} onChange={e=>setRole(e.target.value)} placeholder={visibleBasicValue(document,'title')||'目标岗位'} className="mt-1 w-full rounded border bg-white p-1.5 studio-ui-surface studio-ui-border studio-ui-primary"/></label>
       <p className="text-slate-600 studio-ui-muted">当前目标：{queueTask?queueTask.company+' · ':''}{target}。{queueTask?'与固定岗位任务绑定，草稿按任务独立保存。':'与自荐信目标独立；'}题目是练习建议，并非真实面试必问。只使用当前可见自述或明确选中的历史核对档案，不补造事实。</p>
       <label className="block">练习依据<select data-studio-control="true" aria-label="面试练习依据" value={archiveId} onChange={e=>setArchiveId(e.target.value)} className="mt-1 w-full rounded border bg-white p-1.5 studio-ui-surface studio-ui-border studio-ui-primary">
         <option value="">当前可见简历自述</option>
@@ -81,13 +81,13 @@ export function InterviewPracticePane({document,slug,queueTask,beforeQueueExport
       {q.historical&&<div className="rounded border border-amber-200 bg-amber-50 p-2 studio-ui-warning-border studio-ui-warning-surface"><strong>{q.historical.status}（历史记录）</strong><p>{q.historical.createdAt.slice(0,10)} · {q.historical.location}</p>{q.historical.note&&<p className="whitespace-pre-wrap break-words">当时人工备注：{q.historical.note}</p>}</div>}
       {q.sources.map(s=><details key={s.id} open={q.historical?true:undefined} className="rounded bg-slate-50 p-2 studio-ui-raised"><summary data-studio-control="true" className="cursor-pointer font-semibold">{q.historical?'历史条款原文':'当前可见自述 · '+s.label}</summary><p className="mt-1 whitespace-pre-wrap break-words">{s.text}</p><p className="text-slate-600 studio-ui-muted">{q.historical?'历史公告节选，不是候选人事实。':'本人自述，非独立证明；请核对主体、时间及限定。'}</p></details>)}
       <ul className="list-disc space-y-0.5 pl-4 text-slate-600 studio-ui-muted">{q.starHints.map((hint,j)=><li key={j}>{hint}</li>)}</ul>
-      <textarea data-studio-control="true" aria-label={'面试答案 '+(i+1)} rows={3} data-native-undo="true" disabled={!editable} value={ledger.data.interviewAnswers[q.answerKey]??''} onChange={e=>write(q.answerKey,e.target.value)} placeholder="填写本人核对的 STAR 提纲或逐字稿；无依据处保留待核实。" className="w-full rounded border bg-slate-50 p-2 text-slate-900 studio-ui-raised studio-ui-primary studio-ui-border"/>
+      <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label={'面试答案 '+(i+1)} rows={3} data-native-undo="true" disabled={!editable} value={ledger.data.interviewAnswers[q.answerKey]??''} onChange={e=>write(q.answerKey,e.target.value)} placeholder="填写本人核对的 STAR 提纲或逐字稿；无依据处保留待核实。" className="w-full rounded border bg-slate-50 p-2 text-slate-900 studio-ui-raised studio-ui-primary studio-ui-border"/>
     </article>)}
     {!!(history.length||legacy.length)&&<details aria-label="面试历史草稿" className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2 studio-ui-warning-border studio-ui-warning-surface"><summary data-studio-control="true" className="cursor-pointer font-semibold">历史／旧版草稿 · {history.length+legacy.length} 条（不自动套用）</summary>
       <p>更换岗位、依据或简历内容后，原草稿保留。旧版编号未绑定经历或文档身份，不推断其所属问题；请核对后手动复制需要的内容。</p>
       <div className="max-h-72 space-y-2 overflow-auto">
-      {history.map(h=><article key={h.key} className="rounded border bg-white p-2 studio-ui-surface studio-ui-border studio-ui-primary"><strong>{h.meta.role} · {h.meta.question}</strong><p className="break-all text-slate-500 studio-ui-muted">原练习标识：{h.meta.identity} · {h.meta.digest.slice(0,8)}</p><textarea data-studio-control="true" aria-label="历史面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1 studio-ui-border"/></article>)}
-      {legacy.map(h=><article key={h.key} className="rounded border bg-white p-2 studio-ui-surface studio-ui-border studio-ui-primary"><strong>旧版未绑定 · {h.key.slice(slug.length+1)}</strong><textarea data-studio-control="true" aria-label="旧版面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1 studio-ui-border"/></article>)}
+      {history.map(h=><article key={h.key} className="rounded border bg-white p-2 studio-ui-surface studio-ui-border studio-ui-primary"><strong>{h.meta.role} · {h.meta.question}</strong><p className="break-all text-slate-500 studio-ui-muted">原练习标识：{h.meta.identity} · {h.meta.digest.slice(0,8)}</p><textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="历史面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1 studio-ui-border"/></article>)}
+      {legacy.map(h=><article key={h.key} className="rounded border bg-white p-2 studio-ui-surface studio-ui-border studio-ui-primary"><strong>旧版未绑定 · {h.key.slice(slug.length+1)}</strong><textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="旧版面试答案" readOnly rows={3} value={h.answer} className="w-full rounded border p-1 studio-ui-border"/></article>)}
       </div>
     </details>}
   </section>;

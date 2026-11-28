@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin } from '../../studio-theme/componentSkins';
+import { fieldSkin, buttonSkin } from '../../studio-theme/componentSkins';
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import {useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
@@ -127,8 +127,8 @@ export function JobQueueWorkflowPane({opened,activeDoc,onExit}:{opened:JobQueueO
     {!invalid&&tab==='review'&&<JobRequirementsPane document={document} slug={task.slug} jdText={task.jdText} onJdTextChange={()=>{}} onFlush={async()=>{await verify();}} queueReadBasis={verify} getRevision={()=>task.documentRevision} queueTask={task}/>}
     {!invalid&&tab==='letters'&&<div className="rounded border p-3 space-y-2 studio-ui-border">
       <h4 className="font-semibold">固定岗位自荐信（本地生成，可人工修改）</h4>
-      <textarea data-studio-control="true" aria-label="岗位自荐信正文" value={letter} rows={9} disabled={busy} onChange={e=>setLetter(e.target.value)} className="w-full rounded border p-2 text-slate-900 studio-ui-primary studio-ui-border"/>
-      <input data-studio-control="true" aria-label="岗位自荐信版本名" maxLength={200} value={letterTitle} onChange={e=>setLetterTitle(e.target.value)} disabled={busy} placeholder="选填版本名" className="w-full rounded border p-2 studio-ui-border"/>
+      <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true" aria-label="岗位自荐信正文" value={letter} rows={9} disabled={busy} onChange={e=>setLetter(e.target.value)} className="w-full rounded border p-2 text-slate-900 studio-ui-primary studio-ui-border"/>
+      <input {...fieldSkin(skins,'text')} data-studio-control="true" aria-label="岗位自荐信版本名" maxLength={200} value={letterTitle} onChange={e=>setLetterTitle(e.target.value)} disabled={busy} placeholder="选填版本名" className="w-full rounded border p-2 studio-ui-border"/>
       <div className="flex flex-wrap gap-2"><button {...buttonSkin(skins,'primary')} data-studio-control="true" type="button" className={primary} disabled={disabled} onClick={saveLetter}>保存岗位自荐信</button><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={exportLetter}>导出岗位自荐信 PDF</button></div>
       {letters.map(l=><div key={l.id} className="rounded border p-2 studio-ui-border"><p className="font-semibold break-words">{l.title}</p><p>{l.updatedAt}</p><button {...buttonSkin(skins)} data-studio-control="true" type="button" className={btn} disabled={disabled} onClick={()=>void run(async()=>{await verify();if(mounted.current){setLetter(l.bodyText);setLetterTitle(l.title);}})}>载入此岗位历史自荐信</button></div>)}
       <details><summary data-studio-control="true">本地邮件及平台话术参考（未发送）</summary><p className="font-semibold mt-2">{bundle.emailSubject}</p><pre className="whitespace-pre-wrap break-words">{bundle.emailBody}</pre><pre className="whitespace-pre-wrap break-words mt-2">{bundle.bossGreeting}</pre></details>
