@@ -116,7 +116,7 @@ async function run(){
       for(let k=1;k<=expected.length;k++){await press('Tab',['shift']);const f=await focused();reverse.push(f);assert(f.inside&&f.label===expected[(origin-k+expected.length)%expected.length],'reverse focus escaped '+id);}
       // Programmatic focus outside is redirected without triggering approval.
       await js('document.querySelector('+JSON.stringify(sourceSel)+').focus();true');assert((await focused()).inside,'background focus escaped');
-      await press('K',['control']);assert(await js('!!document.querySelector('+JSON.stringify(portalSelector)+')&&!document.querySelector(\'[aria-label="命令面板"]\')'),'command palette opened over portal');
+      await press('K',['control']);assert(await js('!!document.querySelector('+JSON.stringify(portalSelector)+')&&!document.querySelector(\'[aria-label="全局命令面板"]\')'),'command palette opened over portal');
       await press('Escape');await until('escape closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
       const returned=await focused();assert(returned.label==='展开全屏 PDF 对照','Escape did not restore opener '+id+' '+JSON.stringify(returned));
       await press('Enter');await until('Enter reopens portal',()=>js('!!document.querySelector('+JSON.stringify(portalSelector)+')'));
