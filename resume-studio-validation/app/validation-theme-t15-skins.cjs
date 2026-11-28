@@ -44,8 +44,10 @@ async function run(){
  const set=async(b,i)=>{await selection(dialog+' select[aria-label="普通按钮皮肤"]',b);await selection(dialog+' select[aria-label="图标按钮皮肤"]',i)};
  await until('actual ready',()=>js(()=>document.querySelector('#basic-field-name')?.value==='演示候选人'&&document.querySelector('.studio-shell')?.getAttribute('aria-busy')==='false'));
  await until('disk saved',()=>js(()=>document.querySelector('[aria-label="本地保存状态"]')?.innerText.includes('已保存至本地硬盘')));
- if(win.isMaximized()){win.unmaximize();await sleep(250)}win.setContentSize(1440,900);await sleep(250);
- assert.deepEqual(win.getContentSize(),[1440,900]);
+ await until('native window shown',()=>win.isVisible());
+ await sleep(1600);
+ await until('stable native content 1440x900',async()=>{if(win.isMaximized()){win.unmaximize();await sleep(300);return false;}win.setContentSize(1440,900);await sleep(300);return !win.isMaximized()&&JSON.stringify(win.getContentSize())==='[1440,900]'},8000);
+ await sleep(350);assert.deepEqual(win.getContentSize(),[1440,900]);
  if(phase==='restart'){
   const s=JSON.parse(fs.readFileSync(saved,'utf8'));assert.equal(before,s.before);
   assert.equal(await pref(),s.pref);assert.equal(await val(theme),id);
