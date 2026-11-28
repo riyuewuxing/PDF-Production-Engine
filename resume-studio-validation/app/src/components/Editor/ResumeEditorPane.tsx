@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { buttonSkin, iconSkin, fieldSkin } from '../../studio-theme/componentSkins';
 import {
   ArrowDown,
   ArrowUp,
@@ -288,7 +288,7 @@ export function ResumeEditorPane({
                       <ChevronRight size={15} className="shrink-0 text-slate-500 studio-ui-muted" />
                     )}
                     {renamingId === section.id ? (
-                      <input data-studio-control="true"
+                      <input {...fieldSkin(skins,'text')} data-studio-control="true"
                         type="text"
                         autoFocus
                         value={renameDraft}
@@ -479,7 +479,7 @@ export function ResumeEditorPane({
                 </option>
               ))}
             </select>
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               value={newSectionTitle}
               onChange={(e) => setNewSectionTitle(e.target.value)}

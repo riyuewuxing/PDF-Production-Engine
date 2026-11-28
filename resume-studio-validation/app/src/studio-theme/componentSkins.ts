@@ -2,10 +2,14 @@ import type { ThemeStorage } from './storage';
 
 export const BUTTON_VARIANTS = ['solid','outline','soft','flat','raised','gradient'] as const;
 export const ICON_VARIANTS = ['square','round','pill','ghost','floating','fine-outline'] as const;
+export const FIELD_VARIANTS = ['inset','outline','soft','underline','raised','gradient'] as const;
+export type FieldVariant = typeof FIELD_VARIANTS[number];
+export type FieldFamily = 'text' | 'multiline';
+export const FIELD_LABELS: Record<FieldVariant,string> = {inset:'内嵌',outline:'双描边',soft:'柔色',underline:'下划线',raised:'轻立体',gradient:'渐变细边'};
 export type ButtonVariant = typeof BUTTON_VARIANTS[number];
 export type IconVariant = typeof ICON_VARIANTS[number];
 export type ButtonRole = 'normal' | 'primary' | 'danger';
-export type ComponentSkins = { button: 'inherit' | ButtonVariant; icon: 'inherit' | IconVariant };
+export type ComponentSkins = { button: 'inherit' | ButtonVariant; icon: 'inherit' | IconVariant; text?: 'inherit' | FieldVariant; multiline?: 'inherit' | FieldVariant };
 export const DEFAULT_COMPONENT_SKINS: Readonly<ComponentSkins> = Object.freeze({button:'inherit',icon:'inherit'});
 export const COMPONENT_SKINS_KEY = 'resume-studio-ui-component-skins-v1';
 export const BUTTON_LABELS: Record<ButtonVariant,string> = {solid:'实心',outline:'描边',soft:'柔色',flat:'平面',raised:'轻立体',gradient:'渐变细边'};
@@ -15,11 +19,17 @@ export const isIconVariant = (v: unknown): v is IconVariant => typeof v==='strin
 export function isComponentSkins(v: unknown): v is ComponentSkins {
   if (!v || typeof v!=='object' || Array.isArray(v)) return false;
   const o=v as Record<string,unknown>;
-  return Object.keys(o).length===2 && Object.hasOwn(o,'button') && Object.hasOwn(o,'icon') &&
-    (o.button==='inherit'||isButtonVariant(o.button)) && (o.icon==='inherit'||isIconVariant(o.icon));
+  return Object.keys(o).every(k=>['button','icon','text','multiline'].includes(k)) && Object.hasOwn(o,'button') && Object.hasOwn(o,'icon') &&
+    (o.button==='inherit'||isButtonVariant(o.button)) && (o.icon==='inherit'||isIconVariant(o.icon)) &&
+    (['text','multiline'] as const).every(k=>!Object.hasOwn(o,k)||o[k]==='inherit'||(FIELD_VARIANTS as readonly unknown[]).includes(o[k]));
 }
 export function equalSkins(a: Readonly<ComponentSkins>,b: Readonly<ComponentSkins>): boolean {
-  return a.button===b.button && a.icon===b.icon;
+  return a.button===b.button && a.icon===b.icon && (a.text??'inherit')===(b.text??'inherit') && (a.multiline??'inherit')===(b.multiline??'inherit');
+}
+function canonicalSkins(value:ComponentSkins):ComponentSkins {
+  const skins:ComponentSkins={button:value.button,icon:value.icon};
+  for(const family of ['text','multiline'] as const)if(Object.hasOwn(value,family)&&value[family]&&value[family]!=='inherit')skins[family]=value[family];
+  return skins;
 }
 export type SkinRead = { skins: ComponentSkins; state:'default'|'saved'|'invalid'|'unavailable'; raw:string|null };
 const fallback=(state:SkinRead['state'],raw:string|null=null):SkinRead=>({skins:{...DEFAULT_COMPONENT_SKINS},state,raw});
@@ -34,20 +44,22 @@ export function readComponentSkins(storage:ThemeStorage|null):SkinRead {
       const o:unknown=JSON.parse(raw);
       if(!o||typeof o!=='object'||Array.isArray(o))return fallback('invalid',raw);
       const row=o as Record<string,unknown>;
-      if(Object.keys(row).length!==2||!Object.hasOwn(row,'schemaVersion')||!Object.hasOwn(row,'skins')||row.schemaVersion!==1||!isComponentSkins(row.skins))return fallback('invalid',raw);
-      return {skins:{button:row.skins.button,icon:row.skins.icon},state:'saved',raw};
+      if(Object.keys(row).length!==2||!Object.hasOwn(row,'schemaVersion')||!Object.hasOwn(row,'skins')||(row.schemaVersion!==1&&row.schemaVersion!==2)||!isComponentSkins(row.skins)||(row.schemaVersion===1&&Object.keys(row.skins).length!==2))return fallback('invalid',raw);
+      const skins=canonicalSkins(row.skins);
+      if(row.schemaVersion===2&&!skins.text&&!skins.multiline)return fallback('invalid',raw);
+      return {skins,state:'saved',raw};
     }catch{return fallback('invalid',raw);}
   }catch{return fallback('unavailable');}
 }
 export type SkinSave = { skins:ComponentSkins; notice:string|null; basis:string|null; saved:boolean };
 export function applyComponentSkins(storage:ThemeStorage|null,value:unknown,basis:string|null):SkinSave|null {
   if(!isComponentSkins(value))return null;
-  const skins={button:value.button,icon:value.icon};
+  const skins=canonicalSkins(value);
   const before=readComponentSkins(storage);
   if(!storage||before.state==='invalid'||before.state==='unavailable')
     return {skins,notice:'组件外观仅本次会话生效；原配置已保留。',basis:before.raw,saved:false};
   if(before.raw!==basis)return {skins,notice:'其他窗口已修改组件外观；本次仅临时生效，未覆盖原配置。',basis,saved:false};
-  const raw=JSON.stringify({schemaVersion:1,skins});
+  const raw=JSON.stringify({schemaVersion:skins.text||skins.multiline?2:1,skins});
   try {storage.setItem(COMPONENT_SKINS_KEY,raw);return {skins,notice:null,basis:raw,saved:true};}
   catch{return {skins,notice:'组件外观已应用，但本地持久化失败。',basis,saved:false};}
 }
@@ -58,4 +70,10 @@ export function buttonSkin(skins:Readonly<ComponentSkins>,role:ButtonRole='norma
 }
 export function iconSkin(skins:Readonly<ComponentSkins>,role:ButtonRole='normal') {
   return skins.icon==='inherit'?{}:{'data-studio-skin-family':'icon','data-studio-skin':skins.icon,'data-studio-skin-role':role} as const;
+}
+
+/** Native editable fields only; no marker in inherited mode. */
+export function fieldSkin(skins:Readonly<ComponentSkins>,family:FieldFamily) {
+  const variant=skins[family];
+  return !variant||variant==='inherit'?{}:{'data-studio-skin-family':family,'data-studio-skin':variant} as const;
 }

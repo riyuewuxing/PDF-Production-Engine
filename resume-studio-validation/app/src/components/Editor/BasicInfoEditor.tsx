@@ -1,5 +1,5 @@
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
-import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { buttonSkin, iconSkin, fieldSkin } from '../../studio-theme/componentSkins';
 import { Crop, Eye, EyeOff, Plus, Trash2, Upload } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 import { apiClient, resolveAssetUrl } from '../../lib/apiClient';
@@ -153,7 +153,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
             >
               {field.label}
             </label>
-            <input data-studio-control="true"
+            <input {...(field.key==='birthDate'?{}:fieldSkin(skins,'text'))} data-studio-control="true"
               id={`basic-field-${field.key}`}
               type="text"
               value={getCoreValue(field.key)}
@@ -193,7 +193,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
         <div className="space-y-2">
           {basic.customFields.map((cf) => (
             <div key={cf.id} className="flex items-center gap-1.5">
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 aria-label="标签名"
                 value={cf.label}
@@ -201,7 +201,7 @@ export function BasicInfoEditor({ basic, onChange, onImmediateChange }: BasicInf
                 placeholder="标签"
                 className="w-20 shrink-0 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1 text-xs text-slate-800 studio-ui-primary focus:border-slate-500 studio-ui-focus-border focus:outline-none"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 aria-label={`${cf.label || '自定义'}内容`}
                 value={cf.value}

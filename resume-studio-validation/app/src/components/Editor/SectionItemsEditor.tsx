@@ -1,4 +1,4 @@
-import { buttonSkin, iconSkin } from '../../studio-theme/componentSkins';
+import { buttonSkin, iconSkin, fieldSkin } from '../../studio-theme/componentSkins';
 import { useStudioComponentSkins } from '../../studio-theme/StudioThemeProvider';
 import {
   ArrowDown,
@@ -116,7 +116,7 @@ function MarkdownTextarea({
         </div>
         <span className="text-[10px] text-slate-400 studio-ui-muted">支持 - 列表与 **加粗**</span>
       </div>
-      <textarea data-studio-control="true"
+      <textarea {...fieldSkin(skins,'multiline')} data-studio-control="true"
         ref={ref}
         rows={rows}
         value={value}
@@ -335,28 +335,28 @@ export function SectionItemsEditor({
               }
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={edu.school}
                 onChange={(e) => updateItem(edu.id, { school: e.target.value })}
                 placeholder="学校名称"
                 className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={edu.major}
                 onChange={(e) => updateItem(edu.id, { major: e.target.value })}
                 placeholder="专业"
                 className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={edu.degree}
                 onChange={(e) => updateItem(edu.id, { degree: e.target.value })}
                 placeholder="学历（如 硕士）"
                 className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={edu.gpa}
                 onChange={(e) => updateItem(edu.id, { gpa: e.target.value })}
@@ -466,14 +466,14 @@ export function SectionItemsEditor({
               }
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={exp.company}
                 onChange={(e) => updateItem(exp.id, { company: e.target.value })}
                 placeholder="单位 / 学校名称"
                 className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={exp.position}
                 onChange={(e) => updateItem(exp.id, { position: e.target.value })}
@@ -582,14 +582,14 @@ export function SectionItemsEditor({
               }
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={proj.name}
                 onChange={(e) => updateItem(proj.id, { name: e.target.value })}
                 placeholder="项目名称"
                 className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={proj.role}
                 onChange={(e) => updateItem(proj.id, { role: e.target.value })}
@@ -603,14 +603,14 @@ export function SectionItemsEditor({
                 placeholder="时间范围"
                 className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={proj.link}
                 onChange={(e) => updateItem(proj.id, { link: e.target.value })}
                 placeholder="相关链接（可选）"
                 className="rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
               />
-              <input data-studio-control="true"
+              <input {...fieldSkin(skins,'text')} data-studio-control="true"
                 type="text"
                 value={proj.linkLabel}
                 onChange={(e) => updateItem(proj.id, { linkLabel: e.target.value })}
@@ -692,7 +692,7 @@ export function SectionItemsEditor({
             onDelete={() => updateCustomList(list.filter((x) => x.id !== item.id), true)}
           />
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               value={item.title}
               onChange={(e) =>
@@ -703,7 +703,7 @@ export function SectionItemsEditor({
               placeholder="标题"
               className="col-span-2 rounded border border-slate-200 studio-ui-border bg-white studio-ui-surface px-2 py-1.5 text-slate-900 studio-ui-primary"
             />
-            <input data-studio-control="true"
+            <input {...fieldSkin(skins,'text')} data-studio-control="true"
               type="text"
               value={item.subtitle}
               onChange={(e) =>

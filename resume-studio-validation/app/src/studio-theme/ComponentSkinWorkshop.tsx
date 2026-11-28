@@ -2,7 +2,7 @@ import { useLayoutEffect,useRef,useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useStudioTheme } from './StudioThemeProvider';
 import { surfaceStyle } from './surfaces';
-import { BUTTON_VARIANTS, ICON_VARIANTS, BUTTON_LABELS, ICON_LABELS, buttonSkin, iconSkin, equalSkins, type ComponentSkins } from './componentSkins';
+import { BUTTON_VARIANTS, ICON_VARIANTS, BUTTON_LABELS, ICON_LABELS, buttonSkin, iconSkin, fieldSkin, FIELD_VARIANTS, FIELD_LABELS, equalSkins, type ComponentSkins } from './componentSkins';
 
 /** First slice of the workshop. Native modal, local draft, explicit apply.
  * Sample controls are real native buttons; all handlers are local demonstrations. */
@@ -34,7 +34,7 @@ export function ComponentSkinWorkshop() {
       onClose={()=>{setOpened(false);trigger.current?.focus();setPending(false);}}
       onKeyDown={e=>{if(e.ctrlKey||e.metaKey)e.stopPropagation();}}>
       <div className="flex items-start justify-between gap-3">
-        <div><h2 className="text-lg font-semibold">组件外观工坊 · 首批试点</h2><p className="text-xs mt-1 studio-ui-muted">仅改变已接入的工作台按钮。预览中的操作使用合成样例，不会写入简历。</p></div>
+        <div><h2 className="text-lg font-semibold">组件外观工坊 · 首批试点</h2><p className="text-xs mt-1 studio-ui-muted">仅改变已接入的工作台控件。预览中的操作使用合成样例，不会写入简历。</p></div>
         <button {...buttonSkin(skins)} type="button" className="studio-skin-neutral shrink-0" onClick={close} aria-label="关闭组件外观工坊">关闭</button>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -69,6 +69,20 @@ export function ComponentSkinWorkshop() {
           <span role="status" className="text-sm">样例操作次数：{count}</span>
         </div>
       </section>
+      <section aria-label="文本控件真实样例" className="mt-3 rounded-lg border p-3 studio-ui-border">
+        <h3 className="font-semibold text-sm">文本编辑控件 · 编辑器试点</h3>
+        <div className="grid gap-3 sm:grid-cols-2 mt-2">
+          {(['text','multiline'] as const).map(family=><label key={family} className="grid gap-1 text-sm">{family==='text'?'单行文本':'多行文本'}
+            <select aria-label={family==='text'?'单行文本皮肤':'多行文本皮肤'} value={draft[family]??'inherit'} onChange={e=>setDraft(prev=>({...prev,[family]:e.target.value as ComponentSkins[typeof family]}))}>
+              <option value="inherit">保留当前主题原样</option>{FIELD_VARIANTS.map(v=><option key={v} value={v}>{FIELD_LABELS[v]}</option>)}
+            </select>
+          </label>)}
+          <input type="text" aria-label="单行文本样例" {...fieldSkin(draft,'text')} defaultValue="合成姓名" />
+          <textarea aria-label="多行文本样例" {...fieldSkin(draft,'multiline')} rows={2} defaultValue="合成说明，不写入简历。" className="w-full rounded border p-2 studio-ui-border studio-ui-surface studio-ui-primary" />
+          <input type="text" aria-label="不可用单行文本样例" {...fieldSkin(draft,'text')} disabled defaultValue="不可用" />
+          <textarea aria-label="只读多行文本样例" {...fieldSkin(draft,'multiline')} readOnly rows={2} value="只读样例" className="w-full rounded border p-2 studio-ui-border studio-ui-surface studio-ui-primary" />
+        </div>
+      </section>
       {pending&&<section aria-label="样例危险操作确认" className="mt-3 rounded border p-3 text-sm studio-ui-error-border studio-ui-error-surface">
         <p>仅样例确认，绝不删除真实数据。</p>
         <div className="flex flex-wrap gap-2 mt-2">
@@ -79,7 +93,7 @@ export function ComponentSkinWorkshop() {
       <p className="text-xs mt-3 studio-ui-muted">切换全局色板时保留本族覆盖。选择“保留当前主题原样”即可恢复本族原外观；取消或 Esc 不会保存草稿。</p>
       {conflict&&<p role="alert" className="mt-2 studio-skin-notice">当前组件配置已变化，请关闭后重新打开。</p>}
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        <button {...buttonSkin(skins)} type="button" className="studio-skin-neutral" onClick={()=>setDraft({button:'inherit',icon:'inherit'})}>恢复两族原样（草稿）</button>
+        <button {...buttonSkin(skins)} type="button" className="studio-skin-neutral" onClick={()=>setDraft({button:'inherit',icon:'inherit'})}>恢复各族原样（草稿）</button>
         <button {...buttonSkin(skins)} type="button" className="studio-skin-neutral" onClick={close}>取消</button>
         <button {...buttonSkin(skins,'primary')} type="button" className="studio-skin-apply disabled:opacity-50" disabled={conflict||equalSkins(draft,basis)} onClick={()=>{selectSkins(draft);close();}}>应用组件外观</button>
       </div>
