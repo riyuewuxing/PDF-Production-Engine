@@ -21,6 +21,9 @@ async function run(){
  const noWrite=async()=>{assert.deepEqual(hashes(),before);assert.deepEqual(await main.store.getApplications(),ledger);};
  const card='[data-studio-gallery-card="vip-cyber-dark"]',action=card+' [data-studio-region="gallery-card-actions"]',fav=card+' [data-studio-gallery-favorite="true"]';
  await until('editor',()=>js(()=>!!document.querySelector('#basic-field-name')));
+ await set('select[aria-label="快速切换简历版本"]',slug);
+ await until('exact gallery source',()=>js(slug=>document.querySelector('select[aria-label="快速切换简历版本"]')?.value===slug&&document.querySelector('.studio-shell')?.getAttribute('aria-busy')==='false',slug));
+ await noWrite();
  await click('模板库(51)').catch(async()=>{assert(await js(()=>{const e=[...document.querySelectorAll('nav button')].find(b=>b.innerText.includes('模板库'));if(!e)return false;e.click();return true}));});
  await until('gallery',()=>js(()=>!!document.querySelector('input[aria-label="搜索模板"]')));
  // Target card by exact id; search by the displayed name from its metadata rather than relying on card order.
