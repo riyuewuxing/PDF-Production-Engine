@@ -1,0 +1,70 @@
+name: Resume Studio T12 actual large Windows display capability and viewport proof
+on:
+  push:
+    branches: ['resume-studio/theme-p2-t12-display']
+permissions:
+  contents: read
+jobs:
+  display:
+    runs-on: windows-latest
+    timeout-minutes: 16
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: resume-studio-validation/app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        timeout-minutes: 4
+        run: |
+          npm install --global pnpm@10.30.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build actual Electron app
+        timeout-minutes: 3
+        run: |
+          pnpm desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Enumerate actual display modes and verify real content dimensions
+        timeout-minutes: 7
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $env:RESUME_STUDIO_EVIDENCE_OUT = Join-Path $env:GITHUB_WORKSPACE 'theme-t12-display'
+          $entry = '.\validation-theme-t12-display.cjs'
+          node .\validation-theme-t11-preflight.cjs $entry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          try {
+            & .\validation-theme-t12-display.ps1 -Phase prepare -Evidence $env:RESUME_STUDIO_EVIDENCE_OUT
+            foreach ($id in @('classic','highContrast','nordic','blueprint','terracotta','ink')) {
+              $env:STUDIO_COLD_ID = $id
+              $env:RESUME_STUDIO_DATA_DIR = Join-Path $env:RUNNER_TEMP ('synthetic-t12-cold-' + [guid]::NewGuid().ToString())
+              try {
+                $env:STUDIO_COLD_PHASE = 'select'
+                & .\node_modules\.bin\electron.cmd $entry
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                $env:STUDIO_COLD_PHASE = 'restart'
+                & .\node_modules\.bin\electron.cmd $entry
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              } finally {
+                Remove-Item -LiteralPath $env:RESUME_STUDIO_DATA_DIR -Recurse -Force -ErrorAction SilentlyContinue
+              }
+            }
+          } finally {
+            if (Test-Path (Join-Path $env:RESUME_STUDIO_EVIDENCE_OUT 'display-mode.json')) {
+              & .\validation-theme-t12-display.ps1 -Phase restore -Evidence $env:RESUME_STUDIO_EVIDENCE_OUT
+            }
+          }
+      - name: Preserve native dimensions and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: theme-t12-display
+          path: theme-t12-display/
+          if-no-files-found: error
+          retention-days: 3
