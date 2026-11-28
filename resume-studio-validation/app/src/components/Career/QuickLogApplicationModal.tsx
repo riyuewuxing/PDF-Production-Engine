@@ -1,7 +1,7 @@
 import {useStudioThemeId} from '../../studio-theme/StudioThemeProvider';
 import {surfaceStyle} from '../../studio-theme/surfaces';
 import { BookmarkCheck, Loader2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { localErrorMessage } from '../../lib/apiClient';
 import { careerLedger } from '../../lib/careerLedgerSession';
 import {
@@ -58,6 +58,53 @@ export function QuickLogApplicationModal({
   const refreshingRef=useRef(false);
   const [refreshing,setRefreshing]=useState(false);
   const [feedback, setFeedback] = useState<{kind:'error'|'success'|'warn';message:string} | null>(null);
+  const formRef=useRef<HTMLFormElement>(null);
+  const visible=isOpen&&!!snapshot;
+  const closeRef=useRef(onClose);
+  closeRef.current=onClose;
+  useLayoutEffect(()=>{
+    const form=formRef.current;
+    if(!visible||!form)return;
+    const opener=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    const firstField=()=>form.querySelector<HTMLElement>('input:not([readonly]):not(:disabled)')??form.querySelector<HTMLElement>('button:not(:disabled)')??form;
+    const focusEntry=()=>firstField().focus({preventScroll:true});
+    const locked=()=>submitting.current||refreshingRef.current;
+    focusEntry();
+    const onKey=(e:KeyboardEvent)=>{
+      if(e.isComposing||e.keyCode===229)return;
+      if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&['k','s'].includes(e.key.toLowerCase())){
+        e.preventDefault();e.stopPropagation();return;
+      }
+      if(e.key==='Escape'){
+        e.preventDefault();e.stopPropagation();
+        if(!locked())closeRef.current();
+        return;
+      }
+      if(e.key!=='Tab')return;
+      const items=Array.from(form.querySelectorAll<HTMLElement>('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)')).filter(el=>el.tabIndex>=0&&el.getClientRects().length>0);
+      const index=items.indexOf(document.activeElement as HTMLElement);
+      if(!items.length){e.preventDefault();form.focus({preventScroll:true});return;}
+      if(index<0||(e.shiftKey?index===0:index===items.length-1)){
+        e.preventDefault();e.stopPropagation();
+        (e.shiftKey?items[items.length-1]:items[0])?.focus();
+      }
+    };
+    const onFocus=(e:FocusEvent)=>{if(e.target instanceof Node&&!form.contains(e.target))focusEntry();};
+    document.addEventListener('keydown',onKey,true);
+    document.addEventListener('focusin',onFocus);
+    return()=>{
+      document.removeEventListener('keydown',onKey,true);
+      document.removeEventListener('focusin',onFocus);
+      const active=document.activeElement;
+      if(opener?.isConnected&&!opener.closest('[inert]')&&(!active||active===document.body||form.contains(active)))opener.focus({preventScroll:true});
+    };
+  },[visible]);
+  useLayoutEffect(()=>{
+    const form=formRef.current;
+    if(!visible||!form)return;
+    // A submit/refresh button can become disabled while focused.
+    if(!form.contains(document.activeElement))form.focus({preventScroll:true});
+  },[visible,saving,refreshing]);
 
   useEffect(() => {
     if (!isOpen || !snapshot) return;
@@ -143,7 +190,7 @@ export function QuickLogApplicationModal({
       aria-label="记入投递并锁定永久快照"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
     >
-      <form data-studio-region="quick-log-dialog" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')}
+      <form ref={formRef} tabIndex={-1} data-studio-region="quick-log-dialog" data-studio-surface="panel" data-studio-theme={themeId} style={surfaceStyle(themeId,'panel')}
         onSubmit={(e) => void handleSubmit(e)}
         className="max-h-[90vh] overflow-y-auto w-full max-w-lg rounded-xl border border-slate-700 bg-[#19202c] p-5 text-xs text-slate-100 shadow-2xl space-y-3.5 studio-ui-border studio-ui-surface studio-ui-primary"
       >
