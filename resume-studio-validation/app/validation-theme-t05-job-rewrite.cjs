@@ -116,17 +116,33 @@ async function run(){
       for(let k=1;k<=expected.length;k++){await press('Tab',['shift']);const f=await focused();reverse.push(f);assert(f.inside&&f.label===expected[(origin-k+expected.length)%expected.length],'reverse focus escaped '+id);}
       // Programmatic focus outside is redirected without triggering approval.
       await js('document.querySelector('+JSON.stringify(sourceSel)+').focus();true');assert((await focused()).inside,'background focus escaped');
+      // Verify trusted key events reach this modal and are canceled before window-level shortcuts.
+      await js('window.__t06Keys=[];document.addEventListener("keydown",window.__t06Audit=e=>{if(e.ctrlKey&&["k","s"].includes(e.key.toLowerCase()))window.__t06Keys.push({key:e.key.toLowerCase(),trusted:e.isTrusted,prevented:e.defaultPrevented})},true);true');
       await press('K',['control']);assert(await js('!!document.querySelector('+JSON.stringify(portalSelector)+')&&!document.querySelector(\'[aria-label="全局命令面板"]\')'),'command palette opened over portal');
+      await press('S',['control']);
+      const keyAudit=await js('document.removeEventListener("keydown",window.__t06Audit,true);window.__t06Keys');
+      assert(JSON.stringify(keyAudit)===JSON.stringify([{key:'k',trusted:true,prevented:true},{key:'s',trusted:true,prevented:true}]),'read-only shortcuts not canceled '+JSON.stringify(keyAudit));
+      await noWrite();
+      // Real keyboard scroll of original PDF, not CSS or synthetic scrolling.
+      const scrollSel='[aria-label="原版 PDF 滚动区域"]';
+      const target=await js('(()=>{const e=document.querySelector('+JSON.stringify(scrollSel)+');return {top:e.scrollTop,range:e.scrollHeight-e.clientHeight}})()');
+      assert(target.range>0,'original PDF scroll region has no scrollable content');
+      for(let k=0;k<expected.length&&(await focused()).label!=='原版 PDF 滚动区域';k++)await press('Tab');
+      assert((await focused()).label==='原版 PDF 滚动区域','keyboard cannot reach paper scroll region');
+      await press('PageDown');await until('real keyboard paper scroll',()=>js('document.querySelector('+JSON.stringify(scrollSel)+').scrollTop>'+target.top),2500);
+      const paperScroll=await js('document.querySelector('+JSON.stringify(scrollSel)+').scrollTop');
+      await js('document.querySelector('+JSON.stringify(scrollSel)+').scrollTop=0;true');
       await press('Escape');await until('escape closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
       const returned=await focused();assert(returned.label==='展开全屏 PDF 对照','Escape did not restore opener '+id+' '+JSON.stringify(returned));
       await press('Enter');await until('Enter reopens portal',()=>js('!!document.querySelector('+JSON.stringify(portalSelector)+')'));
       assert((await focused()).label==='关闭全屏对照','reopen focus missing');
-      await click('关闭全屏对照',portalSelector);await until('button closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
+      const rect=await js('(()=>{const b=[...document.querySelector('+JSON.stringify(portalSelector)+').querySelectorAll("button")].find(e=>e.innerText.trim()==="关闭全屏对照"),r=b.getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)}})()');
+      win.webContents.sendInputEvent({type:'mouseDown',...rect,button:'left',clickCount:1});win.webContents.sendInputEvent({type:'mouseUp',...rect,button:'left',clickCount:1});await until('button closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
       const buttonReturn=await focused();assert(buttonReturn.label==='展开全屏 PDF 对照','button did not restore opener');
       await press('Space');await until('Space reopens portal',()=>js('!!document.querySelector('+JSON.stringify(portalSelector)+')'));
       await press('Escape');await until('second Escape closes portal',()=>js('!document.querySelector('+JSON.stringify(portalSelector)+')'));
       assert((await focused()).label==='展开全屏 PDF 对照','repeated focus restoration failed');
-      report.themePortal[id].keyboard={initial,expected,forward,reverse,returned,buttonReturn,backgroundFocusContained:true,shortcutBlocked:true,enterReopen:true,spaceReopen:true,repeatedReturn:true};write();
+      report.themePortal[id].keyboard={initial,expected,forward,reverse,returned,buttonReturn,backgroundFocusContained:true,shortcutBlocked:true,keyAudit,paperScroll,enterReopen:true,spaceReopen:true,repeatedReturn:true};write();
       assert(await applyDisabled(),'closing portal enabled approval');await noWrite();
     }
     await selectTheme('classic');report.checks.themePortalExact=true;report.checks.portalKeyboardGate=true;report.portalKeyboardDiagnostic=themes.map(id=>({id,...report.themePortal[id].keyboard}));write();

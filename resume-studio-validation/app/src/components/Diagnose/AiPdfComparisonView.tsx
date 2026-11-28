@@ -21,7 +21,7 @@ export function AiPdfComparisonView({comparison}:{comparison:AiPdfComparison}){
     focusInitial();
     const onKey=(e:KeyboardEvent)=>{
       if(e.isComposing||e.keyCode===229)return;
-      if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='k'){e.preventDefault();e.stopPropagation();return;}
+      if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&['k','s'].includes(e.key.toLowerCase())){e.preventDefault();e.stopPropagation();return;}
       if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setFull(false);return;}
       if(e.key!=='Tab')return;
       // Explicitly cycle only current enabled controls, including keyboard-scrollable paper regions.
